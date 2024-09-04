@@ -1,0 +1,12 @@
+[submodule "coverage_agents/java"]
+	path = coverage_agents/java
+	url = ../WuppieFuzz-Java.git
+[submodule "coverage_agents/python"]
+	path = coverage_agents/python
+	url = ../WuppieFuzz-Python.git
+[submodule "coverage_agents/javascript"]
+	path = coverage_agents/javascript
+	url = ../WuppieFuzz-Javascript.git
+[submodule "dashboard"]
+	path = dashboard
+	url = ../WuppieFuzz-dashboard.git

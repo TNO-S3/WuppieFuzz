@@ -1,0 +1,4 @@
+mode: cookie
+configuration:
+  set_cookie:
+    a_session_console_legacy: <Cookie value>

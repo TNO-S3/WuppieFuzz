@@ -1,0 +1,40 @@
+## CONFIG FOR USING LCOV TO CREATE COVERAGE REPORTS FOR FUZZING PYTHON CODE
+
+# format used for coverage
+coverage_format: lcov
+
+# Optional total fuzzing time-out in seconds.
+timeout: 60
+
+# If present, ask the coverage monitor to generate a report after the time-out passes.
+report: true
+
+# Must be one of {'json', 'human-readable'}
+output_format: human-readable
+
+## CHANGE TO YOUR OWN PATHS:
+
+# The path to the open api specification of the target.
+openapi_spec: openapi_spec.yaml
+
+# Where is the coverage host running, can be either a hostname or an IP address. Must include a port.
+coverage_host: localhost:6300
+
+# When generating a coverage report, look for source files in this directory
+source_dir: "/my_directory/src/main/java"
+## ADDITIONAL OPTIONAL FIELDS:
+
+## Must be one of {'off', 'error', 'warn', 'info', 'debug', 'trace'}
+# log_level: info
+
+## The path to an initial corpus given in yaml.
+# initial_corpus: corpus_directory
+
+## Per-request time-out in milliseconds. Defaults to 30 seconds.
+# request_timeout: 30000
+
+## If present, reproduces the crash given an input file, then quits.
+# reproduce: test_request.yaml
+
+## How to log in to the API server, if applicable. See login.md.
+# authentication: api_authentication.yaml
