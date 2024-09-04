@@ -85,7 +85,7 @@ coverage reports with LCOV for Python code.
 
 ## Reports
 
-When you WuppieFuzz with the **`--report`** flag, a subdirectory is made inside
+When you WuppieFuzz with the `--report` flag, a subdirectory is made inside
 `reports/` with a timestamp as its name. All supported coverage report(s) are
 written into this subdirectory. There are two types of coverage reports:
 
