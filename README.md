@@ -112,13 +112,7 @@ Grafana dashboard.
 
 For more information on each of these, see the READMEs in these directories.
 
-## Auto documentation
-
-The documentation for this project (latest build) is automatically published in
-GitLab pages
-[here](https://vr.gitlab.tsn.tno.nl/v2009/smart-fuzzing/web-api-fuzzing/wuppiefuzz/doc/wuppiefuzz).
-
-### Generating documentation
+## Generating documentation
 
 `cargo doc --no-deps` to generate documentation from comments in the source
 code. The main page of the documentation will be
