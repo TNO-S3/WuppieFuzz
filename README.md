@@ -14,6 +14,9 @@ supports all three settings of testing (black box, grey box and white box).
 WuppieFuzz was featured in
 [the ONE Conference e-magazine 2024](https://emagazine.one-conference.nl/2024/finally-validate-your-publicly-exposed-interfaces-with-ease/).
 
+> [!NOTE]  
+> For a quick, follow-along guidance please follow the [tutorial](./tutorial)!
+
 ## Prerequisites
 
 To run the project you need to install the following dependencies and tooling
