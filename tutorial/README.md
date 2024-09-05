@@ -152,6 +152,11 @@ the `0.9.x.console.json`.
 The listed specs, however, are in the Swagger 2.x format. We convert these to
 our desired OpenAPI v3 format using the following tool:
 [Swagger to OpenAPI converter](https://converter.swagger.io/#/Converter/convertByContent).
+
+> [!NOTE]  
+> Conversion to OpenAPI v3 format is optional. WuppieFuzz support both v2 and v3
+> specifications.
+
 Once we have our specification in OpenAPI v3 format we must make a final change
 whereby we set the address of the target server. To do this we change the server
 entry to the following:
