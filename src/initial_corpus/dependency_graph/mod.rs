@@ -5,7 +5,6 @@ mod toposort;
 /// as input to other requests (GET artist?id=1). To know which outputs to use for which inputs,
 /// you need a graph that connects possible requests/operations (nodes) by parameters that carry
 /// the same meaning (edges). The dependency graph module attempts to build such a graph.
-
 use std::{
     cmp::Ordering,
     collections::{hash_map::DefaultHasher, HashMap},

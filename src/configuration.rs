@@ -283,13 +283,13 @@ impl Commands {
 
 /// PartialConfiguration is a representation of a fuzzer configuration, obtained from the
 /// CLI or from a configuration file.
-/// 
+///
 /// Partial configurations are only one source, e.g. config file or command line.
 /// You can't make any field mandatory, since then they all need to be specified in both places,
 /// which is counterproductive. The Configuration is combined from the two (many?) Partials
 /// and does have mandatory fields. Therefore creating a Configuration from a PartialConfiguration
 /// using TryFrom can fail.
-/// 
+///
 #[derive(Debug, Default, PartialEq, Eq, Deserialize, Parser)]
 struct PartialConfiguration {
     /// The path to the open api specification of the target. The specification must

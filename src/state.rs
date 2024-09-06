@@ -26,7 +26,7 @@ use libafl_bolts::{
 };
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
-/// 
+///
 /// We have a bespoke one so we're able to pass the api spec to mutators,
 /// which get a reference to the state object as argument to the mutate method.
 #[derive(Serialize, Deserialize, Clone, Debug)]
