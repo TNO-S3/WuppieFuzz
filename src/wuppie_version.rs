@@ -1,10 +1,6 @@
 use std::env;
 use std::process::Command;
 
-// Important: This line is referenced in tbump.toml.
-// Keep any changes in sync with the tbump.toml expression.
-const TBUMP_VERSION: &str = "0.34.2";
-
 pub fn get_wuppie_version() -> String {
     let git_output = Command::new("git").arg("rev-parse").arg("HEAD").output();
     let git_hash = match git_output {
@@ -21,7 +17,7 @@ pub fn get_wuppie_version() -> String {
         Err(_) => "<could not get git hash>".to_string(),
     };
 
-    TBUMP_VERSION.to_string() + &git_hash
+    clap::crate_version!().to_string() + &git_hash
 }
 
 pub fn print_version() {
