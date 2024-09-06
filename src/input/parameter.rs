@@ -14,11 +14,11 @@ use super::new_rand_input;
 /// Structs that help describe parameters to HTTP requests in a way that the fuzzer can still
 /// mutate and reason about. The ParameterKind enum describes the places a parameter can occur
 /// (query, header etc.);
-/// 
+///
 /// the Kind together with the parameter name must be unique within a request/operation.
 /// The ParameterContents enum describes the different kinds of value a parameter can take,
 /// e.g. an array, or a string, or a reference to the output of a previous request.
-/// 
+///
 /// See also: dependency graph module
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
