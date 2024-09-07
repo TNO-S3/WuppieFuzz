@@ -9,7 +9,7 @@ use libafl::{
 };
 use libafl_bolts::rands::Rand;
 use libafl_bolts::Named;
-use std::convert::TryInto;
+use std::{borrow::Cow, convert::TryInto};
 
 /// The `DifferentPathMutator` changes an existing request from the series
 /// to use a different path-plus-method-combination. Only combinations available
@@ -31,8 +31,8 @@ impl Default for DifferentPathMutator {
 }
 
 impl Named for DifferentPathMutator {
-    fn name(&self) -> &str {
-        "differentpathmutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("differentpathmutator")
     }
 }
 
@@ -40,19 +40,14 @@ impl<S> Mutator<OpenApiInput, S> for DifferentPathMutator
 where
     S: HasRandAndOpenAPI,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         let (rand, api) = state.rand_mut_and_openapi();
         if input.0.is_empty() || api.operations().count() < 2 {
             return Ok(MutationResult::Skipped);
         }
-        let random_input = rand.choose(&mut input.0);
+        let random_input = rand.choose(&mut input.0).unwrap();
         for _ in 0..100 {
-            let n_ops = api.operations().count() as u64;
+            let n_ops = api.operations().count();
             let new_path_i = rand.below(n_ops) as usize;
             {
                 let (new_path, new_method, _, _) = api.operations().nth(new_path_i).unwrap();

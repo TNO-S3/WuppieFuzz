@@ -10,6 +10,9 @@ ahash 0.8.11
 aho-corasick 1.1.3
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
+allocator-api2 0.2.18
+	licensed under "Apache-2.0 OR MIT"
+	by Zakarum <zaq.dev@icloud.com>
 android-tzdata 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by RumovZ
@@ -73,6 +76,9 @@ c2rust-bitfields-derive 0.18.0
 cassowary 0.3.0
 	licensed under "Apache-2.0 OR MIT"
 	by Dylan Ede <dylanede@googlemail.com>
+castaway 0.2.3
+	licensed under "MIT"
+	by Stephen M. Coakley <me@stephencoakley.com>
 cesu8 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Eric Kidd <git@randomhacks.net>
@@ -100,9 +106,21 @@ cobs 0.2.3
 colorchoice 1.0.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
+compact_str 0.7.1
+	licensed under "MIT"
+	by Parker Timmerman <parker@parkertimmerman.com>
 console 0.15.8
 	licensed under "MIT"
 	by Armin Ronacher <armin.ronacher@active-4.com>
+const_format 0.2.33
+	licensed under "Zlib"
+	by rodrimati1992 <rodrimatt1985@gmail.com>
+const_format_proc_macros 0.2.33
+	licensed under "Zlib"
+	by rodrimati1992 <rodrimatt1985@gmail.com>
+const_panic 0.2.9
+	licensed under "Zlib"
+	by rodrimati1992 <rodrimatt1985@gmail.com>
 cookie 0.17.0
 	licensed under "Apache-2.0 OR MIT"
 	by Sergio Benitez <sb@sergio.bz>|Alex Crichton <alex@alexcrichton.com>
@@ -133,9 +151,6 @@ ctor 0.2.8
 ctrlc 3.4.4
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
-dashmap 5.5.3
-	licensed under "MIT"
-	by Acrimon <joel.wejdenstal@gmail.com>
 deranged 0.3.11
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
@@ -163,7 +178,7 @@ env_logger 0.11.5
 equivalent 1.0.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-erased-serde 0.3.31
+erased-serde 0.4.5
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 errno 0.3.9
@@ -229,16 +244,13 @@ hashbrown 0.14.5
 hashlink 0.9.1
 	licensed under "Apache-2.0 OR MIT"
 	by kyren <kerriganw@gmail.com>
-heck 0.4.1
-	licensed under "Apache-2.0 OR MIT"
-	by Without Boats <woboats@gmail.com>
 heck 0.5.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 hermit-abi 0.3.9
 	licensed under "Apache-2.0 OR MIT"
 	by Stefan Lankes
-hostname 0.3.1
+hostname 0.4.0
 	licensed under "MIT"
 	by fengcen <fengcen.love@gmail.com>|svartalf <self@svartalf.info>
 http 1.1.0
@@ -289,9 +301,6 @@ indexmap 2.2.6
 indicatif 0.17.8
 	licensed under "MIT"
 	by unspecified authors
-indoc 2.0.5
-	licensed under "Apache-2.0 OR MIT"
-	by David Tolnay <dtolnay@gmail.com>
 instant 0.1.13
 	licensed under "BSD-3-Clause"
 	by sebcrozet <developer@crozet.re>
@@ -304,7 +313,10 @@ is_terminal_polyfill 1.70.1
 iter-read 1.0.1
 	licensed under "Apache-2.0 OR MIT"
 	by Georg Brandl <georg@python.org>
-itertools 0.11.0
+itertools 0.12.1
+	licensed under "Apache-2.0 OR MIT"
+	by bluss
+itertools 0.13.0
 	licensed under "Apache-2.0 OR MIT"
 	by bluss
 itoa 1.0.11
@@ -325,13 +337,13 @@ lazy_static 1.5.0
 lcov 0.8.1
 	licensed under "Apache-2.0 OR MIT"
 	by gifnksm <makoto.nksm+github@gmail.com>
-libafl 0.11.2
+libafl 0.13.2
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libafl_bolts 0.11.2
+libafl_bolts 0.13.2
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libafl_derive 0.11.2
+libafl_derive 0.13.2
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>
 libc 0.2.155
@@ -355,16 +367,19 @@ lock_api 0.4.12
 log 0.4.22
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-match_cfg 0.1.0
-	licensed under "Apache-2.0 OR MIT"
-	by gnzlbg <gonzalobg88@gmail.com>
+lru 0.12.4
+	licensed under "MIT"
+	by Jerome Froelich <jeromefroelic@hotmail.com>
+mach 0.3.2
+	licensed under "BSD-2-Clause"
+	by Nick Fitzgerald <fitzgen@gmail.com>|David Cuddeback <david.cuddeback@gmail.com>|Gonzalo Brito Gadeschi <gonzalobg88@gmail.com>
 memchr 2.7.4
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>|bluss
 meminterval 0.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>
-memoffset 0.7.1
+memoffset 0.9.1
 	licensed under "MIT"
 	by Gilad Naaman <gilad.naaman@gmail.com>
 mime 0.3.17
@@ -382,10 +397,10 @@ mio 1.0.1
 native-tls 0.2.12
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
-nix 0.26.4
+nix 0.28.0
 	licensed under "MIT"
 	by The nix-rust Project Developers
-nix 0.28.0
+nix 0.29.0
 	licensed under "MIT"
 	by The nix-rust Project Developers
 num 0.4.3
@@ -508,7 +523,7 @@ rand_core 0.6.4
 rand_regex 0.17.0
 	licensed under "MIT"
 	by kennytm <kennytm@gmail.com>
-ratatui 0.23.0
+ratatui 0.26.3
 	licensed under "MIT"
 	by Florian Dehau <work@fdehau.com>|The Ratatui Developers
 redox_syscall 0.5.3
@@ -562,12 +577,18 @@ ryu 1.0.18
 same-file 1.0.6
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
+scc 2.1.16
+	licensed under "Apache-2.0"
+	by wvwwvwwv <wvwwvwwv@me.com>
 schannel 0.1.23
 	licensed under "MIT"
 	by Steven Fackler <sfackler@gmail.com>|Steffen Butzer <steffen.butzer@outlook.com>
 scopeguard 1.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by bluss
+sdd 3.0.2
+	licensed under "Apache-2.0"
+	by wvwwvwwv <wvwwvwwv@me.com>
 security-framework 2.11.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>
@@ -589,10 +610,10 @@ serde_urlencoded 0.7.1
 serde_yaml 0.8.26
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-serial_test 2.0.0
+serial_test 3.1.1
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
-serial_test_derive 2.0.0
+serial_test_derive 3.1.1
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
 signal-hook 0.3.17
@@ -616,13 +637,19 @@ socket2 0.5.7
 spin 0.9.8
 	licensed under "MIT"
 	by Mathijs van de Nes <git@mathijs.vd-nes.nl>|John Ericson <git@JohnEricson.me>|Joshua Barretto <joshua.s.barretto@gmail.com>
+stability 0.2.1
+	licensed under "MIT"
+	by Stephen M. Coakley <me@stephencoakley.com>
+static_assertions 1.1.0
+	licensed under "Apache-2.0 OR MIT"
+	by Nikolai Vazquez
 strsim 0.11.1
 	licensed under "MIT"
 	by Danny Guo <danny@dannyguo.com>|maxbachmann <oss@maxbachmann.de>
-strum 0.25.0
+strum 0.26.3
 	licensed under "MIT"
 	by Peter Glotfelty <peter.glotfelty@microsoft.com>
-strum_macros 0.25.3
+strum_macros 0.26.4
 	licensed under "MIT"
 	by Peter Glotfelty <peter.glotfelty@microsoft.com>
 subtle 2.6.1
@@ -700,12 +727,21 @@ try-lock 0.2.5
 tuple_list 0.1.3
 	licensed under "MIT"
 	by Valerii Lashmanov <vflashm@gmail.com>
-typed-builder 0.16.2
+typed-builder 0.18.2
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
-typed-builder-macro 0.16.2
+typed-builder-macro 0.18.2
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
+typeid 1.0.2
+	licensed under "Apache-2.0 OR MIT"
+	by David Tolnay <dtolnay@gmail.com>
+typewit 1.9.0
+	licensed under "Zlib"
+	by rodrimati1992 <rodrimatt1985@gmail.com>
+typewit_proc_macros 1.8.1
+	licensed under "Zlib"
+	by rodrimati1992 <rodrimatt1985@gmail.com>
 uds 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
@@ -721,9 +757,15 @@ unicode-normalization 0.1.23
 unicode-segmentation 1.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
+unicode-truncate 1.1.0
+	licensed under "Apache-2.0 OR MIT"
+	by Aetf <aetf@unlimitedcodeworks.xyz>
 unicode-width 0.1.13
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
+unicode-xid 0.2.5
+	licensed under "Apache-2.0 OR MIT"
+	by erick.tryzelaar <erick.tryzelaar@gmail.com>|kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
 untrusted 0.9.0
 	licensed under "ISC"
 	by Brian Smith <brian@briansmith.org>
@@ -788,6 +830,9 @@ winapi-x86_64-pc-windows-gnu 0.4.0
 	licensed under "Apache-2.0 OR MIT"
 	by Peter Atashian <retep998@gmail.com>
 windows 0.51.1
+	licensed under "Apache-2.0 OR MIT"
+	by Microsoft
+windows 0.52.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows-core 0.51.1

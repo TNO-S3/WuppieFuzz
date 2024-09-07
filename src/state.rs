@@ -8,16 +8,17 @@ use std::{
 };
 
 use libafl::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCurrentCorpusId},
     feedbacks::Feedback,
     inputs::Input,
     prelude::{CorpusId, HasTestcase, Testcase, UsesInput},
     schedulers::powersched::SchedulerMetadata,
+    stages::{HasCurrentStage, StageId},
     state::{
-        HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasMaxSize, HasMetadata,
-        HasNamedMetadata, HasRand, HasSolutions, HasStartTime, State,
+        HasCorpus, HasExecutions, HasImported, HasLastFoundTime, HasLastReportTime, HasMaxSize,
+        HasRand, HasSolutions, HasStartTime, State, Stoppable,
     },
-    Error,
+    Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{
     bolts_prelude::StdRand,
@@ -39,19 +40,25 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
     /// RNG instance
     rand: R,
     /// How many times the executor ran the harness/target
-    executions: usize,
+    executions: u64,
     /// At what time the fuzzing started
     start_time: Duration,
     /// The corpus
     corpus: C,
-    // Solutions corpus
+    /// Solutions corpus
     solutions: SC,
+    /// The current stage
+    current_stage: Option<StageId>,
+    /// The current corpus Id
+    current_corpus_id: Option<CorpusId>,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
     /// Metadata stored with names
     named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
+    /// The last something new was found
+    last_found_time: Duration,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -66,6 +73,54 @@ where
     SC: Corpus<Input = Self::Input>,
     Self: UsesInput,
 {
+}
+
+impl<I, C, R, SC> HasCurrentStage for OpenApiFuzzerState<I, C, R, SC> {
+    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error> {
+        self.current_stage = Some(idx);
+        Ok(())
+    }
+
+    fn clear_stage(&mut self) -> Result<(), Error> {
+        self.current_stage = None;
+        Ok(())
+    }
+
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
+        Ok(self.current_stage)
+    }
+}
+
+impl<I, C, R, SC> HasCurrentCorpusId for OpenApiFuzzerState<I, C, R, SC> {
+    fn set_corpus_id(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.current_corpus_id = Some(id);
+        Ok(())
+    }
+
+    fn clear_corpus_id(&mut self) -> Result<(), Error> {
+        self.current_corpus_id = None;
+        Ok(())
+    }
+
+    fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error> {
+        Ok(self.current_corpus_id)
+    }
+}
+
+impl<I, C, R, SC> Stoppable for OpenApiFuzzerState<I, C, R, SC>
+where
+    R: Rand,
+    Self: UsesInput,
+{
+    fn stop_requested(&self) -> bool {
+        false
+    }
+
+    fn request_stop(&mut self) {
+        todo!("Stopping not implemented")
+    }
+
+    fn discard_stop_request(&mut self) {}
 }
 
 impl<I, C, R, SC> HasRand for OpenApiFuzzerState<I, C, R, SC>
@@ -187,13 +242,13 @@ where
 {
     /// The executions counter
     #[inline]
-    fn executions(&self) -> &usize {
+    fn executions(&self) -> &u64 {
         &self.executions
     }
 
     /// The executions counter (mut)
     #[inline]
-    fn executions_mut(&mut self) -> &mut usize {
+    fn executions_mut(&mut self) -> &mut u64 {
         &mut self.executions
     }
 }
@@ -274,6 +329,16 @@ impl<C, I, R, SC> HasImported for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
+impl<C, I, R, SC> HasLastFoundTime for OpenApiFuzzerState<I, C, R, SC> {
+    fn last_found_time(&self) -> &Duration {
+        &self.last_found_time
+    }
+
+    fn last_found_time_mut(&mut self) -> &mut Duration {
+        &mut self.last_found_time
+    }
+}
+
 impl<C, I, R, SC> OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
@@ -307,6 +372,9 @@ where
             remaining_initial_files: None,
             phantom: PhantomData,
             api,
+            current_stage: None,
+            current_corpus_id: None,
+            last_found_time: Duration::default(),
         };
         state.add_metadata(SchedulerMetadata::new(None));
 
@@ -366,11 +434,11 @@ where
 }
 
 impl<I> HasExecutions for NopState<I> {
-    fn executions(&self) -> &usize {
+    fn executions(&self) -> &u64 {
         unimplemented!()
     }
 
-    fn executions_mut(&mut self) -> &mut usize {
+    fn executions_mut(&mut self) -> &mut u64 {
         unimplemented!()
     }
 }
@@ -408,3 +476,50 @@ impl<I> HasImported for NopState<I> {
 }
 
 impl<I> State for NopState<I> where I: Input {}
+
+impl<I> Stoppable for NopState<I>
+where
+    I: Input,
+{
+    fn stop_requested(&self) -> bool {
+        false
+    }
+
+    fn request_stop(&mut self) {}
+
+    fn discard_stop_request(&mut self) {}
+}
+
+impl<I> HasCurrentStage for NopState<I>
+where
+    I: Input,
+{
+    fn set_current_stage_idx(&mut self, _idx: StageId) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn clear_stage(&mut self) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
+        Ok(None)
+    }
+}
+
+impl<I> HasCurrentCorpusId for NopState<I>
+where
+    I: Input,
+{
+    fn set_corpus_id(&mut self, _id: CorpusId) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn clear_corpus_id(&mut self) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error> {
+        Ok(None)
+    }
+}

@@ -2,18 +2,22 @@ use anyhow::{Context, Result};
 
 use libafl::corpus::Corpus;
 use libafl::events::EventFirer;
-use libafl::executors::inprocess::inprocess_get_event_manager;
+use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
 use libafl::feedbacks::TimeFeedback;
 use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
 use libafl::observers::TimeObserver;
-use libafl::prelude::{BytesInput, DifferentIsNovel, Executor, Feedback, MapFeedback, MaxReducer};
+use libafl::prelude::{
+    BytesInput, CanTrack, DifferentIsNovel, Executor, ExplicitTracking, Feedback, MapFeedback,
+    MaxReducer,
+};
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
 use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasExecutions, HasNamedMetadata, State};
+use libafl::state::{HasExecutions, State};
 use libafl::{feedback_or, ExecutionProcessor};
+use libafl::{ExecuteInputResult, HasNamedMetadata};
 
 use libafl_bolts::current_time;
 use openapiv3::OpenAPI;
@@ -31,6 +35,7 @@ use libafl::{
     observers::StdMapObserver,
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
+use std::borrow::Cow;
 
 use std::fs::create_dir_all;
 use std::path::PathBuf;
@@ -92,7 +97,7 @@ pub fn fuzz() -> Result<()> {
     let mut collective_feedback = feedback_or!(
         endpoint_feedback,
         coverage_feedback, // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -125,11 +130,10 @@ pub fn fuzz() -> Result<()> {
     )?;
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(
-        &mut state,
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &coverage_observer,
-        PowerSchedule::FAST,
-    ));
+        PowerQueueScheduler::new(&mut state, &coverage_observer, PowerSchedule::FAST),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
@@ -273,13 +277,13 @@ pub fn fuzz() -> Result<()> {
             .cloned_input_for_id(input_id)
             .expect("Failed to load input");
         executor.run_target(&mut fuzzer, &mut state, &mut mgr, &input)?;
+        // TODO: The exec_res should be correct here
         fuzzer.process_execution(
             &mut state,
             &mut mgr,
-            input,
+            &input,
+            &ExecuteInputResult::Corpus,
             &collective_observer,
-            &ExitKind::Ok,
-            true,
         )?;
     }
 
@@ -325,7 +329,7 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
     api: OpenAPI,
 ) -> (
     Arc<Mutex<EndpointCoverageClient>>,
-    StdMapObserver<'a, u8, false>,
+    ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>,
     impl Feedback<S>,
 ) {
     let mut endpoint_coverage = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
@@ -336,34 +340,43 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
     // assume they have designed their algorithms for this to work correctly.
     let endpoint_observer = unsafe {
         StdMapObserver::from_mut_ptr("signals", endpoint_coverage.get_coverage_ptr(), MAP_SIZE)
+            .track_novelties()
     };
-    let endpoint_feedback = MaxMapFeedback::tracking(&endpoint_observer, false, true);
+    let endpoint_feedback = MaxMapFeedback::new(&endpoint_observer);
     (endpoint_coverage, endpoint_observer, endpoint_feedback)
 }
 
-type LineCovClientObserverFeedback<'a, S> = (
+type LineCovClientObserverFeedback<'a> = (
     Box<dyn CoverageClient>,
-    StdMapObserver<'a, u8, false>,
-    MapFeedback<DifferentIsNovel, StdMapObserver<'a, u8, false>, MaxReducer, S, u8>,
+    ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
+    MapFeedback<
+        ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
+        DifferentIsNovel,
+        StdMapObserver<'a, u8, false>,
+        MaxReducer,
+        u8,
+    >,
 );
 
 /// Sets up the line coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
-fn setup_line_coverage<'a, S: State + HasNamedMetadata>(
+fn setup_line_coverage<'a>(
     config: &'static Configuration,
     report_path: &Option<PathBuf>,
-) -> Result<LineCovClientObserverFeedback<'a, S>, anyhow::Error> {
+) -> Result<LineCovClientObserverFeedback<'a>, anyhow::Error> {
     let mut coverage_client: Box<dyn CoverageClient> =
         crate::coverage_clients::get_coverage_client(config, report_path)?;
     coverage_client.fetch_coverage(true);
     let coverage_observer = unsafe {
         StdMapObserver::from_mut_ptr(
-            "signals",
+            Cow::Borrowed("signals"),
             coverage_client.get_coverage_ptr(),
             coverage_client.get_coverage_len(),
         )
-    };
-    let coverage_feedback = MaxMapFeedback::tracking(&coverage_observer, true, true);
+    }
+    .track_indices()
+    .track_novelties();
+    let coverage_feedback = MaxMapFeedback::new(&coverage_observer);
     Ok((coverage_client, coverage_observer, coverage_feedback))
 }
 
@@ -457,7 +470,7 @@ fn update_coverage<F: FnMut(String)>(
         if let Err(e) = event_manager.fire(
             &mut state,
             Event::UpdateUserStats {
-                name: "coverage".to_string(),
+                name: Cow::Borrowed("coverage"),
                 value: UserStats::new(cov_stats, AggregatorOps::None),
                 phantom: PhantomData,
             },
@@ -472,7 +485,7 @@ fn update_coverage<F: FnMut(String)>(
         if let Err(e) = event_manager.fire(
             &mut state,
             Event::UpdateUserStats {
-                name: "endpoint_coverage".to_string(),
+                name: Cow::Borrowed("endpoint_coverage"),
                 value: UserStats::new(end_cov_stats, AggregatorOps::None),
                 phantom: PhantomData,
             },
@@ -491,7 +504,7 @@ fn update_coverage<F: FnMut(String)>(
         if let Err(e) = event_manager.fire(
             &mut state,
             Event::UpdateUserStats {
-                name: "requests".to_string(),
+                name: Cow::Borrowed("requests"),
                 value: UserStats::new(req_stats, AggregatorOps::None),
                 phantom: PhantomData,
             },

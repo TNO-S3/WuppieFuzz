@@ -1,5 +1,7 @@
 //! Mutates a request series by swapping two requests.
 
+use std::borrow::Cow;
+
 use crate::input::OpenApiInput;
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -28,8 +30,8 @@ impl Default for SwapRequestsMutator {
 }
 
 impl Named for SwapRequestsMutator {
-    fn name(&self) -> &str {
-        "swaprequestsmutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("swaprequestsmutator")
     }
 }
 
@@ -37,19 +39,14 @@ impl<S> Mutator<OpenApiInput, S> for SwapRequestsMutator
 where
     S: HasRand,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         if input.0.len() < 2 {
             return Ok(MutationResult::Skipped);
         }
-        let random_index1 = state.rand_mut().below(input.0.len() as u64) as usize;
+        let random_index1 = state.rand_mut().below(input.0.len()) as usize;
         let mut random_index2 = random_index1;
         while random_index2 == random_index1 {
-            random_index2 = state.rand_mut().below(input.0.len() as u64) as usize;
+            random_index2 = state.rand_mut().below(input.0.len()) as usize;
         }
         input.0.swap(random_index1, random_index2);
 

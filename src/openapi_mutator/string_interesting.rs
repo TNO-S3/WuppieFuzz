@@ -1,8 +1,10 @@
 //! Mutates a string parameter value by inserting certain special values in it
 //! that are designed to trigger certain classes of bugs.
 
+use std::borrow::Cow;
+
 use libafl::{
-    inputs::{BytesInput, HasBytesVec},
+    inputs::{BytesInput, HasMutatorBytes},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
@@ -31,8 +33,8 @@ impl Default for StringInterestingMutator {
 }
 
 impl Named for StringInterestingMutator {
-    fn name(&self) -> &str {
-        "StringInterestingMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("StringInterestingMutator")
     }
 }
 
@@ -40,16 +42,9 @@ impl<S> Mutator<BytesInput, S> for StringInterestingMutator
 where
     S: HasRand,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut BytesInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
-        input.bytes_mut().clear();
-        input
-            .bytes_mut()
-            .extend_from_slice(state.rand_mut().choose(INTERESTING_STR));
+    fn mutate(&mut self, state: &mut S, input: &mut BytesInput) -> Result<MutationResult, Error> {
+        input.resize(0, 0);
+        input.extend(state.rand_mut().choose(INTERESTING_STR).unwrap());
         Ok(MutationResult::Mutated)
     }
 }
