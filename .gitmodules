@@ -1,12 +1,12 @@
 [submodule "coverage_agents/java"]
 	path = coverage_agents/java
-	url = https://github.com/TNO-S3/WuppieFuzz-Java.git
+	url = ../../TNO-S3/WuppieFuzz-Java.git
 [submodule "coverage_agents/python"]
 	path = coverage_agents/python
-	url = https://github.com/TNO-S3/WuppieFuzz-Python.git
+	url = ../../TNO-S3/WuppieFuzz-Python.git
 [submodule "coverage_agents/javascript"]
 	path = coverage_agents/javascript
-	url = https://github.com/TNO-S3/WuppieFuzz-Javascript.git
+	url = ../../TNO-S3/WuppieFuzz-Javascript.git
 [submodule "dashboard"]
 	path = dashboard
-	url = https://github.com/TNO-S3/WuppieFuzz-dashboard.git
+	url = ../../TNO-S3/WuppieFuzz-dashboard.git
