@@ -329,7 +329,10 @@ pub fn fuzz() -> Result<()> {
             error!("Err: failed to fire event{:?}", e)
         }
         if manual_interrupt.load(Ordering::Relaxed) {
-            break;
+            if let Err(e) = mgr.fire(&mut state, Event::Stop) {
+                error!("Err: failed to fire event{:?}", e);
+                break;
+            }
         }
     }
 
