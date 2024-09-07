@@ -15,7 +15,7 @@ use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
 use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasExecutions, State};
+use libafl::state::{HasCorpus, HasExecutions, State};
 use libafl::{feedback_or, ExecutionProcessor};
 use libafl::{ExecuteInputResult, HasNamedMetadata};
 
@@ -270,24 +270,42 @@ pub fn fuzz() -> Result<()> {
 
     let manual_interrupt = setup_interrupt()?;
 
-    // Force load inputs into corpus
+    // Fire an event to print the initial corpus size
+    let corpus_size = state.corpus().count();
+    let executions = *state.executions();
+    if let Err(e) = mgr.fire(
+        &mut state,
+        Event::NewTestcase {
+            input: OpenApiInput(vec![]),
+            observers_buf: None,
+            exit_kind: ExitKind::Ok,
+            corpus_size,
+            client_config: mgr.configuration(),
+            time: current_time(),
+            executions,
+            forward_id: None,
+        },
+    ) {
+        error!("Err: failed to fire event{:?}", e)
+    }
+
+    // Executed every corpus entry at least once for gathering a proper view on the initial coverage as mutations
     log::debug!("Start initial corpus loop");
     for input_id in initial_corpus_cloned.ids() {
         let input = initial_corpus_cloned
             .cloned_input_for_id(input_id)
             .expect("Failed to load input");
         executor.run_target(&mut fuzzer, &mut state, &mut mgr, &input)?;
-        // TODO: The exec_res should be correct here
         fuzzer.process_execution(
             &mut state,
             &mut mgr,
             &input,
-            &ExecuteInputResult::Corpus,
+            &ExecuteInputResult::None,
             &collective_observer,
         )?;
     }
 
-    log::debug!("start fuzzing loop");
+    log::debug!("Start fuzzing loop");
     let maybe_timeout_secs = config.timeout.map(|t| Duration::from_secs(t.get()));
     let starting_time = Instant::now();
     // check for timeout if applicable

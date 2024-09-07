@@ -85,14 +85,21 @@ where
                     event_msg,
                     format_duration_hms(&(current_time() - self.start_time)),
                     self.objective_size(),
-                                )
+                )
             } else if event_msg == "Testcase" {
-                    format!(
-                        "[{}] The testing corpus expanded! After run time: {}, total corpus size: {}",
-                        event_msg,
-                        format_duration_hms(&(current_time() - self.start_time)),
-                        self.corpus_size(),
-                        )
+                match self.total_execs() {
+                    0 => format!(
+                            "[{}] Starting corpus loaded! Initial corpus size: {}",
+                            event_msg,
+                            self.corpus_size(),
+                        ),
+                    _ => format!(
+                            "[{}] The testing corpus expanded! After run time: {}, total corpus size: {}",
+                            event_msg,
+                            format_duration_hms(&(current_time() - self.start_time)),
+                            self.corpus_size(),
+                        ),
+                }
             } else {
                 format!(
                     "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}",
