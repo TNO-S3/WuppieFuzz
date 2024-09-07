@@ -45,7 +45,7 @@ where
         if input.0.len() < 2 {
             return Ok(MutationResult::Skipped);
         }
-        let random_index = state.rand_mut().below(input.0.len()) as usize;
+        let random_index = state.rand_mut().below(input.0.len());
         input.0.remove(random_index);
 
         // Don't forget to fix up the `ParameterContents::Reference`s contained in the

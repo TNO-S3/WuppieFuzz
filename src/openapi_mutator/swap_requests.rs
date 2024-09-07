@@ -43,10 +43,10 @@ where
         if input.0.len() < 2 {
             return Ok(MutationResult::Skipped);
         }
-        let random_index1 = state.rand_mut().below(input.0.len()) as usize;
+        let random_index1 = state.rand_mut().below(input.0.len());
         let mut random_index2 = random_index1;
         while random_index2 == random_index1 {
-            random_index2 = state.rand_mut().below(input.0.len()) as usize;
+            random_index2 = state.rand_mut().below(input.0.len());
         }
         input.0.swap(random_index1, random_index2);
 

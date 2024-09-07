@@ -43,7 +43,7 @@ where
         if input.0.is_empty() {
             return Ok(MutationResult::Skipped);
         }
-        let random_index = state.rand_mut().below(input.0.len()) as usize;
+        let random_index = state.rand_mut().below(input.0.len());
         input
             .0
             .insert(random_index + 1, input.0[random_index].clone());
