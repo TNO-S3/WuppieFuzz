@@ -57,7 +57,7 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
     named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
-    /// The last something new was found
+    /// The last time something new was found
     last_found_time: Duration,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
