@@ -360,8 +360,12 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
     // this is only possible if it does not touch the map while the harness is running. We must
     // assume they have designed their algorithms for this to work correctly.
     let endpoint_observer = unsafe {
-        StdMapObserver::from_mut_ptr("signals", endpoint_coverage.get_coverage_ptr(), MAP_SIZE)
-            .track_novelties()
+        StdMapObserver::from_mut_ptr(
+            "endpoint_coverage",
+            endpoint_coverage.get_coverage_ptr(),
+            MAP_SIZE,
+        )
+        .track_novelties()
     };
     let endpoint_feedback = MaxMapFeedback::new(&endpoint_observer);
     (endpoint_coverage, endpoint_observer, endpoint_feedback)
@@ -390,7 +394,7 @@ fn setup_line_coverage<'a>(
     coverage_client.fetch_coverage(true);
     let coverage_observer = unsafe {
         StdMapObserver::from_mut_ptr(
-            Cow::Borrowed("signals"),
+            "code_coverage",
             coverage_client.get_coverage_ptr(),
             coverage_client.get_coverage_len(),
         )
