@@ -3,14 +3,12 @@ use anyhow::{Context, Result};
 use libafl::corpus::Corpus;
 use libafl::events::EventFirer;
 use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
-use libafl::feedbacks::TimeFeedback;
+use libafl::executors::{Executor, HasObservers};
+use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
+use libafl::inputs::BytesInput;
 use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
-use libafl::observers::TimeObserver;
-use libafl::prelude::{
-    BytesInput, CanTrack, DifferentIsNovel, Executor, ExplicitTracking, Feedback, HasObservers,
-    MapFeedback, MaxReducer,
-};
+use libafl::observers::{CanTrack, ExplicitTracking, TimeObserver};
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
@@ -23,7 +21,6 @@ use libafl_bolts::current_time;
 use openapiv3::OpenAPI;
 
 use core::marker::PhantomData;
-use std::ops::DerefMut;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
@@ -37,6 +34,7 @@ use libafl::{
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
 use std::borrow::Cow;
+use std::ops::DerefMut;
 
 use std::fs::create_dir_all;
 use std::path::PathBuf;

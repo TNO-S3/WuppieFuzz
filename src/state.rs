@@ -8,10 +8,9 @@ use std::{
 };
 
 use libafl::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     feedbacks::Feedback,
-    inputs::Input,
-    prelude::{CorpusId, HasTestcase, Testcase, UsesInput},
+    inputs::{Input, UsesInput},
     schedulers::powersched::SchedulerMetadata,
     stages::{HasCurrentStage, StageId},
     state::{
