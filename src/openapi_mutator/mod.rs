@@ -247,9 +247,12 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
         let x_sgn = x.signum();
         x *= x_sgn;
         let x_int = x.round() as u64;
-        let x_int_new = state
-            .rand_mut()
-            .below(x_int.saturating_mul(4).try_into().unwrap());
+        let x_int_new = match x_int {
+            0 => 0,
+            _ => state
+                .rand_mut()
+                .below(x_int.saturating_mul(4).try_into().unwrap()),
+        };
         let n_new = serde_json::value::Number::from_f64((x_int_new as f64) - 2.0 * x);
         if let Some(n_new) = n_new {
             *n = n_new;
