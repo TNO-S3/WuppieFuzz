@@ -49,7 +49,7 @@ use log::{error, info, warn};
 use crate::coverage_clients::endpoint::EndpointCoverageClient;
 use crate::{
     configuration::{Configuration, CrashCriterion},
-    coverage_clients::{CoverageClient, MAP_SIZE},
+    coverage_clients::CoverageClient,
     input::OpenApiInput,
     monitors::CoverageMonitor,
     openapi::{
@@ -364,7 +364,7 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
         StdMapObserver::from_mut_ptr(
             "endpoint_coverage",
             endpoint_coverage.get_coverage_ptr(),
-            MAP_SIZE,
+            endpoint_coverage.get_coverage_len(),
         )
         .track_novelties()
     };
