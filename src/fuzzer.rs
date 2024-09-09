@@ -45,7 +45,7 @@ use log::{error, info, warn};
 use crate::coverage_clients::endpoint::EndpointCoverageClient;
 use crate::{
     configuration::{Configuration, CrashCriterion},
-    coverage_clients::{CoverageClient, MAP_SIZE},
+    coverage_clients::CoverageClient,
     input::OpenApiInput,
     monitors::CoverageMonitor,
     openapi::{
@@ -335,7 +335,7 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
     // this is only possible if it does not touch the map while the harness is running. We must
     // assume they have designed their algorithms for this to work correctly.
     let endpoint_observer = unsafe {
-        StdMapObserver::from_mut_ptr("signals", endpoint_coverage.get_coverage_ptr(), MAP_SIZE)
+        StdMapObserver::from_mut_ptr("signals", endpoint_coverage.get_coverage_ptr(), endpoint_coverage.get_coverage_len())
     };
     let endpoint_feedback = MaxMapFeedback::tracking(&endpoint_observer, false, true);
     (endpoint_coverage, endpoint_observer, endpoint_feedback)
