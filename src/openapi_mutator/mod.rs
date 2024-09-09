@@ -214,24 +214,23 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
     // A small chance to get a special value that might just lead to interesting errors
     match state.rand_mut().below(100) {
         0 => {
-            *n = 0.into();
-            return MutationResult::Mutated;
-        }
-        1 => {
             *n = (-1).into();
             return MutationResult::Mutated;
         }
-        2 => {
+        1 => {
             *n = u64::MAX.into();
             return MutationResult::Mutated;
         }
         _ => (),
     };
     if let Some(x) = n.as_u64() {
-        *n = state
-            .rand_mut()
-            .below(x.saturating_mul(2).try_into().unwrap())
-            .into();
+        *n = match x {
+            0 => 0.into(),
+            _ => state
+                .rand_mut()
+                .below(x.saturating_mul(2).try_into().unwrap())
+                .into(),
+        };
         return MutationResult::Mutated;
     };
     if let Some(x) = n.as_i64() {
