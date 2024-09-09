@@ -15,7 +15,7 @@ use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
 use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasCorpus, HasExecutions, State};
+use libafl::state::{HasCorpus, HasExecutions, NopState, State};
 use libafl::{feedback_or, ExecutionProcessor};
 use libafl::{ExecuteInputResult, HasNamedMetadata};
 
@@ -61,7 +61,7 @@ use crate::{
     openapi_mutator::havoc_mutations_openapi,
     parameter_feedback::ParameterFeedback,
     reporting::Reporting,
-    state::{NopState, OpenApiFuzzerState},
+    state::OpenApiFuzzerState,
 };
 
 /// Main fuzzer function.
