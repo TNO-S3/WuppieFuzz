@@ -8,8 +8,8 @@ use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
 use libafl::observers::TimeObserver;
 use libafl::prelude::{
-    BytesInput, CanTrack, DifferentIsNovel, Executor, ExplicitTracking, Feedback, MapFeedback,
-    MaxReducer,
+    BytesInput, CanTrack, DifferentIsNovel, Executor, ExplicitTracking, Feedback, HasObservers,
+    MapFeedback, MaxReducer,
 };
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
@@ -23,6 +23,7 @@ use libafl_bolts::current_time;
 use openapiv3::OpenAPI;
 
 use core::marker::PhantomData;
+use std::ops::DerefMut;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
@@ -261,7 +262,7 @@ pub fn fuzz() -> Result<()> {
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        collective_observer.clone(),
+        collective_observer,
         &mut fuzzer,
         &mut state,
         &mut mgr,
@@ -301,7 +302,7 @@ pub fn fuzz() -> Result<()> {
             &mut mgr,
             &input,
             &ExecuteInputResult::None,
-            &collective_observer,
+            executor.observers_mut().deref_mut(),
         )?;
     }
 
