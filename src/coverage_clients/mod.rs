@@ -53,6 +53,7 @@ pub trait CoverageClient {
 pub fn get_coverage_client<'c>(
     clargs: &'c Configuration,
     report_path: &Option<PathBuf>,
+    endpoint_cov_map_pointer: *mut u8,
 ) -> Result<Box<dyn CoverageClient + 'c>, anyhow::Error> {
     Ok(match clargs.coverage_configuration {
         configuration::CoverageConfiguration::Jacoco {
@@ -95,7 +96,7 @@ pub fn get_coverage_client<'c>(
             ))
         }
         configuration::CoverageConfiguration::Endpoint => {
-            Box::new(dummy::DummyCoverageClient::new())
+            Box::new(dummy::DummyCoverageClient::new(endpoint_cov_map_pointer))
         }
     })
 }

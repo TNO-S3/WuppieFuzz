@@ -85,8 +85,10 @@ pub fn fuzz() -> Result<()> {
     let (mut endpoint_coverage, endpoint_observer, endpoint_feedback) =
         setup_endpoint_coverage(*api.clone());
 
+    let endpoint_cov_map_pointer = endpoint_coverage.get_coverage_ptr();
+
     let (mut coverage_client, coverage_observer, coverage_feedback) =
-        setup_line_coverage(config, &report_path)?;
+        setup_line_coverage(config, &report_path, endpoint_cov_map_pointer)?;
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -387,9 +389,14 @@ type LineCovClientObserverFeedback<'a> = (
 fn setup_line_coverage<'a>(
     config: &'static Configuration,
     report_path: &Option<PathBuf>,
+    endpoint_cov_map_pointer: *mut u8,
 ) -> Result<LineCovClientObserverFeedback<'a>, anyhow::Error> {
     let mut coverage_client: Box<dyn CoverageClient> =
-        crate::coverage_clients::get_coverage_client(config, report_path)?;
+        crate::coverage_clients::get_coverage_client(
+            config,
+            report_path,
+            endpoint_cov_map_pointer,
+        )?;
     coverage_client.fetch_coverage(true);
     let coverage_observer = unsafe {
         StdMapObserver::from_mut_ptr(
@@ -406,7 +413,7 @@ fn setup_line_coverage<'a>(
 
 /// Installs the Ctrl-C interrupt handler
 fn setup_interrupt() -> Result<Arc<AtomicBool>, anyhow::Error> {
-    let manual_interrupt = Arc::new(AtomicBool::new(false));
+    let manual_interrupt: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
     {
         let manual_interrupt = Arc::clone(&manual_interrupt);
         ctrlc::set_handler(move || {

@@ -7,19 +7,15 @@ use super::CoverageClient;
 /// The Dummy coverage client is a minimal implementation that only yields empty
 /// coverage bitmaps.
 pub struct DummyCoverageClient {
-    buf: Vec<u8>,
+    endpoint_cov_map_pointer: *mut u8,
 }
 
 impl DummyCoverageClient {
     /// Creates a new dummy coverage client.
-    pub fn new() -> Self {
-        Self { buf: Vec::new() }
-    }
-}
-
-impl Default for DummyCoverageClient {
-    fn default() -> Self {
-        Self::new()
+    pub fn new(endpoint_cov_map_pointer: *mut u8) -> Self {
+        Self {
+            endpoint_cov_map_pointer,
+        }
     }
 }
 
@@ -30,12 +26,7 @@ impl CoverageClient for DummyCoverageClient {
 
     /// Retrieve a pointer to the coverage bitmap (this is used by LibAFL).
     fn get_coverage_ptr(&mut self) -> *mut u8 {
-        self.buf.as_mut_ptr()
-    }
-
-    /// Retrieve the length of the array pointed to by `get_coverage_pointer`
-    fn get_coverage_len(&self) -> usize {
-        0
+        self.endpoint_cov_map_pointer
     }
 
     /// Retrieve the coverage ratio: nodes hit and total number of nodes.
