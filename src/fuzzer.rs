@@ -366,8 +366,8 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
             endpoint_coverage.get_coverage_ptr(),
             endpoint_coverage.get_coverage_len(),
         )
-        .track_novelties()
-    };
+    }
+    .track_novelties();
     let endpoint_feedback = MaxMapFeedback::new(&endpoint_observer);
     (endpoint_coverage, endpoint_observer, endpoint_feedback)
 }
