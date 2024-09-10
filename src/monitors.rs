@@ -101,6 +101,10 @@ where
                         ),
                 }
             } else {
+                if matches!(&self.client_stats()[0].get_user_stats("endpoint_coverage").unwrap_or(&UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)).aggregator_op(),AggregatorOps::Avg) {
+                    // Ugly hack for ignoring some userstats update
+                    return
+                }
                 format!(
                     "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}",
                     event_msg,
