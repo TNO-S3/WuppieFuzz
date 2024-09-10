@@ -147,7 +147,7 @@ where
     }
 
     fn req_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
-        client_stats.user_monitor.get("requests").unwrap_or(default)
+        client_stats.get_user_stats("requests").unwrap_or(default)
     }
 
     fn req_execs_per_sec(&mut self, execs: u64) -> String {
@@ -165,8 +165,7 @@ where
     ) -> UserStats {
         UserStats::new(
             client_stats
-                .user_monitor
-                .get("requests")
+                .get_user_stats("requests")
                 .unwrap_or(default)
                 .value()
                 .clone()
@@ -177,13 +176,12 @@ where
     }
 
     fn cov_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
-        client_stats.user_monitor.get("coverage").unwrap_or(default)
+        client_stats.get_user_stats("coverage").unwrap_or(default)
     }
 
     fn end_cov_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
         client_stats
-            .user_monitor
-            .get("endpoint_coverage")
+            .get_user_stats("endpoint_coverage")
             .unwrap_or(default)
     }
 }
