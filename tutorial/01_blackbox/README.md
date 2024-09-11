@@ -1,8 +1,8 @@
-# The WuppieFuzz beginner tutorial
+# Tutorial #1: Blackbox Fuzzing 
 
 ## Contents
 
-- [The WuppieFuzz beginner tutorial](#the-wuppiefuzz-beginner-tutorial)
+- [Tutorial #1: Blackbox Fuzzing](#tutorial-1-blackbox-fuzzing)
   - [Contents](#contents)
   - [Introduction](#introduction)
   - [Environment](#environment)
@@ -22,13 +22,13 @@
   - [Run WuppieFuzz to fuzz this target](#run-wuppiefuzz-to-fuzz-this-target)
     - [Set the logging mode](#set-the-logging-mode)
     - [Enabling reporting mode](#enabling-reporting-mode)
-  - [Visualizing fuzzing data](#visualizing-fuzzing-data)
+  - [Visualising fuzzing data](#visualising-fuzzing-data)
     - [Requirements](#requirements)
     - [Starting Grafana](#starting-grafana)
   - [Interpreting results](#interpreting-results)
     - [Incorrect OpenAPI Specification](#incorrect-openapi-specification)
     - [Server side errors](#server-side-errors)
-      - [Visualizing the results](#visualizing-the-results)
+      - [Visualising the results](#visualising-the-results)
       - [View raw request and response data](#view-raw-request-and-response-data)
       - [Extracting useful information](#extracting-useful-information)
       - [Finding vulnerabilities in the web interface](#finding-vulnerabilities-in-the-web-interface)
