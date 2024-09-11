@@ -75,7 +75,7 @@ where
                 "requests": Self::req_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
                 "requests_per_sec": Self::req_sec_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
                 "coverage": Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
-                "endpoint_coverage": Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                "endpoint_coverage": Self::end_cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
             })
             .to_string(),
             OutputFormat::HumanReadable => {
@@ -101,10 +101,6 @@ where
                         ),
                 }
             } else {
-                if matches!(&self.client_stats()[0].get_user_stats("endpoint_coverage").unwrap_or(&UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)).aggregator_op(),AggregatorOps::Avg) {
-                    // Ugly hack for ignoring some userstats update
-                    return
-                }
                 format!(
                     "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}",
                     event_msg,
@@ -180,12 +176,14 @@ where
     }
 
     fn cov_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
-        client_stats.get_user_stats("coverage").unwrap_or(default)
+        client_stats
+            .get_user_stats("wuppiefuzz_code_coverage")
+            .unwrap_or(default)
     }
 
     fn end_cov_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
         client_stats
-            .get_user_stats("endpoint_coverage")
+            .get_user_stats("wuppiefuzz_endpoint_coverage")
             .unwrap_or(default)
     }
 }

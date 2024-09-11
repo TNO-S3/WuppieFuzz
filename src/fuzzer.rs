@@ -502,7 +502,7 @@ fn update_coverage<F: FnMut(String)>(
         if let Err(e) = event_manager.fire(
             &mut state,
             Event::UpdateUserStats {
-                name: Cow::Borrowed("coverage"),
+                name: Cow::Borrowed("wuppiefuzz_code_coverage"),
                 value: UserStats::new(cov_stats, AggregatorOps::None),
                 phantom: PhantomData,
             },
@@ -517,7 +517,7 @@ fn update_coverage<F: FnMut(String)>(
         if let Err(e) = event_manager.fire(
             &mut state,
             Event::UpdateUserStats {
-                name: Cow::Borrowed("endpoint_coverage"),
+                name: Cow::Borrowed("wuppiefuzz_endpoint_coverage"),
                 value: UserStats::new(end_cov_stats, AggregatorOps::None),
                 phantom: PhantomData,
             },
