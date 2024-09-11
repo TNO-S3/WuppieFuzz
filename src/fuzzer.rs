@@ -266,7 +266,7 @@ pub fn fuzz() -> Result<()> {
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        Duration::from_millis(config.request_timeout), // TODO: implement a proper timeout, this is not a request timeout but an input (sequence timeout)
+        Duration::from_millis(0), // disable the timeout
     )
     .context("Failed to create the Executor")?;
 
