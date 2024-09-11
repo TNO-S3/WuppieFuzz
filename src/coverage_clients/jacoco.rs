@@ -288,7 +288,7 @@ impl<'a> JacocoCoverageClient<'a> {
                 if self.first_unused_idx > MAP_SIZE {
                     return Err(libafl::Error::unknown("The map size is not large enough to hold all the probes from the coverage stream. The current size is ".to_string()));
                 }
-                log::info!(
+                log::debug!(
                     "New file found with name {} containing {} probes",
                     segment.name,
                     segment.probe_bytes.len()

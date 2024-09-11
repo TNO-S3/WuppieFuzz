@@ -44,7 +44,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use log::{error, info, warn};
+use log::{debug, error, info};
 
 use crate::coverage_clients::endpoint::EndpointCoverageClient;
 use crate::{
@@ -167,7 +167,7 @@ pub fn fuzz() -> Result<()> {
             let mut request = request.clone();
             log::trace!("OpenAPI request:\n{:#?}", request);
             if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
-                warn!(
+                debug!(
                         "Cannot instantiate request: missing value for backreferenced parameter: {}. Maybe the earlier request crashed?",
                         error
                     );
