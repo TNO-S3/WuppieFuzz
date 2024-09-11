@@ -1,6 +1,6 @@
 # Coverage Agents
 
-WuppieFuzz requires you to run your PUT with a coverage agent. Such an agent
+WuppieFuzz enables you to run your PUT with a coverage agent. Such an agent
 tracks coverage in the PUT and interacts with the fuzzer to provide this
 coverage information as feedback. We currently support two types of coverage
 agents:
