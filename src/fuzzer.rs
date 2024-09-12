@@ -83,7 +83,7 @@ pub fn fuzz() -> Result<()> {
     let mut mgr = SimpleEventManager::new(mon);
 
     // Set up endpoint coverage
-    let (mut endpoint_coverage, endpoint_observer, endpoint_feedback) =
+    let (mut endpoint_coverage_client, endpoint_observer, endpoint_feedback) =
         setup_endpoint_coverage(*api.clone());
 
     let (mut coverage_client, coverage_observer, coverage_feedback) =
@@ -130,9 +130,9 @@ pub fn fuzz() -> Result<()> {
     )?;
 
     let combined_map_observer =
-        combined_observer(&mut endpoint_coverage, coverage_client.as_mut()).track_indices();
+        combined_observer(&mut endpoint_coverage_client, coverage_client.as_mut()).track_indices();
 
-    // A minimization+queue policy to get testcasess from the corpus
+    // A minimization+queue policy to get testcases from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &combined_map_observer,
         PowerQueueScheduler::new(&mut state, &combined_map_observer, PowerSchedule::FAST),
@@ -201,7 +201,7 @@ pub fn fuzz() -> Result<()> {
                     stats.performed_requests += 1;
                     let response: Response = response.into();
 
-                    endpoint_coverage.lock().unwrap().cover(
+                    endpoint_coverage_client.lock().unwrap().cover(
                         request.method,
                         request.path.clone(),
                         response.status(),
@@ -252,7 +252,7 @@ pub fn fuzz() -> Result<()> {
         }
         update_coverage(
             &mut coverage_client,
-            &mut endpoint_coverage,
+            &mut endpoint_coverage_client,
             &reporter,
             &mut stats,
             |s: String| info!("{}", s),
@@ -341,7 +341,7 @@ pub fn fuzz() -> Result<()> {
     }
 
     if let Some(report_path) = report_path {
-        endpoint_coverage.generate_coverage_report(&report_path);
+        endpoint_coverage_client.generate_coverage_report(&report_path);
         coverage_client.generate_coverage_report(&report_path);
     }
 
@@ -357,8 +357,8 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
     ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>,
     impl Feedback<S>,
 ) {
-    let mut endpoint_coverage = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
-    endpoint_coverage.fetch_coverage(true);
+    let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
+    endpoint_coverage_client.fetch_coverage(true);
     // no-op for this particular CoverageClient
     // Safety: libafl wants to read the coverage map directly that we also update in the harness;
     // this is only possible if it does not touch the map while the harness is running. We must
@@ -366,13 +366,17 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
     let endpoint_observer = unsafe {
         StdMapObserver::from_mut_ptr(
             "endpoint_coverage",
-            endpoint_coverage.get_coverage_ptr(),
-            endpoint_coverage.get_coverage_len(),
+            endpoint_coverage_client.get_coverage_ptr(),
+            endpoint_coverage_client.get_coverage_len(),
         )
     }
     .track_novelties();
     let endpoint_feedback = MaxMapFeedback::new(&endpoint_observer);
-    (endpoint_coverage, endpoint_observer, endpoint_feedback)
+    (
+        endpoint_coverage_client,
+        endpoint_observer,
+        endpoint_feedback,
+    )
 }
 
 type LineCovClientObserverFeedback<'a> = (
@@ -485,15 +489,15 @@ impl LoggingStats {
 /// (MySqLite) reporter
 fn update_coverage<F: FnMut(String)>(
     coverage_client: &mut Box<dyn CoverageClient>,
-    endpoint_coverage: &mut Arc<Mutex<EndpointCoverageClient>>,
+    endpoint_coverage_client: &mut Arc<Mutex<EndpointCoverageClient>>,
     reporter: &dyn Reporting<i64>,
     stats: &mut LoggingStats,
     _print_fn: F,
 ) {
     coverage_client.fetch_coverage(true);
     let (covered, total) = coverage_client.max_coverage_ratio();
-    endpoint_coverage.fetch_coverage(true);
-    let (e_covered, e_total) = endpoint_coverage.max_coverage_ratio();
+    endpoint_coverage_client.fetch_coverage(true);
+    let (e_covered, e_total) = endpoint_coverage_client.max_coverage_ratio();
 
     // This input is needed for event_manager.fire, but it doesn't seem to make
     // a difference whether it is meaningful or not, and cloning the entire thing
