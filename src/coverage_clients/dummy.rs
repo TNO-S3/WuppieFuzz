@@ -26,7 +26,9 @@ impl Default for DummyCoverageClient {
 impl CoverageClient for DummyCoverageClient {
     /// Fetch and process the current coverage. If `reset` is true, tells the remote
     /// coverage agent to reset its coverage map.
-    fn fetch_coverage(&mut self, _reset: bool) {}
+    fn fetch_coverage(&mut self, _reset: bool) {
+        self.buf[0] = 1;
+    }
 
     /// Retrieve a pointer to the coverage bitmap (this is used by LibAFL).
     fn get_coverage_ptr(&mut self) -> *mut u8 {
