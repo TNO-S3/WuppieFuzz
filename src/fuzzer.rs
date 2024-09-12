@@ -129,7 +129,8 @@ pub fn fuzz() -> Result<()> {
         *api.clone(),
     )?;
 
-    let combined_map_observer = combined_observer(&mut endpoint_coverage, coverage_client.as_mut());
+    let combined_map_observer =
+        combined_observer(&mut endpoint_coverage, coverage_client.as_mut()).track_indices();
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
