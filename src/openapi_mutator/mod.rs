@@ -224,20 +224,21 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
         _ => (),
     };
     if let Some(x) = n.as_u64() {
-        *n = match x {
+        *n = match x as usize {
             0 => 0.into(),
-            _ => state
-                .rand_mut()
-                .below(x.saturating_mul(2).try_into().unwrap())
-                .into(),
+            x_usz => state.rand_mut().below(x_usz.saturating_mul(2)).into(),
         };
         return MutationResult::Mutated;
     };
     if let Some(x) = n.as_i64() {
         // always negative
-        *n = (state
-            .rand_mut()
-            .below(x.wrapping_neg().saturating_mul(4).try_into().unwrap()) as i64
+        *n = (state.rand_mut().below(
+            x.checked_neg()
+                .unwrap_or(i64::MAX) // because -i64::MIN == i64::MIN
+                .saturating_mul(4)
+                .try_into()
+                .unwrap_or(usize::MAX), // larger values could otherwise be truncated
+        ) as i64
             + x.saturating_mul(2))
         .into();
         return MutationResult::Mutated;
@@ -247,11 +248,9 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
         let x_sgn = x.signum();
         x *= x_sgn;
         let x_int = x.round() as u64;
-        let x_int_new = match x_int {
+        let x_int_new = match x_int as usize {
             0 => 0,
-            _ => state
-                .rand_mut()
-                .below(x_int.saturating_mul(4).try_into().unwrap()),
+            x_usz => state.rand_mut().below(x_usz.saturating_mul(4)),
         };
         let n_new = serde_json::value::Number::from_f64((x_int_new as f64) - 2.0 * x);
         if let Some(n_new) = n_new {
@@ -295,22 +294,23 @@ fn mutate_parameter_contents<S: HasRand>(
     let random_element;
     match param_contents {
         ParameterContents::Object(obj_properties) => {
-            if obj_properties.is_empty() {
-                log::info!("Tried to mutate empty object; skipping. If this happens a lot WuppieFuzz may need improvement on this.");
-                return Ok(MutationResult::Skipped);
-            }
-            random_element = state
-                .rand_mut()
-                .choose(obj_properties.values_mut())
-                .unwrap();
+            random_element = match state.rand_mut().choose(obj_properties.values_mut()) {
+                None => {
+                    log::info!("Tried to mutate empty object; skipping. If this happens a lot WuppieFuzz may need improvement on this.");
+                    return Ok(MutationResult::Skipped);
+                }
+                Some(element) => element,
+            };
         }
         ParameterContents::Array(arr_contents) => {
-            if arr_contents.is_empty() {
+            random_element = if let Some(element) = state.rand_mut().choose(arr_contents.iter_mut())
+            {
+                element
+            } else {
                 // Generate a new element for this empty array
                 arr_contents.push(ParameterContents::Bytes(new_rand_input(state.rand_mut())));
                 return Ok(MutationResult::Mutated);
-            }
-            random_element = state.rand_mut().choose(arr_contents).unwrap();
+            };
         }
         ParameterContents::LeafValue(leaf) => {
             return Ok(mutate_leaf_value(state, contents_mutator, leaf))
