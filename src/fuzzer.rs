@@ -86,10 +86,8 @@ pub fn fuzz() -> Result<()> {
     let (mut endpoint_coverage, endpoint_observer, endpoint_feedback) =
         setup_endpoint_coverage(*api.clone());
 
-    let endpoint_cov_map_pointer = endpoint_coverage.get_coverage_ptr();
-
     let (mut coverage_client, coverage_observer, coverage_feedback) =
-        setup_line_coverage(config, &report_path, endpoint_cov_map_pointer)?;
+        setup_line_coverage(config, &report_path)?;
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -393,14 +391,9 @@ type LineCovClientObserverFeedback<'a> = (
 fn setup_line_coverage<'a>(
     config: &'static Configuration,
     report_path: &Option<PathBuf>,
-    endpoint_cov_map_pointer: *mut u8,
 ) -> Result<LineCovClientObserverFeedback<'a>, anyhow::Error> {
     let mut coverage_client: Box<dyn CoverageClient> =
-        crate::coverage_clients::get_coverage_client(
-            config,
-            report_path,
-            endpoint_cov_map_pointer,
-        )?;
+        crate::coverage_clients::get_coverage_client(config, report_path)?;
     coverage_client.fetch_coverage(true);
     // Safety: libafl wants to read the coverage map directly that we also update in the harness;
     // this is only possible if it does not touch the map while the harness is running. We must
@@ -436,7 +429,7 @@ fn combined_observer<T: CoverageClient, U: CoverageClient + ?Sized>(
 
 /// Installs the Ctrl-C interrupt handler
 fn setup_interrupt() -> Result<Arc<AtomicBool>, anyhow::Error> {
-    let manual_interrupt: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+    let manual_interrupt = Arc::new(AtomicBool::new(false));
     {
         let manual_interrupt = Arc::clone(&manual_interrupt);
         ctrlc::set_handler(move || {
