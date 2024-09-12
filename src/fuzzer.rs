@@ -142,7 +142,11 @@ pub fn fuzz() -> Result<()> {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
 
-    let collective_observer = tuple_list!(endpoint_coverage_observer, code_coverage_observer, time_observer);
+    let collective_observer = tuple_list!(
+        endpoint_coverage_observer,
+        code_coverage_observer,
+        time_observer
+    );
 
     let mutator_openapi = StdScheduledMutator::new(havoc_mutations_openapi());
 
@@ -414,7 +418,11 @@ fn setup_line_coverage<'a>(
     .track_indices()
     .track_novelties();
     let code_coverage_feedback = MaxMapFeedback::new(&code_coverage_observer);
-    Ok((code_coverage_client, code_coverage_observer, code_coverage_feedback))
+    Ok((
+        code_coverage_client,
+        code_coverage_observer,
+        code_coverage_feedback,
+    ))
 }
 
 /// Creates a combined observer from the two coverage streams
