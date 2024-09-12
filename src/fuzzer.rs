@@ -83,21 +83,21 @@ pub fn fuzz() -> Result<()> {
     let mut mgr = SimpleEventManager::new(mon);
 
     // Set up endpoint coverage
-    let (mut endpoint_coverage_client, endpoint_observer, endpoint_feedback) =
+    let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
         setup_endpoint_coverage(*api.clone());
 
-    let (mut coverage_client, coverage_observer, coverage_feedback) =
+    let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let calibration = CalibrationStage::new(&coverage_feedback);
+    let calibration = CalibrationStage::new(&code_coverage_feedback);
 
     let mut collective_feedback = feedback_or!(
-        endpoint_feedback,
-        coverage_feedback, // Time feedback, this one does not need a feedback state
-        TimeFeedback::new(&time_observer)
+        endpoint_coverage_feedback,
+        code_coverage_feedback,
+        TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
     );
 
     // A feedback to choose if an input is a solution or not
@@ -130,7 +130,8 @@ pub fn fuzz() -> Result<()> {
     )?;
 
     let combined_map_observer =
-        combined_observer(&mut endpoint_coverage_client, coverage_client.as_mut()).track_indices();
+        combined_observer(&mut endpoint_coverage_client, code_coverage_client.as_mut())
+            .track_indices();
 
     // A minimization+queue policy to get testcases from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
@@ -141,7 +142,7 @@ pub fn fuzz() -> Result<()> {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
 
-    let collective_observer = tuple_list!(endpoint_observer, coverage_observer, time_observer);
+    let collective_observer = tuple_list!(endpoint_coverage_observer, code_coverage_observer, time_observer);
 
     let mutator_openapi = StdScheduledMutator::new(havoc_mutations_openapi());
 
@@ -251,7 +252,7 @@ pub fn fuzz() -> Result<()> {
             parameter_feedback.process_post_request(request_index, request);
         }
         update_coverage(
-            &mut coverage_client,
+            &mut code_coverage_client,
             &mut endpoint_coverage_client,
             &reporter,
             &mut stats,
@@ -342,7 +343,7 @@ pub fn fuzz() -> Result<()> {
 
     if let Some(report_path) = report_path {
         endpoint_coverage_client.generate_coverage_report(&report_path);
-        coverage_client.generate_coverage_report(&report_path);
+        code_coverage_client.generate_coverage_report(&report_path);
     }
 
     Ok(())
@@ -363,7 +364,7 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
     // Safety: libafl wants to read the coverage map directly that we also update in the harness;
     // this is only possible if it does not touch the map while the harness is running. We must
     // assume they have designed their algorithms for this to work correctly.
-    let endpoint_observer = unsafe {
+    let endpoint_coverage_observer = unsafe {
         StdMapObserver::from_mut_ptr(
             "endpoint_coverage",
             endpoint_coverage_client.get_coverage_ptr(),
@@ -371,11 +372,11 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
         )
     }
     .track_novelties();
-    let endpoint_feedback = MaxMapFeedback::new(&endpoint_observer);
+    let endpoint_coverage_feedback = MaxMapFeedback::new(&endpoint_coverage_observer);
     (
         endpoint_coverage_client,
-        endpoint_observer,
-        endpoint_feedback,
+        endpoint_coverage_observer,
+        endpoint_coverage_feedback,
     )
 }
 
@@ -397,23 +398,23 @@ fn setup_line_coverage<'a>(
     config: &'static Configuration,
     report_path: &Option<PathBuf>,
 ) -> Result<LineCovClientObserverFeedback<'a>, anyhow::Error> {
-    let mut coverage_client: Box<dyn CoverageClient> =
+    let mut code_coverage_client: Box<dyn CoverageClient> =
         crate::coverage_clients::get_coverage_client(config, report_path)?;
-    coverage_client.fetch_coverage(true);
+    code_coverage_client.fetch_coverage(true);
     // Safety: libafl wants to read the coverage map directly that we also update in the harness;
     // this is only possible if it does not touch the map while the harness is running. We must
     // assume they have designed their algorithms for this to work correctly.
-    let coverage_observer = unsafe {
+    let code_coverage_observer = unsafe {
         StdMapObserver::from_mut_ptr(
             "code_coverage",
-            coverage_client.get_coverage_ptr(),
-            coverage_client.get_coverage_len(),
+            code_coverage_client.get_coverage_ptr(),
+            code_coverage_client.get_coverage_len(),
         )
     }
     .track_indices()
     .track_novelties();
-    let coverage_feedback = MaxMapFeedback::new(&coverage_observer);
-    Ok((coverage_client, coverage_observer, coverage_feedback))
+    let code_coverage_feedback = MaxMapFeedback::new(&code_coverage_observer);
+    Ok((code_coverage_client, code_coverage_observer, code_coverage_feedback))
 }
 
 /// Creates a combined observer from the two coverage streams
@@ -488,14 +489,14 @@ impl LoggingStats {
 /// endpoint coverage monitor and any line coverage client. Also updates the given
 /// (MySqLite) reporter
 fn update_coverage<F: FnMut(String)>(
-    coverage_client: &mut Box<dyn CoverageClient>,
+    code_coverage_client: &mut Box<dyn CoverageClient>,
     endpoint_coverage_client: &mut Arc<Mutex<EndpointCoverageClient>>,
     reporter: &dyn Reporting<i64>,
     stats: &mut LoggingStats,
     _print_fn: F,
 ) {
-    coverage_client.fetch_coverage(true);
-    let (covered, total) = coverage_client.max_coverage_ratio();
+    code_coverage_client.fetch_coverage(true);
+    let (covered, total) = code_coverage_client.max_coverage_ratio();
     endpoint_coverage_client.fetch_coverage(true);
     let (e_covered, e_total) = endpoint_coverage_client.max_coverage_ratio();
 
