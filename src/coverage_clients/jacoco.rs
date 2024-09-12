@@ -327,7 +327,7 @@ impl CoverageClient for JacocoCoverageClient<'_> {
             return;
         }
         for segment in cov_bytes.into_iter() {
-            if segment_matches_prefix(self.jacoco_prefix_filter, &segment) {
+            if !segment_matches_prefix(self.jacoco_prefix_filter, &segment) {
                 continue;
             }
 
