@@ -8,7 +8,7 @@ use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, Tim
 use libafl::inputs::BytesInput;
 use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
-use libafl::observers::{CanTrack, ExplicitTracking, TimeObserver};
+use libafl::observers::{CanTrack, ExplicitTracking, MapObserver, MultiMapObserver, TimeObserver};
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
@@ -18,6 +18,7 @@ use libafl::{feedback_or, ExecutionProcessor};
 use libafl::{ExecuteInputResult, HasNamedMetadata};
 
 use libafl_bolts::current_time;
+use libafl_bolts::prelude::OwnedMutSlice;
 use openapiv3::OpenAPI;
 
 use core::marker::PhantomData;
@@ -130,10 +131,12 @@ pub fn fuzz() -> Result<()> {
         *api.clone(),
     )?;
 
+    let combined_map_observer = combined_observer(&mut endpoint_coverage, coverage_client.as_mut());
+
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
-        &coverage_observer,
-        PowerQueueScheduler::new(&mut state, &coverage_observer, PowerSchedule::FAST),
+        &combined_map_observer,
+        PowerQueueScheduler::new(&mut state, &combined_map_observer, PowerSchedule::FAST),
     );
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -399,6 +402,9 @@ fn setup_line_coverage<'a>(
             endpoint_cov_map_pointer,
         )?;
     coverage_client.fetch_coverage(true);
+    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
+    // this is only possible if it does not touch the map while the harness is running. We must
+    // assume they have designed their algorithms for this to work correctly.
     let coverage_observer = unsafe {
         StdMapObserver::from_mut_ptr(
             "code_coverage",
@@ -410,6 +416,22 @@ fn setup_line_coverage<'a>(
     .track_novelties();
     let coverage_feedback = MaxMapFeedback::new(&coverage_observer);
     Ok((coverage_client, coverage_observer, coverage_feedback))
+}
+
+/// Creates a combined observer from the two coverage streams
+fn combined_observer<T: CoverageClient, U: CoverageClient + ?Sized>(
+    obs1: &mut T,
+    obs2: &mut U,
+) -> impl MapObserver {
+    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
+    // this is only possible if it does not touch the map while the harness is running. We must
+    // assume they have designed their algorithms for this to work correctly.
+    MultiMapObserver::new("all_maps", unsafe {
+        vec![
+            OwnedMutSlice::from_raw_parts_mut(obs1.get_coverage_ptr(), obs1.get_coverage_len()),
+            OwnedMutSlice::from_raw_parts_mut(obs2.get_coverage_ptr(), obs2.get_coverage_len()),
+        ]
+    })
 }
 
 /// Installs the Ctrl-C interrupt handler
