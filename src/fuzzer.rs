@@ -83,10 +83,10 @@ pub fn fuzz() -> Result<()> {
     let mut mgr = SimpleEventManager::new(mon);
 
     // Set up endpoint coverage
-    let (mut endpoint_coverage_client, _endpoint_coverage_observer, endpoint_coverage_feedback) =
+    let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
         setup_endpoint_coverage(*api.clone());
 
-    let (mut code_coverage_client, _code_coverage_observer, code_coverage_feedback) =
+    let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
 
     // Create an observation channel to keep track of the execution time
@@ -155,7 +155,12 @@ pub fn fuzz() -> Result<()> {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
 
-    let collective_observer = tuple_list!(combined_map_observer, time_observer);
+    let collective_observer = tuple_list!(
+        code_coverage_observer,
+        endpoint_coverage_observer,
+        combined_map_observer,
+        time_observer
+    );
 
     let mutator_openapi = StdScheduledMutator::new(havoc_mutations_openapi());
 
