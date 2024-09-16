@@ -16,6 +16,9 @@
   box setting in [#5](https://github.com/TNO-S3/WuppieFuzz/pull/5)
 - Tweaks in logging in [#5](https://github.com/TNO-S3/WuppieFuzz/pull/5)
 - Update to LibAFL 0.13.2 in [#5](https://github.com/TNO-S3/WuppieFuzz/pull/5)
+- Add a multimap observer to let the scheduler use both endpoint coverage and
+  line coverage when both are available in
+  [#5](https://github.com/TNO-S3/WuppieFuzz/pull/5)
 
 # v1.0.0 (2024-09-12)
 
