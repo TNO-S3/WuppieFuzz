@@ -2,20 +2,23 @@ use anyhow::{Context, Result};
 
 use libafl::corpus::Corpus;
 use libafl::events::EventFirer;
-use libafl::executors::inprocess::inprocess_get_event_manager;
-use libafl::feedbacks::TimeFeedback;
+use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
+use libafl::executors::{Executor, HasObservers};
+use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
+use libafl::inputs::BytesInput;
 use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
-use libafl::observers::TimeObserver;
-use libafl::prelude::{BytesInput, DifferentIsNovel, Executor, Feedback, MapFeedback, MaxReducer};
+use libafl::observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver};
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
 use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasExecutions, HasNamedMetadata, State};
+use libafl::state::{HasCorpus, HasExecutions, NopState, State};
 use libafl::{feedback_or, ExecutionProcessor};
+use libafl::{ExecuteInputResult, HasNamedMetadata};
 
 use libafl_bolts::current_time;
+use libafl_bolts::prelude::OwnedMutSlice;
 use openapiv3::OpenAPI;
 
 use core::marker::PhantomData;
@@ -31,6 +34,8 @@ use libafl::{
     observers::StdMapObserver,
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
+use std::borrow::Cow;
+use std::ops::DerefMut;
 
 use std::fs::create_dir_all;
 use std::path::PathBuf;
@@ -40,7 +45,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use log::{error, info, warn};
+use log::{debug, error, info};
 
 use crate::coverage_clients::endpoint::EndpointCoverageClient;
 use crate::{
@@ -56,7 +61,7 @@ use crate::{
     openapi_mutator::havoc_mutations_openapi,
     parameter_feedback::ParameterFeedback,
     reporting::Reporting,
-    state::{NopState, OpenApiFuzzerState},
+    state::OpenApiFuzzerState,
 };
 
 /// Main fuzzer function.
@@ -78,21 +83,21 @@ pub fn fuzz() -> Result<()> {
     let mut mgr = SimpleEventManager::new(mon);
 
     // Set up endpoint coverage
-    let (mut endpoint_coverage, endpoint_observer, endpoint_feedback) =
+    let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
         setup_endpoint_coverage(*api.clone());
 
-    let (mut coverage_client, coverage_observer, coverage_feedback) =
+    let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let calibration = CalibrationStage::new(&coverage_feedback);
+    let calibration = CalibrationStage::new(&code_coverage_feedback);
 
     let mut collective_feedback = feedback_or!(
-        endpoint_feedback,
-        coverage_feedback, // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
+        endpoint_coverage_feedback,
+        code_coverage_feedback,
+        TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
     );
 
     // A feedback to choose if an input is a solution or not
@@ -124,17 +129,38 @@ pub fn fuzz() -> Result<()> {
         *api.clone(),
     )?;
 
-    // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(
-        &mut state,
-        &coverage_observer,
-        PowerSchedule::FAST,
-    ));
+    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
+    // this is only possible if it does not touch the map while the harness is running. We must
+    // assume they have designed their algorithms for this to work correctly.
+    let combined_map_observer = MultiMapObserver::new("all_maps", unsafe {
+        vec![
+            OwnedMutSlice::from_raw_parts_mut(
+                endpoint_coverage_client.get_coverage_ptr(),
+                endpoint_coverage_client.get_coverage_len(),
+            ),
+            OwnedMutSlice::from_raw_parts_mut(
+                code_coverage_client.get_coverage_ptr(),
+                code_coverage_client.get_coverage_len(),
+            ),
+        ]
+    })
+    .track_indices();
+
+    // A minimization+queue policy to get testcases from the corpus
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(
+        &combined_map_observer,
+        PowerQueueScheduler::new(&mut state, &combined_map_observer, PowerSchedule::FAST),
+    );
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
 
-    let collective_observer = tuple_list!(endpoint_observer, coverage_observer, time_observer);
+    let collective_observer = tuple_list!(
+        code_coverage_observer,
+        endpoint_coverage_observer,
+        combined_map_observer,
+        time_observer
+    );
 
     let mutator_openapi = StdScheduledMutator::new(havoc_mutations_openapi());
 
@@ -162,7 +188,7 @@ pub fn fuzz() -> Result<()> {
             let mut request = request.clone();
             log::trace!("OpenAPI request:\n{:#?}", request);
             if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
-                warn!(
+                debug!(
                         "Cannot instantiate request: missing value for backreferenced parameter: {}. Maybe the earlier request crashed?",
                         error
                     );
@@ -194,7 +220,7 @@ pub fn fuzz() -> Result<()> {
                     stats.performed_requests += 1;
                     let response: Response = response.into();
 
-                    endpoint_coverage.lock().unwrap().cover(
+                    endpoint_coverage_client.lock().unwrap().cover(
                         request.method,
                         request.path.clone(),
                         response.status(),
@@ -244,8 +270,8 @@ pub fn fuzz() -> Result<()> {
             parameter_feedback.process_post_request(request_index, request);
         }
         update_coverage(
-            &mut coverage_client,
-            &mut endpoint_coverage,
+            &mut code_coverage_client,
+            &mut endpoint_coverage_client,
             &reporter,
             &mut stats,
             |s: String| info!("{}", s),
@@ -255,18 +281,38 @@ pub fn fuzz() -> Result<()> {
     };
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
+    let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
-        collective_observer.clone(),
+        collective_observer,
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        Duration::from_millis(0), // disable the timeout
     )
     .context("Failed to create the Executor")?;
 
     let manual_interrupt = setup_interrupt()?;
 
-    // Force load inputs into corpus
+    // Fire an event to print the initial corpus size
+    let corpus_size = state.corpus().count();
+    let executions = *state.executions();
+    if let Err(e) = mgr.fire(
+        &mut state,
+        Event::NewTestcase {
+            input: OpenApiInput(vec![]),
+            observers_buf: None,
+            exit_kind: ExitKind::Ok,
+            corpus_size,
+            client_config: mgr.configuration(),
+            time: current_time(),
+            executions,
+            forward_id: None,
+        },
+    ) {
+        error!("Err: failed to fire event{:?}", e)
+    }
+
+    // Executed every corpus entry at least once for gathering a proper view on the initial coverage as mutations
     log::debug!("Start initial corpus loop");
     for input_id in initial_corpus_cloned.ids() {
         let input = initial_corpus_cloned
@@ -276,14 +322,13 @@ pub fn fuzz() -> Result<()> {
         fuzzer.process_execution(
             &mut state,
             &mut mgr,
-            input,
-            &collective_observer,
-            &ExitKind::Ok,
-            true,
+            &input,
+            &ExecuteInputResult::None,
+            executor.observers_mut().deref_mut(),
         )?;
     }
 
-    log::debug!("start fuzzing loop");
+    log::debug!("Start fuzzing loop");
     let maybe_timeout_secs = config.timeout.map(|t| Duration::from_secs(t.get()));
     let starting_time = Instant::now();
     // check for timeout if applicable
@@ -307,13 +352,16 @@ pub fn fuzz() -> Result<()> {
             error!("Err: failed to fire event{:?}", e)
         }
         if manual_interrupt.load(Ordering::Relaxed) {
-            break;
+            if let Err(e) = mgr.fire(&mut state, Event::Stop) {
+                error!("Err: failed to fire event{:?}", e);
+                break;
+            }
         }
     }
 
     if let Some(report_path) = report_path {
-        endpoint_coverage.generate_coverage_report(&report_path);
-        coverage_client.generate_coverage_report(&report_path);
+        endpoint_coverage_client.generate_coverage_report(&report_path);
+        code_coverage_client.generate_coverage_report(&report_path);
     }
 
     Ok(())
@@ -325,46 +373,70 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
     api: OpenAPI,
 ) -> (
     Arc<Mutex<EndpointCoverageClient>>,
-    StdMapObserver<'a, u8, false>,
+    ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>,
     impl Feedback<S>,
 ) {
-    let mut endpoint_coverage = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
-    endpoint_coverage.fetch_coverage(true);
+    let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
+    endpoint_coverage_client.fetch_coverage(true);
     // no-op for this particular CoverageClient
     // Safety: libafl wants to read the coverage map directly that we also update in the harness;
     // this is only possible if it does not touch the map while the harness is running. We must
     // assume they have designed their algorithms for this to work correctly.
-    let endpoint_observer = unsafe {
-        StdMapObserver::from_mut_ptr("signals", endpoint_coverage.get_coverage_ptr(), endpoint_coverage.get_coverage_len())
-    };
-    let endpoint_feedback = MaxMapFeedback::tracking(&endpoint_observer, false, true);
-    (endpoint_coverage, endpoint_observer, endpoint_feedback)
+    let endpoint_coverage_observer = unsafe {
+        StdMapObserver::from_mut_ptr(
+            "endpoint_coverage",
+            endpoint_coverage_client.get_coverage_ptr(),
+            endpoint_coverage_client.get_coverage_len(),
+        )
+    }
+    .track_novelties();
+    let endpoint_coverage_feedback = MaxMapFeedback::new(&endpoint_coverage_observer);
+    (
+        endpoint_coverage_client,
+        endpoint_coverage_observer,
+        endpoint_coverage_feedback,
+    )
 }
 
-type LineCovClientObserverFeedback<'a, S> = (
+type LineCovClientObserverFeedback<'a> = (
     Box<dyn CoverageClient>,
-    StdMapObserver<'a, u8, false>,
-    MapFeedback<DifferentIsNovel, StdMapObserver<'a, u8, false>, MaxReducer, S, u8>,
+    ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
+    MapFeedback<
+        ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
+        DifferentIsNovel,
+        StdMapObserver<'a, u8, false>,
+        MaxReducer,
+        u8,
+    >,
 );
 
 /// Sets up the line coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
-fn setup_line_coverage<'a, S: State + HasNamedMetadata>(
+fn setup_line_coverage<'a>(
     config: &'static Configuration,
     report_path: &Option<PathBuf>,
-) -> Result<LineCovClientObserverFeedback<'a, S>, anyhow::Error> {
-    let mut coverage_client: Box<dyn CoverageClient> =
+) -> Result<LineCovClientObserverFeedback<'a>, anyhow::Error> {
+    let mut code_coverage_client: Box<dyn CoverageClient> =
         crate::coverage_clients::get_coverage_client(config, report_path)?;
-    coverage_client.fetch_coverage(true);
-    let coverage_observer = unsafe {
+    code_coverage_client.fetch_coverage(true);
+    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
+    // this is only possible if it does not touch the map while the harness is running. We must
+    // assume they have designed their algorithms for this to work correctly.
+    let code_coverage_observer = unsafe {
         StdMapObserver::from_mut_ptr(
-            "signals",
-            coverage_client.get_coverage_ptr(),
-            coverage_client.get_coverage_len(),
+            "code_coverage",
+            code_coverage_client.get_coverage_ptr(),
+            code_coverage_client.get_coverage_len(),
         )
-    };
-    let coverage_feedback = MaxMapFeedback::tracking(&coverage_observer, true, true);
-    Ok((coverage_client, coverage_observer, coverage_feedback))
+    }
+    .track_indices()
+    .track_novelties();
+    let code_coverage_feedback = MaxMapFeedback::new(&code_coverage_observer);
+    Ok((
+        code_coverage_client,
+        code_coverage_observer,
+        code_coverage_feedback,
+    ))
 }
 
 /// Installs the Ctrl-C interrupt handler
@@ -423,16 +495,16 @@ impl LoggingStats {
 /// endpoint coverage monitor and any line coverage client. Also updates the given
 /// (MySqLite) reporter
 fn update_coverage<F: FnMut(String)>(
-    coverage_client: &mut Box<dyn CoverageClient>,
-    endpoint_coverage: &mut Arc<Mutex<EndpointCoverageClient>>,
+    code_coverage_client: &mut Box<dyn CoverageClient>,
+    endpoint_coverage_client: &mut Arc<Mutex<EndpointCoverageClient>>,
     reporter: &dyn Reporting<i64>,
     stats: &mut LoggingStats,
     _print_fn: F,
 ) {
-    coverage_client.fetch_coverage(true);
-    let (covered, total) = coverage_client.max_coverage_ratio();
-    endpoint_coverage.fetch_coverage(true);
-    let (e_covered, e_total) = endpoint_coverage.max_coverage_ratio();
+    code_coverage_client.fetch_coverage(true);
+    let (covered, total) = code_coverage_client.max_coverage_ratio();
+    endpoint_coverage_client.fetch_coverage(true);
+    let (e_covered, e_total) = endpoint_coverage_client.max_coverage_ratio();
 
     // This input is needed for event_manager.fire, but it doesn't seem to make
     // a difference whether it is meaningful or not, and cloning the entire thing
@@ -457,7 +529,7 @@ fn update_coverage<F: FnMut(String)>(
         if let Err(e) = event_manager.fire(
             &mut state,
             Event::UpdateUserStats {
-                name: "coverage".to_string(),
+                name: Cow::Borrowed("wuppiefuzz_code_coverage"),
                 value: UserStats::new(cov_stats, AggregatorOps::None),
                 phantom: PhantomData,
             },
@@ -472,7 +544,7 @@ fn update_coverage<F: FnMut(String)>(
         if let Err(e) = event_manager.fire(
             &mut state,
             Event::UpdateUserStats {
-                name: "endpoint_coverage".to_string(),
+                name: Cow::Borrowed("wuppiefuzz_endpoint_coverage"),
                 value: UserStats::new(end_cov_stats, AggregatorOps::None),
                 phantom: PhantomData,
             },
@@ -491,7 +563,7 @@ fn update_coverage<F: FnMut(String)>(
         if let Err(e) = event_manager.fire(
             &mut state,
             Event::UpdateUserStats {
-                name: "requests".to_string(),
+                name: Cow::Borrowed("requests"),
                 value: UserStats::new(req_stats, AggregatorOps::None),
                 phantom: PhantomData,
             },

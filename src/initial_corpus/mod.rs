@@ -16,9 +16,8 @@ use crate::{
     input::{OpenApiInput, OpenApiRequest},
 };
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus},
-    prelude::{SchedulerTestcaseMetadata, Testcase},
-    state::HasMetadata,
+    corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
+    HasMetadata,
 };
 use openapiv3::OpenAPI;
 
