@@ -2,6 +2,14 @@
 
 ## Highlights
 
+## Features
+
+## Fixes
+
+# v1.1.0
+
+## Highlights
+
 - Updated [LibAFL](https://github.com/AFLplusplus/LibAFL) from 0.11.2 to 0.13.2,
   special thanks to [@domenukk](https://github.com/domenukk) for initiating the
   update and thinking along.
@@ -19,6 +27,8 @@
 - Add a multimap observer to let the scheduler use both endpoint coverage and
   line coverage when both are available in
   [#5](https://github.com/TNO-S3/WuppieFuzz/pull/5)
+- Updated compatible dependencies releases
+  [#4](https://github.com/TNO-S3/WuppieFuzz/pull/4)
 
 # v1.0.0 (2024-09-12)
 
