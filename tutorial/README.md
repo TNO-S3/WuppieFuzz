@@ -126,7 +126,7 @@ docker run -it --rm \
 ```
 
 This command will launch multiple Docker containers, consisting of a database, a
-web interface, and more. During this process , the installer will ask for a port
+web interface, and more. During this process, the installer will ask for a port
 on which to run the web interface. In this tutorial we assume that port 80 is
 chosen for this.
 

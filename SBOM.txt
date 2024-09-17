@@ -34,7 +34,7 @@ anstyle-query 1.1.1
 anstyle-wincon 3.0.4
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-anyhow 1.0.87
+anyhow 1.0.89
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 atomic-waker 1.1.2
@@ -277,10 +277,10 @@ hyper-rustls 0.27.3
 hyper-tls 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-hyper-util 0.1.7
+hyper-util 0.1.8
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-iana-time-zone 0.1.60
+iana-time-zone 0.1.61
 	licensed under "Apache-2.0 OR MIT"
 	by Andrew Straw <strawman@astraw.com>|René Kijewski <rene.kijewski@fu-berlin.de>|Ryan Lopopolo <rjl@hyperbo.la>
 iana-time-zone-haiku 0.1.2
@@ -304,7 +304,7 @@ indicatif 0.17.8
 instant 0.1.13
 	licensed under "BSD-3-Clause"
 	by sebcrozet <developer@crozet.re>
-ipnet 2.9.0
+ipnet 2.10.0
 	licensed under "Apache-2.0 OR MIT"
 	by Kris Price <kris@krisprice.nz>
 is_terminal_polyfill 1.70.1
@@ -523,7 +523,7 @@ rand_regex 0.17.0
 ratatui 0.26.3
 	licensed under "MIT"
 	by Florian Dehau <work@fdehau.com>|The Ratatui Developers
-redox_syscall 0.5.3
+redox_syscall 0.5.4
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
 regex 1.10.6
@@ -550,10 +550,10 @@ rusqlite 0.31.0
 rustc-demangle 0.1.21
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-rustix 0.38.36
+rustix 0.38.37
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>|Jakub Konka <kubkon@jakubkonka.com>
-rustls 0.23.12
+rustls 0.23.13
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
 rustls-pemfile 2.1.3
@@ -562,7 +562,7 @@ rustls-pemfile 2.1.3
 rustls-pki-types 1.8.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-webpki 0.102.7
+rustls-webpki 0.102.8
 	licensed under "ISC"
 	by unspecified authors
 rustversion 1.0.17
@@ -574,16 +574,16 @@ ryu 1.0.18
 same-file 1.0.6
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-scc 2.1.16
+scc 2.1.17
 	licensed under "Apache-2.0"
 	by wvwwvwwv <wvwwvwwv@me.com>
-schannel 0.1.23
+schannel 0.1.24
 	licensed under "MIT"
 	by Steven Fackler <sfackler@gmail.com>|Steffen Butzer <steffen.butzer@outlook.com>
 scopeguard 1.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by bluss
-sdd 3.0.2
+sdd 3.0.3
 	licensed under "Apache-2.0"
 	by wvwwvwwv <wvwwvwwv@me.com>
 security-framework 2.11.1
@@ -745,13 +745,13 @@ uds 0.4.2
 unicode-bidi 0.3.15
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
-unicode-ident 1.0.12
+unicode-ident 1.0.13
 	licensed under "(MIT OR Apache-2.0) AND Unicode-DFS-2016"
 	by David Tolnay <dtolnay@gmail.com>
 unicode-normalization 0.1.23
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
-unicode-segmentation 1.11.0
+unicode-segmentation 1.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
 unicode-truncate 1.1.0
