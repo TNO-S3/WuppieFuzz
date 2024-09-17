@@ -16,9 +16,8 @@ use crate::{
     input::{OpenApiInput, OpenApiRequest},
 };
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus},
-    prelude::{SchedulerTestcaseMetadata, Testcase},
-    state::HasMetadata,
+    corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
+    HasMetadata,
 };
 use openapiv3::OpenAPI;
 
@@ -81,7 +80,7 @@ pub fn write_corpus_to_files(
 /// Loads an `OpenApiInput` from a yaml file and prints its contents.
 pub fn print_starting_corpus(filename: &Path) {
     match load_starting_corpus(filename) {
-        Ok(res) => log::info!("{res:?}"),
+        Ok(res) => log::debug!("{res:?}"),
         Err(err) => log::error!("Error: {}", err),
     }
 }
@@ -94,11 +93,11 @@ pub fn initialize_corpus(
     let mut corpus = InMemoryOnDiskCorpus::new(PathBuf::from("./queue")).unwrap();
     match initial_corpus_path {
         Some(initial_corpus_path) => {
-            log::debug!("Filling corpus from file: {initial_corpus_path:?}");
+            log::info!("Filling corpus from file: {initial_corpus_path:?}");
             fill_corpus_from_file(&mut corpus, initial_corpus_path)
         }
         None => {
-            log::debug!("No corpus supplied, generating one based on the API");
+            log::info!("No corpus supplied, generating one based on the API");
             fill_corpus_from_api(&mut corpus, api, report_path)
         }
     }

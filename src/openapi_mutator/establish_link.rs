@@ -1,6 +1,8 @@
 //! Mutates a request series by creating a link between to random requests. A link means
 //! that a response value from a request is used as a parameter value in a later request.
 
+use std::borrow::Cow;
+
 use crate::{input::OpenApiInput, input::ParameterContents, state::HasRandAndOpenAPI};
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -29,8 +31,8 @@ impl Default for EstablishLinkMutator {
 }
 
 impl Named for EstablishLinkMutator {
-    fn name(&self) -> &str {
-        "EstablishLinkMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("EstablishLinkMutator")
     }
 }
 
@@ -38,12 +40,7 @@ impl<S> Mutator<OpenApiInput, S> for EstablishLinkMutator
 where
     S: HasRandAndOpenAPI,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         let (rand, api) = state.rand_mut_and_openapi();
 
         // Build a list of (x, y),

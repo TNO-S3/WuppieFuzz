@@ -6,7 +6,15 @@ authors = [
 ]
 edition = "2021"
 license = "Apache-2.0"
+repository = "https://github.com/TNO-S3/WuppieFuzz"
 build = "build.rs"
+description = "A coverage-guided REST API fuzzer developed on top of LibAFL"
+
+[package.metadata.wix]
+upgrade-guid = "A7114AC3-CB9E-48AC-90D9-766CE09CF336"
+path-guid = "5DF1AA51-6503-49B6-9561-010755C05AD8"
+license = false
+eula = false
 
 [features]
 default = ["std"]
@@ -23,6 +31,11 @@ lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
+
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
 
 [build-dependencies]
 cargo-license = "0.6.1"
@@ -46,8 +59,8 @@ iter-read = "1.0.1"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.4.0"
 lcov = "0.8"
-libafl = "=0.11.2"
-libafl_bolts = "0.11.2"
+libafl = "=0.13.2"
+libafl_bolts = "0.13.2"
 log = { version = "0.4.21", features = ["serde"] }
 num = { version = "0.4.2", default-features = false }
 num-derive = "0.4.2"
@@ -73,3 +86,18 @@ tempfile = "3.10.1"
 url = "2.5.0"
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
+
+# Config for 'cargo dist'
+[workspace.metadata.dist]
+# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.22.1"
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+installers = ["shell", "powershell", "msi"]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
+# Whether to install an updater program
+install-updater = true

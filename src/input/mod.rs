@@ -59,6 +59,7 @@ use crate::{
 use ahash::RandomState;
 use indexmap::map::ValuesMut;
 use indexmap::{map::Iter, IndexMap};
+use libafl::corpus::CorpusId;
 use libafl::{inputs::Input, Error};
 use libafl_bolts::{fs::write_file_atomic, rands::Rand, HasLen};
 use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
@@ -572,7 +573,7 @@ impl HasLen for OpenApiInput {
 }
 
 impl Input for OpenApiInput {
-    fn generate_name(&self, _idx: usize) -> String {
+    fn generate_name(&self, _idx: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for request in &self.0 {
             hasher.write(request.method.as_bytes());

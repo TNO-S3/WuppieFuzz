@@ -1,5 +1,5 @@
 use libafl::corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus};
-use libafl::executors::inprocess::inprocess_get_state;
+use libafl::executors::hooks::inprocess::inprocess_get_state;
 use libafl::state::HasCorpus;
 
 use crate::input::{OpenApiInput, OpenApiRequest};

@@ -18,6 +18,7 @@ use libafl::{
 use libafl_bolts::rands::Rand;
 use libafl_bolts::Named;
 use openapiv3::{OpenAPI, RequestBody};
+use std::borrow::Cow;
 use std::convert::TryInto;
 
 /// The `AddRequestMutator` adds a request to a random path from the specification
@@ -40,8 +41,8 @@ impl Default for AddRequestMutator {
 }
 
 impl Named for AddRequestMutator {
-    fn name(&self) -> &str {
-        "addrequestmutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("addrequestmutator")
     }
 }
 
@@ -49,16 +50,11 @@ impl<S> Mutator<OpenApiInput, S> for AddRequestMutator
 where
     S: HasRandAndOpenAPI,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         let (rand, api) = state.rand_mut_and_openapi();
 
         let n_ops = api.operations().count();
-        let new_path_i = rand.below(n_ops as u64) as usize;
+        let new_path_i = rand.below(n_ops);
 
         let (new_path, new_method, new_op, _new_path_item) =
             api.operations().nth(new_path_i).unwrap();
