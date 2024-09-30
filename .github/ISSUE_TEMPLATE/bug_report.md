@@ -18,7 +18,7 @@ A clear and concise description of what the bug is.
 **To Reproduce**
 Please describe the steps to reproduce the behavior:
 1. Describe the fuzzing target setup (product name or url and any relevant configuration such as target source code instrumentation).
-2. Post the wuppiefuzz command-line used and/or attach the wuppiefuzz config file.
+2. Post the WuppieFuzz command-line used and/or attach the WuppieFuzz config file.
 3. Attach or post a link to the OpenAPI specification used.
 4. Attach or post a link to the fuzzing corpus in use.
 5. Describe any authentication mechanisms in use.
