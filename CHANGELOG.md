@@ -6,6 +6,9 @@
 
 ## Fixes
 
+- Split `LICENSE` into `LICENSE` and `LICENSE.THIRDPARTY` in
+  [#18](https://github.com/TNO-S3/WuppieFuzz/pull/18)
+
 # v1.1.0 (2024-09-17)
 
 ## Highlights
