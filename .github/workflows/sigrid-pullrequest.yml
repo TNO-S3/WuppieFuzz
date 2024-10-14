@@ -14,6 +14,7 @@ jobs:
         with:
           customer: TNO
           system: WuppieFuzz
+          subsystem: WuppieFuzz
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
       - name: "Sigrid pull request feedback"

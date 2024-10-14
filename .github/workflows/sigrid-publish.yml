@@ -17,6 +17,7 @@ jobs:
         with:
           customer: TNO
           system: WuppieFuzz
+          subsystem: WuppieFuzz
           publishonly: true
         env:
           SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
