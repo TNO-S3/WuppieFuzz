@@ -1,0 +1,31 @@
+name: sigrid-pullrequest
+on: [pull_request]
+
+jobs:
+  sigridci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download Sigrid CI
+        run: "git clone https://github.com/Software-Improvement-Group/sigridci.git sigridci"
+      - name: "Run Sigrid CI" 
+        env:
+          SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
+        run: "./sigridci/sigridci/sigridci.py --customer <example_customer_name> --system <example_system_name> --source ."
+      - name: "Save Sigrid CI results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          path: "sigrid-ci-output/**"
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: "Sigrid pull request feedback"
+        uses: mshick/add-pr-comment@v2
+        if: always()
+        with:
+          message-id: sigrid
+          message-path: sigrid-ci-output/feedback.md
+

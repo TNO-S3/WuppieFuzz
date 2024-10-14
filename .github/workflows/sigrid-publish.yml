@@ -1,0 +1,21 @@
+name: sigrid-publish
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  sigridci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download Sigrid CI
+        run: "git clone https://github.com/Software-Improvement-Group/sigridci.git sigridci"
+      - name: "Run Sigrid CI" 
+        env:
+          SIGRID_CI_TOKEN: "${{ secrets.SIGRID_CI_TOKEN }}"
+        run: "./sigridci/sigridci/sigridci.py --customer <example_customer_name> --system <example_system_name> --source . --publish" 
+
