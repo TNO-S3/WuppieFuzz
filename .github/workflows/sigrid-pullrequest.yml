@@ -11,7 +11,7 @@ jobs:
           submodules: true
           fetch-depth: 0
       - name: Mark as safe
-        run: git config --global --add safe.directory /github/workspace
+        run: git config --global --add safe.directory /home/runner/work/WuppieFuzz/WuppieFuzz
       - name: Sigrid CI
         uses: Software-Improvement-Group/sigridci@main
         with:
