@@ -9,6 +9,7 @@ use petgraph::prelude::NodeIndex;
 use petgraph::{csr::DefaultIx, graph::DiGraph, visit::EdgeRef};
 use rand::prelude::Distribution;
 use serde_json::Value;
+use unicode_truncate::UnicodeTruncateStr;
 
 use crate::{
     initial_corpus::dependency_graph::ParameterMatching,
@@ -532,7 +533,7 @@ fn enforce_length_bounds(
         *result.to_mut() += &"A".repeat(min);
     }
     if let Some(max) = max_length {
-        result.to_mut().truncate(max);
+        result.to_mut().unicode_truncate(max);
     }
     result
 }

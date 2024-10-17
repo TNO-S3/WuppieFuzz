@@ -8,6 +8,9 @@
 
 - Split `LICENSE` into `LICENSE` and `LICENSE.THIRDPARTY` in
   [#18](https://github.com/TNO-S3/WuppieFuzz/pull/18)
+- Use `unicode_truncate` crate instead of `String::truncate` to make sure we cut
+  strings at a character boundary in
+  [#29](https://github.com/TNO-S3/WuppieFuzz/pull/29)
 
 # v1.1.0 (2024-09-17)
 
