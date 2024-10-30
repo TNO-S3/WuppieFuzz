@@ -11,6 +11,7 @@
 - Use `unicode_truncate` crate instead of `String::truncate` to make sure we cut
   strings at a character boundary in
   [#29](https://github.com/TNO-S3/WuppieFuzz/pull/29)
+- Added support for all remaining HTTP methods (options, connect)
 
 # v1.1.0 (2024-09-17)
 
