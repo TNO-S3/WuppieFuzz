@@ -1,5 +1,7 @@
 //! Mutates a request series by duplicating an existing request.
 
+use std::borrow::Cow;
+
 use crate::input::OpenApiInput;
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -28,8 +30,8 @@ impl Default for DuplicateRequestMutator {
 }
 
 impl Named for DuplicateRequestMutator {
-    fn name(&self) -> &str {
-        "duplicaterequestmutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("duplicaterequestmutator")
     }
 }
 
@@ -37,16 +39,11 @@ impl<S> Mutator<OpenApiInput, S> for DuplicateRequestMutator
 where
     S: HasRand,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         if input.0.is_empty() {
             return Ok(MutationResult::Skipped);
         }
-        let random_index = state.rand_mut().below(input.0.len() as u64) as usize;
+        let random_index = state.rand_mut().below(input.0.len());
         input
             .0
             .insert(random_index + 1, input.0[random_index].clone());

@@ -58,7 +58,7 @@ the source code to be downloaded and run the following command to clone the
 WuppieFuzz repository:
 
 ```sh
-git clone git@gitlab.tsn.tno.nl:vr/v2009/smart-fuzzing/web-api-fuzzing/wuppiefuzz.git
+git clone https://github.com/TNO-S3/WuppieFuzz.git
 ```
 
 ## Building WuppieFuzz
@@ -126,7 +126,7 @@ docker run -it --rm \
 ```
 
 This command will launch multiple Docker containers, consisting of a database, a
-web interface, and more. During this process , the installer will ask for a port
+web interface, and more. During this process, the installer will ask for a port
 on which to run the web interface. In this tutorial we assume that port 80 is
 chosen for this.
 
@@ -257,8 +257,7 @@ any of the endpoints. Depending on how well an API is designed, however, this
 feature may not always be reliable if an API does not return 403 codes for
 failed authentication.
 
-See the documentation for setting up authentication
-[here](https://gitlab.tsn.tno.nl/vr/v2009/smart-fuzzing/web-api-fuzzing/wuppiefuzz/-/blob/main/authentication.md)
+See the documentation for setting up authentication [here](../authentication.md)
 for more info.
 
 ## Run WuppieFuzz to fuzz this target

@@ -5,6 +5,8 @@
 //! reorder them, for instance. And there are other mutators that act on the contents of a
 //! request, changing the parameter values (using a LibAFL byte sequence mutator, for example).
 
+use std::borrow::Cow;
+
 use crate::input::parameter::SimpleValue;
 use crate::input::{new_rand_input, OpenApiInput, ParameterContents};
 use crate::state::OpenApiFuzzerState;
@@ -12,7 +14,7 @@ use libafl::corpus::Corpus;
 use libafl::inputs::Input;
 pub use libafl::mutators::mutations::*;
 use libafl::{
-    inputs::{BytesInput, HasBytesVec},
+    inputs::{BytesInput, HasMutatorBytes},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
@@ -132,8 +134,8 @@ impl<S> Named for OpenApiMutator<S>
 where
     S: HasRand,
 {
-    fn name(&self) -> &str {
-        "OpenApiMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("OpenApiMutator")
     }
 }
 
@@ -167,12 +169,7 @@ impl<S> Mutator<OpenApiInput, S> for OpenApiMutator<S>
 where
     S: HasRand,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         match self {
             OpenApiMutator::Contents(contents_mutator) => {
                 // We want a list of all parameter values that we can change.
@@ -188,9 +185,9 @@ where
                 };
 
                 // Choose the JSON mutators or the ASCII mutators depending on parameter variant
-                mutate_parameter_contents(random_param, state, contents_mutator.as_mut(), stage_idx)
+                mutate_parameter_contents(random_param, state, contents_mutator.as_mut())
             }
-            OpenApiMutator::Series(b) => b.mutate(state, input, stage_idx),
+            OpenApiMutator::Series(b) => b.mutate(state, input),
         }
     }
 }
@@ -200,7 +197,6 @@ fn mutate_leaf_value<S: HasRand>(
     state: &mut S,
     contents_mutator: &mut dyn Mutator<BytesInput, S>,
     leaf_value: &mut SimpleValue,
-    stage_idx: i32,
 ) -> MutationResult {
     match leaf_value {
         SimpleValue::Null => MutationResult::Skipped,
@@ -208,42 +204,41 @@ fn mutate_leaf_value<S: HasRand>(
             *b = !*b;
             MutationResult::Mutated
         }
-        SimpleValue::Number(ref mut n) => mutate_number(state, n, stage_idx),
-        SimpleValue::String(ref mut s) => mutate_string(state, contents_mutator, s, stage_idx),
+        SimpleValue::Number(ref mut n) => mutate_number(state, n),
+        SimpleValue::String(ref mut s) => mutate_string(state, contents_mutator, s),
     }
 }
 
 /// Mutate number in-place
-fn mutate_number<S: HasRand>(
-    state: &mut S,
-    n: &mut serde_json::value::Number,
-    _stage_idx: i32,
-) -> MutationResult {
+fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -> MutationResult {
     // A small chance to get a special value that might just lead to interesting errors
     match state.rand_mut().below(100) {
         0 => {
-            *n = 0.into();
-            return MutationResult::Mutated;
-        }
-        1 => {
             *n = (-1).into();
             return MutationResult::Mutated;
         }
-        2 => {
+        1 => {
             *n = u64::MAX.into();
             return MutationResult::Mutated;
         }
         _ => (),
     };
     if let Some(x) = n.as_u64() {
-        *n = state.rand_mut().below(x.saturating_mul(2)).into();
+        *n = match x as usize {
+            0 => 0.into(),
+            x_usz => state.rand_mut().below(x_usz.saturating_mul(2)).into(),
+        };
         return MutationResult::Mutated;
     };
     if let Some(x) = n.as_i64() {
         // always negative
-        *n = (state
-            .rand_mut()
-            .below(x.wrapping_neg().saturating_mul(4) as u64) as i64
+        *n = (state.rand_mut().below(
+            x.checked_neg()
+                .unwrap_or(i64::MAX) // because -i64::MIN == i64::MIN
+                .saturating_mul(4)
+                .try_into()
+                .unwrap_or(usize::MAX), // larger values could otherwise be truncated
+        ) as i64
             + x.saturating_mul(2))
         .into();
         return MutationResult::Mutated;
@@ -253,7 +248,10 @@ fn mutate_number<S: HasRand>(
         let x_sgn = x.signum();
         x *= x_sgn;
         let x_int = x.round() as u64;
-        let x_int_new = state.rand_mut().below(x_int.saturating_mul(4));
+        let x_int_new = match x_int as usize {
+            0 => 0,
+            x_usz => state.rand_mut().below(x_usz.saturating_mul(4)),
+        };
         let n_new = serde_json::value::Number::from_f64((x_int_new as f64) - 2.0 * x);
         if let Some(n_new) = n_new {
             *n = n_new;
@@ -268,15 +266,12 @@ fn mutate_string<S: HasRand>(
     state: &mut S,
     contents_mutator: &mut dyn Mutator<BytesInput, S>,
     s: &mut String,
-    stage_idx: i32,
 ) -> MutationResult {
     let mut bytes_input = s.as_bytes().into();
 
     // Apply byte-wise mutation using the inner AFL mutator.
     // If it fails, or didn't do anything, stop here
-    if let Ok(MutationResult::Skipped) | Err(_) =
-        contents_mutator.mutate(state, &mut bytes_input, stage_idx)
-    {
+    if let Ok(MutationResult::Skipped) | Err(_) = contents_mutator.mutate(state, &mut bytes_input) {
         return MutationResult::Skipped;
     };
 
@@ -294,34 +289,37 @@ fn mutate_parameter_contents<S: HasRand>(
     param_contents: &mut ParameterContents,
     state: &mut S,
     contents_mutator: &mut dyn Mutator<BytesInput, S>,
-    stage_idx: i32,
 ) -> Result<MutationResult, Error> {
     // Used if we pick an element from an array or object to mutate
     let random_element;
     match param_contents {
         ParameterContents::Object(obj_properties) => {
-            if obj_properties.is_empty() {
-                log::info!("Tried to mutate empty object; skipping. If this happens a lot WuppieFuzz may need improvement on this.");
-                return Ok(MutationResult::Skipped);
-            }
-            (_, random_element) = state.rand_mut().choose(obj_properties);
+            random_element = match state.rand_mut().choose(obj_properties.values_mut()) {
+                None => {
+                    log::info!("Tried to mutate empty object; skipping. If this happens a lot WuppieFuzz may need improvement on this.");
+                    return Ok(MutationResult::Skipped);
+                }
+                Some(element) => element,
+            };
         }
         ParameterContents::Array(arr_contents) => {
-            if arr_contents.is_empty() {
+            random_element = if let Some(element) = state.rand_mut().choose(arr_contents.iter_mut())
+            {
+                element
+            } else {
                 // Generate a new element for this empty array
                 arr_contents.push(ParameterContents::Bytes(new_rand_input(state.rand_mut())));
                 return Ok(MutationResult::Mutated);
-            }
-            random_element = state.rand_mut().choose(arr_contents);
+            };
         }
         ParameterContents::LeafValue(leaf) => {
-            return Ok(mutate_leaf_value(state, contents_mutator, leaf, stage_idx))
+            return Ok(mutate_leaf_value(state, contents_mutator, leaf))
         }
         ParameterContents::Bytes(contents) => {
             // The ASCII mutators operate on the LibAFL `BytesInput` type. This requires
             // conversions.
             let mut new_value = BytesInput::from(contents.clone());
-            let mutation_result = contents_mutator.mutate(state, &mut new_value, stage_idx);
+            let mutation_result = contents_mutator.mutate(state, &mut new_value);
             if mutation_result.is_ok() {
                 // The ASCII mutators might not actually change a value, since bit 0 of all bytes is always 0.
                 // To prevent duplicate inputs, we check explicitly if it actually changed anything.
@@ -341,7 +339,7 @@ fn mutate_parameter_contents<S: HasRand>(
         Ok(MutationResult::Skipped)
     } else {
         // This was nested in an array or object, recursively mutate
-        mutate_parameter_contents(random_element, state, contents_mutator, stage_idx)
+        mutate_parameter_contents(random_element, state, contents_mutator)
     }
 }
 

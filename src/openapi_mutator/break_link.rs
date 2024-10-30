@@ -2,6 +2,8 @@
 //! in a request parameter to a value that should be in the response to an earlier request.
 //! The link is replaced by a randomly generated static value.
 
+use std::borrow::Cow;
+
 use crate::input::OpenApiInput;
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -32,8 +34,8 @@ impl Default for BreakLinkMutator {
 }
 
 impl Named for BreakLinkMutator {
-    fn name(&self) -> &str {
-        "breaklinkmutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("breaklinkmutator")
     }
 }
 
@@ -41,12 +43,7 @@ impl<S> Mutator<OpenApiInput, S> for BreakLinkMutator
 where
     S: HasRand,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         let reference_parameters = input
             .parameter_filter(&|v| v.is_reference())
             .map(|(_, v)| v);

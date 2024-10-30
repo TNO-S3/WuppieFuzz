@@ -15,6 +15,7 @@ use libafl::{
 };
 use libafl_bolts::rands::Rand;
 use libafl_bolts::Named;
+use std::borrow::Cow;
 use std::convert::TryInto;
 
 /// The `DifferentMethodMutator` changes an existing request from the series
@@ -41,8 +42,8 @@ impl Default for DifferentMethodMutator {
 }
 
 impl Named for DifferentMethodMutator {
-    fn name(&self) -> &str {
-        "differentmethodmutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("differentmethodmutator")
     }
 }
 
@@ -50,18 +51,13 @@ impl<S> Mutator<OpenApiInput, S> for DifferentMethodMutator
 where
     S: HasRandAndOpenAPI,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         if input.0.is_empty() {
             return Ok(MutationResult::Skipped);
         }
         let (rand, api) = state.rand_mut_and_openapi();
 
-        let random_input = rand.choose(&mut input.0);
+        let random_input = rand.choose(&mut input.0).unwrap();
 
         let available_methods: Vec<(&str, Option<usize>)> = match self.method_mutation_strategy {
             MethodMutationStrategy::FollowSpec => {
@@ -96,7 +92,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let (new_method, http_method_idx) = rand.choose(available_methods);
+        let (new_method, http_method_idx) = rand.choose(available_methods).unwrap();
         random_input.method = new_method.try_into().unwrap_or_else(|_| {
             panic!(
                 "Tried to mutate into non-existing HTTP method {}",

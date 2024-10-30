@@ -13,7 +13,7 @@ pub struct DummyCoverageClient {
 impl DummyCoverageClient {
     /// Creates a new dummy coverage client.
     pub fn new() -> Self {
-        Self { buf: Vec::new() }
+        Self { buf: vec![0] }
     }
 }
 
@@ -26,7 +26,9 @@ impl Default for DummyCoverageClient {
 impl CoverageClient for DummyCoverageClient {
     /// Fetch and process the current coverage. If `reset` is true, tells the remote
     /// coverage agent to reset its coverage map.
-    fn fetch_coverage(&mut self, _reset: bool) {}
+    fn fetch_coverage(&mut self, _reset: bool) {
+        self.buf[0] = 1;
+    }
 
     /// Retrieve a pointer to the coverage bitmap (this is used by LibAFL).
     fn get_coverage_ptr(&mut self) -> *mut u8 {
@@ -35,12 +37,12 @@ impl CoverageClient for DummyCoverageClient {
 
     /// Retrieve the length of the array pointed to by `get_coverage_pointer`
     fn get_coverage_len(&self) -> usize {
-        0
+        self.buf.len()
     }
 
     /// Retrieve the coverage ratio: nodes hit and total number of nodes.
     fn max_coverage_ratio(&mut self) -> (u64, u64) {
-        (0, 0)
+        (0, 1)
     }
 
     /// Write a format-dependent report to disk

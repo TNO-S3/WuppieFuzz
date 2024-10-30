@@ -26,7 +26,15 @@ pub fn print_version() {
 
 pub fn print_license() {
     print_version();
-    println!("{}", include_str!("../LICENSE"))
+    println!(
+        "===============================================================================\
+    \n                                LICENSE NOTICE\n\
+    ===============================================================================\
+    \n{}\n{}\n\
+    ===============================================================================",
+        include_str!("../LICENSE"),
+        include_str!("../LICENSE.THIRDPARTY")
+    )
 }
 
 pub fn print_sbom() {

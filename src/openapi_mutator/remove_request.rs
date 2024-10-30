@@ -1,6 +1,8 @@
 //! Mutates a request series by removing a random request from it, if there are more
 //! than one.
 
+use std::borrow::Cow;
+
 use crate::input::OpenApiInput;
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -30,8 +32,8 @@ impl Default for RemoveRequestMutator {
 }
 
 impl Named for RemoveRequestMutator {
-    fn name(&self) -> &str {
-        "removerequestmutator"
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("removerequestmutator")
     }
 }
 
@@ -39,16 +41,11 @@ impl<S> Mutator<OpenApiInput, S> for RemoveRequestMutator
 where
     S: HasRand,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut OpenApiInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut OpenApiInput) -> Result<MutationResult, Error> {
         if input.0.len() < 2 {
             return Ok(MutationResult::Skipped);
         }
-        let random_index = state.rand_mut().below(input.0.len() as u64) as usize;
+        let random_index = state.rand_mut().below(input.0.len());
         input.0.remove(random_index);
 
         // Don't forget to fix up the `ParameterContents::Reference`s contained in the

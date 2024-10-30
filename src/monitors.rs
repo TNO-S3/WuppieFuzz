@@ -11,7 +11,7 @@ use libafl::{
 };
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use serde_json::json;
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]
@@ -62,7 +62,7 @@ where
         self.start_time = time
     }
 
-    fn display(&mut self, event_msg: String, _sender_id: ClientId) {
+    fn display(&mut self, event_msg: &str, _sender_id: ClientId) {
         let config = Configuration::must_get();
         let total_time = current_time() - self.start_time;
         let output_string = match config.output_format {
@@ -72,10 +72,10 @@ where
                 "objectives": self.objective_size(),
                 "executed_sequences": self.total_execs(),
                 "sequences_per_sec": self.req_execs_per_sec(self.total_execs()),
-                "requests": Self::req_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String("unknown".to_string()), AggregatorOps::None)),
+                "requests": Self::req_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
                 "requests_per_sec": Self::req_sec_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
-                "coverage": Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String("unknown".to_string()), AggregatorOps::None)),
-                "endpoint_coverage": Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String("unknown".to_string()), AggregatorOps::None)),
+                "coverage": Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                "endpoint_coverage": Self::end_cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
             })
             .to_string(),
             OutputFormat::HumanReadable => {
@@ -85,14 +85,21 @@ where
                     event_msg,
                     format_duration_hms(&(current_time() - self.start_time)),
                     self.objective_size(),
-                                )
+                )
             } else if event_msg == "Testcase" {
-                    format!(
-                        "[{}] The testing corpus expanded! After run time: {}, total corpus size: {}",
-                        event_msg,
-                        format_duration_hms(&(current_time() - self.start_time)),
-                        self.corpus_size(),
-                        )
+                match self.total_execs() {
+                    0 => format!(
+                            "[{}] Starting corpus loaded! Initial corpus size: {}",
+                            event_msg,
+                            self.corpus_size(),
+                        ),
+                    _ => format!(
+                            "[{}] The testing corpus expanded! After run time: {}, total corpus size: {}",
+                            event_msg,
+                            format_duration_hms(&(current_time() - self.start_time)),
+                            self.corpus_size(),
+                        ),
+                }
             } else {
                 format!(
                     "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}",
@@ -104,8 +111,8 @@ where
                     self.req_execs_per_sec(self.total_execs()),
                     Self::req_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None)),
                     Self::req_sec_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
-                    Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String("unknown".to_string()), AggregatorOps::None)),
-                    Self::end_cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String("unknown".to_string()), AggregatorOps::None)),
+                    Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                    Self::end_cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
                 )
             }
         }};
@@ -140,7 +147,7 @@ where
     }
 
     fn req_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
-        client_stats.user_monitor.get("requests").unwrap_or(default)
+        client_stats.get_user_stats("requests").unwrap_or(default)
     }
 
     fn req_execs_per_sec(&mut self, execs: u64) -> String {
@@ -158,8 +165,7 @@ where
     ) -> UserStats {
         UserStats::new(
             client_stats
-                .user_monitor
-                .get("requests")
+                .get_user_stats("requests")
                 .unwrap_or(default)
                 .value()
                 .clone()
@@ -170,13 +176,14 @@ where
     }
 
     fn cov_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
-        client_stats.user_monitor.get("coverage").unwrap_or(default)
+        client_stats
+            .get_user_stats("wuppiefuzz_code_coverage")
+            .unwrap_or(default)
     }
 
     fn end_cov_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
         client_stats
-            .user_monitor
-            .get("endpoint_coverage")
+            .get_user_stats("wuppiefuzz_endpoint_coverage")
             .unwrap_or(default)
     }
 }
