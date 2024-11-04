@@ -14,6 +14,7 @@
 - Added support for all remaining HTTP methods (options, connect) in
   [#32](https://github.com/TNO-S3/WuppieFuzz/pull/32)
 - Added support for Regex anchors
+  [#35](https://github.com/TNO-S3/WuppieFuzz/pull/35)
 
 # v1.1.0 (2024-09-17)
 
