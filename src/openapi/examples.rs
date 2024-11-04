@@ -783,7 +783,7 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
     }
 
     // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
-    let mut error_occurred = false;
+    let mut contains_anchors = false;
     if let Some(pattern) = &string.pattern {
         match rand_regex::Regex::compile(pattern, 100) {
             Ok(regex_pattern) => {
@@ -791,14 +791,14 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
                     regex_pattern.sample(&mut rand::thread_rng()),
                 )]
             }
-            Err(err) => {
-                error_occurred = true;
+            Err(_err) => {
+                contains_anchors = true;
             }
         }
     }
 
     // The regex possibly contains anchors (e.g. ^, $)
-    if error_occurred {
+    if contains_anchors {
         if let Some(pattern) = &string.pattern {
             // Remove anchors from the pattern for the generator
             let gen_pattern = pattern.replace("^", "").replace("$", "");
@@ -808,16 +808,11 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
                     // Define the filter regex with the original pattern including anchors
                     let filter_regex = Regex::new(pattern).unwrap();
 
-                    // Sample and filter the result
-                    // let sample = rand::thread_rng()
-                    //     .sample_iter::<String, _>(&gen)
-                    //     .filter(|s| filter_regex.is_match(s))
-                    //     .next()
-                    //     .unwrap();
+                    // Generate a regex pattern without anchors and test if it matches the anchors
                     let sample = rand::thread_rng()
                         .sample_iter::<String, _>(&gen)
+                        .take(1000) // Limit number of samples
                         .filter(|s| filter_regex.is_match(s))
-                        .take(100) // Limit number of samples
                         .next()
                         .unwrap_or_else(|| "No regex match found".to_string());
 
