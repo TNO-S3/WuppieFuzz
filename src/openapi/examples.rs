@@ -8,6 +8,8 @@ use openapiv3::{
 use petgraph::prelude::NodeIndex;
 use petgraph::{csr::DefaultIx, graph::DiGraph, visit::EdgeRef};
 use rand::prelude::Distribution;
+use rand::Rng;
+use regex::Regex;
 use serde_json::Value;
 use unicode_truncate::UnicodeTruncateStr;
 
@@ -780,7 +782,8 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
             .collect();
     }
 
-    // Regex present? Attempt to compile it, and generate a string that matches it
+    // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
+    let mut error_occurred = false;
     if let Some(pattern) = &string.pattern {
         match rand_regex::Regex::compile(pattern, 100) {
             Ok(regex_pattern) => {
@@ -789,7 +792,40 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
                 )]
             }
             Err(err) => {
-                log::warn!("Broken regex pattern {}, Error message: {}", pattern, err);
+                error_occurred = true;
+            }
+        }
+    }
+
+    // The regex possibly contains anchors (e.g. ^, $)
+    if error_occurred {
+        if let Some(pattern) = &string.pattern {
+            // Remove anchors from the pattern for the generator
+            let gen_pattern = pattern.replace("^", "").replace("$", "");
+
+            match rand_regex::Regex::compile(&gen_pattern, 100) {
+                Ok(gen) => {
+                    // Define the filter regex with the original pattern including anchors
+                    let filter_regex = Regex::new(pattern).unwrap();
+
+                    // Sample and filter the result
+                    // let sample = rand::thread_rng()
+                    //     .sample_iter::<String, _>(&gen)
+                    //     .filter(|s| filter_regex.is_match(s))
+                    //     .next()
+                    //     .unwrap();
+                    let sample = rand::thread_rng()
+                        .sample_iter::<String, _>(&gen)
+                        .filter(|s| filter_regex.is_match(s))
+                        .take(100) // Limit number of samples
+                        .next()
+                        .unwrap_or_else(|| "No regex match found".to_string());
+
+                    return vec![serde_json::Value::String(sample)];
+                }
+                Err(err) => {
+                    log::warn!("Broken regex pattern {}, Error message: {}", pattern, err);
+                }
             }
         }
     }
