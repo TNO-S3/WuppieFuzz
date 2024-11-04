@@ -783,44 +783,39 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
     }
 
     // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
-    let mut contains_anchors = false;
     if let Some(pattern) = &string.pattern {
-        match rand_regex::Regex::compile(pattern, 100) {
-            Ok(regex_pattern) => {
-                return vec![serde_json::Value::String(
-                    regex_pattern.sample(&mut rand::thread_rng()),
-                )]
-            }
-            Err(_err) => {
-                contains_anchors = true;
-            }
+        if let Ok(compiled_regex) = rand_regex::Regex::compile(pattern, 100) {
+            return vec![serde_json::Value::String(
+                compiled_regex.sample(&mut rand::thread_rng()),
+            )];
         }
-    }
 
-    // The regex possibly contains anchors (e.g. ^, $)
-    if contains_anchors {
-        if let Some(pattern) = &string.pattern {
-            // Remove anchors from the pattern for the generator
-            let gen_pattern = pattern.replace("^", "").replace("$", "");
+        // The regex does have anchors, which the generator can not work with
+        // Remove anchors from the pattern for the generator
+        let pattern_without_anchors = pattern.replace("^", "").replace("$", "");
 
-            match rand_regex::Regex::compile(&gen_pattern, 100) {
-                Ok(gen) => {
-                    // Define the filter regex with the original pattern including anchors
-                    let filter_regex = Regex::new(pattern).unwrap();
+        match rand_regex::Regex::compile(&pattern_without_anchors, 100) {
+            Ok(compiled_regex) => {
+                // Define the filter regex with the original pattern including anchors
+                let filter_regex = Regex::new(pattern).unwrap();
 
-                    // Generate a regex pattern without anchors and test if it matches the anchors
-                    let sample = rand::thread_rng()
-                        .sample_iter::<String, _>(&gen)
-                        .take(1000) // Limit number of samples
-                        .filter(|s| filter_regex.is_match(s))
-                        .next()
-                        .unwrap_or_else(|| "No regex match found".to_string());
-
+                // Generate 1000 sample strings from the regex pattern without anchors
+                // and test if one matches the regex with the anchors
+                if let Some(sample) = rand::thread_rng()
+                    .sample_iter::<String, _>(&compiled_regex)
+                    .take(1000) // Limit number of samples
+                    .filter(|s| filter_regex.is_match(s))
+                    .next()
+                {
                     return vec![serde_json::Value::String(sample)];
                 }
-                Err(err) => {
-                    log::warn!("Broken regex pattern {}, Error message: {}", pattern, err);
-                }
+                log::warn!(
+                    "Could not generate an example string that matches the regex {}",
+                    pattern
+                );
+            }
+            Err(err) => {
+                log::warn!("Broken regex pattern {}, Error message: {}", pattern, err);
             }
         }
     }
