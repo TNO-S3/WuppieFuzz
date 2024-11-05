@@ -11,6 +11,9 @@
 - Use `unicode_truncate` crate instead of `String::truncate` to make sure we cut
   strings at a character boundary in
   [#29](https://github.com/TNO-S3/WuppieFuzz/pull/29)
+- Support `text/plain` bodies when replacing backreference-type parameter values
+  by actual values in
+  [#40](https://github.com/TNO-S3/WuppieFuzz/pull/40)
 
 # v1.1.0 (2024-09-17)
 
