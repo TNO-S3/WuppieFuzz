@@ -11,6 +11,8 @@
 - Use `unicode_truncate` crate instead of `String::truncate` to make sure we cut
   strings at a character boundary in
   [#29](https://github.com/TNO-S3/WuppieFuzz/pull/29)
+- Added support for all remaining HTTP methods (options, connect) in
+  [#32](https://github.com/TNO-S3/WuppieFuzz/pull/32)
 - Support `text/plain` bodies when replacing backreference-type parameter values
   by actual values in
   [#40](https://github.com/TNO-S3/WuppieFuzz/pull/40)

@@ -7,6 +7,8 @@ const PATCH: &str = "PATCH";
 const DELETE: &str = "DELETE";
 const HEAD: &str = "HEAD";
 const TRACE: &str = "TRACE";
+const OPTIONS: &str = "OPTIONS";
+const CONNECT: &str = "CONNECT";
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "UPPERCASE", try_from = "String")]
@@ -20,6 +22,8 @@ pub enum Method {
     Delete,
     Head,
     Trace,
+    Options,
+    Connect,
 }
 
 impl Method {
@@ -38,6 +42,8 @@ impl Method {
             Method::Delete => DELETE,
             Method::Head => HEAD,
             Method::Trace => TRACE,
+            Method::Options => OPTIONS,
+            Method::Connect => CONNECT,
         }
     }
 }
@@ -52,6 +58,8 @@ impl From<Method> for reqwest::Method {
             Method::Delete => reqwest::Method::DELETE,
             Method::Head => reqwest::Method::HEAD,
             Method::Trace => reqwest::Method::TRACE,
+            Method::Options => reqwest::Method::OPTIONS,
+            Method::Connect => reqwest::Method::CONNECT,
         }
     }
 }
@@ -85,6 +93,8 @@ impl Ord for Method {
                 Method::Put => 4,
                 Method::Patch => 5,
                 Method::Delete => 6,
+                Method::Options => 7,
+                Method::Connect => 8,
             }
         }
         method_index(*self).cmp(&method_index(*other))
@@ -107,6 +117,8 @@ impl Display for Method {
             Method::Delete => fmt.write_str(DELETE),
             Method::Head => fmt.write_str(HEAD),
             Method::Trace => fmt.write_str(TRACE),
+            Method::Options => fmt.write_str(OPTIONS),
+            Method::Connect => fmt.write_str(CONNECT),
         }
     }
 }
@@ -126,6 +138,8 @@ impl TryFrom<&str> for Method {
             6 if s.eq_ignore_ascii_case(DELETE) => Ok(Self::Delete),
             4 if s.eq_ignore_ascii_case(HEAD) => Ok(Self::Head),
             5 if s.eq_ignore_ascii_case(TRACE) => Ok(Self::Trace),
+            7 if s.eq_ignore_ascii_case(OPTIONS) => Ok(Self::Options),
+            7 if s.eq_ignore_ascii_case(CONNECT) => Ok(Self::Connect),
             _ => Err(InvalidMethodError(s.to_owned())),
         }
     }
