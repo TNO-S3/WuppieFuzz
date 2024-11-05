@@ -13,6 +13,9 @@
   [#29](https://github.com/TNO-S3/WuppieFuzz/pull/29)
 - Added support for all remaining HTTP methods (options, connect) in
   [#32](https://github.com/TNO-S3/WuppieFuzz/pull/32)
+- Support `text/plain` bodies when replacing backreference-type parameter values
+  by actual values in
+  [#40](https://github.com/TNO-S3/WuppieFuzz/pull/40)
 
 # v1.1.0 (2024-09-17)
 
