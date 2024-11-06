@@ -526,13 +526,13 @@ ratatui 0.26.3
 redox_syscall 0.5.4
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
-regex 1.10.6
+regex 1.11.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-automata 0.4.7
+regex-automata 0.4.8
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-syntax 0.8.4
+regex-syntax 0.8.5
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
 reqwest 0.12.7

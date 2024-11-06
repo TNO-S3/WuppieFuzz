@@ -17,6 +17,8 @@
   by actual values in [#40](https://github.com/TNO-S3/WuppieFuzz/pull/40)
 - Fixes missing OpenSSL dependency by static compilation in
   [#43](https://github.com/TNO-S3/WuppieFuzz/pull/43)
+- Added support for Regex anchors in
+  [#35](https://github.com/TNO-S3/WuppieFuzz/pull/35)
 
 # v1.1.0 (2024-09-17)
 

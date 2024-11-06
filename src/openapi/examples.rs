@@ -8,6 +8,8 @@ use openapiv3::{
 use petgraph::prelude::NodeIndex;
 use petgraph::{csr::DefaultIx, graph::DiGraph, visit::EdgeRef};
 use rand::prelude::Distribution;
+use rand::Rng;
+use regex::Regex;
 use serde_json::Value;
 use unicode_truncate::UnicodeTruncateStr;
 
@@ -780,13 +782,37 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
             .collect();
     }
 
-    // Regex present? Attempt to compile it, and generate a string that matches it
+    // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
     if let Some(pattern) = &string.pattern {
-        match rand_regex::Regex::compile(pattern, 100) {
-            Ok(regex_pattern) => {
-                return vec![serde_json::Value::String(
-                    regex_pattern.sample(&mut rand::thread_rng()),
-                )]
+        if let Ok(compiled_regex) = rand_regex::Regex::compile(pattern, 100) {
+            return vec![serde_json::Value::String(
+                compiled_regex.sample(&mut rand::thread_rng()),
+            )];
+        }
+
+        // The regex does have anchors, which the generator can not work with
+        // Remove anchors from the pattern for the generator
+        let pattern_without_anchors = pattern.replace("^", "").replace("$", "");
+
+        match rand_regex::Regex::compile(&pattern_without_anchors, 100) {
+            Ok(compiled_regex) => {
+                // Define the filter regex with the original pattern including anchors
+                let filter_regex = Regex::new(pattern).unwrap();
+
+                // Generate 1000 sample strings from the regex pattern without anchors
+                // and test if one matches the regex with the anchors
+                if let Some(sample) = rand::thread_rng()
+                    .sample_iter::<String, _>(&compiled_regex)
+                    .take(1000) // Limit number of samples
+                    .filter(|s| filter_regex.is_match(s))
+                    .next()
+                {
+                    return vec![serde_json::Value::String(sample)];
+                }
+                log::warn!(
+                    "Could not generate an example string that matches the regex {}",
+                    pattern
+                );
             }
             Err(err) => {
                 log::warn!("Broken regex pattern {}, Error message: {}", pattern, err);

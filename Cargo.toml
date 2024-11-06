@@ -72,6 +72,7 @@ petgraph = "0.6.4"
 porter-stemmer = "0.1.2"
 rand = "0.8.5"
 rand_regex = "0.17.0"
+regex = "1.11.1"
 reqwest = { version = "0.12.4", features = ["blocking", "json"] }
 reqwest_cookie_store = "0.7.0"
 rusqlite = { version = "0.31.0", features = ["bundled"] }
