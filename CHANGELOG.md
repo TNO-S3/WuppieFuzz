@@ -13,7 +13,11 @@
   [#29](https://github.com/TNO-S3/WuppieFuzz/pull/29)
 - Added support for all remaining HTTP methods (options, connect) in
   [#32](https://github.com/TNO-S3/WuppieFuzz/pull/32)
-- Added support for Regex anchors
+- Support `text/plain` bodies when replacing backreference-type parameter values
+  by actual values in [#40](https://github.com/TNO-S3/WuppieFuzz/pull/40)
+- Fixes missing OpenSSL dependency by static compilation in
+  [#43](https://github.com/TNO-S3/WuppieFuzz/pull/43)
+- Added support for Regex anchors in
   [#35](https://github.com/TNO-S3/WuppieFuzz/pull/35)
 
 # v1.1.0 (2024-09-17)

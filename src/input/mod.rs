@@ -165,8 +165,9 @@ impl OpenApiRequest {
         // Resolve body parameters
         match &mut self.body {
             Body::Empty => (), // No (reference) parameters in body, so nothing to resolve here!
-            Body::TextPlain(_) => todo!(),
-            Body::ApplicationJson(body) | Body::XWwwFormUrlencoded(body) => match body {
+            Body::TextPlain(body)
+            | Body::ApplicationJson(body)
+            | Body::XWwwFormUrlencoded(body) => match body {
                 ParameterContents::Reference { .. } => {
                     resolve_single_parameter(body, parameter_values)?;
                 }
