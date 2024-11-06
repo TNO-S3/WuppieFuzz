@@ -6,6 +6,14 @@
 
 ## Fixes
 
+# v1.1.1 (2024-11-06)
+
+## Highlights
+
+## Features
+
+## Fixes
+
 - Split `LICENSE` into `LICENSE` and `LICENSE.THIRDPARTY` in
   [#18](https://github.com/TNO-S3/WuppieFuzz/pull/18)
 - Use `unicode_truncate` crate instead of `String::truncate` to make sure we cut
