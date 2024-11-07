@@ -5,6 +5,8 @@
 ## Features
 
 ## Fixes
+- Removed `libssl` from installation prerequisites and added `build-essential` in
+  [#45](https://github.com/TNO-S3/WuppieFuzz/pull/45)
 
 # v1.1.1 (2024-11-06)
 
