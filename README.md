@@ -21,7 +21,7 @@ WuppieFuzz was featured in
 
 To run the project you need to install the following dependencies and tooling
 
-- libssl-dev `sudo apt install libssl-dev`
+- build-essential `sudo apt install build-essential`
 - pkg-config `sudo apt install pkg-config`
 - Rust `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
