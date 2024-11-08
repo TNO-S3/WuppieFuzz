@@ -336,18 +336,17 @@ pub fn fuzz() -> Result<()> {
         .map(|timeout| Instant::now() - starting_time < timeout)
         .unwrap_or(true)
     {
-        match fuzzer
-            .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
-                Ok(res) => res,
-                Err(err) => match err {
-                    libafl_bolts::Error::ShuttingDown => {
-                        return Ok(());
-                    }
-                    _ => {
-                        panic!("Error in the fuzz loop.");
-                    }
+        match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
+            Ok(res) => res,
+            Err(err) => match err {
+                libafl_bolts::Error::ShuttingDown => {
+                    return Ok(());
                 }
-            };
+                _ => {
+                    panic!("Error in the fuzz loop.");
+                }
+            },
+        };
         // send update of execution data to the monitor
         let executions = *state.executions();
         if let Err(e) = mgr.fire(
