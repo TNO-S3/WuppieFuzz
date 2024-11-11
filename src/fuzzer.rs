@@ -338,14 +338,12 @@ pub fn fuzz() -> Result<()> {
     {
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(res) => res,
-            Err(err) => match err {
-                libafl_bolts::Error::ShuttingDown => {
-                    return Ok(());
-                }
-                _ => {
-                    panic!("Error in the fuzz loop.");
-                }
-            },
+            Err(libafl_bolts::Error::ShuttingDown) => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Error in the fuzz loop.");
+            }
         };
         // send update of execution data to the monitor
         let executions = *state.executions();
