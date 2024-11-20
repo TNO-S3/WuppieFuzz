@@ -168,7 +168,7 @@ pub fn fuzz() -> Result<()> {
     let power = StdPowerMutationalStage::new(mutator_openapi);
     let mut stages = tuple_list!(calibration, power);
 
-    let (authentication, cookie_store, client) = crate::build_http_client()?;
+    let (mut authentication, cookie_store, client) = crate::build_http_client(&api)?;
 
     let reporter = crate::reporting::sqlite::get_reporter(config)?;
 
@@ -194,11 +194,16 @@ pub fn fuzz() -> Result<()> {
                     );
                 break 'chain;
             };
-            let request_builder =
-                match build_request_from_input(&client, &cookie_store, &api, &request) {
-                    None => continue,
-                    Some(r) => r.timeout(Duration::from_millis(config.request_timeout)),
-                };
+            let request_builder = match build_request_from_input(
+                &client,
+                &mut authentication,
+                &cookie_store,
+                &api,
+                &request,
+            ) {
+                None => continue,
+                Some(r) => r.timeout(Duration::from_millis(config.request_timeout)),
+            };
 
             let request_built = match request_builder.build() {
                 Ok(request) => request,

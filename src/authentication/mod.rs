@@ -34,6 +34,8 @@ pub enum Mode {
     Custom(custom::CustomLogin),
     #[serde(rename = "cookie")]
     Cookie(cookie::CookieLogin),
+    #[serde(rename = "oauth")]
+    Oauth(oauth::OauthLogin),
 }
 
 /// Authentication details received after logging in. Depending on the
@@ -100,6 +102,11 @@ pub fn initialize_from_config(config_path: Option<&Path>) -> Result<Authenticati
                 .map(|(name, value)| RawCookie::new(name, value))
                 .collect(),
         ),
+        Mode::Oauth(config) => Authentication::OAuth(
+            config
+                .login()
+                .context("Error during OAuth authentication with the server")?,
+        ),
     })
 }
 
@@ -115,27 +122,70 @@ impl Authentication {
             Authentication::Bearer(token) => {
                 single_header_force(AUTHORIZATION, &format!("Bearer {token}"))
             }
-            Authentication::OAuth(tokens) => {
+            Authentication::OAuth(tokens) if tokens.mode == oauth::Mode::AuthorizationHeader => {
                 if let Ok(token) = tokens.access_token() {
-                    single_header_force(AUTHORIZATION, token)
+                    single_header_force(AUTHORIZATION, &token)
                 } else {
+                    // TODO this should do something panicky right??
                     Default::default()
                 }
             }
+            Authentication::OAuth(_tokens) => Default::default(),
             Authentication::Cookie(_) => Default::default(),
         }
     }
 
-    pub fn cookie_store(&self, server_url: &Url) -> reqwest_cookie_store::CookieStore {
+    pub fn cookie_store(
+        &mut self,
+        server_url: &Url,
+    ) -> Result<reqwest_cookie_store::CookieStore, anyhow::Error> {
         match self {
             Authentication::Cookie(cookies) => {
                 let cookies = cookies
                     .iter()
                     .map(|c| Cookie::try_from_raw_cookie(c, server_url));
-                reqwest_cookie_store::CookieStore::from_cookies(cookies, true).unwrap_or_default()
+                reqwest_cookie_store::CookieStore::from_cookies(cookies, true)
+                    .context("Parsing cookie values from authentication file")
             }
-            _ => reqwest_cookie_store::CookieStore::default(),
+            Authentication::OAuth(tokens) if tokens.mode == oauth::Mode::Cookie => {
+                reqwest_cookie_store::CookieStore::from_cookies(
+                    [
+                        Cookie::try_from_raw_cookie(
+                            &RawCookie::new("access_token", tokens.access_token()?),
+                            server_url,
+                        ),
+                        Cookie::try_from_raw_cookie(
+                            &RawCookie::new("refresh_token", tokens.refresh_token()?),
+                            server_url,
+                        ),
+                    ],
+                    true,
+                )
+                .context("Parsing cookie values from access token")
+            }
+            _ => Ok(reqwest_cookie_store::CookieStore::default()),
         }
+    }
+
+    pub fn update_cookie_store(
+        &mut self,
+        cookie_store: &mut reqwest_cookie_store::CookieStore,
+        server_url: &Url,
+    ) -> Result<(), anyhow::Error> {
+        match self {
+            Authentication::OAuth(tokens) if tokens.mode == oauth::Mode::Cookie => {
+                cookie_store.insert_raw(
+                    &RawCookie::new("access_token", tokens.access_token()?),
+                    server_url,
+                )?;
+                cookie_store.insert_raw(
+                    &RawCookie::new("refresh_token", tokens.refresh_token()?),
+                    server_url,
+                )?;
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     /// Return the last Autorization header value, without refreshing it if expired.
@@ -144,7 +194,9 @@ impl Authentication {
             Authentication::Raw(text) => Some(Cow::from(text)),
             Authentication::Basic(config) => Some(Cow::from(format!("Basic {config}"))),
             Authentication::Bearer(token) => Some(Cow::from(format!("Bearer {token}"))),
-            Authentication::OAuth(tokens) => Some(Cow::from(&tokens.access_token)),
+            Authentication::OAuth(tokens) if tokens.mode == oauth::Mode::AuthorizationHeader => {
+                Some(Cow::from(&tokens.access_token))
+            }
             _ => None,
         }
     }

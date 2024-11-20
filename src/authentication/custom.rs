@@ -50,9 +50,10 @@ impl CustomLogin {
 
         Ok(oauth::Tokens {
             access_token: response.access_token,
-            _refresh_token: response.refresh_token,
-            _refresh_url: reqwest::Url::parse(&self.url)?,
-            expiry_timestamp: response.authentication.payload.exp,
+            refresh_token: response.refresh_token,
+            refresh_url: self.url,
+            access_expiry_timestamp: response.authentication.payload.exp,
+            mode: oauth::Mode::AuthorizationHeader,
         })
     }
 }

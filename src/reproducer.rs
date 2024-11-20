@@ -33,7 +33,7 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
     )?;
     let inputs = OpenApiInput::from_file(input_file)?;
 
-    let (authentication, cookie_store, client) = crate::build_http_client()?;
+    let (mut authentication, cookie_store, client) = crate::build_http_client(&api)?;
 
     println!(
         "Input file {:?} contains {} inputs",
@@ -55,8 +55,14 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
             continue;
         };
 
-        let request_built = match build_request_from_input(&client, &cookie_store, &api, &request)
-            .map(|builder| builder.build())
+        let request_built = match build_request_from_input(
+            &client,
+            &mut authentication,
+            &cookie_store,
+            &api,
+            &request,
+        )
+        .map(|builder| builder.build())
         {
             None => {
                 warn!("Could not generate a HTTP request from this input. Skipping ...");

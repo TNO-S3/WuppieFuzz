@@ -1,4 +1,7 @@
-use crate::input::{parameter::ParameterKind, OpenApiRequest};
+use crate::{
+    authentication,
+    input::{parameter::ParameterKind, OpenApiRequest},
+};
 use cookie::Cookie;
 use openapiv3::OpenAPI;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -6,6 +9,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 /// Build a request to a path from the API using the input values.
 pub fn build_request_from_input(
     client: &reqwest::blocking::Client,
+    authentication: &mut authentication::Authentication,
     cookie_store: &std::sync::Arc<reqwest_cookie_store::CookieStoreMutex>,
     api: &OpenAPI,
     input: &OpenApiRequest,
@@ -14,6 +18,8 @@ pub fn build_request_from_input(
         .servers.first()
         .expect("API specification contains no usable servers. If you did specify any, consult logs for attempts to connect to them.");
     let mut path = server.url.to_owned() + &input.path;
+
+    // Apply parameters from the input
     let mut header_params = HeaderMap::new();
     header_params.insert(
         reqwest::header::ACCEPT,
@@ -50,10 +56,14 @@ pub fn build_request_from_input(
     let path_with_query_params =
         reqwest::Url::parse_with_params(&path, query_params).expect("Invalid URL");
 
-    // Add any collected cookie parameters to the cookie store
+    // Update the authentication cookie if needed and
+    // add any collected cookie parameters to the cookie store
     {
         let mut cookie_store = cookie_store.lock().unwrap();
         let bare_url = reqwest::Url::parse(&path).expect("Invalid URL");
+        authentication
+            .update_cookie_store(&mut cookie_store, &bare_url)
+            .expect("Error updating authentication tokens");
         for cookie in cookie_params {
             let _ = cookie_store.insert_raw(&cookie, &bare_url);
         }

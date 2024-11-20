@@ -37,6 +37,7 @@ use clap::Parser;
 use configuration::{Commands, OutputFormat};
 use env_logger::{Builder, Env};
 use log::warn;
+use openapiv3::OpenAPI;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::sync::Arc;
@@ -105,7 +106,9 @@ pub fn setup_logging(clargs: &Configuration) {
 }
 
 /// Initializes the authentication module and cookie store and builds a Reqwest HTTP client
-fn build_http_client() -> Result<
+fn build_http_client(
+    api: &OpenAPI,
+) -> Result<
     (
         authentication::Authentication,
         Arc<reqwest_cookie_store::CookieStoreMutex>,
@@ -113,11 +116,18 @@ fn build_http_client() -> Result<
     ),
     anyhow::Error,
 > {
+    let server_url = reqwest::Url::parse(
+        &api.servers
+            .first()
+            .ok_or(anyhow!("Could not extract server URL from API spec"))?
+            .url,
+    )?;
+
     // Load auth information from the configuration
     let mut authentication = authentication::initialize()?;
     // Make a cookie jar for our client
     let cookie_store = std::sync::Arc::new(reqwest_cookie_store::CookieStoreMutex::new(
-        reqwest_cookie_store::CookieStore::default(),
+        authentication.cookie_store(&server_url)?,
     ));
     // Construct a client with the authentication and static headers
     let client_builder =

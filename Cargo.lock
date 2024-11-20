@@ -3289,6 +3289,7 @@ dependencies = [
  "indexmap 2.6.0",
  "indicatif",
  "iter-read",
+ "itertools 0.13.0",
  "json_env_logger2",
  "lazy_static",
  "lcov",
