@@ -803,9 +803,8 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
                 // and test if one matches the regex with the anchors
                 if let Some(sample) = rand::thread_rng()
                     .sample_iter::<String, _>(&compiled_regex)
-                    .take(1000) // Limit number of samples
-                    .filter(|s| filter_regex.is_match(s))
-                    .next()
+                    .take(1000)
+                    .find(|s| filter_regex.is_match(s))
                 {
                     return vec![serde_json::Value::String(sample)];
                 }
