@@ -267,7 +267,7 @@ pub fn fuzz() -> Result<()> {
                 }
                 Err(e) => {
                     reporter.report_response_error(&e.to_string(), reporter_request_id);
-                    error!("{}", e);
+                    error!("Error sending request: {:?}", e);
                     exit_kind = ExitKind::Timeout;
                     log::debug!(
                         "OpenAPI-request resulted in timeout, ignoring rest of request chain."
