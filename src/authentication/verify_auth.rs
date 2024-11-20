@@ -70,12 +70,8 @@ pub fn verify_auth(api: OpenAPI) -> Result<()> {
             }
             print_response("Cookie", cookies.as_str());
         }
-        super::Authentication::OAuth(mut tokens) => {
-            if let Ok(token) = tokens.access_token() {
-                print_response("OAuth", &token);
-            } else {
-                print_response("OAuth", "Token");
-            }
+        super::Authentication::OAuth(tokens) => {
+            print_response("OAuth", &tokens.access_token);
         }
     };
 
