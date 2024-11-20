@@ -23,6 +23,7 @@ pub struct OauthLogin {
     password: String,
     access_url: String,
     refresh_url: String,
+    #[serde(default)]
     extra_headers: Vec<Header>,
     mode: Mode,
 }
