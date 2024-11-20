@@ -201,8 +201,11 @@ pub fn fuzz() -> Result<()> {
                 &api,
                 &request,
             ) {
-                None => continue,
-                Some(r) => r.timeout(Duration::from_millis(config.request_timeout)),
+                Err(err) => {
+                    error!("Error building request: {err}");
+                    continue;
+                }
+                Ok(r) => r.timeout(Duration::from_millis(config.request_timeout)),
             };
 
             let request_built = match request_builder.build() {

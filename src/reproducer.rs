@@ -64,15 +64,18 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
         )
         .map(|builder| builder.build())
         {
-            None => {
-                warn!("Could not generate a HTTP request from this input. Skipping ...");
+            Err(message) => {
+                warn!(
+                    "Could not generate a HTTP request from this input: {}. Skipping ...",
+                    message
+                );
                 continue;
             }
-            Some(Err(message)) => {
+            Ok(Err(message)) => {
                 error!("Error building the request: {}", message);
                 break;
             }
-            Some(Ok(request)) => {
+            Ok(Ok(request)) => {
                 info!(
                     "Converted to CURL command:\n{}",
                     CurlRequest(&request, &authentication)
