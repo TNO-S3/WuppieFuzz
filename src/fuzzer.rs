@@ -337,12 +337,12 @@ pub fn fuzz() -> Result<()> {
         .unwrap_or(true)
     {
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
-            Ok(res) => res,
+            Ok(_) => (),
             Err(libafl_bolts::Error::ShuttingDown) => {
                 return Ok(());
             }
-            _ => {
-                panic!("Error in the fuzz loop.");
+            Err(err) => {
+                return Err(err).context("Error in the fuzz loop");
             }
         };
         // send update of execution data to the monitor
