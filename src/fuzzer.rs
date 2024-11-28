@@ -27,7 +27,7 @@ use libafl::Fuzzer; // This may be marked unused, but will make the compiler giv
 use libafl::{
     corpus::OnDiskCorpus,
     events::{Event, SimpleEventManager},
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::ExitKind,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::StdFuzzer,
     monitors::UserStats,
@@ -48,6 +48,7 @@ use std::time::{Duration, Instant};
 use log::{debug, error, info};
 
 use crate::coverage_clients::endpoint::EndpointCoverageClient;
+use crate::executor::SequenceExecutor;
 use crate::{
     configuration::{Configuration, CrashCriterion},
     coverage_clients::CoverageClient,
@@ -277,19 +278,11 @@ pub fn fuzz() -> Result<()> {
             |s: String| info!("{}", s),
         );
 
-        exit_kind
+        Ok(exit_kind)
     };
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        collective_observer,
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        Duration::from_millis(0), // disable the timeout
-    )
-    .context("Failed to create the Executor")?;
+    let mut executor = SequenceExecutor::new(&mut harness, collective_observer);
 
     let manual_interrupt = setup_interrupt()?;
 
@@ -528,6 +521,7 @@ fn update_coverage<F: FnMut(String)>(
         SimpleEventManager<CoverageMonitor<F>, NopState<BytesInput>>,
     >()
     .expect("Can not load the event manager");
+    // TODO
 
     if covered != stats.last_covered {
         stats.last_covered = covered;
