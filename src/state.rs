@@ -39,6 +39,8 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
     rand: R,
     /// How many times the executor ran the harness/target
     executions: u64,
+    /// Request to stop
+    stop_requested: bool,
     /// At what time the fuzzing started
     start_time: Duration,
     /// The corpus
@@ -111,14 +113,16 @@ where
     Self: UsesInput,
 {
     fn stop_requested(&self) -> bool {
-        false
+        self.stop_requested
     }
 
     fn request_stop(&mut self) {
-        todo!("Stopping not implemented")
+        self.stop_requested = true;
     }
 
-    fn discard_stop_request(&mut self) {}
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
+    }
 }
 
 impl<I, C, R, SC> HasRand for OpenApiFuzzerState<I, C, R, SC>
@@ -360,6 +364,7 @@ where
         let mut state = Self {
             rand,
             executions: 0,
+            stop_requested: false,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
