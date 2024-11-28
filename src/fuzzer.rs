@@ -2,18 +2,15 @@ use anyhow::{Context, Result};
 
 use libafl::corpus::Corpus;
 use libafl::events::EventFirer;
-use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
 use libafl::executors::{Executor, HasObservers};
 use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
-use libafl::inputs::BytesInput;
-use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
 use libafl::observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver};
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
 use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasCorpus, HasExecutions, NopState, State};
+use libafl::state::{HasCorpus, HasExecutions, State};
 use libafl::{feedback_or, ExecutionProcessor};
 use libafl::{ExecuteInputResult, HasNamedMetadata};
 
@@ -30,11 +27,9 @@ use libafl::{
     executors::ExitKind,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::StdFuzzer,
-    monitors::UserStats,
     observers::StdMapObserver,
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
-use std::borrow::Cow;
 use std::ops::DerefMut;
 
 use std::fs::create_dir_all;
@@ -175,13 +170,12 @@ pub fn fuzz() -> Result<()> {
 
     // Keep track of the number of inputs
     let mut inputs_tested = 0;
-    // Logging the number of executed requests
-    let mut stats = LoggingStats::new();
 
     // The closure that we want to fuzz
     let mut harness = |inputs: &OpenApiInput| {
         let mut exit_kind = ExitKind::Ok;
         inputs_tested += 1;
+        let mut performed_requests = 0;
 
         let mut parameter_feedback = ParameterFeedback::new(inputs.0.len());
         log::debug!("Sending {} requests", inputs.0.len());
@@ -218,7 +212,7 @@ pub fn fuzz() -> Result<()> {
 
             match client.execute(request_built) {
                 Ok(response) => {
-                    stats.performed_requests += 1;
+                    performed_requests += 1;
                     let response: Response = response.into();
 
                     endpoint_coverage_client.lock().unwrap().cover(
@@ -270,19 +264,18 @@ pub fn fuzz() -> Result<()> {
             }
             parameter_feedback.process_post_request(request_index, request);
         }
-        update_coverage(
-            &mut code_coverage_client,
-            &mut endpoint_coverage_client,
-            &reporter,
-            &mut stats,
-            |s: String| info!("{}", s),
-        );
 
-        Ok(exit_kind)
+        (Ok(exit_kind), performed_requests)
     };
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = SequenceExecutor::new(&mut harness, collective_observer);
+    let mut executor = SequenceExecutor::new(
+        &mut harness,
+        collective_observer,
+        code_coverage_client,
+        endpoint_coverage_client.clone(),
+        &reporter,
+    );
 
     let manual_interrupt = setup_interrupt()?;
 
@@ -359,8 +352,7 @@ pub fn fuzz() -> Result<()> {
     }
 
     if let Some(report_path) = report_path {
-        endpoint_coverage_client.generate_coverage_report(&report_path);
-        code_coverage_client.generate_coverage_report(&report_path);
+        executor.generate_coverage_report(&report_path);
     }
 
     Ok(())
@@ -466,111 +458,4 @@ fn generate_report_path() -> PathBuf {
     let report_path = PathBuf::from("reports").join(timestamp);
     create_dir_all(&report_path).expect("unable to make reports directory");
     report_path
-}
-
-/// How often to print a new log line
-const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5;
-
-#[derive(Clone, Copy)]
-struct LoggingStats {
-    performed_requests: u64,
-    last_window_time: Instant,
-    last_covered: u64,
-    last_endpoint_covered: u64,
-}
-
-impl LoggingStats {
-    fn new() -> Self {
-        Self {
-            performed_requests: 0,
-            last_window_time: Instant::now(),
-            last_covered: 0,
-            last_endpoint_covered: 0,
-        }
-    }
-}
-
-/// Updates the LibAFL event manager with coverage information fetched from the
-/// endpoint coverage monitor and any line coverage client. Also updates the given
-/// (MySqLite) reporter
-fn update_coverage<F: FnMut(String)>(
-    code_coverage_client: &mut Box<dyn CoverageClient>,
-    endpoint_coverage_client: &mut Arc<Mutex<EndpointCoverageClient>>,
-    reporter: &dyn Reporting<i64>,
-    stats: &mut LoggingStats,
-    _print_fn: F,
-) {
-    code_coverage_client.fetch_coverage(true);
-    let (covered, total) = code_coverage_client.max_coverage_ratio();
-    endpoint_coverage_client.fetch_coverage(true);
-    let (e_covered, e_total) = endpoint_coverage_client.max_coverage_ratio();
-
-    // This input is needed for event_manager.fire, but it doesn't seem to make
-    // a difference whether it is meaningful or not, and cloning the entire thing
-    // in the harness (because it's immutable there and we need it to be mutable)
-    // seems wasteful.
-    let mut state = NopState::new();
-
-    // Add own user stats
-    let cov_stats = UserStatsValue::Ratio(covered, total);
-    let end_cov_stats = UserStatsValue::Ratio(e_covered, e_total);
-
-    let req_stats = UserStatsValue::Number(stats.performed_requests);
-
-    let event_manager = inprocess_get_event_manager::<
-        SimpleEventManager<CoverageMonitor<F>, NopState<BytesInput>>,
-    >()
-    .expect("Can not load the event manager");
-    // TODO
-
-    if covered != stats.last_covered {
-        stats.last_covered = covered;
-        // send the coverage stats to the event manager for use in the monitor
-        if let Err(e) = event_manager.fire(
-            &mut state,
-            Event::UpdateUserStats {
-                name: Cow::Borrowed("wuppiefuzz_code_coverage"),
-                value: UserStats::new(cov_stats, AggregatorOps::None),
-                phantom: PhantomData,
-            },
-        ) {
-            error!("Err: failed to fire event{:?}", e)
-        }
-    }
-
-    if e_covered != stats.last_endpoint_covered {
-        stats.last_endpoint_covered = e_covered;
-        // send the coverage stats to the event manager for use in the monitor
-        if let Err(e) = event_manager.fire(
-            &mut state,
-            Event::UpdateUserStats {
-                name: Cow::Borrowed("wuppiefuzz_endpoint_coverage"),
-                value: UserStats::new(end_cov_stats, AggregatorOps::None),
-                phantom: PhantomData,
-            },
-        ) {
-            error!("Err: failed to fire event{:?}", e)
-        }
-    }
-
-    let current_time = Instant::now();
-    let diff = current_time
-        .duration_since(stats.last_window_time)
-        .as_secs();
-    if diff > CLIENT_STATS_TIME_WINDOW_SECS {
-        stats.last_window_time = current_time;
-        // send the request stats to the event manager for use in the monitor
-        if let Err(e) = event_manager.fire(
-            &mut state,
-            Event::UpdateUserStats {
-                name: Cow::Borrowed("requests"),
-                value: UserStats::new(req_stats, AggregatorOps::None),
-                phantom: PhantomData,
-            },
-        ) {
-            error!("Err: failed to fire event{:?}", e)
-        }
-    }
-
-    reporter.report_coverage(covered, total, e_covered, e_total)
 }
