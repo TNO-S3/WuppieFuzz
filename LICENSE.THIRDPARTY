@@ -8,7 +8,7 @@ This product includes third-party software components.
 ===============================================================================
 Zlib LICENSE NOTICE
 
-Copyright (c) 2020-2021 Matias Rodriguez.
+Copyright (c) Matias Rodriguez.
 
 This software is provided 'as-is', without any express or implied warranty. In
 no event will the authors be held liable for any damages arising from the use of
@@ -31,7 +31,6 @@ Components:
 - const_format
 - const_format_proc_macros
 - const_panic
-- foldhash
 - typewit
 - typewit_proc_macros
 
