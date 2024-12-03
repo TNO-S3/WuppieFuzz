@@ -40,24 +40,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use log::{debug, error, info};
+use log::{error, info};
 
 use crate::coverage_clients::endpoint::EndpointCoverageClient;
 use crate::executor::SequenceExecutor;
 use crate::{
-    configuration::{Configuration, CrashCriterion},
-    coverage_clients::CoverageClient,
-    input::OpenApiInput,
-    monitors::CoverageMonitor,
-    openapi::{
-        build_request::build_request_from_input,
-        curl_request::CurlRequest,
-        validate_response::{validate_response, Response},
-    },
-    openapi_mutator::havoc_mutations_openapi,
-    parameter_feedback::ParameterFeedback,
-    reporting::Reporting,
-    state::OpenApiFuzzerState,
+    configuration::Configuration, coverage_clients::CoverageClient, input::OpenApiInput,
+    monitors::CoverageMonitor, openapi_mutator::havoc_mutations_openapi, state::OpenApiFuzzerState,
 };
 
 /// Main fuzzer function.
@@ -168,110 +157,14 @@ pub fn fuzz() -> Result<()> {
 
     let reporter = crate::reporting::sqlite::get_reporter(config)?;
 
-    // Keep track of the number of inputs
-    let mut inputs_tested = 0;
-
-    // The closure that we want to fuzz
-    let mut harness = |inputs: &OpenApiInput| {
-        let mut exit_kind = ExitKind::Ok;
-        inputs_tested += 1;
-        let mut performed_requests = 0;
-
-        let mut parameter_feedback = ParameterFeedback::new(inputs.0.len());
-        log::debug!("Sending {} requests", inputs.0.len());
-        'chain: for (request_index, request) in inputs.0.iter().enumerate() {
-            let mut request = request.clone();
-            log::trace!("OpenAPI request:\n{:#?}", request);
-            if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
-                debug!(
-                        "Cannot instantiate request: missing value for backreferenced parameter: {}. Maybe the earlier request crashed?",
-                        error
-                    );
-                break 'chain;
-            };
-            let request_builder =
-                match build_request_from_input(&client, &cookie_store, &api, &request) {
-                    None => continue,
-                    Some(r) => r.timeout(Duration::from_millis(config.request_timeout)),
-                };
-
-            let request_built = match request_builder.build() {
-                Ok(request) => request,
-                Err(err) => {
-                    // We don't expect errors to occur in the reqwest builder. If one occurs,
-                    // it's not the target's fault, so we don't set ExitKind::Crash or Timeout.
-                    error!("Error building request: {err}");
-                    break;
-                }
-            };
-
-            let curl_request = CurlRequest(&request_built, &authentication);
-            let reporter_request_id =
-                reporter.report_request(&request, &curl_request, inputs_tested);
-            let curl_request = curl_request.to_string();
-
-            match client.execute(request_built) {
-                Ok(response) => {
-                    performed_requests += 1;
-                    let response: Response = response.into();
-
-                    endpoint_coverage_client.lock().unwrap().cover(
-                        request.method,
-                        request.path.clone(),
-                        response.status(),
-                        curl_request,
-                        response.text().unwrap_or_else(|_| {
-                            String::from("Unable to decode the response to UTF-8")
-                        }),
-                    );
-                    reporter.report_response(&response, reporter_request_id);
-                    log::trace!("Got response {}", response.status());
-
-                    if response.status() == 429 {
-                        log::warn!("HTTP status 429 'Too Many Requests' encountered!");
-                        log::warn!("Rate limiting is likely active on the program under test.");
-                        log::warn!("This hinders fuzz testing. Consider disabling it.");
-                    }
-
-                    if response.status().is_server_error() {
-                        exit_kind = ExitKind::Crash;
-                        log::debug!("OpenAPI-input resulted in server error response, ignoring rest of request chain.");
-                        break 'chain;
-                    } else {
-                        if config.crash_criterion == CrashCriterion::AllErrors {
-                            if let Err(validation_err) =
-                                validate_response(&api, &request, &response)
-                            {
-                                log::debug!("OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain.");
-                                exit_kind = ExitKind::Crash;
-                                break 'chain;
-                            }
-                        }
-                        if response.status().is_success() {
-                            parameter_feedback.process_response(request_index, response);
-                        }
-                    }
-                }
-                Err(e) => {
-                    reporter.report_response_error(&e.to_string(), reporter_request_id);
-                    error!("{}", e);
-                    exit_kind = ExitKind::Timeout;
-                    log::debug!(
-                        "OpenAPI-request resulted in timeout, ignoring rest of request chain."
-                    );
-                    break;
-                }
-            }
-            parameter_feedback.process_post_request(request_index, request);
-        }
-
-        (Ok(exit_kind), performed_requests)
-    };
-
     // Create the executor for an in-process function with just one observer
     let mut executor = SequenceExecutor::new(
-        &mut harness,
         collective_observer,
+        &api,
+        config,
+        client,
+        authentication,
+        cookie_store.clone(),
         code_coverage_client,
         endpoint_coverage_client.clone(),
         &reporter,
