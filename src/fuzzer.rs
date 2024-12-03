@@ -153,8 +153,6 @@ pub fn fuzz() -> Result<()> {
     let power = StdPowerMutationalStage::new(mutator_openapi);
     let mut stages = tuple_list!(calibration, power);
 
-    let (authentication, cookie_store, client) = crate::build_http_client()?;
-
     let reporter = crate::reporting::sqlite::get_reporter(config)?;
 
     // Create the executor for an in-process function with just one observer
@@ -162,13 +160,10 @@ pub fn fuzz() -> Result<()> {
         collective_observer,
         &api,
         config,
-        client,
-        authentication,
-        cookie_store.clone(),
         code_coverage_client,
         endpoint_coverage_client.clone(),
         &reporter,
-    );
+    )?;
 
     let manual_interrupt = setup_interrupt()?;
 

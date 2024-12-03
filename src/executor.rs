@@ -1,3 +1,6 @@
+//! The executor module contains our custom executor, which implements the harness (for sending
+//! OpenAPI-based requests to the target) and statistics tracking (mainly coverage).
+
 use std::{
     borrow::Cow,
     marker::PhantomData,
@@ -43,6 +46,7 @@ type FuzzerState = crate::state::OpenApiFuzzerState<
     libafl::corpus::OnDiskCorpus<OpenApiInput>,
 >;
 
+/// The Executor for sending Sequences of OpenAPI requests to the target.
 pub struct SequenceExecutor<'h, OT>
 where
     OT: ObserversTuple<FuzzerState>,
@@ -102,14 +106,13 @@ where
         observers: OT,
         api: &'h OpenAPI,
         config: &'h Configuration,
-        http_client: Client,
-        authentication: Authentication,
-        cookie_store: Arc<CookieStoreMutex>,
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
         reporter: &'h Option<MySqLite>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        let (authentication, cookie_store, http_client) = crate::build_http_client()?;
+
+        Ok(Self {
             observers,
 
             api,
@@ -128,9 +131,9 @@ where
             last_window_time: Instant::now(),
             last_covered: 0,
             last_endpoint_covered: 0,
-        }
+        })
     }
-    fn pre_exec(&mut self, state: &mut FuzzerState, input: &OpenApiInput) {}
+    fn pre_exec(&mut self, _state: &mut FuzzerState, _input: &OpenApiInput) {}
 
     fn harness(&mut self, inputs: &OpenApiInput) -> (Result<ExitKind, libafl::Error>, u64) {
         let mut exit_kind = ExitKind::Ok;
