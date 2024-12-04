@@ -252,39 +252,26 @@ where
         let (e_covered, e_total) = self.endpoint_client.max_coverage_ratio();
 
         // Add own user stats
-        let cov_stats = UserStatsValue::Ratio(covered, total);
-        let end_cov_stats = UserStatsValue::Ratio(e_covered, e_total);
-
-        let req_stats = UserStatsValue::Number(self.performed_requests);
-
         if covered != self.last_covered {
             self.last_covered = covered;
             // send the coverage stats to the event manager for use in the monitor
-            if let Err(e) = event_manager.fire(
+            update_stats(
                 state,
-                Event::UpdateUserStats {
-                    name: Cow::Borrowed("wuppiefuzz_code_coverage"),
-                    value: UserStats::new(cov_stats, AggregatorOps::None),
-                    phantom: PhantomData,
-                },
-            ) {
-                error!("Err: failed to fire event{:?}", e)
-            }
+                event_manager,
+                "wuppiefuzz_code_coverage",
+                UserStatsValue::Ratio(covered, total),
+            );
         }
 
         if e_covered != self.last_endpoint_covered {
             self.last_endpoint_covered = e_covered;
             // send the coverage stats to the event manager for use in the monitor
-            if let Err(e) = event_manager.fire(
+            update_stats(
                 state,
-                Event::UpdateUserStats {
-                    name: Cow::Borrowed("wuppiefuzz_endpoint_coverage"),
-                    value: UserStats::new(end_cov_stats, AggregatorOps::None),
-                    phantom: PhantomData,
-                },
-            ) {
-                error!("Err: failed to fire event{:?}", e)
-            }
+                event_manager,
+                "wuppiefuzz_endpoint_coverage",
+                UserStatsValue::Ratio(e_covered, e_total),
+            );
         }
 
         let current_time = Instant::now();
@@ -292,16 +279,12 @@ where
         if diff > CLIENT_STATS_TIME_WINDOW_SECS {
             self.last_window_time = current_time;
             // send the request stats to the event manager for use in the monitor
-            if let Err(e) = event_manager.fire(
+            update_stats(
                 state,
-                Event::UpdateUserStats {
-                    name: Cow::Borrowed("requests"),
-                    value: UserStats::new(req_stats, AggregatorOps::None),
-                    phantom: PhantomData,
-                },
-            ) {
-                error!("Err: failed to fire event{:?}", e)
-            }
+                event_manager,
+                "requests",
+                UserStatsValue::Number(self.performed_requests),
+            );
         }
 
         self.reporter
@@ -312,6 +295,27 @@ where
     pub fn generate_coverage_report(&self, report_path: &std::path::Path) {
         self.endpoint_client.generate_coverage_report(report_path);
         self.coverage_client.generate_coverage_report(report_path);
+    }
+}
+
+/// Uses the given event manager to log an event with the given name and value
+fn update_stats<EM>(
+    state: &mut FuzzerState,
+    event_manager: &mut EM,
+    name: &'static str,
+    value: UserStatsValue,
+) where
+    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
+{
+    if let Err(e) = event_manager.fire(
+        state,
+        Event::UpdateUserStats {
+            name: Cow::Borrowed(name),
+            value: UserStats::new(value, AggregatorOps::None),
+            phantom: PhantomData,
+        },
+    ) {
+        error!("Err: failed to fire event {name}: {:?}", e)
     }
 }
 
