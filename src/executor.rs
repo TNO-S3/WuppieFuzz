@@ -122,9 +122,9 @@ where
             log::trace!("OpenAPI request:\n{:#?}", request);
             if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
                 debug!(
-                            "Cannot instantiate request: missing value for backreferenced parameter: {}. Maybe the earlier request crashed?",
-                            error
-                        );
+                    "Cannot instantiate request: missing value for backreferenced parameter: {}. Maybe the earlier request crashed?",
+                    error
+                );
                 break 'chain;
             };
             let request_builder = match build_request_from_input(
@@ -196,14 +196,11 @@ where
                         }
                     }
                 }
-                Err(e) => {
+                Err(transport_error) => {
                     self.reporter
-                        .report_response_error(&e.to_string(), reporter_request_id);
-                    error!("{}", e);
+                        .report_response_error(&transport_error.to_string(), reporter_request_id);
+                    error!("{}", transport_error);
                     exit_kind = ExitKind::Timeout;
-                    log::debug!(
-                        "OpenAPI-request resulted in timeout, ignoring rest of request chain."
-                    );
                     break;
                 }
             }
