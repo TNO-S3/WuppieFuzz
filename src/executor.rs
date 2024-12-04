@@ -108,6 +108,7 @@ where
             last_endpoint_covered: 0,
         })
     }
+
     fn pre_exec(&mut self, _state: &mut FuzzerState, _input: &OpenApiInput) {}
 
     fn harness(&mut self, inputs: &OpenApiInput) -> (Result<ExitKind, libafl::Error>, u64) {
@@ -270,15 +271,15 @@ where
     }
 }
 
-impl<'h, EM, Z, OT> Executor<EM, Z> for SequenceExecutor<'h, OT>
+impl<'h, EM, FZ, OT> Executor<EM, FZ> for SequenceExecutor<'h, OT>
 where
-    Z: UsesState<State = FuzzerState>,
+    FZ: UsesState<State = FuzzerState>,
     EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
     OT: ObserversTuple<FuzzerState>,
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut FZ,
         state: &mut Self::State,
         event_manager: &mut EM,
         input: &Self::Input,
