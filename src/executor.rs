@@ -47,6 +47,8 @@ type FuzzerState = crate::state::OpenApiFuzzerState<
 >;
 
 /// The Executor for sending Sequences of OpenAPI requests to the target.
+/// It is responsible for executing inputs chosen by the fuzzer, and tracking
+/// statistics about coverage and errors.
 pub struct SequenceExecutor<'h, OT>
 where
     OT: ObserversTuple<FuzzerState>,
@@ -109,9 +111,10 @@ where
         })
     }
 
-    fn pre_exec(&mut self, _state: &mut FuzzerState, _input: &OpenApiInput) {}
-
-    fn harness(&mut self, inputs: &OpenApiInput) -> (Result<ExitKind, libafl::Error>, u64) {
+    /// Executes the given input, tracking and using response parameters and verifying responses.
+    /// Returns the target's performance as ExitKind, and the number of requests successfully
+    /// executed (i.e. before an error occurred).
+    fn harness(&mut self, inputs: &OpenApiInput) -> (ExitKind, u64) {
         let mut exit_kind = ExitKind::Ok;
         self.inputs_tested += 1;
         let mut performed_requests = 0;
@@ -208,7 +211,7 @@ where
             parameter_feedback.process_post_request(request_index, request);
         }
 
-        (Ok(exit_kind), performed_requests)
+        (exit_kind, performed_requests)
     }
 
     fn post_exec<EM>(
@@ -286,13 +289,11 @@ where
     ) -> Result<ExitKind, libafl::Error> {
         *state.executions_mut() += 1;
 
-        self.pre_exec(state, input);
-
         let (ret, performed_requests) = self.harness(input);
         self.performed_requests += performed_requests;
 
         self.post_exec(state, input, event_manager);
-        ret
+        Ok(ret)
     }
 }
 
