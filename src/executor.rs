@@ -72,31 +72,6 @@ where
     last_endpoint_covered: u64,
 }
 
-impl<'h, EM, Z, OT> Executor<EM, Z> for SequenceExecutor<'h, OT>
-where
-    Z: UsesState<State = FuzzerState>,
-    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
-    OT: ObserversTuple<FuzzerState>,
-{
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut Self::State,
-        event_manager: &mut EM,
-        input: &Self::Input,
-    ) -> Result<ExitKind, libafl::Error> {
-        *state.executions_mut() += 1;
-
-        self.pre_exec(state, input);
-
-        let (ret, performed_requests) = self.harness(input);
-        self.performed_requests += performed_requests;
-
-        self.post_exec(state, input, event_manager);
-        ret
-    }
-}
-
 impl<'h, OT> SequenceExecutor<'h, OT>
 where
     OT: ObserversTuple<FuzzerState>,
@@ -295,6 +270,31 @@ where
     pub fn generate_coverage_report(&self, report_path: &std::path::Path) {
         self.endpoint_client.generate_coverage_report(report_path);
         self.coverage_client.generate_coverage_report(report_path);
+    }
+}
+
+impl<'h, EM, Z, OT> Executor<EM, Z> for SequenceExecutor<'h, OT>
+where
+    Z: UsesState<State = FuzzerState>,
+    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
+    OT: ObserversTuple<FuzzerState>,
+{
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut Self::State,
+        event_manager: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, libafl::Error> {
+        *state.executions_mut() += 1;
+
+        self.pre_exec(state, input);
+
+        let (ret, performed_requests) = self.harness(input);
+        self.performed_requests += performed_requests;
+
+        self.post_exec(state, input, event_manager);
+        ret
     }
 }
 
