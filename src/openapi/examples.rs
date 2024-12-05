@@ -1,3 +1,7 @@
+//! The functions in this file are used to generate http requests which are sent to the
+//! fuzzing target during normal fuzzing operation. These functions need an OpenAPI struct
+//! to generate realistic requests for the given target.
+
 use std::borrow::Cow;
 use std::{collections::VecDeque, f64::consts::PI};
 
@@ -19,10 +23,6 @@ use crate::{
 };
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
-
-/// The functions in this file are used to generate http requests which are sent to the
-/// fuzzing target during normal fuzzing operation. These functions need an OpenAPI struct
-/// to generate realistic requests for the given target.
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest
 /// filled with example values from the API specification, and default values
