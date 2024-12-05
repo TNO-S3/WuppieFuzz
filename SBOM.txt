@@ -244,9 +244,6 @@ gimli 0.28.1
 h2 0.4.7
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
-hashbrown 0.12.3
-	licensed under "Apache-2.0 OR MIT"
-	by Amanieu d'Antras <amanieu@gmail.com>
 hashbrown 0.14.5
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
@@ -334,9 +331,6 @@ idna 1.0.3
 idna_adapter 1.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-indexmap 1.9.3
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 indexmap 2.7.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -394,9 +388,6 @@ libm 0.2.11
 libsqlite3-sys 0.28.0
 	licensed under "MIT"
 	by The rusqlite developers
-linked-hash-map 0.5.6
-	licensed under "Apache-2.0 OR MIT"
-	by Stepan Koltsov <stepan.koltsov@gmail.com>|Andrew Paseltiner <apaseltiner@gmail.com>
 linux-raw-sys 0.4.14
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>
@@ -643,7 +634,7 @@ serde_json 1.0.133
 serde_urlencoded 0.7.1
 	licensed under "Apache-2.0 OR MIT"
 	by Anthony Ramine <n.oxyde@gmail.com>
-serde_yaml 0.8.26
+serde_yaml 0.9.34+deprecated
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 serial_test 3.2.0
@@ -808,6 +799,9 @@ unicode-width 0.2.0
 unicode-xid 0.2.6
 	licensed under "Apache-2.0 OR MIT"
 	by erick.tryzelaar <erick.tryzelaar@gmail.com>|kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
+unsafe-libyaml 0.2.11
+	licensed under "MIT"
+	by David Tolnay <dtolnay@gmail.com>
 untrusted 0.9.0
 	licensed under "ISC"
 	by Brian Smith <brian@briansmith.org>
@@ -970,9 +964,6 @@ writeable 0.5.5
 xxhash-rust 0.8.12
 	licensed under "BSL-1.0"
 	by Douman <douman@gmx.se>
-yaml-rust 0.4.5
-	licensed under "Apache-2.0 OR MIT"
-	by Yuheng Chen <yuhengchen@sensetime.com>
 yoke 0.7.5
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
