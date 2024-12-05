@@ -155,6 +155,8 @@ pub fn fuzz() -> Result<()> {
 
     let reporter = crate::reporting::sqlite::get_reporter(config)?;
 
+    let manual_interrupt = setup_interrupt()?;
+
     // Create the executor for an in-process function with just one observer
     let mut executor = SequenceExecutor::new(
         collective_observer,
@@ -163,9 +165,8 @@ pub fn fuzz() -> Result<()> {
         code_coverage_client,
         endpoint_coverage_client.clone(),
         &reporter,
+        manual_interrupt,
     )?;
-
-    let manual_interrupt = setup_interrupt()?;
 
     // Fire an event to print the initial corpus size
     let corpus_size = state.corpus().count();
@@ -230,12 +231,6 @@ pub fn fuzz() -> Result<()> {
             },
         ) {
             error!("Err: failed to fire event{:?}", e)
-        }
-        if manual_interrupt.load(Ordering::Relaxed) {
-            if let Err(e) = mgr.fire(&mut state, Event::Stop) {
-                error!("Err: failed to fire event{:?}", e);
-                break;
-            }
         }
     }
 

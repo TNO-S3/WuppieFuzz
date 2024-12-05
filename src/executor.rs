@@ -4,7 +4,7 @@
 use std::{
     borrow::Cow,
     marker::PhantomData,
-    sync::{Arc, Mutex},
+    sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -66,6 +66,8 @@ where
     endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
     reporter: &'h Option<MySqLite>,
 
+    manual_interrupt: Arc<AtomicBool>,
+
     // Logging stats
     inputs_tested: usize,
     performed_requests: u64,
@@ -86,6 +88,7 @@ where
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
         reporter: &'h Option<MySqLite>,
+        manual_interrupt: Arc<AtomicBool>,
     ) -> anyhow::Result<Self> {
         let (authentication, cookie_store, http_client) = crate::build_http_client()?;
 
@@ -102,6 +105,8 @@ where
             coverage_client,
             endpoint_client,
             reporter,
+
+            manual_interrupt,
 
             inputs_tested: 0,
             performed_requests: 0,
@@ -264,7 +269,13 @@ where
         }
 
         self.reporter
-            .report_coverage(covered, total, e_covered, e_total)
+            .report_coverage(covered, total, e_covered, e_total);
+
+        if self.manual_interrupt.load(Ordering::Relaxed) {
+            if let Err(e) = event_manager.fire(state, Event::Stop) {
+                error!("Err: failed to fire event{:?}", e);
+            }
+        }
     }
 
     /// Uses the embedded coverage clients to generate a coverage report
