@@ -1,0 +1,91 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    name: Build, Test, and Coverage
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable, nightly]
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Install Rust toolchain
+      - name: Install Rust ${{ matrix.rust }}
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt, clippy
+
+      # Cache dependencies to speed up builds
+      - name: Cache Cargo registry and build artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Run `cargo fmt` to check formatting
+      - name: Check formatting with rustfmt
+        run: cargo fmt --all -- --check
+
+      # Run `cargo clippy` for linting
+      - name: Run Clippy for linting
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # Build the entire workspace
+      - name: Build the workspace
+        run: cargo build --workspace --verbose
+
+      # Run tests for all crates in the workspace
+      - name: Run tests for all crates in the workspace
+        run: cargo test --workspace --verbose
+
+  coverage:
+    name: Code Coverage (Tarpaulin)
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Install Rust nightly toolchain with required components for Tarpaulin or llvm-tools-preview
+      - name: Install nightly toolchain with llvm-tools-preview
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+          components: llvm-tools-preview
+
+      # Install Tarpaulin for coverage generation (requires nightly)
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      # Generate code coverage reports for all crates in the workspace using Tarpaulin
+      - name: Generate code coverage report with Tarpaulin
+        run: |
+          cargo tarpaulin --workspace --out Html --output-dir ./coverage-report \
+            --ignore-tests --all-features
+
+      # Upload the generated coverage report as an artifact to GitHub Actions for inspection or download.
+      - name: Upload code coverage report as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: code-coverage-report-html
+          path: ./coverage-report/
