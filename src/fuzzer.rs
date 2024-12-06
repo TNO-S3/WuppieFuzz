@@ -151,8 +151,6 @@ pub fn fuzz() -> Result<()> {
     let power = StdPowerMutationalStage::new(mutator_openapi);
     let mut stages = tuple_list!(calibration, power);
 
-    let reporter = crate::reporting::sqlite::get_reporter(config)?;
-
     // Create the executor for an in-process function with just one observer
     let mut executor = SequenceExecutor::new(
         collective_observer,
@@ -160,7 +158,6 @@ pub fn fuzz() -> Result<()> {
         config,
         code_coverage_client,
         endpoint_coverage_client.clone(),
-        &reporter,
     )?;
 
     // Fire an event to print the initial corpus size

@@ -68,7 +68,7 @@ where
 
     coverage_client: Box<dyn CoverageClient>,
     endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
-    reporter: &'h Option<MySqLite>,
+    reporter: Option<MySqLite>,
 
     manual_interrupt: Arc<AtomicBool>,
     maybe_timeout_secs: Option<Duration>,
@@ -93,7 +93,6 @@ where
         config: &'h Configuration,
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
-        reporter: &'h Option<MySqLite>,
     ) -> anyhow::Result<Self> {
         let (authentication, cookie_store, http_client) = crate::build_http_client()?;
 
@@ -109,7 +108,7 @@ where
 
             coverage_client,
             endpoint_client,
-            reporter,
+            reporter: crate::reporting::sqlite::get_reporter(config)?,
 
             manual_interrupt: setup_interrupt()?,
             maybe_timeout_secs: config.timeout.map(|t| Duration::from_secs(t.get())),
