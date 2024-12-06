@@ -227,6 +227,7 @@ where
         EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventProcessor<EM, FZ>,
     {
         if state.stop_requested() {
+            state.discard_stop_request();
             event_manager.on_shutdown()?;
             return Err(Error::shutting_down());
         }
