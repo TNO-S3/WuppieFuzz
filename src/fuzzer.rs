@@ -38,7 +38,6 @@ use std::path::PathBuf;
 use std::ptr::write_volatile;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 
 use log::{error, info};
 
@@ -204,11 +203,11 @@ pub fn fuzz() -> Result<()> {
     }
 
     log::debug!("Start fuzzing loop");
-    // check for timeout if applicable
     loop {
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) => (),
             Err(libafl_bolts::Error::ShuttingDown) => {
+                log::info!("[Fuzzing campaign ended] Thanks for using WuppieFuzz!");
                 break;
             }
             Err(err) => {
