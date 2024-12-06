@@ -8,7 +8,7 @@ This product includes third-party software components.
 ===============================================================================
 Zlib LICENSE NOTICE
 
-Copyright (c) 2020-2021 Matias Rodriguez.
+Copyright (c) Matias Rodriguez.
 
 This software is provided 'as-is', without any express or implied warranty. In
 no event will the authors be held liable for any damages arising from the use of
@@ -31,6 +31,8 @@ Components:
 - const_format
 - const_format_proc_macros
 - const_panic
+- typewit
+- typewit_proc_macros
 
 ===============================================================================
 Zlib LICENSE NOTICE
@@ -58,48 +60,6 @@ the following restrictions:
 Components:
 
 - foldhash
-
-===============================================================================
-Unicode-DFS-2016 LICENSE NOTICE
-
-This product includes software licensed under the Unicode-DFS-2016 License:
-
-COPYRIGHT AND PERMISSION NOTICE
-
-Copyright © 1991-2016 Unicode, Inc. All rights reserved. Distributed under the
-Terms of Use in http://www.unicode.org/copyright.html.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-the Unicode data files and any associated documentation (the "Data Files") or
-Unicode software and any associated documentation (the "Software") to deal in
-the Data Files or Software without restriction, including without limitation the
-rights to use, copy, modify, merge, publish, distribute, and/or sell copies of
-the Data Files or Software, and to permit persons to whom the Data Files or
-Software are furnished to do so, provided that (a) this copyright and permission
-notice appear with all copies of the Data Files or Software, (b) this copyright
-and permission notice appear in associated documentation, and (c) there is clear
-notice in each modified Data File or in the Software as well as in the
-documentation associated with the Data File(s) or Software that the data or
-software has been modified.
-
-THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD
-PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS
-NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL
-DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
-WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
-OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA FILES OR
-SOFTWARE.
-
-Except as contained in this notice, the name of a copyright holder shall not be
-used in advertising or otherwise to promote the sale, use or other dealings in
-these Data Files or Software without prior written authorization of the
-copyright holder.
-
-Components:
-
-- unicode-ident
 
 ===============================================================================
 BSD-3-Clause LICENSE NOTICE
@@ -131,9 +91,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Components:
 
+- c2rust-bitfields
+- c2rust-bitfields-derive
 - encoding_rs
-- num_enum
-- num_enum_derive
+- subtle
 
 ===============================================================================
 BSD-2-Clause LICENSE NOTICE
@@ -163,8 +124,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Components:
 
 - mach
-- zerocopy
-- zerocopy-derive
 
 ===============================================================================
 BSL-1.0 LICENSE NOTICE
@@ -194,7 +153,7 @@ OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Components:
 
-- ryu
+- xxhash-rust
 
 ===============================================================================
 ISC LICENSE NOTICE
@@ -215,9 +174,8 @@ THIS SOFTWARE.
 
 Components:
 
-- hyper-rustls
-- rustls
-- rustls-pemfile
+- rustls-webpki
+- untrusted
 
 ===============================================================================
 Ring 0.17.8 LICENSE NOTICE
