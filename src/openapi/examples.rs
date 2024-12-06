@@ -1,3 +1,7 @@
+//! The functions in this file are used to generate http requests which are sent to the
+//! fuzzing target during normal fuzzing operation. These functions need an OpenAPI struct
+//! to generate realistic requests for the given target.
+
 use std::borrow::Cow;
 use std::{collections::VecDeque, f64::consts::PI};
 
@@ -19,10 +23,6 @@ use crate::{
 };
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
-
-/// The functions in this file are used to generate http requests which are sent to the
-/// fuzzing target during normal fuzzing operation. These functions need an OpenAPI struct
-/// to generate realistic requests for the given target.
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest
 /// filled with example values from the API specification, and default values
@@ -803,9 +803,8 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
                 // and test if one matches the regex with the anchors
                 if let Some(sample) = rand::thread_rng()
                     .sample_iter::<String, _>(&compiled_regex)
-                    .take(1000) // Limit number of samples
-                    .filter(|s| filter_regex.is_match(s))
-                    .next()
+                    .take(1000)
+                    .find(|s| filter_regex.is_match(s))
                 {
                     return vec![serde_json::Value::String(sample)];
                 }
