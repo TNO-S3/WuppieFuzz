@@ -204,17 +204,12 @@ pub fn fuzz() -> Result<()> {
     }
 
     log::debug!("Start fuzzing loop");
-    let maybe_timeout_secs = config.timeout.map(|t| Duration::from_secs(t.get()));
-    let starting_time = Instant::now();
     // check for timeout if applicable
-    while maybe_timeout_secs
-        .map(|timeout| Instant::now() - starting_time < timeout)
-        .unwrap_or(true)
-    {
+    loop {
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) => (),
             Err(libafl_bolts::Error::ShuttingDown) => {
-                return Ok(());
+                break;
             }
             Err(err) => {
                 return Err(err).context("Error in the fuzz loop");

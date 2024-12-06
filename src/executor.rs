@@ -4,15 +4,21 @@
 use std::{
     borrow::Cow,
     marker::PhantomData,
-    sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     time::{Duration, Instant},
 };
 
 use libafl::{
-    events::{Event, EventFirer, EventProcessor, EventRestarter}, prelude::{
+    events::{Event, EventFirer, EventProcessor, EventRestarter},
+    prelude::{
         AggregatorOps, Executor, ExitKind, HasObservers, ObserversTuple, UserStats, UserStatsValue,
         UsesObservers,
-    }, state::{HasExecutions, Stoppable, UsesState}, Error
+    },
+    state::{HasExecutions, Stoppable, UsesState},
+    Error,
 };
 use libafl_bolts::prelude::RefIndexable;
 use log::{debug, error};
@@ -65,6 +71,8 @@ where
     reporter: &'h Option<MySqLite>,
 
     manual_interrupt: Arc<AtomicBool>,
+    maybe_timeout_secs: Option<Duration>,
+    starting_time: Instant,
 
     // Logging stats
     inputs_tested: usize,
@@ -105,6 +113,8 @@ where
             reporter,
 
             manual_interrupt,
+            maybe_timeout_secs: config.timeout.map(|t| Duration::from_secs(t.get())),
+            starting_time: Instant::now(),
 
             inputs_tested: 0,
             performed_requests: 0,
@@ -222,9 +232,11 @@ where
         state: &mut FuzzerState,
         _input: &OpenApiInput,
         event_manager: &mut EM,
-    )  -> Result<(), Error>
-     where
-        EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventProcessor<EM, FZ>,
+    ) -> Result<(), Error>
+    where
+        EM: UsesState<State = FuzzerState>
+            + EventFirer<State = FuzzerState>
+            + EventProcessor<EM, FZ>,
     {
         if state.stop_requested() {
             state.discard_stop_request();
@@ -286,7 +298,13 @@ where
         self.reporter
             .report_coverage(covered, total, e_covered, e_total);
 
-        if self.manual_interrupt.load(Ordering::Relaxed) {
+        // If we interrupt using ctrl+c or the timeout is over, request stop!
+        if self.manual_interrupt.load(Ordering::Relaxed)
+            | self
+                .maybe_timeout_secs
+                .map(|timeout| Instant::now() - self.starting_time > timeout)
+                .unwrap_or(false)
+        {
             if let Err(e) = event_manager.fire(state, Event::Stop) {
                 error!("Err: failed to fire event{:?}", e);
             }
@@ -304,7 +322,10 @@ where
 impl<'h, EM, FZ, OT> Executor<EM, FZ> for SequenceExecutor<'h, OT>
 where
     FZ: UsesState<State = FuzzerState>,
-    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter + EventProcessor<EM, FZ>,
+    EM: UsesState<State = FuzzerState>
+        + EventFirer<State = FuzzerState>
+        + EventRestarter
+        + EventProcessor<EM, FZ>,
     OT: ObserversTuple<FuzzerState>,
 {
     fn run_target(
@@ -336,7 +357,7 @@ fn update_stats<EM>(
     name: &'static str,
     value: UserStatsValue,
 ) where
-    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter
+    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
 {
     if let Err(e) = event_manager.fire(
         state,
