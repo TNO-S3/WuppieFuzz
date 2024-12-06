@@ -9,12 +9,10 @@ use std::{
 };
 
 use libafl::{
-    events::{Event, EventFirer, EventRestarter},
-    prelude::{
+    events::{Event, EventFirer, EventProcessor, EventRestarter}, prelude::{
         AggregatorOps, Executor, ExitKind, HasObservers, ObserversTuple, UserStats, UserStatsValue,
         UsesObservers,
-    },
-    state::{HasExecutions, UsesState},
+    }, state::{HasExecutions, Stoppable, UsesState}, Error
 };
 use libafl_bolts::prelude::RefIndexable;
 use log::{debug, error};
@@ -219,6 +217,22 @@ where
         (exit_kind, performed_requests)
     }
 
+    fn pre_exec<EM, FZ>(
+        &mut self,
+        state: &mut FuzzerState,
+        _input: &OpenApiInput,
+        event_manager: &mut EM,
+    )  -> Result<(), Error>
+     where
+        EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventProcessor<EM, FZ>,
+    {
+        if state.stop_requested() {
+            event_manager.on_shutdown()?;
+            return Err(Error::shutting_down());
+        }
+        Ok(())
+    }
+
     fn post_exec<EM>(
         &mut self,
         state: &mut FuzzerState,
@@ -275,6 +289,7 @@ where
             if let Err(e) = event_manager.fire(state, Event::Stop) {
                 error!("Err: failed to fire event{:?}", e);
             }
+            state.request_stop();
         }
     }
 
@@ -288,7 +303,7 @@ where
 impl<'h, EM, FZ, OT> Executor<EM, FZ> for SequenceExecutor<'h, OT>
 where
     FZ: UsesState<State = FuzzerState>,
-    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
+    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter + EventProcessor<EM, FZ>,
     OT: ObserversTuple<FuzzerState>,
 {
     fn run_target(
@@ -299,6 +314,11 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, libafl::Error> {
         *state.executions_mut() += 1;
+
+        match self.pre_exec(state, input, event_manager) {
+            Err(Error::ShuttingDown) => return Err(Error::ShuttingDown),
+            Ok(_) | Err(_) => (),
+        }
 
         let (ret, performed_requests) = self.harness(input);
         self.performed_requests += performed_requests;
@@ -315,7 +335,7 @@ fn update_stats<EM>(
     name: &'static str,
     value: UserStatsValue,
 ) where
-    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
+    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter
 {
     if let Err(e) = event_manager.fire(
         state,
