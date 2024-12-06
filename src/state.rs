@@ -1,6 +1,6 @@
 use core::{fmt::Debug, time::Duration};
 use openapiv3::OpenAPI;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     cell::{Ref, RefMut},
     marker::PhantomData,
@@ -9,10 +9,10 @@ use std::{
 
 use libafl::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    feedbacks::Feedback,
+    feedbacks::{Feedback, StateInitializer},
     inputs::{Input, UsesInput},
     schedulers::powersched::SchedulerMetadata,
-    stages::{HasCurrentStage, StageId},
+    stages::{HasCurrentStageId, StageId},
     state::{
         HasCorpus, HasExecutions, HasImported, HasLastFoundTime, HasLastReportTime, HasMaxSize,
         HasRand, HasSolutions, HasStartTime, State, Stoppable,
@@ -68,25 +68,25 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
 
 impl<I, C, R, SC> State for OpenApiFuzzerState<I, C, R, SC>
 where
-    C: Corpus<Input = Self::Input>,
+    C: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
     R: Rand,
-    SC: Corpus<Input = Self::Input>,
+    SC: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
     Self: UsesInput,
 {
 }
 
-impl<I, C, R, SC> HasCurrentStage for OpenApiFuzzerState<I, C, R, SC> {
-    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error> {
+impl<I, C, R, SC> HasCurrentStageId for OpenApiFuzzerState<I, C, R, SC> {
+    fn set_current_stage_id(&mut self, idx: StageId) -> Result<(), Error> {
         self.current_stage = Some(idx);
         Ok(())
     }
 
-    fn clear_stage(&mut self) -> Result<(), Error> {
+    fn clear_stage_id(&mut self) -> Result<(), Error> {
         self.current_stage = None;
         Ok(())
     }
 
-    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
+    fn current_stage_id(&self) -> Result<Option<StageId>, Error> {
         Ok(self.current_stage)
     }
 }
@@ -127,10 +127,7 @@ where
 
 impl<I, C, R, SC> HasRand for OpenApiFuzzerState<I, C, R, SC>
 where
-    I: Input,
-    C: Corpus,
     R: Rand,
-    SC: Corpus,
 {
     type Rand = R;
 
@@ -358,8 +355,10 @@ where
         api: OpenAPI,
     ) -> Result<Self, Error>
     where
-        F: Feedback<Self>,
-        O: Feedback<Self>,
+        F: StateInitializer<Self>,
+        O: StateInitializer<Self>,
+        C: Serialize + DeserializeOwned,
+        SC: Serialize + DeserializeOwned,
     {
         let mut state = Self {
             rand,

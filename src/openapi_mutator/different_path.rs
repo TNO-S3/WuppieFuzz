@@ -48,7 +48,7 @@ where
         let random_input = rand.choose(&mut input.0).unwrap();
         for _ in 0..100 {
             let n_ops = api.operations().count();
-            let new_path_i = rand.below(n_ops);
+            let new_path_i = rand.below(core::num::NonZero::new(n_ops).unwrap());
             {
                 let (new_path, new_method, _, _) = api.operations().nth(new_path_i).unwrap();
                 // Only set "mutated" if it's actually different

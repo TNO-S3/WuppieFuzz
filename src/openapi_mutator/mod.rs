@@ -212,7 +212,10 @@ fn mutate_leaf_value<S: HasRand>(
 /// Mutate number in-place
 fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -> MutationResult {
     // A small chance to get a special value that might just lead to interesting errors
-    match state.rand_mut().below(100) {
+    match state
+        .rand_mut()
+        .below(core::num::NonZero::new(100).unwrap())
+    {
         0 => {
             *n = (-1).into();
             return MutationResult::Mutated;
@@ -226,18 +229,21 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
     if let Some(x) = n.as_u64() {
         *n = match x as usize {
             0 => 0.into(),
-            x_usz => state.rand_mut().below(x_usz.saturating_mul(2)).into(),
+            x_usz => state
+                .rand_mut()
+                .below(core::num::NonZero::new(x_usz.saturating_mul(2)).unwrap())
+                .into(),
         };
         return MutationResult::Mutated;
     };
     if let Some(x) = n.as_i64() {
         // always negative
         *n = (state.rand_mut().below(
-            x.checked_neg()
-                .unwrap_or(i64::MAX) // because -i64::MIN == i64::MIN
-                .saturating_mul(4)
+            core::num::NonZero::new(x)
+                .unwrap_or(core::num::NonZero::new(i64::MAX).unwrap()) // because -i64::MIN == i64::MIN
+                .saturating_mul(core::num::NonZero::new(4).unwrap())
                 .try_into()
-                .unwrap_or(usize::MAX), // larger values could otherwise be truncated
+                .unwrap_or(core::num::NonZero::new(usize::MAX).unwrap()), // larger values could otherwise be truncated
         ) as i64
             + x.saturating_mul(2))
         .into();
@@ -250,7 +256,9 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
         let x_int = x.round() as u64;
         let x_int_new = match x_int as usize {
             0 => 0,
-            x_usz => state.rand_mut().below(x_usz.saturating_mul(4)),
+            x_usz => state
+                .rand_mut()
+                .below(core::num::NonZero::new(x_usz.saturating_mul(4)).unwrap()),
         };
         let n_new = serde_json::value::Number::from_f64((x_int_new as f64) - 2.0 * x);
         if let Some(n_new) = n_new {
@@ -360,8 +368,10 @@ where
 {
     from.into_iter()
         .zip(1..)
-        .fold(None, |result, (element, count)| match rand.below(count) {
-            0 => Some(element),
-            _ => result,
+        .fold(None, |result, (element, count)| {
+            match rand.below(core::num::NonZero::new(count).unwrap()) {
+                0 => Some(element),
+                _ => result,
+            }
         })
 }

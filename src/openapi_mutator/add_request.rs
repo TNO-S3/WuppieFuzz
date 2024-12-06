@@ -54,7 +54,7 @@ where
         let (rand, api) = state.rand_mut_and_openapi();
 
         let n_ops = api.operations().count();
-        let new_path_i = rand.below(n_ops);
+        let new_path_i = rand.below(core::num::NonZero::new(n_ops).unwrap());
 
         let (new_path, new_method, new_op, _new_path_item) =
             api.operations().nth(new_path_i).unwrap();
