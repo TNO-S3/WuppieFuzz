@@ -36,7 +36,6 @@ use std::fs::create_dir_all;
 use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use log::{error, info};
@@ -154,8 +153,6 @@ pub fn fuzz() -> Result<()> {
 
     let reporter = crate::reporting::sqlite::get_reporter(config)?;
 
-    let manual_interrupt = setup_interrupt()?;
-
     // Create the executor for an in-process function with just one observer
     let mut executor = SequenceExecutor::new(
         collective_observer,
@@ -164,7 +161,6 @@ pub fn fuzz() -> Result<()> {
         code_coverage_client,
         endpoint_coverage_client.clone(),
         &reporter,
-        manual_interrupt,
     )?;
 
     // Fire an event to print the initial corpus size
@@ -305,24 +301,6 @@ fn setup_line_coverage<'a>(
         code_coverage_observer,
         code_coverage_feedback,
     ))
-}
-
-/// Installs the Ctrl-C interrupt handler
-fn setup_interrupt() -> Result<Arc<AtomicBool>, anyhow::Error> {
-    let manual_interrupt = Arc::new(AtomicBool::new(false));
-    {
-        let manual_interrupt = Arc::clone(&manual_interrupt);
-        ctrlc::set_handler(move || {
-            let second_time_pressed = manual_interrupt.swap(true, Ordering::Relaxed);
-            if second_time_pressed {
-                info!("Ctrl + c pressed, again - exiting forcefully!");
-                std::process::exit(0);
-            } else {
-                info!("Ctrl + c pressed, starting graceful shutdown.");
-            }
-        })?;
-    }
-    Ok(manual_interrupt)
 }
 
 /// Creates and returns the report path for this run. It is typically of the form

@@ -94,7 +94,6 @@ where
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
         reporter: &'h Option<MySqLite>,
-        manual_interrupt: Arc<AtomicBool>,
     ) -> anyhow::Result<Self> {
         let (authentication, cookie_store, http_client) = crate::build_http_client()?;
 
@@ -112,7 +111,7 @@ where
             endpoint_client,
             reporter,
 
-            manual_interrupt,
+            manual_interrupt: setup_interrupt()?,
             maybe_timeout_secs: config.timeout.map(|t| Duration::from_secs(t.get())),
             starting_time: Instant::now(),
 
@@ -348,6 +347,24 @@ where
         self.post_exec(state, input, event_manager);
         Ok(ret)
     }
+}
+
+/// Installs the Ctrl-C interrupt handler
+fn setup_interrupt() -> Result<Arc<AtomicBool>, anyhow::Error> {
+    let manual_interrupt = Arc::new(AtomicBool::new(false));
+    {
+        let manual_interrupt = Arc::clone(&manual_interrupt);
+        ctrlc::set_handler(move || {
+            let second_time_pressed = manual_interrupt.swap(true, Ordering::Relaxed);
+            if second_time_pressed {
+                log::info!("[User input] Ctrl + c pressed, again - exiting forcefully!");
+                std::process::exit(0);
+            } else {
+                log::info!("[User input] Ctrl + c pressed, starting graceful shutdown.");
+            }
+        })?;
+    }
+    Ok(manual_interrupt)
 }
 
 /// Uses the given event manager to log an event with the given name and value
