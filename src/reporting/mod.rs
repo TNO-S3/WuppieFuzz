@@ -75,16 +75,18 @@ where
 }
 
 fn get_current_test_case_file_name() -> Option<String> {
-    let corpus = inprocess_get_state::<
-        OpenApiFuzzerState<
-            OpenApiInput,
-            InMemoryOnDiskCorpus<OpenApiInput>,
-            libafl_bolts::rands::RomuDuoJrRand,
-            OnDiskCorpus<OpenApiInput>,
-        >,
-    >()
-    .expect("State is gone??")
-    .corpus();
+    let corpus = unsafe {
+        inprocess_get_state::<
+            OpenApiFuzzerState<
+                OpenApiInput,
+                InMemoryOnDiskCorpus<OpenApiInput>,
+                libafl_bolts::rands::RomuDuoJrRand,
+                OnDiskCorpus<OpenApiInput>,
+            >,
+        >()
+        .expect("State is gone??")
+        .corpus()
+    };
     corpus
         .current()
         .and_then(|id| corpus.get(id).ok())
