@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 use libafl::corpus::Corpus;
-use libafl::events::{EventFirer, EventManager};
+use libafl::events::EventFirer;
 use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
 use libafl::executors::{Executor, HasObservers};
 use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
@@ -9,18 +9,19 @@ use libafl::inputs::{BytesInput, Input};
 use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
 use libafl::observers::{
-    CanTrack, ExplicitTracking, MultiMapObserver, ObserversTuple, TimeObserver,
+    CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver,
 };
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
-use libafl::stages::{CalibrationStage, StagesTuple, StdPowerMutationalStage};
+use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
 use libafl::state::{HasCorpus, HasExecutions, HasLastReportTime, NopState, State, UsesState};
 use libafl::{feedback_or, ExecutionProcessor, HasMetadata};
 use libafl::{ExecuteInputResult, HasNamedMetadata};
 
 use libafl_bolts::current_time;
 use libafl_bolts::prelude::OwnedMutSlice;
+use libafl_bolts::tuples::MatchName;
 use openapiv3::OpenAPI;
 
 use core::marker::PhantomData;
@@ -378,12 +379,9 @@ pub fn fuzz() -> Result<()> {
 fn setup_endpoint_coverage<
     'a,
     S: State + HasNamedMetadata + HasMetadata + HasExecutions + HasLastReportTime,
-    E: HasObservers + UsesState<State = S>,
-    Z: UsesState<State = S>,
-    ST: StagesTuple<E, EM, S, Z>,
-    EM: EventManager<E, Z, State = S>,
+    EM: UsesState<State = S> + EventFirer,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: MatchName,
 >(
     api: OpenAPI,
 ) -> (
