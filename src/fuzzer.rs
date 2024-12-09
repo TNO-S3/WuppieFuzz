@@ -5,18 +5,16 @@ use libafl::events::EventFirer;
 use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
 use libafl::executors::{Executor, HasObservers};
 use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
-use libafl::inputs::{BytesInput, Input};
+use libafl::inputs::BytesInput;
 use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
-use libafl::observers::{
-    CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver,
-};
+use libafl::observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver};
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
 use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasCorpus, HasExecutions, HasLastReportTime, NopState, State, UsesState};
-use libafl::{feedback_or, ExecutionProcessor, HasMetadata};
+use libafl::state::{HasCorpus, HasExecutions, NopState, State, UsesState};
+use libafl::{feedback_or, ExecutionProcessor};
 use libafl::{ExecuteInputResult, HasNamedMetadata};
 
 use libafl_bolts::current_time;
@@ -378,9 +376,9 @@ pub fn fuzz() -> Result<()> {
 /// and constructs a LibAFL observer and feedback
 fn setup_endpoint_coverage<
     'a,
-    S: State + HasNamedMetadata + HasMetadata + HasExecutions + HasLastReportTime,
-    EM: UsesState<State = S> + EventFirer,
-    I: Input,
+    S: State + HasNamedMetadata,
+    EM: EventFirer + UsesState<State = S>,
+    I,
     OT: MatchName,
 >(
     api: OpenAPI,
