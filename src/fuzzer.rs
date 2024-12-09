@@ -378,8 +378,8 @@ pub fn fuzz() -> Result<()> {
 fn setup_endpoint_coverage<
     'a,
     S: State + HasNamedMetadata + HasMetadata + HasExecutions + HasLastReportTime,
-    E: EventFirer + UsesState<State = S>,
-    Z: Fuzzer<E, EM, ST> + UsesState<State = S>,
+    E: HasObservers + UsesState<State = S>,
+    Z: Fuzzer<E, EM, ST, State = S>,
     ST: StagesTuple<E, EM, S, Z>,
     EM: EventManager<E, Z, State = S>,
     I: Input,
