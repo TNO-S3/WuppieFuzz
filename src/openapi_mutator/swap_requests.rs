@@ -9,8 +9,7 @@ use libafl::{
     state::HasRand,
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::Named;
+use libafl_bolts::{rands::Rand, Named};
 
 /// The `SwapRequestsMutator` swaps two requests in the series.
 pub struct SwapRequestsMutator;

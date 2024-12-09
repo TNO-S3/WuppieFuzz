@@ -5,9 +5,7 @@
 use crate::configuration::Configuration;
 use anyhow::{Context, Result};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use std::collections::HashMap;
-use std::fs::File;
-use std::str::FromStr;
+use std::{collections::HashMap, fs::File, str::FromStr};
 
 /// Load default headers from a file specified in configuration and apply
 /// them to the given ClientBuilder

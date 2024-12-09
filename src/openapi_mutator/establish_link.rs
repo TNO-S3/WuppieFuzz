@@ -3,7 +3,10 @@
 
 use std::borrow::Cow;
 
-use crate::{input::OpenApiInput, input::ParameterContents, state::HasRandAndOpenAPI};
+use crate::{
+    input::{OpenApiInput, ParameterContents},
+    state::HasRandAndOpenAPI,
+};
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},

@@ -10,8 +10,7 @@ use libafl::{
     state::HasRand,
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::Named;
+use libafl_bolts::{rands::Rand, Named};
 
 /// The `RemoveRequestMutator` removes an existing request in the series,
 /// but it will never leave a series empty.

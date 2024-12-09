@@ -3,19 +3,22 @@
 
 use lcov::{Reader, Record};
 use libafl::Error;
-use std::fs::{create_dir_all, read_dir, File};
-use std::io::prelude::*;
-use std::net::{SocketAddr, TcpStream};
-use std::{cmp, slice};
 use std::{
+    cmp,
     collections::HashMap,
+    fs::{create_dir_all, read_dir, File},
+    io::prelude::*,
+    net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
+    slice,
 };
 
-use crate::configuration::{Configuration, CoverageConfiguration};
-use crate::coverage_clients::{
-    read_utilities::{read_byte_vec, read_char},
-    CoverageClient, MAP_SIZE,
+use crate::{
+    configuration::{Configuration, CoverageConfiguration},
+    coverage_clients::{
+        read_utilities::{read_byte_vec, read_char},
+        CoverageClient, MAP_SIZE,
+    },
 };
 extern crate num;
 

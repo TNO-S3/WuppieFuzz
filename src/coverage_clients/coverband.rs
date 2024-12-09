@@ -3,12 +3,14 @@
 
 use super::CoverageClient;
 use crate::coverage_clients::MAP_SIZE;
-use reqwest::blocking::{Client, Response};
-use reqwest::Url;
-use std::path::Path;
+use reqwest::{
+    blocking::{Client, Response},
+    Url,
+};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Debug,
+    path::Path,
 };
 
 #[derive(Debug, serde::Deserialize)]

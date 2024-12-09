@@ -13,10 +13,8 @@ use libafl::{
     mutators::{MutationResult, Mutator},
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::Named;
-use std::borrow::Cow;
-use std::convert::TryInto;
+use libafl_bolts::{rands::Rand, Named};
+use std::{borrow::Cow, convert::TryInto};
 
 /// The `DifferentMethodMutator` changes an existing request from the series
 /// to use a different method. Only methods available for the current path

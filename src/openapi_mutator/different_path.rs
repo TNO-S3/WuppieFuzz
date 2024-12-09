@@ -1,14 +1,16 @@
 //! Mutates a request series by changing the path and method on one of the HTTP requests.
 //! The new path and method are taken from the API specification.
 
-use crate::{input::fix_input_parameters, input::OpenApiInput, state::HasRandAndOpenAPI};
+use crate::{
+    input::{fix_input_parameters, OpenApiInput},
+    state::HasRandAndOpenAPI,
+};
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::Named;
+use libafl_bolts::{rands::Rand, Named};
 use std::{borrow::Cow, convert::TryInto};
 
 /// The `DifferentPathMutator` changes an existing request from the series

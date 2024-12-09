@@ -1,11 +1,14 @@
-use libafl::corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus};
-use libafl::executors::hooks::inprocess::inprocess_get_state;
-use libafl::state::HasCorpus;
+use libafl::{
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    executors::hooks::inprocess::inprocess_get_state,
+    state::HasCorpus,
+};
 
-use crate::input::{OpenApiInput, OpenApiRequest};
-use crate::openapi::curl_request::CurlRequest;
-use crate::openapi::validate_response::Response;
-use crate::state::OpenApiFuzzerState;
+use crate::{
+    input::{OpenApiInput, OpenApiRequest},
+    openapi::{curl_request::CurlRequest, validate_response::Response},
+    state::OpenApiFuzzerState,
+};
 
 pub mod sqlite;
 

@@ -2,17 +2,14 @@
 //! fuzzing target during normal fuzzing operation. These functions need an OpenAPI struct
 //! to generate realistic requests for the given target.
 
-use std::borrow::Cow;
-use std::{collections::VecDeque, f64::consts::PI};
+use std::{borrow::Cow, collections::VecDeque, f64::consts::PI};
 
 use indexmap::IndexMap;
 use openapiv3::{
     OpenAPI, Operation, Parameter, ParameterData, RefOr, Schema, SchemaKind, StringFormat, Type,
 };
-use petgraph::prelude::NodeIndex;
-use petgraph::{csr::DefaultIx, graph::DiGraph, visit::EdgeRef};
-use rand::prelude::Distribution;
-use rand::Rng;
+use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
+use rand::{prelude::Distribution, Rng};
 use regex::Regex;
 use serde_json::Value;
 use unicode_truncate::UnicodeTruncateStr;

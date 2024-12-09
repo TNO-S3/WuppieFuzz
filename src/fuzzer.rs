@@ -1,25 +1,24 @@
 use anyhow::{Context, Result};
 
-use libafl::corpus::Corpus;
-use libafl::events::EventFirer;
-use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
-use libafl::executors::{Executor, HasObservers};
-use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
-use libafl::inputs::{BytesInput, UsesInput};
-use libafl::monitors::{AggregatorOps, UserStatsValue};
-use libafl::mutators::StdScheduledMutator;
-use libafl::observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver};
-use libafl::schedulers::{
-    powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+use libafl::{
+    corpus::Corpus,
+    events::EventFirer,
+    executors::{hooks::inprocess::inprocess_get_event_manager, Executor, HasObservers},
+    feedback_or,
+    feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback},
+    inputs::{BytesInput, UsesInput},
+    monitors::{AggregatorOps, UserStatsValue},
+    mutators::StdScheduledMutator,
+    observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+    },
+    stages::{CalibrationStage, StdPowerMutationalStage},
+    state::{HasCorpus, HasExecutions, NopState, UsesState},
+    ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
 };
-use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasCorpus, HasExecutions, NopState, State, UsesState};
-use libafl::{feedback_or, ExecutionProcessor};
-use libafl::{ExecuteInputResult, HasNamedMetadata};
 
-use libafl_bolts::current_time;
-use libafl_bolts::prelude::OwnedMutSlice;
-use libafl_bolts::tuples::MatchName;
+use libafl_bolts::{current_time, prelude::OwnedMutSlice, tuples::MatchName};
 use openapiv3::OpenAPI;
 
 use core::marker::PhantomData;
@@ -35,23 +34,25 @@ use libafl::{
     observers::StdMapObserver,
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
-use std::borrow::Cow;
-use std::ops::DerefMut;
+use std::{borrow::Cow, ops::DerefMut};
 
-use std::fs::create_dir_all;
-use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::{
+    fs::create_dir_all,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::{Duration, Instant},
+};
 
 use log::{debug, error, info};
 
-use crate::coverage_clients::endpoint::EndpointCoverageClient;
 use crate::{
     configuration::{Configuration, CrashCriterion},
-    coverage_clients::CoverageClient,
+    coverage_clients::{endpoint::EndpointCoverageClient, CoverageClient},
     input::OpenApiInput,
     monitors::CoverageMonitor,
     openapi::{

@@ -1,18 +1,24 @@
 //! Coverage client for agents that communicate using Jacoco. Jacoco is the supported way
 //! to collect coverage from Java targets.
 
-use std::collections::{hash_map::Entry, HashMap};
-use std::fs::{create_dir_all, read_dir, remove_file, DirBuilder, OpenOptions};
-use std::io::prelude::*;
-use std::net::{SocketAddr, TcpStream};
-use std::path::{Path, PathBuf};
-use std::slice;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fs::{create_dir_all, read_dir, remove_file, DirBuilder, OpenOptions},
+    io::prelude::*,
+    net::{SocketAddr, TcpStream},
+    path::{Path, PathBuf},
+    slice,
+};
 
 extern crate num;
 
-use crate::configuration::{Configuration, CoverageConfiguration};
-use crate::coverage_clients::read_utilities::{read_bool_array, read_cesu8, read_char, read_u64be};
-use crate::coverage_clients::{CoverageClient, MAP_SIZE};
+use crate::{
+    configuration::{Configuration, CoverageConfiguration},
+    coverage_clients::{
+        read_utilities::{read_bool_array, read_cesu8, read_char, read_u64be},
+        CoverageClient, MAP_SIZE,
+    },
+};
 
 use libafl::Error;
 use log::trace;

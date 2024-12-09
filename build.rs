@@ -1,10 +1,7 @@
 //! Creates a Software Bill of Materials to be include in every build.
 
 use cargo_license::{get_dependencies_from_cargo_lock, GetDependenciesOpt};
-use std::env;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
+use std::{env, fs::File, io::Write, path::Path};
 
 fn main() {
     let dependencies = get_dependencies_from_cargo_lock(

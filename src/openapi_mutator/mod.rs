@@ -8,21 +8,23 @@
 use core::num::NonZero;
 use std::borrow::Cow;
 
-use crate::input::parameter::SimpleValue;
-use crate::input::{new_rand_input, OpenApiInput, ParameterContents};
-use crate::state::OpenApiFuzzerState;
-use libafl::corpus::Corpus;
-use libafl::inputs::Input;
+use crate::{
+    input::{new_rand_input, parameter::SimpleValue, OpenApiInput, ParameterContents},
+    state::OpenApiFuzzerState,
+};
 pub use libafl::mutators::mutations::*;
 use libafl::{
-    inputs::{BytesInput, HasMutatorBytes},
+    corpus::Corpus,
+    inputs::{BytesInput, HasMutatorBytes, Input},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::tuples::{tuple_list, tuple_list_type};
-use libafl_bolts::Named;
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{tuple_list, tuple_list_type},
+    Named,
+};
 
 pub mod add_request;
 use add_request::AddRequestMutator;
