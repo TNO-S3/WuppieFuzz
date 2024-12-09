@@ -85,7 +85,7 @@ pub fn fuzz() -> Result<()> {
 
     // Set up endpoint coverage
     let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
-        setup_endpoint_coverage(*api.clone());
+        setup_endpoint_coverage(*api.clone())?;
 
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
@@ -374,6 +374,7 @@ pub fn fuzz() -> Result<()> {
 
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
+#[allow(clippy::type_complexity)]
 fn setup_endpoint_coverage<
     'a,
     S: UsesInput + HasNamedMetadata,
@@ -382,11 +383,14 @@ fn setup_endpoint_coverage<
     OT: MatchName,
 >(
     api: OpenAPI,
-) -> (
-    Arc<Mutex<EndpointCoverageClient>>,
-    ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>,
-    impl Feedback<EM, I, OT, S>,
-) {
+) -> Result<
+    (
+        Arc<Mutex<EndpointCoverageClient>>,
+        ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>,
+        impl Feedback<EM, I, OT, S>,
+    ),
+    anyhow::Error,
+> {
     let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
     endpoint_coverage_client.fetch_coverage(true);
     // no-op for this particular CoverageClient
@@ -407,11 +411,11 @@ fn setup_endpoint_coverage<
         StdMapObserver<'_, u8, false>,
         MaxReducer,
     > = MaxMapFeedback::new(&endpoint_coverage_observer);
-    (
+    Ok((
         endpoint_coverage_client,
         endpoint_coverage_observer,
         endpoint_coverage_feedback,
-    )
+    ))
 }
 
 type LineCovClientObserverFeedback<'a> = (
