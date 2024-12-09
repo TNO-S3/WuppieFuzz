@@ -108,9 +108,6 @@ impl<I, C, R, SC> HasCurrentCorpusId for OpenApiFuzzerState<I, C, R, SC> {
 }
 
 impl<I, C, R, SC> Stoppable for OpenApiFuzzerState<I, C, R, SC>
-where
-    R: Rand,
-    Self: UsesInput,
 {
     fn stop_requested(&self) -> bool {
         self.stop_requested
@@ -146,12 +143,10 @@ where
 
 impl<I, C, R, SC> HasTestcase for OpenApiFuzzerState<I, C, R, SC>
 where
-    I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
-    R: Rand,
+    C: Corpus,
 {
     /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<C::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow())
     }
 
@@ -159,8 +154,22 @@ where
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+    ) -> Result<RefMut<'_, Testcase<C::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
+    }
+}
+
+impl<I, C, R, SC> HasLastFoundTime for OpenApiFuzzerState<I, C, R, SC> {
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn last_found_time(&self) -> &Duration {
+        &self.last_found_time
+    }
+
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn last_found_time_mut(&mut self) -> &mut Duration {
+        &mut self.last_found_time
     }
 }
 
@@ -173,9 +182,7 @@ where
 
 impl<I, C, R, SC> HasCorpus for OpenApiFuzzerState<I, C, R, SC>
 where
-    I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
-    R: Rand,
+    C: Corpus,
 {
     type Corpus = C;
 
@@ -195,7 +202,7 @@ where
 impl<I, C, R, SC> HasSolutions for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    SC: Corpus<Input = <Self as UsesInput>::Input>,
+    SC: Corpus,
 {
     type Solutions = SC;
 
@@ -325,16 +332,6 @@ impl<C, I, R, SC> HasImported for OpenApiFuzzerState<I, C, R, SC> {
 
     fn imported_mut(&mut self) -> &mut usize {
         todo!()
-    }
-}
-
-impl<C, I, R, SC> HasLastFoundTime for OpenApiFuzzerState<I, C, R, SC> {
-    fn last_found_time(&self) -> &Duration {
-        &self.last_found_time
-    }
-
-    fn last_found_time_mut(&mut self) -> &mut Duration {
-        &mut self.last_found_time
     }
 }
 
