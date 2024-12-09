@@ -379,7 +379,7 @@ fn setup_endpoint_coverage<
     'a,
     S: State + HasNamedMetadata + HasMetadata + HasExecutions + HasLastReportTime,
     E: HasObservers + UsesState<State = S>,
-    Z: Fuzzer<E, EM, ST, State = S>,
+    Z: UsesState<State = S>,
     ST: StagesTuple<E, EM, S, Z>,
     EM: EventManager<E, Z, State = S>,
     I: Input,
