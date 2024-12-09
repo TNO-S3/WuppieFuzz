@@ -2,7 +2,6 @@
 
 use std::borrow::Cow;
 
-use crate::input::OpenApiInput;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
@@ -10,6 +9,8 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{rands::Rand, Named};
+
+use crate::input::OpenApiInput;
 
 /// The `DuplicateRequestMutator` duplicates an existing request in the series.
 pub struct DuplicateRequestMutator;

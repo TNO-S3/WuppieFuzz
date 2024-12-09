@@ -1,8 +1,6 @@
 //! Coverage client for agents that communicate using LCOV. This is a generic protocol,
 //! and we can use it to get coverage from targets written in Python and Javascript.
 
-use lcov::{Reader, Record};
-use libafl::Error;
 use std::{
     cmp,
     collections::HashMap,
@@ -12,6 +10,9 @@ use std::{
     path::{Path, PathBuf},
     slice,
 };
+
+use lcov::{Reader, Record};
+use libafl::Error;
 
 use crate::{
     configuration::{Configuration, CoverageConfiguration},

@@ -12,6 +12,9 @@ use std::{
 
 extern crate num;
 
+use libafl::Error;
+use log::trace;
+
 use crate::{
     configuration::{Configuration, CoverageConfiguration},
     coverage_clients::{
@@ -19,9 +22,6 @@ use crate::{
         CoverageClient, MAP_SIZE,
     },
 };
-
-use libafl::Error;
-use log::trace;
 
 const REQUEST_HEADER: [u8; 5] = [0x01, 0xc0, 0xc0, 0x10, 0x07];
 const BLOCK_CMD_DUMP: u8 = 0x40;

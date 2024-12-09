@@ -2,10 +2,12 @@
 //! specify headers that should be sent with every request the fuzzer makes,
 //! and this module parses those into a Reqwest HeaderMap.
 
-use crate::configuration::Configuration;
+use std::{collections::HashMap, fs::File, str::FromStr};
+
 use anyhow::{Context, Result};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use std::{collections::HashMap, fs::File, str::FromStr};
+
+use crate::configuration::Configuration;
 
 /// Load default headers from a file specified in configuration and apply
 /// them to the given ClientBuilder

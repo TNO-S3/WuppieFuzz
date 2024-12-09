@@ -1,13 +1,14 @@
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display, Formatter, Result},
+};
+
 use base64::{display::Base64Display, engine::general_purpose::STANDARD, Engine as _};
 use indexmap::IndexMap;
 use libafl_bolts::rands::Rand;
 use openapiv3::Parameter;
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
-use std::{
-    borrow::Cow,
-    fmt::{Debug, Display, Formatter, Result},
-};
 
 use super::new_rand_input;
 

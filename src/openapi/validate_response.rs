@@ -1,11 +1,12 @@
-use crate::input::{Method, OpenApiRequest};
+use std::{error::Error, str::Utf8Error};
+
 use anyhow::Result;
 use openapiv3::{OpenAPI, ReferenceOr, Schema, Type};
 use reqwest::StatusCode;
 use serde_json::Value;
-use std::{error::Error, str::Utf8Error};
 
 use super::JsonContent;
+use crate::input::{Method, OpenApiRequest};
 
 /// The Response object provided by Reqwest is unwieldy, since its body contents
 /// can only be obtained once by consuming the object. This prevents later reading

@@ -1,45 +1,10 @@
-use anyhow::{Context, Result};
-
-use libafl::{
-    corpus::Corpus,
-    events::EventFirer,
-    executors::{hooks::inprocess::inprocess_get_event_manager, Executor, HasObservers},
-    feedback_or,
-    feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback},
-    inputs::{BytesInput, UsesInput},
-    monitors::{AggregatorOps, UserStatsValue},
-    mutators::StdScheduledMutator,
-    observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver},
-    schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
-    },
-    stages::{CalibrationStage, StdPowerMutationalStage},
-    state::{HasCorpus, HasExecutions, NopState, UsesState},
-    ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
-};
-
-use libafl_bolts::{current_time, prelude::OwnedMutSlice, tuples::MatchName};
-use openapiv3::OpenAPI;
-
 use core::marker::PhantomData;
-#[allow(unused_imports)]
-use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
-use libafl::{
-    corpus::OnDiskCorpus,
-    events::{Event, SimpleEventManager},
-    executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::StdFuzzer,
-    monitors::UserStats,
-    observers::StdMapObserver,
-};
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
-use std::{borrow::Cow, ops::DerefMut};
-
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{
+    borrow::Cow,
     fs::create_dir_all,
+    ops::DerefMut,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -48,7 +13,41 @@ use std::{
     time::{Duration, Instant},
 };
 
+use anyhow::{Context, Result};
+#[allow(unused_imports)]
+use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
+use libafl::{
+    corpus::{Corpus, OnDiskCorpus},
+    events::{Event, EventFirer, SimpleEventManager},
+    executors::{
+        hooks::inprocess::inprocess_get_event_manager, inprocess::InProcessExecutor, Executor,
+        ExitKind, HasObservers,
+    },
+    feedback_or,
+    feedbacks::{
+        CrashFeedback, DifferentIsNovel, Feedback, MapFeedback, MaxMapFeedback, MaxReducer,
+        TimeFeedback,
+    },
+    fuzzer::StdFuzzer,
+    inputs::{BytesInput, UsesInput},
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    mutators::StdScheduledMutator,
+    observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+    },
+    stages::{CalibrationStage, StdPowerMutationalStage},
+    state::{HasCorpus, HasExecutions, NopState, UsesState},
+    ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
+};
+use libafl_bolts::{
+    current_nanos, current_time,
+    prelude::OwnedMutSlice,
+    rands::StdRand,
+    tuples::{tuple_list, MatchName},
+};
 use log::{debug, error, info};
+use openapiv3::OpenAPI;
 
 use crate::{
     configuration::{Configuration, CrashCriterion},

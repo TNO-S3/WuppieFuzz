@@ -1,6 +1,4 @@
 use core::{fmt::Debug, time::Duration};
-use openapiv3::OpenAPI;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     cell::{Ref, RefMut},
     marker::PhantomData,
@@ -23,6 +21,8 @@ use libafl_bolts::{
     rands::Rand,
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
+use openapiv3::OpenAPI;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///

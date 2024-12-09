@@ -1,5 +1,3 @@
-use clap::{value_parser, Parser, Subcommand, ValueEnum};
-use serde::Deserialize;
 use std::{
     convert::TryFrom,
     io,
@@ -7,6 +5,9 @@ use std::{
     net::{SocketAddr, ToSocketAddrs},
     path::{Path, PathBuf},
 };
+
+use clap::{value_parser, Parser, Subcommand, ValueEnum};
+use serde::Deserialize;
 
 const DEFAULT_REQUEST_TIMEOUT: u64 = 30000;
 const DEFAULT_METHOD_MUTATION_STRATEGY: MethodMutationStrategy = MethodMutationStrategy::FollowSpec;

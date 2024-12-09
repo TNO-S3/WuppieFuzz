@@ -8,10 +8,6 @@
 use core::num::NonZero;
 use std::borrow::Cow;
 
-use crate::{
-    input::{new_rand_input, parameter::SimpleValue, OpenApiInput, ParameterContents},
-    state::OpenApiFuzzerState,
-};
 pub use libafl::mutators::mutations::*;
 use libafl::{
     corpus::Corpus,
@@ -24,6 +20,11 @@ use libafl_bolts::{
     rands::Rand,
     tuples::{tuple_list, tuple_list_type},
     Named,
+};
+
+use crate::{
+    input::{new_rand_input, parameter::SimpleValue, OpenApiInput, ParameterContents},
+    state::OpenApiFuzzerState,
 };
 
 pub mod add_request;

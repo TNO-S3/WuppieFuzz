@@ -1,20 +1,21 @@
 //! Mutates a request series by changing the method (GET, POST, ...) of one of the HTTP
 //! requests to a random different method.
 
-use crate::configuration::{Configuration, MethodMutationStrategy};
+use std::{borrow::Cow, convert::TryInto};
 
-use crate::{
-    input::{fix_input_parameters, OpenApiInput},
-    openapi::find_method_indices_for_path,
-    state::HasRandAndOpenAPI,
-};
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
     Error,
 };
 use libafl_bolts::{rands::Rand, Named};
-use std::{borrow::Cow, convert::TryInto};
+
+use crate::{
+    configuration::{Configuration, MethodMutationStrategy},
+    input::{fix_input_parameters, OpenApiInput},
+    openapi::find_method_indices_for_path,
+    state::HasRandAndOpenAPI,
+};
 
 /// The `DifferentMethodMutator` changes an existing request from the series
 /// to use a different method. Only methods available for the current path

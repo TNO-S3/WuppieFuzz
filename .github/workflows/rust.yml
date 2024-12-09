@@ -42,7 +42,7 @@ jobs:
 
       # Run `cargo fmt` to check formatting
       - name: Check formatting with rustfmt
-        run: cargo fmt --all -- --check
+        run: cargo +nightly fmt --all -- --check
 
       # Run `cargo clippy` for linting
       - name: Run Clippy for linting

@@ -1,14 +1,8 @@
 //! Mutates a request series by adding a new request to it. The new request is taken
 //! at random from the API specification.
 
-use crate::{
-    input::{
-        new_rand_input, parameter::ParameterKind, Body, OpenApiInput, OpenApiRequest,
-        ParameterContents,
-    },
-    openapi::JsonContent,
-    state::HasRandAndOpenAPI,
-};
+use std::{borrow::Cow, convert::TryInto};
+
 use indexmap::IndexMap;
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -17,7 +11,15 @@ use libafl::{
 };
 use libafl_bolts::{rands::Rand, Named};
 use openapiv3::{OpenAPI, RequestBody};
-use std::{borrow::Cow, convert::TryInto};
+
+use crate::{
+    input::{
+        new_rand_input, parameter::ParameterKind, Body, OpenApiInput, OpenApiRequest,
+        ParameterContents,
+    },
+    openapi::JsonContent,
+    state::HasRandAndOpenAPI,
+};
 
 /// The `AddRequestMutator` adds a request to a random path from the specification
 /// to the series of requests. The request is added at the end of the series, and

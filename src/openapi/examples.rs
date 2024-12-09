@@ -14,12 +14,11 @@ use regex::Regex;
 use serde_json::Value;
 use unicode_truncate::UnicodeTruncateStr;
 
+use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
     initial_corpus::dependency_graph::ParameterMatching,
     input::{parameter::ParameterKind, Body, OpenApiInput, OpenApiRequest, ParameterContents},
 };
-
-use super::{JsonContent, QualifiedOperation, WwwForm};
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest
 /// filled with example values from the API specification, and default values
