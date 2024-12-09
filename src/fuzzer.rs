@@ -5,7 +5,7 @@ use libafl::events::EventFirer;
 use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
 use libafl::executors::{Executor, HasObservers};
 use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
-use libafl::inputs::BytesInput;
+use libafl::inputs::{BytesInput, UsesInput};
 use libafl::monitors::{AggregatorOps, UserStatsValue};
 use libafl::mutators::StdScheduledMutator;
 use libafl::observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver};
@@ -376,7 +376,7 @@ pub fn fuzz() -> Result<()> {
 /// and constructs a LibAFL observer and feedback
 fn setup_endpoint_coverage<
     'a,
-    S: State + HasNamedMetadata,
+    S: UsesInput + HasNamedMetadata,
     EM: EventFirer + UsesState<State = S>,
     I,
     OT: MatchName,
