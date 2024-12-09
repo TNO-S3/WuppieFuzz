@@ -14,7 +14,7 @@ use libafl::observers::{
 use libafl::schedulers::{
     powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
 };
-use libafl::stages::{CalibrationStage, HasCurrentStageId, StagesTuple, StdPowerMutationalStage};
+use libafl::stages::{CalibrationStage, StagesTuple, StdPowerMutationalStage};
 use libafl::state::{HasCorpus, HasExecutions, HasLastReportTime, NopState, State, UsesState};
 use libafl::{feedback_or, ExecutionProcessor, HasMetadata};
 use libafl::{ExecuteInputResult, HasNamedMetadata};
@@ -49,7 +49,7 @@ use std::time::{Duration, Instant};
 
 use log::{debug, error, info};
 
-use crate::coverage_clients::endpoint::{self, EndpointCoverageClient};
+use crate::coverage_clients::endpoint::EndpointCoverageClient;
 use crate::{
     configuration::{Configuration, CrashCriterion},
     coverage_clients::CoverageClient,

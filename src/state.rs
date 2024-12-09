@@ -9,7 +9,7 @@ use std::{
 
 use libafl::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    feedbacks::{Feedback, StateInitializer},
+    feedbacks::StateInitializer,
     inputs::{Input, UsesInput},
     schedulers::powersched::SchedulerMetadata,
     stages::{HasCurrentStageId, StageId},
@@ -107,8 +107,7 @@ impl<I, C, R, SC> HasCurrentCorpusId for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> Stoppable for OpenApiFuzzerState<I, C, R, SC>
-{
+impl<I, C, R, SC> Stoppable for OpenApiFuzzerState<I, C, R, SC> {
     fn stop_requested(&self) -> bool {
         self.stop_requested
     }
@@ -151,10 +150,7 @@ where
     }
 
     /// To get mutable testcase
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<'_, Testcase<C::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<C::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
     }
 }
