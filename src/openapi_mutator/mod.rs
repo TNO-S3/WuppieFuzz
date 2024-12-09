@@ -213,10 +213,7 @@ fn mutate_leaf_value<S: HasRand>(
 /// Mutate number in-place
 fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -> MutationResult {
     // A small chance to get a special value that might just lead to interesting errors
-    match state
-        .rand_mut()
-        .below(NonZero::new(100).unwrap())
-    {
+    match state.rand_mut().below(NonZero::new(100).unwrap()) {
         0 => {
             *n = (-1).into();
             return MutationResult::Mutated;
@@ -240,10 +237,7 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
     if let Some(x) = n.as_i64() {
         // always negative
         *n = (state.rand_mut().below(
-            NonZero::new(x)
-                .unwrap_or(NonZero::new(i64::MAX).unwrap()) // because -i64::MIN == i64::MIN
-                .saturating_mul(NonZero::new(4).unwrap())
-                .try_into()
+            NonZero::new(x.wrapping_neg().saturating_mul(4) as usize)
                 .unwrap_or(NonZero::new(usize::MAX).unwrap()), // larger values could otherwise be truncated
         ) as i64
             + x.saturating_mul(2))
