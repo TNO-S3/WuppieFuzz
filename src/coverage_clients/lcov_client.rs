@@ -1,21 +1,25 @@
 //! Coverage client for agents that communicate using LCOV. This is a generic protocol,
 //! and we can use it to get coverage from targets written in Python and Javascript.
 
-use lcov::{Reader, Record};
-use libafl::Error;
-use std::fs::{create_dir_all, read_dir, File};
-use std::io::prelude::*;
-use std::net::{SocketAddr, TcpStream};
-use std::{cmp, slice};
 use std::{
+    cmp,
     collections::HashMap,
+    fs::{create_dir_all, read_dir, File},
+    io::prelude::*,
+    net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
+    slice,
 };
 
-use crate::configuration::{Configuration, CoverageConfiguration};
-use crate::coverage_clients::{
-    read_utilities::{read_byte_vec, read_char},
-    CoverageClient, MAP_SIZE,
+use lcov::{Reader, Record};
+use libafl::Error;
+
+use crate::{
+    configuration::{Configuration, CoverageConfiguration},
+    coverage_clients::{
+        read_utilities::{read_byte_vec, read_char},
+        CoverageClient, MAP_SIZE,
+    },
 };
 extern crate num;
 

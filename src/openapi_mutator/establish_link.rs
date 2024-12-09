@@ -3,13 +3,17 @@
 
 use std::borrow::Cow;
 
-use crate::{input::OpenApiInput, input::ParameterContents, state::HasRandAndOpenAPI};
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
     Error,
 };
 use libafl_bolts::Named;
+
+use crate::{
+    input::{OpenApiInput, ParameterContents},
+    state::HasRandAndOpenAPI,
+};
 
 /// The `EstablishLinkMutator` adds a connection to the series of requests.
 /// A connection is a `ParameterContents::Reference` variant in a named parameter

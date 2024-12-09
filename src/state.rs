@@ -1,6 +1,4 @@
 use core::{fmt::Debug, time::Duration};
-use openapiv3::OpenAPI;
-use serde::{Deserialize, Serialize};
 use std::{
     cell::{Ref, RefMut},
     marker::PhantomData,
@@ -9,10 +7,10 @@ use std::{
 
 use libafl::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    feedbacks::Feedback,
+    feedbacks::StateInitializer,
     inputs::{Input, UsesInput},
     schedulers::powersched::SchedulerMetadata,
-    stages::{HasCurrentStage, StageId},
+    stages::{HasCurrentStageId, StageId},
     state::{
         HasCorpus, HasExecutions, HasImported, HasLastFoundTime, HasLastReportTime, HasMaxSize,
         HasRand, HasSolutions, HasStartTime, State, Stoppable,
@@ -23,6 +21,8 @@ use libafl_bolts::{
     rands::Rand,
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
+use openapiv3::OpenAPI;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///
@@ -68,25 +68,25 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
 
 impl<I, C, R, SC> State for OpenApiFuzzerState<I, C, R, SC>
 where
-    C: Corpus<Input = Self::Input>,
+    C: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
     R: Rand,
-    SC: Corpus<Input = Self::Input>,
+    SC: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
     Self: UsesInput,
 {
 }
 
-impl<I, C, R, SC> HasCurrentStage for OpenApiFuzzerState<I, C, R, SC> {
-    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error> {
+impl<I, C, R, SC> HasCurrentStageId for OpenApiFuzzerState<I, C, R, SC> {
+    fn set_current_stage_id(&mut self, idx: StageId) -> Result<(), Error> {
         self.current_stage = Some(idx);
         Ok(())
     }
 
-    fn clear_stage(&mut self) -> Result<(), Error> {
+    fn clear_stage_id(&mut self) -> Result<(), Error> {
         self.current_stage = None;
         Ok(())
     }
 
-    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
+    fn current_stage_id(&self) -> Result<Option<StageId>, Error> {
         Ok(self.current_stage)
     }
 }
@@ -107,11 +107,7 @@ impl<I, C, R, SC> HasCurrentCorpusId for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> Stoppable for OpenApiFuzzerState<I, C, R, SC>
-where
-    R: Rand,
-    Self: UsesInput,
-{
+impl<I, C, R, SC> Stoppable for OpenApiFuzzerState<I, C, R, SC> {
     fn stop_requested(&self) -> bool {
         self.stop_requested
     }
@@ -127,10 +123,7 @@ where
 
 impl<I, C, R, SC> HasRand for OpenApiFuzzerState<I, C, R, SC>
 where
-    I: Input,
-    C: Corpus,
     R: Rand,
-    SC: Corpus,
 {
     type Rand = R;
 
@@ -149,21 +142,30 @@ where
 
 impl<I, C, R, SC> HasTestcase for OpenApiFuzzerState<I, C, R, SC>
 where
-    I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
-    R: Rand,
+    C: Corpus,
 {
     /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<C::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow())
     }
 
     /// To get mutable testcase
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<C::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
+    }
+}
+
+impl<I, C, R, SC> HasLastFoundTime for OpenApiFuzzerState<I, C, R, SC> {
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn last_found_time(&self) -> &Duration {
+        &self.last_found_time
+    }
+
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn last_found_time_mut(&mut self) -> &mut Duration {
+        &mut self.last_found_time
     }
 }
 
@@ -176,9 +178,7 @@ where
 
 impl<I, C, R, SC> HasCorpus for OpenApiFuzzerState<I, C, R, SC>
 where
-    I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
-    R: Rand,
+    C: Corpus,
 {
     type Corpus = C;
 
@@ -198,7 +198,7 @@ where
 impl<I, C, R, SC> HasSolutions for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    SC: Corpus<Input = <Self as UsesInput>::Input>,
+    SC: Corpus,
 {
     type Solutions = SC;
 
@@ -331,16 +331,6 @@ impl<C, I, R, SC> HasImported for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasLastFoundTime for OpenApiFuzzerState<I, C, R, SC> {
-    fn last_found_time(&self) -> &Duration {
-        &self.last_found_time
-    }
-
-    fn last_found_time_mut(&mut self) -> &mut Duration {
-        &mut self.last_found_time
-    }
-}
-
 impl<C, I, R, SC> OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
@@ -358,8 +348,10 @@ where
         api: OpenAPI,
     ) -> Result<Self, Error>
     where
-        F: Feedback<Self>,
-        O: Feedback<Self>,
+        F: StateInitializer<Self>,
+        O: StateInitializer<Self>,
+        C: Serialize + DeserializeOwned,
+        SC: Serialize + DeserializeOwned,
     {
         let mut state = Self {
             rand,

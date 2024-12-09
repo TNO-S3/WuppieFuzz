@@ -50,21 +50,30 @@
 //!           parameter_name: name_of_field_in_returned_object_from_first_request
 //! ```
 
-use self::parameter::ParameterKind;
-pub use self::{method::Method, parameter::ParameterContents};
-use crate::openapi::{JsonContent, TextPlain, WwwForm};
-use crate::{
-    openapi::find_operation, parameter_feedback::ParameterFeedback, state::HasRandAndOpenAPI,
+use std::{
+    borrow::Cow,
+    fs::File,
+    hash::{BuildHasher, Hasher},
+    io::Read,
+    path::Path,
 };
+
 use ahash::RandomState;
-use indexmap::map::ValuesMut;
-use indexmap::{map::Iter, IndexMap};
-use libafl::corpus::CorpusId;
-use libafl::{inputs::Input, Error};
+use indexmap::{
+    map::{Iter, ValuesMut},
+    IndexMap,
+};
+use libafl::{corpus::CorpusId, inputs::Input, Error};
 use libafl_bolts::{fs::write_file_atomic, rands::Rand, HasLen};
 use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
-use std::{borrow::Cow, hash::BuildHasher, hash::Hasher};
-use std::{fs::File, io::Read, path::Path};
+
+use self::parameter::ParameterKind;
+pub use self::{method::Method, parameter::ParameterContents};
+use crate::{
+    openapi::{find_operation, JsonContent, TextPlain, WwwForm},
+    parameter_feedback::ParameterFeedback,
+    state::HasRandAndOpenAPI,
+};
 
 pub mod method;
 pub mod parameter;

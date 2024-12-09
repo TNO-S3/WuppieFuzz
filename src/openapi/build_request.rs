@@ -1,7 +1,8 @@
-use crate::input::{parameter::ParameterKind, OpenApiRequest};
 use cookie::Cookie;
 use openapiv3::OpenAPI;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+
+use crate::input::{parameter::ParameterKind, OpenApiRequest};
 
 /// Build a request to a path from the API using the input values.
 pub fn build_request_from_input(

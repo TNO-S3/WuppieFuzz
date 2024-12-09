@@ -1,8 +1,8 @@
-use openapiv3::OpenAPI;
 use std::{borrow::Cow, fs::File, path::Path};
 
 use anyhow::{Context, Result};
 use cookie_store::{Cookie, RawCookie};
+use openapiv3::OpenAPI;
 use reqwest::header::{HeaderMap, IntoHeaderName, AUTHORIZATION};
 use url::Url;
 
