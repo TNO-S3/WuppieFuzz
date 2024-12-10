@@ -1,15 +1,19 @@
 //! Mutates a request series by changing the path and method on one of the HTTP requests.
 //! The new path and method are taken from the API specification.
 
-use crate::{input::fix_input_parameters, input::OpenApiInput, state::HasRandAndOpenAPI};
+use std::{borrow::Cow, convert::TryInto};
+
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::Named;
-use std::{borrow::Cow, convert::TryInto};
+use libafl_bolts::{rands::Rand, Named};
+
+use crate::{
+    input::{fix_input_parameters, OpenApiInput},
+    state::HasRandAndOpenAPI,
+};
 
 /// The `DifferentPathMutator` changes an existing request from the series
 /// to use a different path-plus-method-combination. Only combinations available
@@ -48,7 +52,7 @@ where
         let random_input = rand.choose(&mut input.0).unwrap();
         for _ in 0..100 {
             let n_ops = api.operations().count();
-            let new_path_i = rand.below(n_ops);
+            let new_path_i = rand.below(core::num::NonZero::new(n_ops).unwrap());
             {
                 let (new_path, new_method, _, _) = api.operations().nth(new_path_i).unwrap();
                 // Only set "mutated" if it's actually different

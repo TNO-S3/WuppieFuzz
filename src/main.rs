@@ -29,17 +29,17 @@ extern crate num_derive;
 #[macro_use]
 extern crate lazy_static;
 
-#[allow(unused_imports)]
-use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
+#[cfg(windows)]
+use std::ptr::write_volatile;
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
 use configuration::{Commands, OutputFormat};
 use env_logger::{Builder, Env};
+#[allow(unused_imports)]
+use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use log::warn;
-#[cfg(windows)]
-use std::ptr::write_volatile;
-use std::sync::Arc;
 
 mod authentication;
 mod configuration;

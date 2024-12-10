@@ -1,11 +1,14 @@
-use libafl::corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus};
-use libafl::executors::hooks::inprocess::inprocess_get_state;
-use libafl::state::HasCorpus;
+use libafl::{
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    executors::hooks::inprocess::inprocess_get_state,
+    state::HasCorpus,
+};
 
-use crate::input::{OpenApiInput, OpenApiRequest};
-use crate::openapi::curl_request::CurlRequest;
-use crate::openapi::validate_response::Response;
-use crate::state::OpenApiFuzzerState;
+use crate::{
+    input::{OpenApiInput, OpenApiRequest},
+    openapi::{curl_request::CurlRequest, validate_response::Response},
+    state::OpenApiFuzzerState,
+};
 
 pub mod sqlite;
 
@@ -75,16 +78,18 @@ where
 }
 
 fn get_current_test_case_file_name() -> Option<String> {
-    let corpus = inprocess_get_state::<
-        OpenApiFuzzerState<
-            OpenApiInput,
-            InMemoryOnDiskCorpus<OpenApiInput>,
-            libafl_bolts::rands::RomuDuoJrRand,
-            OnDiskCorpus<OpenApiInput>,
-        >,
-    >()
-    .expect("State is gone??")
-    .corpus();
+    let corpus = unsafe {
+        inprocess_get_state::<
+            OpenApiFuzzerState<
+                OpenApiInput,
+                InMemoryOnDiskCorpus<OpenApiInput>,
+                libafl_bolts::rands::RomuDuoJrRand,
+                OnDiskCorpus<OpenApiInput>,
+            >,
+        >()
+        .expect("State is gone??")
+        .corpus()
+    };
     corpus
         .current()
         .and_then(|id| corpus.get(id).ok())
