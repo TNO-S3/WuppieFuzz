@@ -1,8 +1,9 @@
 //! Collection of utility functions to read data from a stream.
 
-use std::convert::{TryFrom, TryInto};
-use std::io::ErrorKind;
-use std::io::{prelude::*, Error, Result};
+use std::{
+    convert::{TryFrom, TryInto},
+    io::{prelude::*, Error, ErrorKind, Result},
+};
 
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use cesu8::{from_java_cesu8, to_java_cesu8};

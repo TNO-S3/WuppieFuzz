@@ -11,10 +11,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    initial_corpus::dependency_graph::initial_corpus_from_api,
-    input::{OpenApiInput, OpenApiRequest},
-};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
     HasMetadata,
@@ -22,6 +18,10 @@ use libafl::{
 use openapiv3::OpenAPI;
 
 use self::dependency_graph::DependencyGraph;
+use crate::{
+    initial_corpus::dependency_graph::initial_corpus_from_api,
+    input::{OpenApiInput, OpenApiRequest},
+};
 
 /// Loads an `OpenApiInput` from a yaml file.
 pub fn load_starting_corpus(

@@ -9,10 +9,6 @@
 //! attaching a coverage agent to a target is not always easy, and we do not support all types
 //! of programming languages.
 
-use super::{CoverageClient, MAP_SIZE};
-use build_html::{escape_html, Container, ContainerType, Html, HtmlContainer, HtmlPage};
-use indexmap::{map::Entry, IndexMap};
-use openapiv3::{OpenAPI, StatusCode};
 use std::{
     convert::TryFrom,
     fs::{create_dir_all, File},
@@ -21,6 +17,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use build_html::{escape_html, Container, ContainerType, Html, HtmlContainer, HtmlPage};
+use indexmap::{map::Entry, IndexMap};
+use openapiv3::{OpenAPI, StatusCode};
+
+use super::{CoverageClient, MAP_SIZE};
 use crate::input::Method;
 
 const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";

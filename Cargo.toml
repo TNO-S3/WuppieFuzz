@@ -59,8 +59,8 @@ iter-read = "1.0.1"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.4.0"
 lcov = "0.8"
-libafl = "=0.13.2"
-libafl_bolts = "0.13.2"
+libafl = "=0.14.1"
+libafl_bolts = { version = "0.14.1", features = ["prelude"] }
 log = { version = "0.4.21", features = ["serde"] }
 num = { version = "0.4.2", default-features = false }
 num-derive = "0.4.2"
@@ -76,7 +76,6 @@ regex = "1.11.1"
 reqwest = { version = "0.12.4", features = ["blocking", "json"] }
 reqwest_cookie_store = "0.7.0"
 rusqlite = { version = "0.31.0", features = ["bundled"] }
-rustc-demangle = "=0.1.21"
 serde = { version = "1.0", default-features = false, features = [
     "alloc",
     "derive",

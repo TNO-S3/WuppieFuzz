@@ -1,56 +1,57 @@
-use anyhow::{Context, Result};
-
-use libafl::corpus::Corpus;
-use libafl::events::EventFirer;
-use libafl::executors::hooks::inprocess::inprocess_get_event_manager;
-use libafl::executors::{Executor, HasObservers};
-use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
-use libafl::inputs::BytesInput;
-use libafl::monitors::{AggregatorOps, UserStatsValue};
-use libafl::mutators::StdScheduledMutator;
-use libafl::observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver};
-use libafl::schedulers::{
-    powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
-};
-use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasCorpus, HasExecutions, NopState, State};
-use libafl::{feedback_or, ExecutionProcessor};
-use libafl::{ExecuteInputResult, HasNamedMetadata};
-
-use libafl_bolts::current_time;
-use libafl_bolts::prelude::OwnedMutSlice;
-use openapiv3::OpenAPI;
-
 use core::marker::PhantomData;
+#[cfg(windows)]
+use std::ptr::write_volatile;
+use std::{
+    borrow::Cow,
+    fs::create_dir_all,
+    ops::DerefMut,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::{Duration, Instant},
+};
+
+use anyhow::{Context, Result};
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    corpus::OnDiskCorpus,
-    events::{Event, SimpleEventManager},
-    executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    corpus::{Corpus, OnDiskCorpus},
+    events::{Event, EventFirer, SimpleEventManager},
+    executors::{
+        hooks::inprocess::inprocess_get_event_manager, inprocess::InProcessExecutor, Executor,
+        ExitKind, HasObservers,
+    },
+    feedback_or,
+    feedbacks::{
+        CrashFeedback, DifferentIsNovel, Feedback, MapFeedback, MaxMapFeedback, MaxReducer,
+        TimeFeedback,
+    },
     fuzzer::StdFuzzer,
-    monitors::UserStats,
-    observers::StdMapObserver,
+    inputs::{BytesInput, UsesInput},
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    mutators::StdScheduledMutator,
+    observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+    },
+    stages::{CalibrationStage, StdPowerMutationalStage},
+    state::{HasCorpus, HasExecutions, NopState, UsesState},
+    ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
-use std::borrow::Cow;
-use std::ops::DerefMut;
-
-use std::fs::create_dir_all;
-use std::path::PathBuf;
-#[cfg(windows)]
-use std::ptr::write_volatile;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-
+use libafl_bolts::{
+    current_nanos, current_time,
+    prelude::OwnedMutSlice,
+    rands::StdRand,
+    tuples::{tuple_list, MatchName},
+};
 use log::{debug, error, info};
+use openapiv3::OpenAPI;
 
-use crate::coverage_clients::endpoint::EndpointCoverageClient;
 use crate::{
     configuration::{Configuration, CrashCriterion},
-    coverage_clients::CoverageClient,
+    coverage_clients::{endpoint::EndpointCoverageClient, CoverageClient},
     input::OpenApiInput,
     monitors::CoverageMonitor,
     openapi::{
@@ -84,7 +85,7 @@ pub fn fuzz() -> Result<()> {
 
     // Set up endpoint coverage
     let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
-        setup_endpoint_coverage(*api.clone());
+        setup_endpoint_coverage(*api.clone())?;
 
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
@@ -149,7 +150,7 @@ pub fn fuzz() -> Result<()> {
     // A minimization+queue policy to get testcases from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &combined_map_observer,
-        PowerQueueScheduler::new(&mut state, &combined_map_observer, PowerSchedule::FAST),
+        PowerQueueScheduler::new(&mut state, &combined_map_observer, PowerSchedule::fast()),
     );
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -295,7 +296,6 @@ pub fn fuzz() -> Result<()> {
 
     // Fire an event to print the initial corpus size
     let corpus_size = state.corpus().count();
-    let executions = *state.executions();
     if let Err(e) = mgr.fire(
         &mut state,
         Event::NewTestcase {
@@ -305,7 +305,6 @@ pub fn fuzz() -> Result<()> {
             corpus_size,
             client_config: mgr.configuration(),
             time: current_time(),
-            executions,
             forward_id: None,
         },
     ) {
@@ -375,13 +374,23 @@ pub fn fuzz() -> Result<()> {
 
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
-fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
+#[allow(clippy::type_complexity)]
+fn setup_endpoint_coverage<
+    'a,
+    S: UsesInput + HasNamedMetadata,
+    EM: EventFirer + UsesState<State = S>,
+    I,
+    OT: MatchName,
+>(
     api: OpenAPI,
-) -> (
-    Arc<Mutex<EndpointCoverageClient>>,
-    ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>,
-    impl Feedback<S>,
-) {
+) -> Result<
+    (
+        Arc<Mutex<EndpointCoverageClient>>,
+        ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>,
+        impl Feedback<EM, I, OT, S>,
+    ),
+    anyhow::Error,
+> {
     let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
     endpoint_coverage_client.fetch_coverage(true);
     // no-op for this particular CoverageClient
@@ -396,12 +405,17 @@ fn setup_endpoint_coverage<'a, S: State + HasNamedMetadata>(
         )
     }
     .track_novelties();
-    let endpoint_coverage_feedback = MaxMapFeedback::new(&endpoint_coverage_observer);
-    (
+    let endpoint_coverage_feedback: MapFeedback<
+        ExplicitTracking<StdMapObserver<'_, u8, false>, false, true>,
+        DifferentIsNovel,
+        StdMapObserver<'_, u8, false>,
+        MaxReducer,
+    > = MaxMapFeedback::new(&endpoint_coverage_observer);
+    Ok((
         endpoint_coverage_client,
         endpoint_coverage_observer,
         endpoint_coverage_feedback,
-    )
+    ))
 }
 
 type LineCovClientObserverFeedback<'a> = (
@@ -412,7 +426,6 @@ type LineCovClientObserverFeedback<'a> = (
         DifferentIsNovel,
         StdMapObserver<'a, u8, false>,
         MaxReducer,
-        u8,
     >,
 );
 
@@ -524,10 +537,11 @@ fn update_coverage<F: FnMut(String)>(
 
     let req_stats = UserStatsValue::Number(stats.performed_requests);
 
-    let event_manager = inprocess_get_event_manager::<
-        SimpleEventManager<CoverageMonitor<F>, NopState<BytesInput>>,
-    >()
-    .expect("Can not load the event manager");
+    let event_manager = unsafe {
+        inprocess_get_event_manager::<SimpleEventManager<CoverageMonitor<F>, NopState<BytesInput>>>(
+        )
+        .expect("Can not load the event manager")
+    };
 
     if covered != stats.last_covered {
         stats.last_covered = covered;

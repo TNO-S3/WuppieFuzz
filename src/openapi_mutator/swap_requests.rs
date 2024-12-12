@@ -2,15 +2,15 @@
 
 use std::borrow::Cow;
 
-use crate::input::OpenApiInput;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::Named;
+use libafl_bolts::{rands::Rand, Named};
+
+use crate::input::OpenApiInput;
 
 /// The `SwapRequestsMutator` swaps two requests in the series.
 pub struct SwapRequestsMutator;
@@ -43,10 +43,14 @@ where
         if input.0.len() < 2 {
             return Ok(MutationResult::Skipped);
         }
-        let random_index1 = state.rand_mut().below(input.0.len());
+        let random_index1 = state
+            .rand_mut()
+            .below(core::num::NonZero::new(input.0.len()).unwrap());
         let mut random_index2 = random_index1;
         while random_index2 == random_index1 {
-            random_index2 = state.rand_mut().below(input.0.len());
+            random_index2 = state
+                .rand_mut()
+                .below(core::num::NonZero::new(input.0.len()).unwrap());
         }
         input.0.swap(random_index1, random_index2);
 

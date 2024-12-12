@@ -1,5 +1,4 @@
-use std::env;
-use std::process::Command;
+use std::{env, process::Command};
 
 pub fn get_wuppie_version() -> String {
     let git_output = Command::new("git").arg("rev-parse").arg("HEAD").output();
