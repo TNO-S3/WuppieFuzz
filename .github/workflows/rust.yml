@@ -56,6 +56,17 @@ jobs:
       - name: Run tests for all crates in the workspace
         run: cargo test --workspace --verbose
 
+      # Check for uncommitted changes
+      - name: Check for uncommitted changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Uncommitted changes found after build!"
+            git status
+            exit 1
+          else
+            echo "No uncommitted changes found."
+          fi
+
   coverage:
     name: Code Coverage (Tarpaulin)
     runs-on: ubuntu-latest
