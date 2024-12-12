@@ -56,6 +56,33 @@ jobs:
       - name: Run tests for all crates in the workspace
         run: cargo test --workspace --verbose
 
+      # Run the thorough documentation check and summarize results
+      - name: Run thorough documentation check and summarize results
+        run: |
+          # Run Clippy and capture the exit code
+          cargo clippy --workspace --all-features -- -D missing_docs -W clippy::missing_docs_in_private_items
+          CLIPPY_EXIT_CODE=$?
+
+          # Summarize the results
+          echo "Thorough documentation check completed."
+          echo "This job is allowed to fail without breaking the workflow."
+          echo "Please review the output above for any missing documentation warnings or errors."
+          echo "Gradually address these issues to improve your project's documentation coverage."
+
+          # Exit with the captured Clippy exit code
+          exit $CLIPPY_EXIT_CODE
+
+      # Check for uncommitted changes
+      - name: Check for uncommitted changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Uncommitted changes found after build!"
+            git status
+            exit 1
+          else
+            echo "No uncommitted changes found."
+          fi
+
   coverage:
     name: Code Coverage (Tarpaulin)
     runs-on: ubuntu-latest
@@ -90,33 +117,3 @@ jobs:
           name: code-coverage-report-html
           path: ./coverage-report/
 
-  thorough-docs-check:
-    name: Thorough Documentation Check
-    runs-on: ubuntu-latest
-    # This allows the job to fail without failing the whole workflow
-    continue-on-error: true
-    steps:
-      # Check out the repository
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      # Install the Rust toolchain
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: clippy # Ensure Clippy is installed
-      # Run the thorough documentation check
-      - name: Run thorough documentation check
-        run: |
-          # Use Clippy to check for missing documentation
-          # -D missing_docs: Elevate missing docs on public items to an error
-          # -W clippy::missing_docs_in_private_items: Warn about missing docs in private items
-          cargo clippy --workspace --all-features -- -D missing_docs -W clippy::missing_docs_in_private_items
-      # Provide a summary of the results
-      - name: Summarize results
-        if: always() # This step will run even if the previous step fails
-        run: |
-          echo "Thorough documentation check completed."
-          echo "This job is allowed to fail without breaking the workflow."
-          echo "Please review the output above for any missing documentation warnings or errors."
-          echo "Gradually address these issues to improve your project's documentation coverage."
