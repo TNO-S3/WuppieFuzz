@@ -1,3 +1,8 @@
+# WuppieFuzz CI Pipeline
+# This workflow automates fuzz testing using WuppieFuzz on an OpenAPI target.
+# It builds and runs Docker services, installs necessary dependencies, and performs fuzz testing.
+# The workflow is triggered on pushes and pull requests to the `main` branch.
+
 name: WuppieFuzz fuzz target single runner Pipeline
 
 on:
@@ -15,9 +20,9 @@ jobs:
     steps:
       # Step 1: Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v4 # Updated to v4-beta for Node.js 20 support
+        uses: actions/checkout@v4
 
-      # Step 2: Install Docker Compose
+      # Step 2: Install Docker Compose (remove this step if already installed on your self-hosted for improved security)
       - name: Install Docker Compose
         run: |
           sudo apt-get update
@@ -46,13 +51,13 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # Step 8: Install dependencies for WuppieFuzz
+      # Step 8: Install dependencies for WuppieFuzz (remove this step if already installed on your self-hosted for improved security)
       - name: Install dependencies for WuppieFuzz
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
       
-      # Step 9: Clone WuppieFuzz repository
+      # Step 9: Clone WuppieFuzz repository 
       - name: Clone WuppieFuzz repository
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
