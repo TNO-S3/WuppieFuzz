@@ -56,6 +56,23 @@ jobs:
       - name: Run tests for all crates in the workspace
         run: cargo test --workspace --verbose
 
+      # Run the thorough documentation check and summarize results
+      - name: Run thorough documentation check and summarize results
+	continue-on-error: true
+        run: |
+          # Run Clippy and capture the exit code
+          cargo clippy --workspace --all-features -- -D missing_docs -W clippy::missing_docs_in_private_items
+          CLIPPY_EXIT_CODE=$?
+
+          # Summarize the results
+          echo "Thorough documentation check completed."
+          echo "This job is allowed to fail without breaking the workflow."
+          echo "Please review the output above for any missing documentation warnings or errors."
+          echo "Gradually address these issues to improve your project's documentation coverage."
+
+          # Exit with the captured Clippy exit code
+          exit $CLIPPY_EXIT_CODE
+
       # Check for uncommitted changes
       - name: Check for uncommitted changes
         run: |
