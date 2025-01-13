@@ -42,17 +42,17 @@ cargo-license = "0.6.1"
 
 [dependencies]
 ahash = "0.8"
-anyhow = "1.0.82"
+anyhow = "1.0.95"
 base64 = "0.22.0"
 build_html = "2.4.0"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
-chrono = "0.4.38"
-clap = { version = "4.5.4", features = ["cargo", "derive", "env"] }
-cookie = "0.17.0"
-cookie_store = "0.20.0"
+chrono = "0.4.39"
+clap = { version = "4.5.26", features = ["cargo", "derive", "env"] }
+cookie = "0.18.1"
+cookie_store = "0.21.1"
 ctrlc = "3.4.4"
-env_logger = "0.11.3"
+env_logger = "0.11.6"
 indexmap = { version = "2.2.6", features = ["serde"] }
 indicatif = "0.17.8"
 iter-read = "1.0.1"
@@ -68,15 +68,15 @@ num-traits = { version = "0.2", default-features = false }
 once_cell = "1.19.0"
 openapiv3-extended = { version = "6.0.0", features = ["v2"] }
 openssl = { version = "0.10", features = ["vendored"] }
-petgraph = "0.6.4"
+petgraph = "0.7.1"
 porter-stemmer = "0.1.2"
 rand = "0.8.5"
 rand_regex = "0.17.0"
 regex = "1.11.1"
-reqwest = { version = "0.12.4", features = ["blocking", "json"] }
-reqwest_cookie_store = "0.7.0"
-rusqlite = { version = "0.31.0", features = ["bundled"] }
-rustc-demangle = "=0.1.21"
+reqwest = { version = "0.12.12", features = ["blocking", "json"] }
+reqwest_cookie_store = "0.8.0"
+rusqlite = { version = "0.32.1", features = ["bundled"] }
+rustc-demangle = "=0.1.24"
 serde = { version = "1.0", default-features = false, features = [
     "alloc",
     "derive",
@@ -84,8 +84,8 @@ serde = { version = "1.0", default-features = false, features = [
 serde_json = "1.0"
 serde_urlencoded = "0.7.1"
 serde_yaml = "0.9.34"
-tempfile = "3.10.1"
-unicode-truncate = "1.1.0"
+tempfile = "3.15.0"
+unicode-truncate = "2.0.0"
 url = "2.5.0"
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
