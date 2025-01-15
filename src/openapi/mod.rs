@@ -1,8 +1,8 @@
+use std::{convert::TryFrom, fmt::Debug, path::Path};
+
 use anyhow::{Context, Result};
 use indexmap::IndexMap;
 use openapiv3::{MediaType, OpenAPI, Operation, PathItem, VersionedOpenAPI};
-use std::fmt::Debug;
-use std::{convert::TryFrom, path::Path};
 
 use crate::input::{method::InvalidMethodError, Method};
 

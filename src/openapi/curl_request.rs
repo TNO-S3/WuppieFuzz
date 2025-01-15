@@ -5,7 +5,7 @@ pub struct CurlRequest<'a>(
     pub &'a crate::authentication::Authentication,
 );
 
-impl<'a> CurlRequest<'a> {
+impl CurlRequest<'_> {
     /// Gives the URL of this request (the path, but with all path and query
     /// parameters filled)
     pub fn url(&self) -> &str {
@@ -18,7 +18,7 @@ impl<'a> CurlRequest<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for CurlRequest<'a> {
+impl std::fmt::Display for CurlRequest<'_> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         if let Some(body) = self.0.body() {
             let wrapper = Base64Display::new(

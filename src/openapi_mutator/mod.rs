@@ -5,23 +5,27 @@
 //! reorder them, for instance. And there are other mutators that act on the contents of a
 //! request, changing the parameter values (using a LibAFL byte sequence mutator, for example).
 
+use core::num::NonZero;
 use std::borrow::Cow;
 
-use crate::input::parameter::SimpleValue;
-use crate::input::{new_rand_input, OpenApiInput, ParameterContents};
-use crate::state::OpenApiFuzzerState;
-use libafl::corpus::Corpus;
-use libafl::inputs::Input;
 pub use libafl::mutators::mutations::*;
 use libafl::{
-    inputs::{BytesInput, HasMutatorBytes},
+    corpus::Corpus,
+    inputs::{BytesInput, HasMutatorBytes, Input},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::tuples::{tuple_list, tuple_list_type};
-use libafl_bolts::Named;
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{tuple_list, tuple_list_type},
+    Named,
+};
+
+use crate::{
+    input::{new_rand_input, parameter::SimpleValue, OpenApiInput, ParameterContents},
+    state::OpenApiFuzzerState,
+};
 
 pub mod add_request;
 use add_request::AddRequestMutator;
@@ -212,7 +216,7 @@ fn mutate_leaf_value<S: HasRand>(
 /// Mutate number in-place
 fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -> MutationResult {
     // A small chance to get a special value that might just lead to interesting errors
-    match state.rand_mut().below(100) {
+    match state.rand_mut().below(NonZero::new(100).unwrap()) {
         0 => {
             *n = (-1).into();
             return MutationResult::Mutated;
@@ -226,18 +230,17 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
     if let Some(x) = n.as_u64() {
         *n = match x as usize {
             0 => 0.into(),
-            x_usz => state.rand_mut().below(x_usz.saturating_mul(2)).into(),
+            x_usz => state
+                .rand_mut()
+                .below(NonZero::new(x_usz.saturating_mul(2)).unwrap())
+                .into(),
         };
         return MutationResult::Mutated;
     };
     if let Some(x) = n.as_i64() {
         // always negative
         *n = (state.rand_mut().below(
-            x.checked_neg()
-                .unwrap_or(i64::MAX) // because -i64::MIN == i64::MIN
-                .saturating_mul(4)
-                .try_into()
-                .unwrap_or(usize::MAX), // larger values could otherwise be truncated
+            NonZero::new(x.checked_neg().unwrap_or(i64::MAX).saturating_mul(4) as usize).unwrap(), // larger values could otherwise be truncated
         ) as i64
             + x.saturating_mul(2))
         .into();
@@ -250,7 +253,9 @@ fn mutate_number<S: HasRand>(state: &mut S, n: &mut serde_json::value::Number) -
         let x_int = x.round() as u64;
         let x_int_new = match x_int as usize {
             0 => 0,
-            x_usz => state.rand_mut().below(x_usz.saturating_mul(4)),
+            x_usz => state
+                .rand_mut()
+                .below(NonZero::new(x_usz.saturating_mul(4)).unwrap()),
         };
         let n_new = serde_json::value::Number::from_f64((x_int_new as f64) - 2.0 * x);
         if let Some(n_new) = n_new {
@@ -360,8 +365,10 @@ where
 {
     from.into_iter()
         .zip(1..)
-        .fold(None, |result, (element, count)| match rand.below(count) {
-            0 => Some(element),
-            _ => result,
+        .fold(None, |result, (element, count)| {
+            match rand.below(NonZero::new(count).unwrap()) {
+                0 => Some(element),
+                _ => result,
+            }
         })
 }

@@ -5,8 +5,12 @@
 ## Features
 
 ## Fixes
-- Removed `libssl` from installation prerequisites and added `build-essential` in
-  [#45](https://github.com/TNO-S3/WuppieFuzz/pull/45)
+
+- Removed `libssl` from installation prerequisites and added `build-essential`
+  in [#45](https://github.com/TNO-S3/WuppieFuzz/pull/45)
+- Temporary workaround for ctrl+c behaviour in
+  [#47](https://github.com/TNO-S3/WuppieFuzz/pull/47)
+- Update to LibAFL 0.14.1 in [#52](https://github.com/TNO-S3/WuppieFuzz/pull/52)
 
 # v1.1.1 (2024-11-06)
 

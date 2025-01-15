@@ -13,10 +13,9 @@ use std::{
 
 use libafl::{
     events::{Event, EventFirer, EventProcessor, EventRestarter},
-    prelude::{
-        AggregatorOps, Executor, ExitKind, HasObservers, ObserversTuple, UserStats, UserStatsValue,
-        UsesObservers,
-    },
+    executors::{Executor, ExitKind, HasObservers},
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    observers::ObserversTuple,
     state::{HasExecutions, Stoppable, UsesState},
     Error,
 };
@@ -55,7 +54,7 @@ type FuzzerState = crate::state::OpenApiFuzzerState<
 /// statistics about coverage and errors.
 pub struct SequenceExecutor<'h, OT>
 where
-    OT: ObserversTuple<FuzzerState>,
+    OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     observers: OT,
 
@@ -84,7 +83,7 @@ where
 
 impl<'h, OT> SequenceExecutor<'h, OT>
 where
-    OT: ObserversTuple<FuzzerState>,
+    OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     /// Create a new SequenceExecutor.
     pub fn new(
@@ -317,27 +316,26 @@ where
     }
 }
 
-impl<'h, EM, FZ, OT> Executor<EM, FZ> for SequenceExecutor<'h, OT>
+impl<EM, FZ, OT> Executor<EM, FZ> for SequenceExecutor<'_, OT>
 where
     FZ: UsesState<State = FuzzerState>,
     EM: UsesState<State = FuzzerState>
         + EventFirer<State = FuzzerState>
         + EventRestarter
         + EventProcessor<EM, FZ>,
-    OT: ObserversTuple<FuzzerState>,
+    OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut FZ,
-        state: &mut Self::State,
+        state: &mut <Self as UsesState>::State,
         event_manager: &mut EM,
-        input: &Self::Input,
+        input: &<Self as libafl::inputs::UsesInput>::Input,
     ) -> Result<ExitKind, libafl::Error> {
         *state.executions_mut() += 1;
 
-        match self.pre_exec(state, input, event_manager) {
-            Err(Error::ShuttingDown) => return Err(Error::ShuttingDown),
-            Ok(_) | Err(_) => (),
+        if let Err(Error::ShuttingDown) = self.pre_exec(state, input, event_manager) {
+            return Err(Error::ShuttingDown);
         }
 
         let (ret, performed_requests) = self.harness(input);
@@ -387,24 +385,19 @@ fn update_stats<EM>(
     }
 }
 
-impl<'h, OT> UsesState for SequenceExecutor<'h, OT>
+impl<OT> UsesState for SequenceExecutor<'_, OT>
 where
-    OT: ObserversTuple<FuzzerState>,
+    OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     type State = FuzzerState;
 }
 
-impl<'h, OT> UsesObservers for SequenceExecutor<'h, OT>
+impl<OT> HasObservers for SequenceExecutor<'_, OT>
 where
-    OT: ObserversTuple<FuzzerState>,
+    OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     type Observers = OT;
-}
 
-impl<'h, OT> HasObservers for SequenceExecutor<'h, OT>
-where
-    OT: ObserversTuple<FuzzerState>,
-{
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }

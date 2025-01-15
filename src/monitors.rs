@@ -2,8 +2,7 @@
 //! while fuzzing, and tracks the time consumed.
 
 use core::{time, time::Duration};
-
-use crate::configuration::{Configuration, OutputFormat};
+use std::{borrow::Cow, fmt};
 
 use libafl::{
     alloc::fmt::Debug,
@@ -11,7 +10,8 @@ use libafl::{
 };
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use serde_json::json;
-use std::{borrow::Cow, fmt};
+
+use crate::configuration::{Configuration, OutputFormat};
 
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]

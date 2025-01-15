@@ -4,7 +4,6 @@
 
 use std::borrow::Cow;
 
-use crate::input::OpenApiInput;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
@@ -12,6 +11,8 @@ use libafl::{
     Error,
 };
 use libafl_bolts::Named;
+
+use crate::input::OpenApiInput;
 
 /// The `BreakConnectionMutator` removes a connection from the series of
 /// requests. A connection is a `ParameterContents::Reference` variant in a

@@ -1,25 +1,25 @@
 //! Mutates a request series by adding a new request to it. The new request is taken
 //! at random from the API specification.
 
-use crate::openapi::JsonContent;
-use crate::{
-    input::{
-        new_rand_input, parameter::ParameterKind, Body, OpenApiInput, OpenApiRequest,
-        ParameterContents,
-    },
-    state::HasRandAndOpenAPI,
-};
+use std::{borrow::Cow, convert::TryInto};
+
 use indexmap::IndexMap;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::Named;
+use libafl_bolts::{rands::Rand, Named};
 use openapiv3::{OpenAPI, RequestBody};
-use std::borrow::Cow;
-use std::convert::TryInto;
+
+use crate::{
+    input::{
+        new_rand_input, parameter::ParameterKind, Body, OpenApiInput, OpenApiRequest,
+        ParameterContents,
+    },
+    openapi::JsonContent,
+    state::HasRandAndOpenAPI,
+};
 
 /// The `AddRequestMutator` adds a request to a random path from the specification
 /// to the series of requests. The request is added at the end of the series, and
@@ -54,7 +54,7 @@ where
         let (rand, api) = state.rand_mut_and_openapi();
 
         let n_ops = api.operations().count();
-        let new_path_i = rand.below(n_ops);
+        let new_path_i = rand.below(core::num::NonZero::new(n_ops).unwrap());
 
         let (new_path, new_method, new_op, _new_path_item) =
             api.operations().nth(new_path_i).unwrap();
