@@ -1,13 +1,16 @@
-use crate::configuration::Configuration;
-use crate::openapi::validate_response::Response;
-use crate::reporting::Reporting;
-use crate::{input::OpenApiRequest, openapi::curl_request::CurlRequest};
+use std::{fs::create_dir_all, path::Path};
+
 use anyhow::Context;
 use chrono::SecondsFormat;
 use log::info;
 use rusqlite::{named_params, Connection};
-use std::fs::create_dir_all;
-use std::path::Path;
+
+use crate::{
+    configuration::Configuration,
+    input::OpenApiRequest,
+    openapi::{curl_request::CurlRequest, validate_response::Response},
+    reporting::Reporting,
+};
 
 /// Instantiates a MySqLite reporter if desired by the configuration
 pub fn get_reporter(config: &Configuration) -> Result<Option<MySqLite>, anyhow::Error> {

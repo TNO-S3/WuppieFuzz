@@ -1,18 +1,15 @@
-addr2line 0.21.0
+addr2line 0.24.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-adler 1.0.2
+adler2 2.0.0
 	licensed under "0BSD OR Apache-2.0 OR MIT"
-	by Jonas Schievink <jonasschievink@gmail.com>
+	by Jonas Schievink <jonasschievink@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>
 ahash 0.8.11
 	licensed under "Apache-2.0 OR MIT"
 	by Tom Kaitchuck <Tom.Kaitchuck@gmail.com>
 aho-corasick 1.1.3
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-allocator-api2 0.2.21
-	licensed under "Apache-2.0 OR MIT"
-	by Zakarum <zaq.dev@icloud.com>
 android-tzdata 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by RumovZ
@@ -37,10 +34,13 @@ anstyle-wincon 3.0.6
 anyhow 1.0.93
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
+arbitrary-int 1.2.7
+	licensed under "MIT"
+	by Daniel Lehmann <danlehmannmuc@gmail.com>
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
-backtrace 0.3.71
+backtrace 0.3.74
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 base64 0.22.1
@@ -49,6 +49,9 @@ base64 0.22.1
 bincode 1.3.3
 	licensed under "MIT"
 	by Ty Overby <ty@pre-alpha.com>|Francesco Mazzoli <f@mazzo.li>|David Tolnay <dtolnay@gmail.com>|Zoey Riordan <zoey@dos.cafe>
+bitbybit 1.3.2
+	licensed under "MIT"
+	by Daniel Lehmann <danlehmannmuc@gmail.com>
 bitflags 2.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
@@ -64,18 +67,6 @@ byteorder 1.5.0
 bytes 1.9.0
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
-c2rust-bitfields 0.18.0
-	licensed under "BSD-3-Clause"
-	by The C2Rust Project Developers <c2rust@immunant.com>
-c2rust-bitfields-derive 0.18.0
-	licensed under "BSD-3-Clause"
-	by The C2Rust Project Developers <c2rust@immunant.com>
-cassowary 0.3.0
-	licensed under "Apache-2.0 OR MIT"
-	by Dylan Ede <dylanede@googlemail.com>
-castaway 0.2.3
-	licensed under "MIT"
-	by Stephen M. Coakley <me@stephencoakley.com>
 cesu8 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Eric Kidd <git@randomhacks.net>
@@ -103,9 +94,6 @@ cobs 0.2.3
 colorchoice 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-compact_str 0.7.1
-	licensed under "MIT"
-	by Parker Timmerman <parker@parkertimmerman.com>
 console 0.15.8
 	licensed under "MIT"
 	by Armin Ronacher <armin.ronacher@active-4.com>
@@ -136,12 +124,6 @@ core-foundation 0.9.4
 core-foundation-sys 0.8.7
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
-crossterm 0.27.0
-	licensed under "MIT"
-	by T. Post
-crossterm_winapi 0.9.1
-	licensed under "MIT"
-	by T. Post
 ctor 0.2.9
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
@@ -205,9 +187,6 @@ fixedbitset 0.4.2
 fnv 1.0.7
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-foldhash 0.1.3
-	licensed under "Zlib"
-	by Orson Peters <orsonpeters@gmail.com>
 foreign-types 0.3.2
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
@@ -238,7 +217,7 @@ futures-util 0.3.31
 getrandom 0.2.15
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
-gimli 0.28.1
+gimli 0.31.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 h2 0.4.7
@@ -346,9 +325,6 @@ is_terminal_polyfill 1.70.1
 iter-read 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Georg Brandl <georg@python.org>
-itertools 0.12.1
-	licensed under "Apache-2.0 OR MIT"
-	by bluss
 itertools 0.13.0
 	licensed under "Apache-2.0 OR MIT"
 	by bluss
@@ -370,13 +346,13 @@ lazy_static 1.5.0
 lcov 0.8.1
 	licensed under "Apache-2.0 OR MIT"
 	by gifnksm <makoto.nksm+github@gmail.com>
-libafl 0.13.2
+libafl 0.14.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libafl_bolts 0.13.2
+libafl_bolts 0.14.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libafl_derive 0.13.2
+libafl_derive 0.14.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>
 libc 0.2.167
@@ -403,9 +379,6 @@ lock_api 0.4.12
 log 0.4.22
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-lru 0.12.5
-	licensed under "MIT"
-	by Jerome Froelich <jeromefroelic@hotmail.com>
 mach 0.3.2
 	licensed under "BSD-2-Clause"
 	by Nick Fitzgerald <fitzgen@gmail.com>|David Cuddeback <david.cuddeback@gmail.com>|Gonzalo Brito Gadeschi <gonzalobg88@gmail.com>
@@ -421,12 +394,9 @@ memoffset 0.9.1
 mime 0.3.17
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-miniz_oxide 0.7.4
+miniz_oxide 0.8.0
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Frommi <daniil.liferenko@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>
-mio 0.8.11
-	licensed under "MIT"
-	by Carl Lerche <me@carllerche.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>|Tokio Contributors <team@tokio.rs>
 mio 1.0.3
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>|Tokio Contributors <team@tokio.rs>
@@ -469,7 +439,7 @@ num_enum_derive 0.7.3
 number_prefix 0.4.0
 	licensed under "MIT"
 	by Benjamin Sago <ogham@bsago.me>
-object 0.32.2
+object 0.36.5
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 once_cell 1.20.2
@@ -496,9 +466,6 @@ parking_lot 0.12.3
 parking_lot_core 0.9.10
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-paste 1.0.15
-	licensed under "Apache-2.0 OR MIT"
-	by David Tolnay <dtolnay@gmail.com>
 percent-encoding 2.3.1
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
@@ -550,9 +517,6 @@ rand_core 0.6.4
 rand_regex 0.17.0
 	licensed under "MIT"
 	by kennytm <kennytm@gmail.com>
-ratatui 0.26.3
-	licensed under "MIT"
-	by Florian Dehau <work@fdehau.com>|The Ratatui Developers
 redox_syscall 0.5.7
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
@@ -577,7 +541,7 @@ ring 0.17.8
 rusqlite 0.31.0
 	licensed under "MIT"
 	by The rusqlite developers
-rustc-demangle 0.1.21
+rustc-demangle 0.1.24
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
 rustix 0.38.41
@@ -643,15 +607,6 @@ serial_test 3.2.0
 serial_test_derive 3.2.0
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
-signal-hook 0.3.17
-	licensed under "Apache-2.0 OR MIT"
-	by Michal 'vorner' Vaner <vorner@vorner.cz>|Thomas Himmelstoss <thimm@posteo.de>
-signal-hook-mio 0.2.4
-	licensed under "Apache-2.0 OR MIT"
-	by Michal 'vorner' Vaner <vorner@vorner.cz>|Thomas Himmelstoss <thimm@posteo.de>
-signal-hook-registry 1.4.2
-	licensed under "Apache-2.0 OR MIT"
-	by Michal 'vorner' Vaner <vorner@vorner.cz>|Masaki Hara <ackie.h.gmai@gmail.com>
 slab 0.4.9
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>
@@ -664,9 +619,6 @@ socket2 0.5.8
 spin 0.9.8
 	licensed under "MIT"
 	by Mathijs van de Nes <git@mathijs.vd-nes.nl>|John Ericson <git@JohnEricson.me>|Joshua Barretto <joshua.s.barretto@gmail.com>
-stability 0.2.1
-	licensed under "MIT"
-	by Stephen M. Coakley <me@stephencoakley.com>
 stable_deref_trait 1.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by Robert Grosse <n210241048576@gmail.com>
@@ -676,18 +628,9 @@ static_assertions 1.1.0
 strsim 0.11.1
 	licensed under "MIT"
 	by Danny Guo <danny@dannyguo.com>|maxbachmann <oss@maxbachmann.de>
-strum 0.26.3
-	licensed under "MIT"
-	by Peter Glotfelty <peter.glotfelty@microsoft.com>
-strum_macros 0.26.4
-	licensed under "MIT"
-	by Peter Glotfelty <peter.glotfelty@microsoft.com>
 subtle 2.6.1
 	licensed under "BSD-3-Clause"
 	by Isis Lovecruft <isis@patternsinthevoid.net>|Henry de Valence <hdevalence@hdevalence.ca>
-syn 1.0.109
-	licensed under "Apache-2.0 OR MIT"
-	by David Tolnay <dtolnay@gmail.com>
 syn 2.0.90
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
@@ -757,10 +700,10 @@ try-lock 0.2.5
 tuple_list 0.1.3
 	licensed under "MIT"
 	by Valerii Lashmanov <vflashm@gmail.com>
-typed-builder 0.18.2
+typed-builder 0.20.0
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
-typed-builder-macro 0.18.2
+typed-builder-macro 0.20.0
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
 typeid 1.0.2
@@ -862,28 +805,25 @@ web-sys 0.3.74
 web-time 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-winapi 0.3.9
-	licensed under "Apache-2.0 OR MIT"
-	by Peter Atashian <retep998@gmail.com>
-winapi-i686-pc-windows-gnu 0.4.0
-	licensed under "Apache-2.0 OR MIT"
-	by Peter Atashian <retep998@gmail.com>
 winapi-util 0.1.9
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-winapi-x86_64-pc-windows-gnu 0.4.0
-	licensed under "Apache-2.0 OR MIT"
-	by Peter Atashian <retep998@gmail.com>
-windows 0.51.1
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows 0.52.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-core 0.51.1
+windows 0.58.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows-core 0.52.0
+	licensed under "Apache-2.0 OR MIT"
+	by Microsoft
+windows-core 0.58.0
+	licensed under "Apache-2.0 OR MIT"
+	by Microsoft
+windows-implement 0.58.0
+	licensed under "Apache-2.0 OR MIT"
+	by Microsoft
+windows-interface 0.58.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows-registry 0.2.0
@@ -895,34 +835,19 @@ windows-result 0.2.0
 windows-strings 0.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-sys 0.48.0
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows-sys 0.52.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows-sys 0.59.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-targets 0.48.5
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows-targets 0.52.6
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
-windows_aarch64_gnullvm 0.48.5
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_aarch64_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_aarch64_msvc 0.48.5
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows_aarch64_msvc 0.52.6
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
-windows_i686_gnu 0.48.5
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_i686_gnu 0.52.6
@@ -931,25 +856,13 @@ windows_i686_gnu 0.52.6
 windows_i686_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_i686_msvc 0.48.5
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows_i686_msvc 0.52.6
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
-windows_x86_64_gnu 0.48.5
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_x86_64_gnu 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_x86_64_gnullvm 0.48.5
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows_x86_64_gnullvm 0.52.6
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
-windows_x86_64_msvc 0.48.5
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_x86_64_msvc 0.52.6
