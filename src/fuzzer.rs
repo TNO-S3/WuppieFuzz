@@ -1,52 +1,53 @@
-use anyhow::{Context, Result};
-
-use libafl::corpus::Corpus;
-use libafl::events::EventFirer;
-use libafl::executors::{Executor, HasObservers};
-use libafl::feedbacks::{DifferentIsNovel, Feedback, MapFeedback, MaxReducer, TimeFeedback};
-use libafl::inputs::UsesInput;
-use libafl::mutators::StdScheduledMutator;
-use libafl::observers::{CanTrack, ExplicitTracking, MultiMapObserver, TimeObserver};
-use libafl::schedulers::{
-    powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+#[cfg(windows)]
+use std::ptr::write_volatile;
+use std::{
+    fs::create_dir_all,
+    marker::PhantomData,
+    ops::DerefMut,
+    path::PathBuf,
+    sync::{Arc, Mutex},
 };
-use libafl::stages::{CalibrationStage, StdPowerMutationalStage};
-use libafl::state::{HasCorpus, HasExecutions, UsesState};
-use libafl::{feedback_or, ExecutionProcessor};
-use libafl::{ExecuteInputResult, HasNamedMetadata};
 
-use libafl_bolts::current_time;
-use libafl_bolts::prelude::OwnedMutSlice;
-use libafl_bolts::tuples::MatchName;
-use openapiv3::OpenAPI;
-
+use anyhow::{Context, Result};
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    corpus::OnDiskCorpus,
-    events::{Event, SimpleEventManager},
-    executors::ExitKind,
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    corpus::{Corpus, OnDiskCorpus},
+    events::{Event, EventFirer, SimpleEventManager},
+    executors::{Executor, ExitKind, HasObservers},
+    feedback_or,
+    feedbacks::{
+        CrashFeedback, DifferentIsNovel, Feedback, MapFeedback, MaxMapFeedback, MaxReducer,
+        TimeFeedback,
+    },
     fuzzer::StdFuzzer,
-    observers::StdMapObserver,
+    inputs::UsesInput,
+    mutators::StdScheduledMutator,
+    observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+    },
+    stages::{CalibrationStage, StdPowerMutationalStage},
+    state::{HasCorpus, HasExecutions, UsesState},
+    ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
-use std::marker::PhantomData;
-use std::ops::DerefMut;
-
-use std::fs::create_dir_all;
-use std::path::PathBuf;
-#[cfg(windows)]
-use std::ptr::write_volatile;
-use std::sync::{Arc, Mutex};
-
+use libafl_bolts::{
+    current_nanos, current_time,
+    prelude::OwnedMutSlice,
+    rands::StdRand,
+    tuples::{tuple_list, MatchName},
+};
 use log::{error, info};
+use openapiv3::OpenAPI;
 
-use crate::coverage_clients::endpoint::EndpointCoverageClient;
-use crate::executor::SequenceExecutor;
 use crate::{
-    configuration::Configuration, coverage_clients::CoverageClient, input::OpenApiInput,
-    monitors::CoverageMonitor, openapi_mutator::havoc_mutations_openapi, state::OpenApiFuzzerState,
+    configuration::Configuration,
+    coverage_clients::{endpoint::EndpointCoverageClient, CoverageClient},
+    executor::SequenceExecutor,
+    input::OpenApiInput,
+    monitors::CoverageMonitor,
+    openapi_mutator::havoc_mutations_openapi,
+    state::OpenApiFuzzerState,
 };
 
 /// Main fuzzer function.
