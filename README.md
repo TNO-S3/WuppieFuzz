@@ -1,4 +1,4 @@
-# WuppieFuzz v1.1.1
+# WuppieFuzz v1.1.2
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/WuppieFuzz-dark.svg">
