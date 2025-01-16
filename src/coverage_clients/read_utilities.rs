@@ -75,7 +75,7 @@ pub fn read_var_int(readable: &mut dyn Read) -> Result<u32> {
         return Ok(b as u32);
     }
     let nxt = read_var_int(readable)?;
-    Ok((b & 0x7f) as u32 | nxt << 7)
+    Ok((b & 0x7f) as u32 | (nxt << 7))
 }
 
 /// Reads a byte vector, preceded by a length given as little-endian u32.

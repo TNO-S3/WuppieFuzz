@@ -447,7 +447,7 @@ fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&s
         for variant in variants {
             if let RefOr::Reference { reference } = variant {
                 // Select the Dog in '#/components/schemas/Dog'
-                if let Some(name) = reference.split('/').last() {
+                if let Some(name) = reference.split('/').next_back() {
                     mapping.insert(reference.clone(), name.to_string());
                 }
             }

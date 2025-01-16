@@ -31,7 +31,7 @@ anstyle-query 1.1.2
 anstyle-wincon 3.0.6
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-anyhow 1.0.93
+anyhow 1.0.95
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 arbitrary-int 1.2.7
@@ -73,19 +73,19 @@ cesu8 1.1.0
 cfg-if 1.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-chrono 0.4.38
+chrono 0.4.39
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.21
+clap 4.5.26
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.21
+clap_builder 4.5.26
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_derive 4.5.18
+clap_derive 4.5.24
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_lex 0.7.3
+clap_lex 0.7.4
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 cobs 0.2.3
@@ -106,15 +106,9 @@ const_format_proc_macros 0.2.33
 const_panic 0.2.10
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
-cookie 0.17.0
-	licensed under "Apache-2.0 OR MIT"
-	by Sergio Benitez <sb@sergio.bz>|Alex Crichton <alex@alexcrichton.com>
 cookie 0.18.1
 	licensed under "Apache-2.0 OR MIT"
 	by Sergio Benitez <sb@sergio.bz>|Alex Crichton <alex@alexcrichton.com>
-cookie_store 0.20.0
-	licensed under "Apache-2.0 OR MIT"
-	by Patrick Fernie <patrick.fernie@gmail.com>
 cookie_store 0.21.1
 	licensed under "Apache-2.0 OR MIT"
 	by Patrick Fernie <patrick.fernie@gmail.com>
@@ -160,7 +154,7 @@ env_filter 0.1.2
 env_logger 0.9.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-env_logger 0.11.5
+env_logger 0.11.6
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 equivalent 1.0.1
@@ -181,7 +175,7 @@ fallible-streaming-iterator 0.1.9
 fastrand 2.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>
-fixedbitset 0.4.2
+fixedbitset 0.5.7
 	licensed under "Apache-2.0 OR MIT"
 	by bluss
 fnv 1.0.7
@@ -301,9 +295,6 @@ icu_provider 1.5.0
 icu_provider_macros 1.5.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-idna 0.3.0
-	licensed under "Apache-2.0 OR MIT"
-	by The rust-url developers
 idna 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
@@ -361,7 +352,7 @@ libc 0.2.167
 libm 0.2.11
 	licensed under "Apache-2.0) OR MIT AND (MIT"
 	by Jorge Aparicio <jorge@japaric.io>
-libsqlite3-sys 0.28.0
+libsqlite3-sys 0.30.1
 	licensed under "MIT"
 	by The rusqlite developers
 linux-raw-sys 0.4.14
@@ -376,7 +367,7 @@ litrs 0.4.1
 lock_api 0.4.12
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-log 0.4.22
+log 0.4.25
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 mach 0.3.2
@@ -469,7 +460,7 @@ parking_lot_core 0.9.10
 percent-encoding 2.3.1
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-petgraph 0.6.5
+petgraph 0.7.1
 	licensed under "Apache-2.0 OR MIT"
 	by bluss|mitchmindtree
 pin-project-lite 0.2.15
@@ -529,16 +520,16 @@ regex-automata 0.4.9
 regex-syntax 0.8.5
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-reqwest 0.12.9
+reqwest 0.12.12
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-reqwest_cookie_store 0.7.0
+reqwest_cookie_store 0.8.0
 	licensed under "Apache-2.0 OR MIT"
 	by Patrick Fernie <patrick.fernie@gmail.com>
 ring 0.17.8
 	licensed under "custom license"
 	by Brian Smith <brian@briansmith.org>
-rusqlite 0.31.0
+rusqlite 0.32.1
 	licensed under "MIT"
 	by The rusqlite developers
 rustc-demangle 0.1.24
@@ -586,13 +577,13 @@ security-framework 2.11.1
 security-framework-sys 2.12.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>
-serde 1.0.215
+serde 1.0.217
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
-serde_derive 1.0.215
+serde_derive 1.0.217
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
-serde_json 1.0.133
+serde_json 1.0.135
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
 serde_urlencoded 0.7.1
@@ -646,7 +637,7 @@ system-configuration 0.6.1
 system-configuration-sys 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
-tempfile 3.14.0
+tempfile 3.15.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
 thiserror 1.0.69
@@ -667,12 +658,6 @@ time-macros 0.2.18
 tinystr 0.7.6
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-tinyvec 1.8.0
-	licensed under "Apache-2.0 OR MIT OR Zlib"
-	by Lokathor <zefria@gmail.com>
-tinyvec_macros 0.1.1
-	licensed under "Apache-2.0 OR MIT OR Zlib"
-	by Soveu <marx.tomasz@gmail.com>
 tokio 1.41.1
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
@@ -685,6 +670,12 @@ tokio-rustls 0.26.0
 tokio-util 0.7.12
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
+tower 0.5.2
+	licensed under "MIT"
+	by Tower Maintainers <team@tower-rs.com>
+tower-layer 0.3.3
+	licensed under "MIT"
+	by Tower Maintainers <team@tower-rs.com>
 tower-service 0.3.3
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
@@ -718,19 +709,13 @@ typewit_proc_macros 1.8.1
 uds 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
-unicode-bidi 0.3.17
-	licensed under "Apache-2.0 OR MIT"
-	by The Servo Project Developers
 unicode-ident 1.0.14
 	licensed under "(MIT OR Apache-2.0) AND Unicode-3.0"
 	by David Tolnay <dtolnay@gmail.com>
-unicode-normalization 0.1.24
-	licensed under "Apache-2.0 OR MIT"
-	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
 unicode-segmentation 1.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
-unicode-truncate 1.1.0
+unicode-truncate 2.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Aetf <aetf@unlimitedcodeworks.xyz>
 unicode-width 0.1.14
