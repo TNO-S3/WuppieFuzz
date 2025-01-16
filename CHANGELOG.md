@@ -6,6 +6,14 @@
 
 ## Fixes
 
+# v1.1.2 (2025-01-16)
+
+## Highlights
+
+## Features
+
+## Fixes
+
 - Removed `libssl` from installation prerequisites and added `build-essential`
   in [#45](https://github.com/TNO-S3/WuppieFuzz/pull/45)
 - Temporary workaround for ctrl+c behaviour in
