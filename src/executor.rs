@@ -124,7 +124,11 @@ where
     /// Executes the given input, tracking and using response parameters and verifying responses.
     /// Returns the target's performance as ExitKind, and the number of requests successfully
     /// executed (i.e. before an error occurred).
-    fn harness(&mut self, inputs: &OpenApiInput) -> (ExitKind, u64) {
+    fn harness(
+        &mut self,
+        inputs: &OpenApiInput,
+        state: &mut <Self as UsesState>::State,
+    ) -> (ExitKind, u64) {
         let mut exit_kind = ExitKind::Ok;
         self.inputs_tested += 1;
         let mut performed_requests = 0;
@@ -164,7 +168,7 @@ where
             let curl_request = CurlRequest(&request_built, &self.authentication);
             let reporter_request_id =
                 self.reporter
-                    .report_request(&request, &curl_request, self.inputs_tested);
+                    .report_request(&request, &curl_request, state, self.inputs_tested);
             let curl_request = curl_request.to_string();
 
             match self.http_client.execute(request_built) {
@@ -338,7 +342,7 @@ where
             return Err(Error::ShuttingDown);
         }
 
-        let (ret, performed_requests) = self.harness(input);
+        let (ret, performed_requests) = self.harness(input, state);
         self.performed_requests += performed_requests;
 
         self.post_exec(state, input, event_manager);
