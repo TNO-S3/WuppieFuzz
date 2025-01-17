@@ -4,6 +4,9 @@
 
 ## Features
 
+- Adds custom executor enabling proper timeout kill in
+  [#49](https://github.com/TNO-S3/WuppieFuzz/pull/49)
+
 ## Fixes
 
 # v1.1.2 (2025-01-16)
