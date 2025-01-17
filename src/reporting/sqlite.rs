@@ -2,14 +2,16 @@ use std::{fs::create_dir_all, path::Path};
 
 use anyhow::Context;
 use chrono::SecondsFormat;
+use libafl::corpus::{InMemoryOnDiskCorpus, OnDiskCorpus};
 use log::info;
 use rusqlite::{named_params, Connection};
 
 use crate::{
     configuration::Configuration,
-    input::OpenApiRequest,
+    input::{OpenApiInput, OpenApiRequest},
     openapi::{curl_request::CurlRequest, validate_response::Response},
     reporting::Reporting,
+    state::OpenApiFuzzerState,
 };
 
 /// Instantiates a MySqLite reporter if desired by the configuration
@@ -101,8 +103,21 @@ impl MySqLite {
     }
 }
 
-impl Reporting<i64> for MySqLite {
-    fn report_request(&self, request: &OpenApiRequest, curl: &CurlRequest, input_id: usize) -> i64 {
+type Oafs = OpenApiFuzzerState<
+    OpenApiInput,
+    InMemoryOnDiskCorpus<OpenApiInput>,
+    libafl_bolts::rands::RomuDuoJrRand,
+    OnDiskCorpus<OpenApiInput>,
+>;
+
+impl Reporting<i64, Oafs> for MySqLite {
+    fn report_request(
+        &self,
+        request: &OpenApiRequest,
+        curl: &CurlRequest,
+        state: &Oafs,
+        input_id: usize,
+    ) -> i64 {
         let path = &request.path;
         let method = request.method.to_string();
 
@@ -111,7 +126,7 @@ impl Reporting<i64> for MySqLite {
             .expect("Could not prepare insert statement for request");
         let params = named_params! {
             ":timestamp": time.to_rfc3339_opts(SecondsFormat::Millis, true),
-            ":testcase": super::get_current_test_case_file_name(),
+            ":testcase": super::get_current_test_case_file_name(state),
             ":path": path,
             ":type": method,
             ":data": curl.to_string(),
