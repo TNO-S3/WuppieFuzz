@@ -29,7 +29,7 @@ use libafl::{
         TimeFeedback,
     },
     fuzzer::StdFuzzer,
-    inputs::{BytesInput, UsesInput},
+    inputs::BytesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     mutators::StdScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
@@ -37,7 +37,7 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{CalibrationStage, StdPowerMutationalStage},
-    state::{HasCorpus, HasExecutions, NopState, UsesState},
+    state::{HasCorpus, HasExecutions, NopState},
     ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
 };
 use libafl_bolts::{
@@ -375,13 +375,7 @@ pub fn fuzz() -> Result<()> {
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
-fn setup_endpoint_coverage<
-    'a,
-    S: UsesInput + HasNamedMetadata,
-    EM: EventFirer + UsesState<State = S>,
-    I,
-    OT: MatchName,
->(
+fn setup_endpoint_coverage<'a, S: HasNamedMetadata, EM: EventFirer<I, S>, I, OT: MatchName>(
     api: OpenAPI,
 ) -> Result<
     (
@@ -538,8 +532,9 @@ fn update_coverage<F: FnMut(String)>(
     let req_stats = UserStatsValue::Number(stats.performed_requests);
 
     let event_manager = unsafe {
-        inprocess_get_event_manager::<SimpleEventManager<CoverageMonitor<F>, NopState<BytesInput>>>(
-        )
+        inprocess_get_event_manager::<
+            SimpleEventManager<BytesInput, CoverageMonitor<F>, NopState<BytesInput>>,
+        >()
         .expect("Can not load the event manager")
     };
 
