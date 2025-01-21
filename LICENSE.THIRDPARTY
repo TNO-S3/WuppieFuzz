@@ -31,8 +31,6 @@ Components:
 - const_format
 - const_format_proc_macros
 - const_panic
-- typewit
-- typewit_proc_macros
 
 ===============================================================================
 BSD-3-Clause LICENSE NOTICE
