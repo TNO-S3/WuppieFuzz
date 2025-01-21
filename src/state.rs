@@ -8,12 +8,12 @@ use std::{
 use libafl::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     feedbacks::StateInitializer,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     schedulers::powersched::SchedulerMetadata,
     stages::{HasCurrentStageId, StageId},
     state::{
         HasCorpus, HasExecutions, HasImported, HasLastFoundTime, HasLastReportTime, HasMaxSize,
-        HasRand, HasSolutions, HasStartTime, State, Stoppable,
+        HasRand, HasSolutions, HasStartTime, Stoppable,
     },
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -64,15 +64,6 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
     remaining_initial_files: Option<Vec<PathBuf>>,
     phantom: PhantomData<I>,
     api: OpenAPI,
-}
-
-impl<I, C, R, SC> State for OpenApiFuzzerState<I, C, R, SC>
-where
-    C: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
-    R: Rand,
-    SC: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
-    Self: UsesInput,
-{
 }
 
 impl<I, C, R, SC> HasCurrentStageId for OpenApiFuzzerState<I, C, R, SC> {
@@ -140,17 +131,17 @@ where
     }
 }
 
-impl<I, C, R, SC> HasTestcase for OpenApiFuzzerState<I, C, R, SC>
+impl<I, C, R, SC> HasTestcase<I> for OpenApiFuzzerState<I, C, R, SC>
 where
-    C: Corpus,
+    C: Corpus<I>,
 {
     /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<C::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error> {
         Ok(self.corpus().get(id)?.borrow())
     }
 
     /// To get mutable testcase
-    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<C::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
     }
 }
@@ -169,16 +160,9 @@ impl<I, C, R, SC> HasLastFoundTime for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> UsesInput for OpenApiFuzzerState<I, C, R, SC>
+impl<I, C, R, SC> HasCorpus<I> for OpenApiFuzzerState<I, C, R, SC>
 where
-    I: Input,
-{
-    type Input = I;
-}
-
-impl<I, C, R, SC> HasCorpus for OpenApiFuzzerState<I, C, R, SC>
-where
-    C: Corpus,
+    C: Corpus<I>,
 {
     type Corpus = C;
 
@@ -195,10 +179,10 @@ where
     }
 }
 
-impl<I, C, R, SC> HasSolutions for OpenApiFuzzerState<I, C, R, SC>
+impl<I, C, R, SC> HasSolutions<I> for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    SC: Corpus,
+    SC: Corpus<I>,
 {
     type Solutions = SC;
 
@@ -218,9 +202,9 @@ where
 impl<I, C, R, SC> HasMetadata for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus,
+    C: Corpus<I>,
     R: Rand,
-    SC: Corpus,
+    SC: Corpus<I>,
 {
     /// Get all the metadata into a HashMap
     #[inline]
@@ -238,9 +222,9 @@ where
 impl<I, C, R, SC> HasExecutions for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus,
+    C: Corpus<I>,
     R: Rand,
-    SC: Corpus,
+    SC: Corpus<I>,
 {
     /// The executions counter
     #[inline]
@@ -258,9 +242,9 @@ where
 impl<C, I, R, SC> HasMaxSize for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus,
+    C: Corpus<I>,
     R: Rand,
-    SC: Corpus,
+    SC: Corpus<I>,
 {
     fn max_size(&self) -> usize {
         self.max_size
@@ -274,9 +258,9 @@ where
 impl<C, I, R, SC> HasStartTime for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus,
+    C: Corpus<I>,
     R: Rand,
-    SC: Corpus,
+    SC: Corpus<I>,
 {
     /// The starting time
     #[inline]
@@ -308,9 +292,9 @@ impl<I, C, R, SC> HasNamedMetadata for OpenApiFuzzerState<I, C, R, SC> {
 impl<I, C, R, SC> HasLastReportTime for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus,
+    C: Corpus<I>,
     R: Rand,
-    SC: Corpus,
+    SC: Corpus<I>,
 {
     fn last_report_time(&self) -> &Option<Duration> {
         todo!()
@@ -334,9 +318,9 @@ impl<C, I, R, SC> HasImported for OpenApiFuzzerState<I, C, R, SC> {
 impl<C, I, R, SC> OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = I>,
+    C: Corpus<I>,
     R: Rand,
-    SC: Corpus<Input = I>,
+    SC: Corpus<I>,
 {
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
     pub fn new<F, O>(
@@ -388,9 +372,9 @@ pub trait HasRandAndOpenAPI {
 impl<C, I, R, SC> HasRandAndOpenAPI for OpenApiFuzzerState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus,
+    C: Corpus<I>,
     R: Rand,
-    SC: Corpus,
+    SC: Corpus<I>,
 {
     type Rand = <Self as HasRand>::Rand;
     fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &OpenAPI) {
