@@ -1,6 +1,6 @@
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    state::{HasCorpus, State},
+    state::HasCorpus,
 };
 
 use crate::{
@@ -44,7 +44,6 @@ impl<R, T, S> Reporting<T, S> for Option<R>
 where
     R: Reporting<T, S>,
     T: Default,
-    S: State,
 {
     fn report_request(
         &self,

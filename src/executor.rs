@@ -16,7 +16,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
-    state::{HasExecutions, Stoppable, UsesState},
+    state::{HasExecutions, Stoppable},
     Error,
 };
 use libafl_bolts::prelude::RefIndexable;
@@ -124,11 +124,7 @@ where
     /// Executes the given input, tracking and using response parameters and verifying responses.
     /// Returns the target's performance as ExitKind, and the number of requests successfully
     /// executed (i.e. before an error occurred).
-    fn harness(
-        &mut self,
-        inputs: &OpenApiInput,
-        state: &mut <Self as UsesState>::State,
-    ) -> (ExitKind, u64) {
+    fn harness(&mut self, inputs: &OpenApiInput, state: &mut FuzzerState) -> (ExitKind, u64) {
         let mut exit_kind = ExitKind::Ok;
         self.inputs_tested += 1;
         let mut performed_requests = 0;
@@ -235,9 +231,7 @@ where
         event_manager: &mut EM,
     ) -> Result<(), Error>
     where
-        EM: UsesState<State = FuzzerState>
-            + EventFirer<State = FuzzerState>
-            + EventProcessor<EM, FZ>,
+        EM: EventFirer<OpenApiInput, FuzzerState> + EventProcessor<EM, FuzzerState, FZ>,
     {
         if state.stop_requested() {
             state.discard_stop_request();
@@ -253,7 +247,7 @@ where
         _input: &OpenApiInput,
         event_manager: &mut EM,
     ) where
-        EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
+        EM: EventFirer<OpenApiInput, FuzzerState> + EventRestarter<FuzzerState>,
     {
         self.coverage_client.fetch_coverage(true);
         let (covered, total) = self.coverage_client.max_coverage_ratio();
@@ -320,21 +314,19 @@ where
     }
 }
 
-impl<EM, FZ, OT> Executor<EM, FZ> for SequenceExecutor<'_, OT>
+impl<EM, FZ, OT> Executor<EM, OpenApiInput, FuzzerState, FZ> for SequenceExecutor<'_, OT>
 where
-    FZ: UsesState<State = FuzzerState>,
-    EM: UsesState<State = FuzzerState>
-        + EventFirer<State = FuzzerState>
-        + EventRestarter
-        + EventProcessor<EM, FZ>,
+    EM: EventFirer<OpenApiInput, FuzzerState>
+        + EventRestarter<FuzzerState>
+        + EventProcessor<EM, FuzzerState, FZ>,
     OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut FZ,
-        state: &mut <Self as UsesState>::State,
+        state: &mut FuzzerState,
         event_manager: &mut EM,
-        input: &<Self as libafl::inputs::UsesInput>::Input,
+        input: &OpenApiInput,
     ) -> Result<ExitKind, libafl::Error> {
         *state.executions_mut() += 1;
 
@@ -375,7 +367,7 @@ fn update_stats<EM>(
     name: &'static str,
     value: UserStatsValue,
 ) where
-    EM: UsesState<State = FuzzerState> + EventFirer<State = FuzzerState> + EventRestarter,
+    EM: EventFirer<OpenApiInput, FuzzerState> + EventRestarter<FuzzerState>,
 {
     if let Err(e) = event_manager.fire(
         state,
@@ -387,13 +379,6 @@ fn update_stats<EM>(
     ) {
         error!("Err: failed to fire event {name}: {:?}", e)
     }
-}
-
-impl<OT> UsesState for SequenceExecutor<'_, OT>
-where
-    OT: ObserversTuple<OpenApiInput, FuzzerState>,
-{
-    type State = FuzzerState;
 }
 
 impl<OT> HasObservers for SequenceExecutor<'_, OT>

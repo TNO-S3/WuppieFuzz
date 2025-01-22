@@ -21,14 +21,13 @@ use libafl::{
         TimeFeedback,
     },
     fuzzer::StdFuzzer,
-    inputs::UsesInput,
     mutators::StdScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{CalibrationStage, StdPowerMutationalStage},
-    state::{HasCorpus, HasExecutions, UsesState},
+    state::{HasCorpus, HasExecutions},
     ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
 };
 use libafl_bolts::{
@@ -232,13 +231,7 @@ pub fn fuzz() -> Result<()> {
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
-fn setup_endpoint_coverage<
-    'a,
-    S: UsesInput + HasNamedMetadata,
-    EM: EventFirer + UsesState<State = S>,
-    I,
-    OT: MatchName,
->(
+fn setup_endpoint_coverage<'a, S: HasNamedMetadata, EM: EventFirer<I, S>, I, OT: MatchName>(
     api: OpenAPI,
 ) -> Result<
     (

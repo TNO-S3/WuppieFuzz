@@ -81,10 +81,10 @@ pub fn havoc_mutations_openapi<C, I, R, SC>() -> tuple_list_type!(
     OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
 )
 where
-    C: Corpus + 'static,
+    C: Corpus<I> + 'static,
     I: Input + 'static,
     R: Rand + 'static,
-    SC: Corpus + 'static,
+    SC: Corpus<I> + 'static,
 {
     tuple_list!(
         OpenApiMutator::from_bytes_mutator(Box::new(BitFlipMutator::new())),
@@ -281,7 +281,7 @@ fn mutate_string<S: HasRand>(
     };
 
     // Parse the ASCII string to a &str
-    let new_s = String::from_utf8_lossy(bytes_input.bytes());
+    let new_s = String::from_utf8_lossy(bytes_input.mutator_bytes());
     if *s == new_s {
         return MutationResult::Skipped;
     }
@@ -328,10 +328,10 @@ fn mutate_parameter_contents<S: HasRand>(
             if mutation_result.is_ok() {
                 // The ASCII mutators might not actually change a value, since bit 0 of all bytes is always 0.
                 // To prevent duplicate inputs, we check explicitly if it actually changed anything.
-                if contents == new_value.bytes() {
+                if contents == new_value.mutator_bytes() {
                     return Ok(MutationResult::Skipped);
                 }
-                *param_contents = ParameterContents::Bytes(new_value.bytes().to_owned())
+                *param_contents = ParameterContents::Bytes(new_value.mutator_bytes().to_owned())
             }
             return mutation_result;
         }
