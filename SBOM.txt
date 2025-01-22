@@ -88,10 +88,10 @@ cfg-if 1.0.0
 chrono 0.4.39
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.26
+clap 4.5.27
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.26
+clap_builder 4.5.27
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_derive 4.5.24
@@ -259,7 +259,7 @@ hashbrown 0.14.5
 hashbrown 0.15.2
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-hashlink 0.9.1
+hashlink 0.10.0
 	licensed under "Apache-2.0 OR MIT"
 	by kyren <kerriganw@gmail.com>
 heck 0.5.0
@@ -340,7 +340,7 @@ idna 1.0.3
 idna_adapter 1.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-indexmap 2.7.0
+indexmap 2.7.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 indicatif 0.17.9
@@ -397,7 +397,7 @@ libc 0.2.167
 libm 0.2.11
 	licensed under "Apache-2.0) OR MIT AND (MIT"
 	by Jorge Aparicio <jorge@japaric.io>
-libsqlite3-sys 0.30.1
+libsqlite3-sys 0.31.0
 	licensed under "MIT"
 	by The rusqlite developers
 linux-raw-sys 0.4.14
@@ -583,7 +583,7 @@ reqwest_cookie_store 0.8.0
 ring 0.17.8
 	licensed under "custom license"
 	by Brian Smith <brian@briansmith.org>
-rusqlite 0.32.1
+rusqlite 0.33.0
 	licensed under "MIT"
 	by The rusqlite developers
 rustc-demangle 0.1.24
@@ -640,7 +640,7 @@ serde 1.0.217
 serde_derive 1.0.217
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
-serde_json 1.0.135
+serde_json 1.0.137
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
 serde_urlencoded 0.7.1
