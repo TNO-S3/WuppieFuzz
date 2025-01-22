@@ -328,13 +328,12 @@ where
         event_manager: &mut EM,
         input: &OpenApiInput,
     ) -> Result<ExitKind, libafl::Error> {
-        *state.executions_mut() += 1;
-
         if let Err(Error::ShuttingDown) = self.pre_exec(state, input, event_manager) {
             return Err(Error::ShuttingDown);
         }
 
         let (ret, performed_requests) = self.harness(input, state);
+        *state.executions_mut() += 1;
         self.performed_requests += performed_requests;
 
         self.post_exec(state, input, event_manager);
