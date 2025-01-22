@@ -4,7 +4,7 @@
 
 ## Features
 
-- Adds custom executor enabling proper timeout kill in
+- Adds custom executor enabling proper timeout kill and removing unsafe code in
   [#49](https://github.com/TNO-S3/WuppieFuzz/pull/49)
 
 ## Fixes
