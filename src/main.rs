@@ -29,23 +29,23 @@ extern crate num_derive;
 #[macro_use]
 extern crate lazy_static;
 
-#[allow(unused_imports)]
-use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
+#[cfg(windows)]
+use std::ptr::write_volatile;
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
 use configuration::{Commands, OutputFormat};
 use env_logger::{Builder, Env};
+#[allow(unused_imports)]
+use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use log::warn;
-use openapiv3::OpenAPI;
-#[cfg(windows)]
-use std::ptr::write_volatile;
-use std::sync::Arc;
 
 mod authentication;
 mod configuration;
 pub mod coverage_clients;
 mod debug_writer;
+pub mod executor;
 mod fuzzer;
 pub mod header;
 mod initial_corpus;
@@ -107,7 +107,7 @@ pub fn setup_logging(clargs: &Configuration) {
 
 /// Initializes the authentication module and cookie store and builds a Reqwest HTTP client
 fn build_http_client(
-    api: &OpenAPI,
+    api: &openapiv3::OpenAPI,
 ) -> Result<
     (
         authentication::Authentication,

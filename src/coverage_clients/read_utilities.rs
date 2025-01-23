@@ -1,8 +1,9 @@
 //! Collection of utility functions to read data from a stream.
 
-use std::convert::{TryFrom, TryInto};
-use std::io::ErrorKind;
-use std::io::{prelude::*, Error, Result};
+use std::{
+    convert::{TryFrom, TryInto},
+    io::{prelude::*, Error, ErrorKind, Result},
+};
 
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use cesu8::{from_java_cesu8, to_java_cesu8};
@@ -74,7 +75,7 @@ pub fn read_var_int(readable: &mut dyn Read) -> Result<u32> {
         return Ok(b as u32);
     }
     let nxt = read_var_int(readable)?;
-    Ok((b & 0x7f) as u32 | nxt << 7)
+    Ok((b & 0x7f) as u32 | (nxt << 7))
 }
 
 /// Reads a byte vector, preceded by a length given as little-endian u32.

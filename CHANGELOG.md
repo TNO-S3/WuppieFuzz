@@ -4,9 +4,28 @@
 
 ## Features
 
+- Adds custom executor enabling proper timeout kill and removing unsafe code in
+  [#49](https://github.com/TNO-S3/WuppieFuzz/pull/49)
+
 ## Fixes
-- Removed `libssl` from installation prerequisites and added `build-essential` in
-  [#45](https://github.com/TNO-S3/WuppieFuzz/pull/45)
+
+- Updated [LibAFL](https://github.com/AFLplusplus/LibAFL) to 0.15.0 in
+  [#65](https://github.com/TNO-S3/WuppieFuzz/pull/65) thanks to
+  [@tokatoka](https://github.com/tokatoka)
+
+# v1.1.2 (2025-01-16)
+
+## Highlights
+
+## Features
+
+## Fixes
+
+- Removed `libssl` from installation prerequisites and added `build-essential`
+  in [#45](https://github.com/TNO-S3/WuppieFuzz/pull/45)
+- Temporary workaround for ctrl+c behaviour in
+  [#47](https://github.com/TNO-S3/WuppieFuzz/pull/47)
+- Update to LibAFL 0.14.1 in [#52](https://github.com/TNO-S3/WuppieFuzz/pull/52)
 
 # v1.1.1 (2024-11-06)
 

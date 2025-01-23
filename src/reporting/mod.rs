@@ -1,20 +1,28 @@
-use libafl::corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus};
-use libafl::executors::hooks::inprocess::inprocess_get_state;
-use libafl::state::HasCorpus;
+use libafl::{
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    state::HasCorpus,
+};
 
-use crate::input::{OpenApiInput, OpenApiRequest};
-use crate::openapi::curl_request::CurlRequest;
-use crate::openapi::validate_response::Response;
-use crate::state::OpenApiFuzzerState;
+use crate::{
+    input::{OpenApiInput, OpenApiRequest},
+    openapi::{curl_request::CurlRequest, validate_response::Response},
+    state::OpenApiFuzzerState,
+};
 
 pub mod sqlite;
 
 // The reporting trait allows reporting requests and responses for later analysis.
 // The type `T` is the type used by the underlying data store to refer to records,
 // so that information can be added to a record made earlier.
-pub trait Reporting<T> {
+pub trait Reporting<T, S> {
     /// Report the request with the corresponding input id for further analysis
-    fn report_request(&self, request: &OpenApiRequest, curl: &CurlRequest, input_id: usize) -> T;
+    fn report_request(
+        &self,
+        request: &OpenApiRequest,
+        curl: &CurlRequest,
+        state: &S,
+        input_id: usize,
+    ) -> T;
 
     /// Report a valid response link to the corresponding request
     fn report_response(&self, response: &Response, request_id: T);
@@ -32,14 +40,20 @@ pub trait Reporting<T> {
     );
 }
 
-impl<R, T> Reporting<T> for Option<R>
+impl<R, T, S> Reporting<T, S> for Option<R>
 where
-    R: Reporting<T>,
+    R: Reporting<T, S>,
     T: Default,
 {
-    fn report_request(&self, request: &OpenApiRequest, curl: &CurlRequest, input_id: usize) -> T {
+    fn report_request(
+        &self,
+        request: &OpenApiRequest,
+        curl: &CurlRequest,
+        state: &S,
+        input_id: usize,
+    ) -> T {
         match self.as_ref() {
-            Some(reporter) => reporter.report_request(request, curl, input_id),
+            Some(reporter) => reporter.report_request(request, curl, state, input_id),
             _ => Default::default(),
         }
     }
@@ -74,17 +88,15 @@ where
     }
 }
 
-fn get_current_test_case_file_name() -> Option<String> {
-    let corpus = inprocess_get_state::<
-        OpenApiFuzzerState<
-            OpenApiInput,
-            InMemoryOnDiskCorpus<OpenApiInput>,
-            libafl_bolts::rands::RomuDuoJrRand,
-            OnDiskCorpus<OpenApiInput>,
-        >,
-    >()
-    .expect("State is gone??")
-    .corpus();
+fn get_current_test_case_file_name(
+    state: &OpenApiFuzzerState<
+        OpenApiInput,
+        InMemoryOnDiskCorpus<OpenApiInput>,
+        libafl_bolts::rands::RomuDuoJrRand,
+        OnDiskCorpus<OpenApiInput>,
+    >,
+) -> Option<String> {
+    let corpus = state.corpus();
     corpus
         .current()
         .and_then(|id| corpus.get(id).ok())

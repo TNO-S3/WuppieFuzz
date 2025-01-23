@@ -3,15 +3,15 @@
 
 use std::borrow::Cow;
 
-use crate::input::OpenApiInput;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
 };
-use libafl_bolts::rands::Rand;
-use libafl_bolts::Named;
+use libafl_bolts::{rands::Rand, Named};
+
+use crate::input::OpenApiInput;
 
 /// The `RemoveRequestMutator` removes an existing request in the series,
 /// but it will never leave a series empty.
@@ -45,7 +45,9 @@ where
         if input.0.len() < 2 {
             return Ok(MutationResult::Skipped);
         }
-        let random_index = state.rand_mut().below(input.0.len());
+        let random_index = state
+            .rand_mut()
+            .below(core::num::NonZero::new(input.0.len()).unwrap());
         input.0.remove(random_index);
 
         // Don't forget to fix up the `ParameterContents::Reference`s contained in the

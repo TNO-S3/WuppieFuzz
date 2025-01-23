@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 
 use libafl::{
-    inputs::{BytesInput, HasMutatorBytes},
+    inputs::{BytesInput, ResizableMutator},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,

@@ -1,14 +1,12 @@
-use anyhow::Result;
-
 use std::path::Path;
+#[cfg(windows)]
+use std::ptr::write_volatile;
 
+use anyhow::Result;
 use libafl::inputs::Input;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
-
 use log::{error, info, warn};
-#[cfg(windows)]
-use std::ptr::write_volatile;
 
 use crate::{
     configuration::Configuration,
