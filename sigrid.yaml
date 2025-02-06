@@ -25,37 +25,37 @@ components:
       - ".*/reporting/.*"
   - name: configuration
     include:
-      - ".*/configuration\.rs"
+      - ".*/configuration[.]rs"
   - name: debug-writer
     include:
-      - ".*/debug_writer\.rs"
+      - ".*/debug_writer[.]rs"
   - name: executor
     include:
-      - ".*/executor\.rs"
+      - ".*/executor[.]rs"
   - name: fuzzer
     include:
-      - ".*/fuzzer\.rs"
+      - ".*/fuzzer[.]rs"
   - name: header
     include:
-      - ".*/herader\.rs"
+      - ".*/herader[.]rs"
   - name: main
     include:
-      - ".*/main\.rs"
+      - ".*/main[.]rs"
   - name: montiors
     include:
-      - ".*/monitors\.rs"
+      - ".*/monitors[.]rs"
   - name: parameter-feedback
     include:
-      - ".*/parameter_feedback\.rs"
+      - ".*/parameter_feedback[.]rs"
   - name: reproducer
     include:
-      - ".*/reproducer\.rs"
+      - ".*/reproducer[.]rs"
   - name: state
     include:
-      - ".*/state\.rs"
+      - ".*/state[.]rs"
   - name: wuppie-version
     include:
-      - ".*/wuppie_version\.rs"
+      - ".*/wuppie_version[.]rs"
 
 architecture:
   grouping:
