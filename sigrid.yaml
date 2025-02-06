@@ -2,57 +2,57 @@ languages:
   - name: Rust
 
 components:
-  - name: Authentication
+  - name: authentication
     include:
       - ".*/authentication/.*"
-  - name: Coverage-Clients
+  - name: coverage-clients
     include:
       - ".*/coverage_clients/.*"
-  - name: Initial-Corpus
+  - name: initial-corpus
     include:
       - ".*/initial_corpus/.*"
-  - name: Input
+  - name: input
     include:
       - ".*/input/.*"
-  - name: OpenAPI
+  - name: openapi
     include:
       - ".*/openapi/.*"
-  - name: OpenAPI-Mutator
+  - name: openapi-mutator
     include:
       - ".*/openapi_mutator/.*"
-  - name: Reporting
+  - name: reporting
     include:
       - ".*/reporting/.*"
-  - name: Configuration
+  - name: configuration
     include:
       - ".*/configuration\.rs"
-  - name: Debug-Writer
+  - name: debug-writer
     include:
       - ".*/debug_writer\.rs"
-  - name: Executor
+  - name: executor
     include:
       - ".*/executor\.rs"
-  - name: Fuzzer
+  - name: fuzzer
     include:
       - ".*/fuzzer\.rs"
-  - name: Header
+  - name: header
     include:
       - ".*/herader\.rs"
-  - name: Main
+  - name: main
     include:
       - ".*/main\.rs"
-  - name: Montiors
+  - name: montiors
     include:
       - ".*/monitors\.rs"
-  - name: Parameter-Feedback
+  - name: parameter-feedback
     include:
       - ".*/parameter_feedback\.rs"
-  - name: Reproducer
+  - name: reproducer
     include:
       - ".*/reproducer\.rs"
-  - name: State
+  - name: state
     include:
       - ".*/state\.rs"
-  - name: Wuppie-Version
+  - name: wuppie-version
     include:
       - ".*/wuppie_version\.rs"
