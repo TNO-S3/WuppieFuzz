@@ -1,0 +1,58 @@
+languages:
+  - name: Rust
+
+components:
+  - name: Authentication
+    include:
+      - ".*/authentication/.*"
+  - name: Coverage-Clients
+    include:
+      - ".*/coverage_clients/.*"
+  - name: Initial-Corpus
+    include:
+      - ".*/initial_corpus/.*"
+  - name: Input
+    include:
+      - ".*/input/.*"
+  - name: OpenAPI
+    include:
+      - ".*/openapi/.*"
+  - name: OpenAPI-Mutator
+    include:
+      - ".*/openapi_mutator/.*"
+  - name: Reporting
+    include:
+      - ".*/reporting/.*"
+  - name: Configuration
+    include:
+      - ".*/configuration\.rs"
+  - name: Debug-Writer
+    include:
+      - ".*/debug_writer\.rs"
+  - name: Executor
+    include:
+      - ".*/executor\.rs"
+  - name: Fuzzer
+    include:
+      - ".*/fuzzer\.rs"
+  - name: Header
+    include:
+      - ".*/herader\.rs"
+  - name: Main
+    include:
+      - ".*/main\.rs"
+  - name: Montiors
+    include:
+      - ".*/monitors\.rs"
+  - name: Parameter-Feedback
+    include:
+      - ".*/parameter_feedback\.rs"
+  - name: Reproducer
+    include:
+      - ".*/reproducer\.rs"
+  - name: State
+    include:
+      - ".*/state\.rs"
+  - name: Wuppie-Version
+    include:
+      - ".*/wuppie_version\.rs"
