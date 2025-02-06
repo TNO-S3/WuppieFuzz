@@ -78,3 +78,9 @@ architecture:
         - openapi
         - initial-corpus
       annotation: "Modules handling REST API related complexity"
+    - name: "HTTP infrastructure"
+      include:
+        - authentication
+        - header
+        - parameter_feedback
+      annotation: "Modules handling REST API related complexity"
