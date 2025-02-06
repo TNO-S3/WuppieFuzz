@@ -56,3 +56,25 @@ components:
   - name: wuppie-version
     include:
       - ".*/wuppie_version\.rs"
+
+architecture:
+  grouping:
+    - name: "Entry points"
+      include:
+        - fuzzer
+        - reproducer
+        - wuppie-version
+      annotation: "Modules providing main functionality of the application"
+    - name: "LibAFL Components"
+      include:
+        - state
+        - executor
+        - monitors
+        - openapi-mutator
+        - input
+      annotation: "Specializations of LibAFL components"
+    - name: "OpenAPI infrastructure"
+      include:
+        - openapi
+        - initial-corpus
+      annotation: "Modules handling REST API related complexity"
