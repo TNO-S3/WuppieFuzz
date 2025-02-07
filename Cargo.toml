@@ -59,7 +59,7 @@ iter-read = "1.0.1"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.4.0"
 lcov = "0.8"
-libafl = "=0.15.0"
+libafl = { version = "=0.15.0", features = ["clap"] }
 libafl_bolts = { version = "=0.15.0", features = ["prelude"] }
 log = { version = "0.4.25", features = ["serde"] }
 num = { version = "0.4.2", default-features = false }
