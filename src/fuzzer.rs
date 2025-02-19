@@ -205,6 +205,7 @@ pub fn fuzz() -> Result<()> {
             Ok(_) => (),
             Err(libafl_bolts::Error::ShuttingDown) => {
                 log::info!("[Fuzzing campaign ended] Thanks for using WuppieFuzz!");
+                log::info!("Execution statistics: {}", executor);
                 break;
             }
             Err(err) => {

@@ -2,13 +2,10 @@
 //! OpenAPI-based requests to the target) and statistics tracking (mainly coverage).
 
 use std::{
-    borrow::Cow,
-    marker::PhantomData,
-    sync::{
+    borrow::Cow, fmt::Display, marker::PhantomData, sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
-    },
-    time::{Duration, Instant},
+    }, time::{Duration, Instant}
 };
 
 use libafl::{
@@ -79,6 +76,20 @@ where
     last_window_time: Instant,
     last_covered: u64,
     last_endpoint_covered: u64,
+}
+
+impl<OT> Display for SequenceExecutor<'_, OT>
+where
+    OT: ObserversTuple<OpenApiInput, FuzzerState>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let run_time = self.starting_time.elapsed().as_secs();
+        write!(f, "{} seconds, ", run_time)?;
+        write!(f, "{} sequences ({:.2} per second), ", self.inputs_tested, self.inputs_tested as f64 / run_time as f64)?;
+        write!(f, "{} requests ({:.2} per second)", self.performed_requests, self.performed_requests as f64 / run_time as f64)?;
+
+        Ok(())
+    }
 }
 
 impl<'h, OT> SequenceExecutor<'h, OT>
