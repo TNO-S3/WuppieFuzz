@@ -1,20 +1,27 @@
+use anyhow::Context;
 use cookie::Cookie;
 use openapiv3::OpenAPI;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
-use crate::input::{parameter::ParameterKind, OpenApiRequest};
+use crate::{
+    authentication,
+    input::{parameter::ParameterKind, OpenApiRequest},
+};
 
 /// Build a request to a path from the API using the input values.
 pub fn build_request_from_input(
     client: &reqwest::blocking::Client,
+    authentication: &mut authentication::Authentication,
     cookie_store: &std::sync::Arc<reqwest_cookie_store::CookieStoreMutex>,
     api: &OpenAPI,
     input: &OpenApiRequest,
-) -> Option<reqwest::blocking::RequestBuilder> {
+) -> anyhow::Result<reqwest::blocking::RequestBuilder> {
     let server = &api
         .servers.first()
-        .expect("API specification contains no usable servers. If you did specify any, consult logs for attempts to connect to them.");
+        .ok_or(anyhow!("API specification contains no usable servers. If you did specify any, consult logs for attempts to connect to them."))?;
     let mut path = server.url.to_owned() + &input.path;
+
+    // Apply parameters from the input
     let mut header_params = HeaderMap::new();
     header_params.insert(
         reqwest::header::ACCEPT,
@@ -48,15 +55,24 @@ pub fn build_request_from_input(
     }
 
     // Deserialize the path into a Url
-    let path_with_query_params =
-        reqwest::Url::parse_with_params(&path, query_params).expect("Invalid URL");
+    let path_with_query_params = reqwest::Url::parse_with_params(&path, query_params)
+        .context("Can't parse request path into a URL")?;
 
-    // Add any collected cookie parameters to the cookie store
+    // Update the authentication cookie if needed and
+    // add any collected cookie parameters to the cookie store
     {
         let mut cookie_store = cookie_store.lock().unwrap();
-        let bare_url = reqwest::Url::parse(&path).expect("Invalid URL");
+        authentication
+            .update_cookie_store(
+                &mut cookie_store,
+                &reqwest::Url::parse(&server.url).context("Can't parse server url")?,
+            )
+            .context("Error updating authentication tokens")?;
         for cookie in cookie_params {
-            let _ = cookie_store.insert_raw(&cookie, &bare_url);
+            let _ = cookie_store.insert_raw(
+                &cookie,
+                &reqwest::Url::parse(&path).context("Can't parse full request path into a URL")?,
+            );
         }
     } // Release the cookie_store lock
 
@@ -68,5 +84,5 @@ pub fn build_request_from_input(
             .body(contents)
             .header(reqwest::header::CONTENT_TYPE, input.body_content_type());
     }
-    Some(builder)
+    Ok(builder)
 }

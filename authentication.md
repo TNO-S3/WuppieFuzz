@@ -9,6 +9,11 @@ required to log in, by using a command line argument of the form
 This file should contain the configuration. See the section conforming to your mode of
 authentication for guidance on its contents.
 
+> [!WARNING]  
+> If you have a logout endpoint in your API, the fuzzer will try to access it and possibly
+> invalidate its authentication. We recommend removing such endpoints from the specifiation
+> for the fuzzing run.
+
 ## Bearer authentication
 
 For bearer authentication, a POST request is made to a login endpoint with a username
@@ -51,3 +56,28 @@ configuration:
     XSRF-TOKEN: eyHEREisSOMENICEbase64JSONobject=
     lazarus-token: something
 ```
+
+## OAuth authentication
+
+Wuppiefuzz supports OAuth authentication. You can configure it as shown below.
+
+The username and password are sent (as a POST body) to the `access_url` endpoint, which should then supply the access and refresh tokens by setting a cookie.
+
+The access token is parsed under the assumption that it is a JWT, and the expiry timestamp is checked before each request the fuzzer makes. If the access token is about to expire, the `refresh_url` endpoint is sent a POST request with an empty body, and the tokens as cookies. It should set a new `access_token` cookie.
+
+```yaml
+mode: oauth
+configuration:
+  access_url: http://localhost:8081/token
+  refresh_url: http://localhost:8081/token/refresh
+  username: AdaLovelace
+  password: VeryStr0ngPa$sw0rd
+  extra_headers:
+    - name: Referrer
+      value: http://localhost:8081/
+    - name: ClientID
+      value: 1234abcd
+  mode: Cookie
+```
+
+The `mode` parameter can be set to `cookie`, if the access token should be sent as a cookie with each request, or `authorization_header`, if it should be a Bearer token. Refreshing is done via cookie in both cases.

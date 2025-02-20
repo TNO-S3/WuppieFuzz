@@ -93,7 +93,7 @@ where
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
     ) -> anyhow::Result<Self> {
-        let (authentication, cookie_store, http_client) = build_http_client()?;
+        let (authentication, cookie_store, http_client) = build_http_client(api)?;
 
         Ok(Self {
             observers,
@@ -143,12 +143,16 @@ where
             };
             let request_builder = match build_request_from_input(
                 &self.http_client,
+                &mut self.authentication,
                 &self.cookie_store,
                 self.api,
                 &request,
             ) {
-                None => continue,
-                Some(r) => r.timeout(Duration::from_millis(self.config.request_timeout)),
+                Err(err) => {
+                    error!("Error building request: {err}");
+                    continue;
+                }
+                Ok(r) => r.timeout(Duration::from_millis(self.config.request_timeout)),
             };
 
             let request_built = match request_builder.build() {

@@ -41,7 +41,7 @@ pub fn verify_auth(api: OpenAPI) -> Result<()> {
 
     // Setup cookie store to save the authentication token. This token is added to all HTTP headers.
     let cookie_store = std::sync::Arc::new(reqwest_cookie_store::CookieStoreMutex::new(
-        authentication.cookie_store(&Url::parse(&server.url).unwrap()),
+        authentication.cookie_store(&Url::parse(&server.url)?)?,
     ));
     let client_builder =
         reqwest::blocking::Client::builder().cookie_provider(std::sync::Arc::clone(&cookie_store));
@@ -70,12 +70,8 @@ pub fn verify_auth(api: OpenAPI) -> Result<()> {
             }
             print_response("Cookie", cookies.as_str());
         }
-        super::Authentication::OAuth(mut tokens) => {
-            if let Ok(token) = tokens.access_token() {
-                print_response("OAuth", token);
-            } else {
-                print_response("OAuth", "Token");
-            }
+        super::Authentication::OAuth(tokens) => {
+            print_response("OAuth", &tokens.access_token);
         }
     };
 
