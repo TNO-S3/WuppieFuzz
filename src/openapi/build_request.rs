@@ -62,12 +62,17 @@ pub fn build_request_from_input(
     // add any collected cookie parameters to the cookie store
     {
         let mut cookie_store = cookie_store.lock().unwrap();
-        let bare_url = reqwest::Url::parse(&path).context("Can't parse server path into a URL")?;
         authentication
-            .update_cookie_store(&mut cookie_store, &bare_url)
+            .update_cookie_store(
+                &mut cookie_store,
+                &reqwest::Url::parse(&server.url).context("Can't parse server url")?,
+            )
             .context("Error updating authentication tokens")?;
         for cookie in cookie_params {
-            let _ = cookie_store.insert_raw(&cookie, &bare_url);
+            let _ = cookie_store.insert_raw(
+                &cookie,
+                &reqwest::Url::parse(&path).context("Can't parse full request path into a URL")?,
+            );
         }
     } // Release the cookie_store lock
 
