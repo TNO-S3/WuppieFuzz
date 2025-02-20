@@ -782,7 +782,7 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
     if let Some(pattern) = &string.pattern {
         if let Ok(compiled_regex) = rand_regex::Regex::compile(pattern, 100) {
             return vec![serde_json::Value::String(
-                compiled_regex.sample(&mut rand::thread_rng()),
+                compiled_regex.sample(&mut rand::rng()),
             )];
         }
 
@@ -797,7 +797,7 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
 
                 // Generate 1000 sample strings from the regex pattern without anchors
                 // and test if one matches the regex with the anchors
-                if let Some(sample) = rand::thread_rng()
+                if let Some(sample) = rand::rng()
                     .sample_iter::<String, _>(&compiled_regex)
                     .take(1000)
                     .find(|s| filter_regex.is_match(s))
