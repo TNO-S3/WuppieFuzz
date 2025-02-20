@@ -72,7 +72,7 @@ configuration:
       value: http://localhost:8081/
     - name: ClientID
       value: 1234abcd
-  mode: cookie
+  mode: Cookie
 ```
 
 The `mode` parameter can be set to `cookie`, if the access token should be sent as a cookie with each request, or `authorization_header`, if it should be a Bearer token. Refreshing is done via cookie in both cases.
