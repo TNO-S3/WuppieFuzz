@@ -74,7 +74,6 @@ use crate::{parameter_feedback::ParameterFeedback, state::HasRandAndOpenAPI};
 pub mod method;
 pub mod parameter;
 mod serde_helpers;
-
 /// The main representation of an HTTP request in WuppieFuzz.
 ///
 /// It contains an HTTP method and a path to send the request to, and optionally
