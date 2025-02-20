@@ -1391,9 +1391,9 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.15.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dbc904c273db78320d117a5edf6cad45f486d0f01f0ff09d8673943e904a4df"
+checksum = "861b93e34c52a9c72209cbd104165482cc4def054525aadceb4ae0a9c571e3bd"
 dependencies = [
  "ahash",
  "backtrace",
