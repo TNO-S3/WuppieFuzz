@@ -68,7 +68,6 @@ pub fn find_operation<'a>(api: &'a OpenAPI, path: &str, method: Method) -> Optio
 
 pub trait JsonContent {
     fn get_json_content(&self) -> Option<&MediaType>;
-    fn has_json_content(&self) -> bool;
 }
 
 impl JsonContent for IndexMap<String, MediaType> {
@@ -76,15 +75,10 @@ impl JsonContent for IndexMap<String, MediaType> {
         self.iter()
             .find_map(|(key, value)| key.starts_with("application/json").then_some(value))
     }
-    fn has_json_content(&self) -> bool {
-        self.iter()
-            .any(|(key, _value)| key.starts_with("application/json"))
-    }
 }
 
 pub trait WwwForm {
     fn get_www_form_content(&self) -> Option<&MediaType>;
-    fn has_www_form_content(&self) -> bool;
 }
 
 impl WwwForm for IndexMap<String, MediaType> {
@@ -94,25 +88,16 @@ impl WwwForm for IndexMap<String, MediaType> {
                 .then_some(value)
         })
     }
-    fn has_www_form_content(&self) -> bool {
-        self.iter()
-            .any(|(key, _value)| key.starts_with("application/x-www-form-urlencoded"))
-    }
 }
 
 pub trait TextPlain {
     #[allow(dead_code)]
     fn get_text_plain(&self) -> Option<&MediaType>;
-    fn has_text_plain(&self) -> bool;
 }
 
 impl TextPlain for IndexMap<String, MediaType> {
     fn get_text_plain(&self) -> Option<&MediaType> {
         self.iter()
             .find_map(|(key, value)| key.starts_with("text/plain").then_some(value))
-    }
-    fn has_text_plain(&self) -> bool {
-        self.iter()
-            .any(|(key, _value)| key.starts_with("text/plain"))
     }
 }
