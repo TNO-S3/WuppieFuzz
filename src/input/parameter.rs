@@ -10,6 +10,8 @@ use openapiv3::Parameter;
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
+use super::utils::new_rand_input;
+
 /// Structs that help describe parameters to HTTP requests in a way that the fuzzer can still
 /// mutate and reason about. The ParameterKind enum describes the places a parameter can occur
 /// (query, header etc.);
@@ -308,11 +310,4 @@ impl From<&Parameter> for ParameterKind {
 /// Return the Mime utf-8 + base-64 encoding of a byte array.
 fn mime_encode_bytes(bytes: &[u8]) -> String {
     String::from("=?UTF-8?B?") + &base64::engine::general_purpose::STANDARD.encode(bytes) + "?="
-}
-
-/// Helper function that gives a new random input of length 8 (which seems sensible for
-/// most api parameters), starting out with sort-of ascii.
-fn new_rand_input<R: Rand>(rand: &mut R) -> Vec<u8> {
-    let r = rand.next();
-    (0..8).map(|i| (r >> i) as u8 & 0x7f).collect()
 }

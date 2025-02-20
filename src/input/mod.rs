@@ -68,12 +68,13 @@ use libafl_bolts::{HasLen, fs::write_file_atomic, rands::Rand};
 use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
 
 use self::parameter::ParameterKind;
-pub use self::{method::Method, parameter::ParameterContents};
+pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
 use crate::{parameter_feedback::ParameterFeedback, state::HasRandAndOpenAPI};
 
 pub mod method;
 pub mod parameter;
 mod serde_helpers;
+mod utils;
 /// The main representation of an HTTP request in WuppieFuzz.
 ///
 /// It contains an HTTP method and a path to send the request to, and optionally
@@ -635,13 +636,6 @@ impl Input for OpenApiInput {
         file.read_to_end(&mut bytes)?;
         serde_yaml::from_slice(&bytes).map_err(|err| Error::serialize(err.to_string()))
     }
-}
-
-/// Helper function that gives a new random input of length 8 (which seems sensible for
-/// most api parameters), starting out with sort-of ascii.
-pub fn new_rand_input<R: Rand>(rand: &mut R) -> Vec<u8> {
-    let r = rand.next();
-    (0..8).map(|i| (r >> i) as u8 & 0x7f).collect()
 }
 
 /// Fix a malformed (perhaps by a mutator) request using the API specification.
