@@ -6,7 +6,7 @@
 
 - Adds custom executor enabling proper timeout kill and removing unsafe code in
   [#49](https://github.com/TNO-S3/WuppieFuzz/pull/49)
-- Implement support for refresh tokens for OAuth in 
+- Implement support for access and refresh tokens for OAuth in
   [#70](https://github.com/TNO-S3/WuppieFuzz/pull/70)
 
 ## Fixes
