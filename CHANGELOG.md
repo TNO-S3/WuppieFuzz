@@ -12,6 +12,7 @@
 - Updated [LibAFL](https://github.com/AFLplusplus/LibAFL) to 0.15.0 in
   [#65](https://github.com/TNO-S3/WuppieFuzz/pull/65) thanks to
   [@tokatoka](https://github.com/tokatoka)
+- Sqlite reporting: save body contents as text (instead of `&[u8]`)
 
 # v1.1.2 (2025-01-16)
 
