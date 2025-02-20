@@ -26,7 +26,7 @@ use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
 
 use crate::{
-    authentication::Authentication,
+    authentication::{build_http_client, Authentication},
     configuration::{Configuration, CrashCriterion},
     coverage_clients::{endpoint::EndpointCoverageClient, CoverageClient},
     input::OpenApiInput,
@@ -93,7 +93,7 @@ where
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
     ) -> anyhow::Result<Self> {
-        let (authentication, cookie_store, http_client) = crate::build_http_client(api)?;
+        let (authentication, cookie_store, http_client) = build_http_client(api)?;
 
         Ok(Self {
             observers,

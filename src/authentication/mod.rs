@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fs::File, path::Path};
+use std::{borrow::Cow, fs::File, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use cookie_store::{Cookie, RawCookie};
@@ -6,7 +6,7 @@ use openapiv3::OpenAPI;
 use reqwest::header::{HeaderMap, IntoHeaderName, AUTHORIZATION};
 use url::Url;
 
-use crate::configuration::Configuration;
+use crate::{configuration::Configuration, header};
 
 pub mod basic;
 pub mod bearer;
@@ -216,4 +216,38 @@ where
 
 pub fn verify_authentication(api: OpenAPI) -> Result<()> {
     verify_auth::verify_auth(api)
+}
+
+/// Initializes the authentication module and cookie store and builds a Reqwest HTTP client
+pub fn build_http_client(
+    api: &openapiv3::OpenAPI,
+) -> Result<
+    (
+        Authentication,
+        Arc<reqwest_cookie_store::CookieStoreMutex>,
+        reqwest::blocking::Client,
+    ),
+    anyhow::Error,
+> {
+    let server_url = reqwest::Url::parse(
+        &api.servers
+            .first()
+            .ok_or(anyhow!("Could not extract server URL from API spec"))?
+            .url,
+    )?;
+
+    // Load auth information from the configuration
+    let mut authentication = initialize()?;
+    // Make a cookie jar for our client
+    let cookie_store = std::sync::Arc::new(reqwest_cookie_store::CookieStoreMutex::new(
+        authentication.cookie_store(&server_url)?,
+    ));
+    // Construct a client with the authentication and static headers
+    let client_builder =
+        reqwest::blocking::Client::builder().cookie_provider(std::sync::Arc::clone(&cookie_store));
+    let mut default_headers = authentication.generate_headers();
+    default_headers.extend(header::get_default_headers()?);
+    let client = client_builder.default_headers(default_headers).build()?;
+
+    Ok((authentication, cookie_store, client))
 }

@@ -69,11 +69,7 @@ use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
 
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents};
-use crate::{
-    openapi::{find_operation, JsonContent, TextPlain, WwwForm},
-    parameter_feedback::ParameterFeedback,
-    state::HasRandAndOpenAPI,
-};
+use crate::{parameter_feedback::ParameterFeedback, state::HasRandAndOpenAPI};
 
 pub mod method;
 pub mod parameter;
@@ -121,14 +117,16 @@ impl Body {
 
         match ref_or_body.resolve(api) {
             Ok(body) => {
-                if body.content.has_json_content() {
-                    return Body::ApplicationJson(param_contents);
-                }
-                if body.content.has_www_form_content() {
-                    return Body::XWwwFormUrlencoded(param_contents);
-                }
-                if body.content.has_text_plain() {
-                    return Body::TextPlain(param_contents.to_string().into());
+                for (key, _value) in &body.content {
+                    if key.starts_with("application/json") {
+                        return Body::ApplicationJson(param_contents);
+                    }
+                    if key.starts_with("application/x-www-form-urlencoded") {
+                        return Body::XWwwFormUrlencoded(param_contents);
+                    }
+                    if key.starts_with("text/plain") {
+                        return Body::TextPlain(param_contents.to_string().into());
+                    }
                 }
                 Body::Empty
             }
@@ -457,7 +455,11 @@ impl OpenApiInput {
             .iter()
             .enumerate()
             // Find the request's corresponding operation in the API spec
-            .filter_map(|(i, e)| find_operation(api, &e.path, e.method).map(|op| (i, op)))
+            .filter_map(|(i, e)| {
+                api.operations()
+                    .find(|&(p, m, _, _)| e.path.eq_ignore_ascii_case(p) && e.method == m)
+                    .map(|op| (i, op.2))
+            })
             // Extract the specification of each operation's possible responses
             .flat_map(|(i, op)| {
                 op.responses
@@ -466,10 +468,11 @@ impl OpenApiInput {
                     .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
                     // Filter this by extracting only json responses, which contain usable return values
                     .flat_map(|response| {
-                        response
-                            .content
-                            .get_json_content()
-                            .and_then(|media| media.schema.as_ref())
+                        response.content.iter().find_map(|(key, value)| {
+                            key.starts_with("application/json")
+                                .then_some(value.schema.as_ref())
+                                .flatten()
+                        })
                     })
                     // Finally if the schema is an object, extract its field names
                     .filter_map(|schema| match schema.resolve(api).kind {

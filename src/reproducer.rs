@@ -9,6 +9,7 @@ use libafl::Fuzzer; // This may be marked unused, but will make the compiler giv
 use log::{error, info, warn};
 
 use crate::{
+    authentication::build_http_client,
     configuration::Configuration,
     input::OpenApiInput,
     openapi::{
@@ -31,7 +32,7 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
     )?;
     let inputs = OpenApiInput::from_file(input_file)?;
 
-    let (mut authentication, cookie_store, client) = crate::build_http_client(&api)?;
+    let (mut authentication, cookie_store, client) = build_http_client(&api)?;
 
     println!(
         "Input file {:?} contains {} inputs",

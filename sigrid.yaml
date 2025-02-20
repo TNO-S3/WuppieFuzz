@@ -1,0 +1,86 @@
+languages:
+  - name: Rust
+
+components:
+  - name: authentication
+    include:
+      - ".*/authentication/.*"
+  - name: coverage-clients
+    include:
+      - ".*/coverage_clients/.*"
+  - name: initial-corpus
+    include:
+      - ".*/initial_corpus/.*"
+  - name: input
+    include:
+      - ".*/input/.*"
+  - name: openapi
+    include:
+      - ".*/openapi/.*"
+  - name: openapi-mutator
+    include:
+      - ".*/openapi_mutator/.*"
+  - name: reporting
+    include:
+      - ".*/reporting/.*"
+  - name: configuration
+    include:
+      - ".*/configuration[.]rs"
+  - name: debug-writer
+    include:
+      - ".*/debug_writer[.]rs"
+  - name: executor
+    include:
+      - ".*/executor[.]rs"
+  - name: fuzzer
+    include:
+      - ".*/fuzzer[.]rs"
+  - name: header
+    include:
+      - ".*/herader[.]rs"
+  - name: main
+    include:
+      - ".*/main[.]rs"
+  - name: montiors
+    include:
+      - ".*/monitors[.]rs"
+  - name: parameter-feedback
+    include:
+      - ".*/parameter_feedback[.]rs"
+  - name: reproducer
+    include:
+      - ".*/reproducer[.]rs"
+  - name: state
+    include:
+      - ".*/state[.]rs"
+  - name: wuppie-version
+    include:
+      - ".*/wuppie_version[.]rs"
+
+architecture:
+  grouping:
+    - name: "Entry points"
+      include:
+        - fuzzer
+        - reproducer
+        - wuppie-version
+      annotation: "Modules providing main functionality of the application"
+    - name: "LibAFL Components"
+      include:
+        - state
+        - executor
+        - monitors
+        - openapi-mutator
+        - input
+      annotation: "Specializations of LibAFL components"
+    - name: "OpenAPI infrastructure"
+      include:
+        - openapi
+        - initial-corpus
+      annotation: "Modules handling REST API related complexity"
+    - name: "HTTP infrastructure"
+      include:
+        - authentication
+        - header
+        - parameter_feedback
+      annotation: "Modules handling REST API related complexity"

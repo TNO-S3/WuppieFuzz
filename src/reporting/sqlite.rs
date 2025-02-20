@@ -131,7 +131,7 @@ impl Reporting<i64, Oafs> for MySqLite {
             ":type": method,
             ":data": curl.to_string(),
             ":url": curl.url(),
-            ":body": curl.body(),
+            ":body": curl.body().map(String::from_utf8_lossy),
             ":inputid": input_id,
             ":runid": self.run_id,
         };
