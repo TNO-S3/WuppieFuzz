@@ -34,7 +34,7 @@ anstyle-query 1.1.2
 anstyle-wincon 3.0.6
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-anyhow 1.0.95
+anyhow 1.0.96
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 arbitrary-int 1.2.7
@@ -58,7 +58,7 @@ bitbybit 1.3.2
 bitflags 2.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-build_html 2.5.0
+build_html 2.6.0
 	licensed under "MIT"
 	by Joseph Skubal
 bumpalo 3.16.0
@@ -88,13 +88,13 @@ cfg-if 1.0.0
 chrono 0.4.39
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.27
+clap 4.5.30
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.27
+clap_builder 4.5.30
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_derive 4.5.24
+clap_derive 4.5.28
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.4
@@ -247,6 +247,9 @@ futures-util 0.3.31
 getrandom 0.2.15
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
+getrandom 0.3.1
+	licensed under "Apache-2.0 OR MIT"
+	by The Rand Project Developers
 gimli 0.31.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -343,7 +346,7 @@ idna_adapter 1.2.0
 indexmap 2.7.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-indicatif 0.17.9
+indicatif 0.17.11
 	licensed under "MIT"
 	by unspecified authors
 indoc 2.0.5
@@ -362,6 +365,9 @@ iter-read 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Georg Brandl <georg@python.org>
 itertools 0.13.0
+	licensed under "Apache-2.0 OR MIT"
+	by bluss
+itertools 0.14.0
 	licensed under "Apache-2.0 OR MIT"
 	by bluss
 itoa 1.0.14
@@ -388,7 +394,7 @@ libafl 0.15.0
 libafl_bolts 0.15.0
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libafl_derive 0.15.0
+libafl_derive 0.15.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>
 libc 0.2.167
@@ -481,13 +487,13 @@ number_prefix 0.4.0
 object 0.36.5
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-once_cell 1.20.2
+once_cell 1.20.3
 	licensed under "Apache-2.0 OR MIT"
 	by Aleksey Kladov <aleksey.kladov@gmail.com>
 openapiv3-extended 6.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Kurt Wolf <kurtwolfbuilds@gmail.com>
-openssl 0.10.68
+openssl 0.10.71
 	licensed under "Apache-2.0"
 	by Steven Fackler <sfackler@gmail.com>
 openssl-macros 0.1.1
@@ -496,7 +502,7 @@ openssl-macros 0.1.1
 openssl-probe 0.1.5
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-openssl-sys 0.9.104
+openssl-sys 0.9.106
 	licensed under "MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Steven Fackler <sfackler@gmail.com>
 parking_lot 0.12.3
@@ -547,16 +553,19 @@ publicsuffix 2.3.0
 quote 1.0.37
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-rand 0.8.5
+rand 0.9.0
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers
-rand_chacha 0.3.1
+rand_chacha 0.9.0
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers|The CryptoCorrosion Contributors
 rand_core 0.6.4
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers
-rand_regex 0.17.0
+rand_core 0.9.1
+	licensed under "Apache-2.0 OR MIT"
+	by The Rand Project Developers|The Rust Project Developers
+rand_regex 0.18.0
 	licensed under "MIT"
 	by kennytm <kennytm@gmail.com>
 ratatui 0.29.0
@@ -634,13 +643,13 @@ security-framework 2.11.1
 security-framework-sys 2.12.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>
-serde 1.0.217
+serde 1.0.218
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
-serde_derive 1.0.217
+serde_derive 1.0.218
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
-serde_json 1.0.137
+serde_json 1.0.139
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
 serde_urlencoded 0.7.1
@@ -712,7 +721,7 @@ system-configuration 0.6.1
 system-configuration-sys 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
-tempfile 3.15.0
+tempfile 3.17.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
 thiserror 1.0.69
@@ -836,6 +845,9 @@ want 0.3.1
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 wasi 0.11.0+wasi-snapshot-preview1
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by The Cranelift Project Developers
+wasi 0.13.3+wasi-0.2.2
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by The Cranelift Project Developers
 wasm-bindgen 0.2.97
@@ -970,6 +982,9 @@ windows_x86_64_msvc 0.52.6
 windows_x86_64_msvc 0.53.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
+wit-bindgen-rt 0.33.0
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by unspecified authors
 write16 1.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -988,9 +1003,15 @@ yoke-derive 0.7.5
 zerocopy 0.7.35
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>
+zerocopy 0.8.20
+	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
+	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
 zerocopy-derive 0.7.35
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>
+zerocopy-derive 0.8.20
+	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
+	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
 zerofrom 0.1.5
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
