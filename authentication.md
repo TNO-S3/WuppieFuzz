@@ -9,6 +9,11 @@ required to log in, by using a command line argument of the form
 This file should contain the configuration. See the section conforming to your mode of
 authentication for guidance on its contents.
 
+> [!WARNING]  
+> If you have a logout endpoint in your API, the fuzzer will try to access it and possibly
+> invalidate its authentication. We recommend removing such endpoints from the specifiation
+> for the fuzzing run.
+
 ## Bearer authentication
 
 For bearer authentication, a POST request is made to a login endpoint with a username
