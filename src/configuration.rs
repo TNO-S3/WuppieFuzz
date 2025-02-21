@@ -143,7 +143,7 @@ pub enum Commands {
         #[arg(value_parser, long)]
         request_timeout: Option<u64>,
 
-        /// Set the power schedule to use. Defaults to EXPLOIT.
+        /// Set the power schedule to use. Defaults to FAST.
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
         power_schedule: Option<BaseSchedule>,
 
@@ -332,7 +332,7 @@ struct PartialConfiguration {
     #[clap(value_parser, long)]
     pub request_timeout: Option<u64>,
 
-    /// Set the power schedule to use. Defaults to EXPLOIT.
+    /// Set the power schedule to use. Defaults to FAST.
     #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
     pub power_schedule: Option<BaseSchedule>,
 
@@ -574,7 +574,7 @@ impl TryFrom<PartialConfiguration> for Configuration {
             },
             timeout: value.timeout,
             request_timeout: value.request_timeout.unwrap_or(DEFAULT_REQUEST_TIMEOUT),
-            power_schedule: value.power_schedule.unwrap_or(BaseSchedule::EXPLOIT),
+            power_schedule: value.power_schedule.unwrap_or(BaseSchedule::FAST),
             crash_criterion: value.crash_criterion.unwrap_or(CrashCriterion::AllErrors),
             report: value.report.unwrap_or(false),
             method_mutation_strategy: value
