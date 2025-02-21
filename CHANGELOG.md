@@ -4,6 +4,14 @@
 
 ## Features
 
+## Fixes
+
+# v1.2.0 (2025-02-21)
+
+## Highlights
+
+## Features
+
 - Adds support for setting power schedules for seed scheduling in
   [#73](https://github.com/TNO-S3/WuppieFuzz/pull/73)
 - Adds custom executor enabling proper timeout kill and removing unsafe code in
