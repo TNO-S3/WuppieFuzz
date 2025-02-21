@@ -1363,6 +1363,7 @@ dependencies = [
  "backtrace",
  "bincode",
  "bitbybit",
+ "clap",
  "const_format",
  "const_panic",
  "crossterm",

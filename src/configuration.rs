@@ -7,6 +7,7 @@ use std::{
 };
 
 use clap::{value_parser, Parser, Subcommand, ValueEnum};
+use libafl::schedulers::powersched::BaseSchedule;
 use serde::Deserialize;
 
 const DEFAULT_REQUEST_TIMEOUT: u64 = 30000;
@@ -142,6 +143,10 @@ pub enum Commands {
         #[arg(value_parser, long)]
         request_timeout: Option<u64>,
 
+        /// Set the power schedule to use. Defaults to FAST.
+        #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
+        power_schedule: Option<BaseSchedule>,
+
         /// What the fuzzer considers a bug. By default, all behaviour that does not match
         /// the specification is considered a bug (all-errors). If only-5xx is specified,
         /// only requests for which the program under test returns a HTTP 5xx status are
@@ -249,6 +254,7 @@ impl Commands {
                 coverage_format,
                 timeout,
                 request_timeout,
+                power_schedule,
                 crash_criterion,
                 report,
                 method_mutation_strategy,
@@ -267,6 +273,7 @@ impl Commands {
                 coverage_format,
                 timeout,
                 request_timeout,
+                power_schedule,
                 crash_criterion,
                 report,
                 method_mutation_strategy,
@@ -324,6 +331,10 @@ struct PartialConfiguration {
     /// Per-request time-out in milliseconds. Defaults to DEFAULT_REQUEST_TIMEOUT milliseconds.
     #[clap(value_parser, long)]
     pub request_timeout: Option<u64>,
+
+    /// Set the power schedule to use. Defaults to FAST.
+    #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
+    pub power_schedule: Option<BaseSchedule>,
 
     /// What the fuzzer considers a bug. By default, all behaviour that does not match
     /// the specification is considered a bug (all-errors). If only-5xx is specified,
@@ -452,6 +463,9 @@ pub struct Configuration {
     /// Per-request time-out in milliseconds. Defaults to DEFAULT_REQUEST_TIMEOUT miliseconds.
     pub request_timeout: u64,
 
+    /// The power schedule to use for prioritizing seeds.
+    pub power_schedule: BaseSchedule,
+
     /// What the fuzzer considers a bug. By default, all behaviour that does not match
     /// the specification is considered a bug (all-errors). If only-5xx is specified,
     /// only requests for which the program under test returns a HTTP 5xx status are
@@ -459,7 +473,7 @@ pub struct Configuration {
     pub crash_criterion: CrashCriterion,
 
     /// If present, ask the coverage monitor to generate a report after the
-    /// time-out passes
+    /// time-out passes.
     pub report: bool,
 
     /// If present, determine with which HTTP methods to mutate.
@@ -560,6 +574,7 @@ impl TryFrom<PartialConfiguration> for Configuration {
             },
             timeout: value.timeout,
             request_timeout: value.request_timeout.unwrap_or(DEFAULT_REQUEST_TIMEOUT),
+            power_schedule: value.power_schedule.unwrap_or(BaseSchedule::FAST),
             crash_criterion: value.crash_criterion.unwrap_or(CrashCriterion::AllErrors),
             report: value.report.unwrap_or(false),
             method_mutation_strategy: value
@@ -607,6 +622,7 @@ impl PartialConfiguration {
             coverage_format: other.coverage_format.or(self.coverage_format.take()),
             timeout: other.timeout.or(self.timeout.take()),
             request_timeout: other.request_timeout.or(self.request_timeout.take()),
+            power_schedule: other.power_schedule.or(self.power_schedule.take()),
             crash_criterion: other.crash_criterion.or(self.crash_criterion.take()),
             report: other.report.or(self.report.take()),
             method_mutation_strategy: other
