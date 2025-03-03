@@ -42,13 +42,13 @@ cargo-license = "0.6.1"
 
 [dependencies]
 ahash = "0.8"
-anyhow = "1.0.96"
+anyhow = "1.0.97"
 base64 = "0.22.0"
 build_html = "2.6.0"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
-chrono = "0.4.39"
-clap = { version = "4.5.30", features = ["cargo", "derive", "env"] }
+chrono = "0.4.40"
+clap = { version = "4.5.31", features = ["cargo", "derive", "env"] }
 cookie = "0.18.1"
 cookie_store = "0.21.1"
 ctrlc = "3.4.4"
@@ -61,8 +61,8 @@ json_env_logger2 = "0.2.1"
 lazy_static = "1.4.0"
 lcov = "0.8"
 libafl = { version = "=0.15.0", features = ["clap"] }
-libafl_bolts = { version = "=0.15.0", features = ["prelude"] }
-log = { version = "0.4.25", features = ["serde"] }
+libafl_bolts = { version = "=0.15.1", features = ["prelude"] }
+log = { version = "0.4.26", features = ["serde"] }
 num = { version = "0.4.2", default-features = false }
 num-derive = "0.4.2"
 num-traits = { version = "0.2", default-features = false }
