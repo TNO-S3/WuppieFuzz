@@ -17,9 +17,18 @@ WuppieFuzz was featured in
 > [!NOTE]  
 > For a quick, follow-along guidance please follow the [tutorial](./tutorial)!
 
-## Prerequisites
+## Quick install
 
-To run the project you need to install the following dependencies and tooling
+For quick installation of WuppieFuzz for popular operating systems (MacOS,
+Windows, Linux) see [releases](https://github.com/TNO-S3/WuppieFuzz/releases/)
+
+### Short how-to
+
+[![How to use WuppieFuzz? - YouTube](./assets/demo_video.png)](https://www.youtube.com/watch?v=-oR4d9aXrqo)
+
+## Prerequisites for development
+
+To build the project you need to install the following dependencies and tooling
 
 - build-essential `sudo apt install build-essential`
 - pkg-config `sudo apt install pkg-config`
