@@ -384,6 +384,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
+    use libafl::state::HasRand;
     use libafl_bolts::rands::StdRand;
     use openapiv3::OpenAPI;
     use super::HasRandAndOpenAPI;
@@ -452,6 +453,18 @@ pub mod tests {
 
         fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &openapiv3::OpenAPI) {
             (&mut self.rand, &self.openapi)
+        }
+    }
+
+    impl HasRand for TestOpenApiFuzzerState {
+        type Rand = StdRand;
+
+        fn rand(&self) -> &Self::Rand {
+            &self.rand
+        }
+
+        fn rand_mut(&mut self) -> &mut Self::Rand {
+            &mut self.rand
         }
     }
 }
