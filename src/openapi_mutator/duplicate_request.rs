@@ -71,3 +71,27 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use libafl::mutators::{MutationResult, Mutator};
+
+    use crate::{input::OpenApiInput, state::tests::TestOpenApiFuzzerState};
+
+    use super::DuplicateRequestMutator;
+
+    /// Tests whether the mutator correctly skips mutation if there's no requests.
+    #[test]
+    fn skip_when_empty() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut input = OpenApiInput(vec![]);
+            let mut mutator = DuplicateRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Skipped);
+        }
+        
+        Ok(())
+    }
+}
