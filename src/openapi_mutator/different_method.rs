@@ -130,22 +130,23 @@ mod test {
     /// when using MethodMutationStrategy::Common5.
     #[test]
     fn different_method_common5() -> anyhow::Result<()> {
-        let mut state = TestOpenApiFuzzerState::new();
-        let test_request = OpenApiRequest {
-            method: Method::Get,
-            path: "/simple".to_string(),
-            body: Body::Empty,
-            parameters: IndexMap::new(),
-        };
-        let mut input = OpenApiInput(vec![test_request]);
-        let mut mutator = DifferentMethodMutator {
-            method_mutation_strategy: MethodMutationStrategy::Common5,
-        };
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let test_request = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+            let mut input = OpenApiInput(vec![test_request]);
+            let mut mutator = DifferentMethodMutator {
+                method_mutation_strategy: MethodMutationStrategy::Common5,
+            };
 
-        mutator.mutate(&mut state, &mut input)?;
+            mutator.mutate(&mut state, &mut input)?;
 
-        assert_ne!(input.0[0].method, Method::Get);
-
+            assert_ne!(input.0[0].method, Method::Get);
+        }
         Ok(())
     }
 
@@ -153,21 +154,23 @@ mod test {
     /// when using MethodMutationStrategy::FollowSpec.
     #[test]
     fn different_method_follow_spec() -> anyhow::Result<()> {
-        let mut state = TestOpenApiFuzzerState::new();
-        let test_request = OpenApiRequest {
-            method: Method::Get,
-            path: "/simple".to_string(),
-            body: Body::Empty,
-            parameters: IndexMap::new(),
-        };
-        let mut input = OpenApiInput(vec![test_request]);
-        let mut mutator = DifferentMethodMutator {
-            method_mutation_strategy: MethodMutationStrategy::FollowSpec,
-        };
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let test_request = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+            let mut input = OpenApiInput(vec![test_request]);
+            let mut mutator = DifferentMethodMutator {
+                method_mutation_strategy: MethodMutationStrategy::FollowSpec,
+            };
 
-        mutator.mutate(&mut state, &mut input)?;
+            mutator.mutate(&mut state, &mut input)?;
 
-        assert_eq!(input.0[0].method, Method::Delete);
+            assert_eq!(input.0[0].method, Method::Delete);
+        }
 
         Ok(())
     }
