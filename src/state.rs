@@ -418,6 +418,14 @@ pub mod tests {
                         responses:
                             "200":
                                 description: OK
+                                content:
+                                    application/json:
+                                        schema:
+                                            type: object
+                                            properties:
+                                                id:
+                                                    type: integer
+                                                    description: The user ID.
                         parameters:
                             - name: id
                               in: path
