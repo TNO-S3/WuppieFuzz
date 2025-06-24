@@ -102,8 +102,8 @@ mod test {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
             let test_request = OpenApiRequest {
-                method: Method::Post,
-                path: "/simple".to_string(),
+                method: Method::Get,
+                path: "/with-query-parameter".to_string(),
                 body: Body::Empty,
                 parameters: IndexMap::new(),
             };
@@ -113,9 +113,9 @@ mod test {
 
             let result = mutator.mutate(&mut state, &mut input)?;
 
-            let expected_paths = ["/with-path-parameter/{id}", "/with-query-parameter"];
-            assert!(expected_paths.contains(&input.0[0].path.as_str()));
-            assert_eq!(input.0[0].method, Method::Get);
+            let new_path = input.0[0].path.as_str();
+            assert!(new_path == "/with-path-parameter/{id}" || new_path == "/simple");
+            assert!(input.0[0].method == Method::Get || (new_path == "/simple" && input.0[0].method == Method::Delete));
             assert_eq!(result, MutationResult::Mutated);
         }
 
