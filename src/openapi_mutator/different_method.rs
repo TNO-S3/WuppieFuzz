@@ -59,7 +59,8 @@ where
 
         let random_input = rand.choose(&mut input.0).unwrap();
 
-        let available_methods: Vec<(&str, Option<usize>)> = match self.method_mutation_strategy {
+        let mut available_methods: Vec<(&str, Option<usize>)> = match self.method_mutation_strategy
+        {
             MethodMutationStrategy::FollowSpec => {
                 // Find the operations in the API with this input's path, and select one
                 // with a different method than the current input's method, if available
@@ -88,6 +89,8 @@ where
             ],
         };
 
+        available_methods
+            .retain(|&(method, _)| !method.eq_ignore_ascii_case(&random_input.method.to_string()));
         if available_methods.is_empty() {
             return Ok(MutationResult::Skipped);
         }
