@@ -395,6 +395,9 @@ pub mod tests {
     }
 
     impl TestOpenApiFuzzerState {
+        /// The paths that occur in the spec provided by this test state.
+        pub const PATHS: [&'static str; 3] = ["/simple", "/with-path-parameter/{id}", "/with-query-parameter"];
+
         pub fn new() -> Self {
             const DUMMY_SPEC: &'static str = r#"
             openapi: 3.0.4
@@ -409,6 +412,14 @@ pub mod tests {
                         responses:
                             "200":
                                 description: OK
+                                content:
+                                    application/json:
+                                        schema:
+                                            type: object
+                                            properties:
+                                                id:
+                                                    type: integer
+                                                    description: The user ID.
                     delete:
                         responses:
                             "200":
@@ -418,14 +429,6 @@ pub mod tests {
                         responses:
                             "200":
                                 description: OK
-                                content:
-                                    application/json:
-                                        schema:
-                                            type: object
-                                            properties:
-                                                id:
-                                                    type: integer
-                                                    description: The user ID.
                         parameters:
                             - name: id
                               in: path
