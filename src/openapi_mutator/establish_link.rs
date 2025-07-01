@@ -113,12 +113,13 @@ mod test {
     use indexmap::IndexMap;
     use libafl::mutators::{MutationResult, Mutator};
 
+    use super::EstablishLinkMutator;
     use crate::{
-        input::{parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents},
+        input::{
+            parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
+        },
         state::tests::TestOpenApiFuzzerState,
     };
-
-    use super::EstablishLinkMutator;
 
     /// Tests whether the mutator correctly a link between an earlier request (to /simple) and a later parameter (id).
     #[test]
@@ -126,7 +127,10 @@ mod test {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
             let mut parameters = IndexMap::new();
-            parameters.insert(("id".to_string(), ParameterKind::Query), ParameterContents::Bytes(vec![0x0, 0x1, 0x2]));
+            parameters.insert(
+                ("id".to_string(), ParameterKind::Query),
+                ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
+            );
             let has_param = OpenApiRequest {
                 method: Method::Get,
                 path: "/with-query-parameter".to_string(),
@@ -144,10 +148,11 @@ mod test {
             let mut input = OpenApiInput(vec![has_return_value, has_param]);
             let mut mutator = EstablishLinkMutator;
 
-            
             let result = mutator.mutate(&mut state, &mut input)?;
             assert_eq!(result, MutationResult::Mutated);
-            let parameter = input.0[1].get_mut_parameter("id", ParameterKind::Query).expect("Request got the wrong parameter");
+            let parameter = input.0[1]
+                .get_mut_parameter("id", ParameterKind::Query)
+                .expect("Request got the wrong parameter");
             assert!(parameter.is_reference());
             assert_eq!(parameter.reference_index().copied(), Some(0));
         }
@@ -162,7 +167,10 @@ mod test {
             // In this case, the mutator should skip mutation because the parameters are in the wrong order
             let mut state = TestOpenApiFuzzerState::new();
             let mut parameters = IndexMap::new();
-            parameters.insert(("id".to_string(), ParameterKind::Query), ParameterContents::Bytes(vec![0x0, 0x1, 0x2]));
+            parameters.insert(
+                ("id".to_string(), ParameterKind::Query),
+                ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
+            );
             let has_param = OpenApiRequest {
                 method: Method::Get,
                 path: "/with-query-parameter".to_string(),
@@ -180,7 +188,6 @@ mod test {
             let mut input = OpenApiInput(vec![has_param, has_return_value]);
             let mut mutator = EstablishLinkMutator;
 
-            
             let result = mutator.mutate(&mut state, &mut input)?;
             assert_eq!(result, MutationResult::Skipped);
 

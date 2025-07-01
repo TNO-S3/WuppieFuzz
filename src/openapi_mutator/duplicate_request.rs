@@ -77,14 +77,13 @@ mod test {
     use indexmap::IndexMap;
     use libafl::mutators::{MutationResult, Mutator};
 
+    use super::DuplicateRequestMutator;
     use crate::{
         input::{
             parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
         },
         state::tests::TestOpenApiFuzzerState,
     };
-
-    use super::DuplicateRequestMutator;
 
     /// Tests whether the mutator correctly skips mutation if there's no requests.
     #[test]

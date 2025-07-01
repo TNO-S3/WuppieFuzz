@@ -84,14 +84,13 @@ mod test {
     use indexmap::IndexMap;
     use libafl::mutators::{MutationResult, Mutator};
 
+    use super::SwapRequestsMutator;
     use crate::{
         input::{
             parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
         },
         state::tests::TestOpenApiFuzzerState,
     };
-
-    use super::SwapRequestsMutator;
 
     /// Tests whether the mutator correctly swaps two simple requests.
     #[test]

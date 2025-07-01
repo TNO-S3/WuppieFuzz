@@ -89,12 +89,11 @@ mod test {
     use indexmap::IndexMap;
     use libafl::mutators::{MutationResult, Mutator};
 
+    use super::DifferentPathMutator;
     use crate::{
         input::{Body, Method, OpenApiInput, OpenApiRequest},
         state::tests::TestOpenApiFuzzerState,
     };
-
-    use super::DifferentPathMutator;
 
     /// Tests whether the mutator correctly changes the path of a request.
     #[test]
@@ -115,7 +114,10 @@ mod test {
 
             let new_path = input.0[0].path.as_str();
             assert!(new_path == "/with-path-parameter/{id}" || new_path == "/simple");
-            assert!(input.0[0].method == Method::Get || (new_path == "/simple" && input.0[0].method == Method::Delete));
+            assert!(
+                input.0[0].method == Method::Get
+                    || (new_path == "/simple" && input.0[0].method == Method::Delete)
+            );
             assert_eq!(result, MutationResult::Mutated);
         }
 

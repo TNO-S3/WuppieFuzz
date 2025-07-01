@@ -121,9 +121,11 @@ fn field_names(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>>
 mod test {
     use libafl::mutators::{MutationResult, Mutator};
 
-    use crate::{input::{Method, OpenApiInput}, state::tests::TestOpenApiFuzzerState};
-
     use super::AddRequestMutator;
+    use crate::{
+        input::{Method, OpenApiInput},
+        state::tests::TestOpenApiFuzzerState,
+    };
 
     /// Tests whether the mutator adds a valid request (including parameters, if required for the chosen request).
     #[test]
@@ -137,8 +139,13 @@ mod test {
             assert_eq!(result, MutationResult::Mutated);
             assert_eq!(input.0.len(), 1);
             assert!(TestOpenApiFuzzerState::PATHS.contains(&input.0[0].path.as_str()));
-            assert!(input.0[0].method == Method::Get || (input.0[0].path == "/simple" && input.0[0].method == Method::Delete));
-            if input.0[0].path == "/with-query-parameter" || input.0[0].path == "/with-path-parameter/{id}" {
+            assert!(
+                input.0[0].method == Method::Get
+                    || (input.0[0].path == "/simple" && input.0[0].method == Method::Delete)
+            );
+            if input.0[0].path == "/with-query-parameter"
+                || input.0[0].path == "/with-path-parameter/{id}"
+            {
                 assert!(input.0[0].contains_parameter("id"));
             }
         }

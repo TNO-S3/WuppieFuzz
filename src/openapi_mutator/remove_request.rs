@@ -78,14 +78,13 @@ mod test {
     use indexmap::IndexMap;
     use libafl::mutators::{MutationResult, Mutator};
 
+    use super::RemoveRequestMutator;
     use crate::{
         input::{
             parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
         },
         state::tests::TestOpenApiFuzzerState,
     };
-
-    use super::RemoveRequestMutator;
 
     /// Tests whether the mutator correctly removes a request from a list of 10 requests.
     #[test]
@@ -171,7 +170,9 @@ mod test {
                 let parameter = input.0[1]
                     .get_mut_parameter("id", ParameterKind::Query)
                     .expect("Could not find parameter after request removal");
-                assert!(parameter.reference_index().map_or(true, |&mut idx| idx == 0));
+                assert!(parameter
+                    .reference_index()
+                    .map_or(true, |&mut idx| idx == 0));
             }
         }
         Ok(())

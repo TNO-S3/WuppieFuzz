@@ -121,13 +121,12 @@ mod test {
     use indexmap::IndexMap;
     use libafl::mutators::Mutator;
 
+    use super::DifferentMethodMutator;
     use crate::{
         configuration::MethodMutationStrategy,
         input::{Body, Method, OpenApiInput, OpenApiRequest},
         state::tests::TestOpenApiFuzzerState,
     };
-
-    use super::DifferentMethodMutator;
 
     /// Tests whether the mutator correctly assigns a different method when using
     /// when using MethodMutationStrategy::Common5.
