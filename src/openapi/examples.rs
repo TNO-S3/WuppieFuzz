@@ -53,7 +53,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
     let schema = media_type.schema.as_ref()?.resolve(api);
 
     match &schema.kind {
-        SchemaKind::Type(Type::Object(ref obj)) => {
+        SchemaKind::Type(Type::Object(obj)) => {
             let body_map: IndexMap<String, ParameterContents> = obj
                 .properties
                 .iter()
@@ -69,7 +69,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
                 .collect();
             Some(body_map.into())
         }
-        SchemaKind::Type(Type::Array(ref arr)) => match &arr.items {
+        SchemaKind::Type(Type::Array(arr)) => match &arr.items {
             Some(items) => {
                 let result = items.resolve(api);
                 Some(ParameterContents::from(example_from_schema(api, result)?))
@@ -77,7 +77,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
             None => None,
         },
         // TODO: create other body types, or document why not
-        SchemaKind::Type(ref unimplemented_type) => {
+        SchemaKind::Type(unimplemented_type) => {
             log::warn!("Cannot create an example body for schema type {unimplemented_type:?}. Using empty body.");
             None
         }

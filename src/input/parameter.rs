@@ -148,7 +148,7 @@ impl ParameterContents {
     pub fn reference_index(&mut self) -> Option<&mut usize> {
         match self {
             ParameterContents::Reference {
-                ref mut request_index,
+                request_index,
                 ..
             } => Some(request_index),
             _ => None,

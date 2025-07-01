@@ -204,12 +204,12 @@ fn mutate_leaf_value<S: HasRand>(
 ) -> MutationResult {
     match leaf_value {
         SimpleValue::Null => MutationResult::Skipped,
-        SimpleValue::Bool(ref mut b) => {
+        SimpleValue::Bool(b) => {
             *b = !*b;
             MutationResult::Mutated
         }
-        SimpleValue::Number(ref mut n) => mutate_number(state, n),
-        SimpleValue::String(ref mut s) => mutate_string(state, contents_mutator, s),
+        SimpleValue::Number(n) => mutate_number(state, n),
+        SimpleValue::String(s) => mutate_string(state, contents_mutator, s),
     }
 }
 

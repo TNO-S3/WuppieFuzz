@@ -4,7 +4,7 @@ version = "1.2.0"
 authors = [
     "TNO Software and System Security"
 ]
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/TNO-S3/WuppieFuzz"
 build = "build.rs"
@@ -61,7 +61,7 @@ json_env_logger2 = "0.2.1"
 lazy_static = "1.4.0"
 lcov = "0.8"
 libafl = { version = "=0.15.0", features = ["clap"] }
-libafl_bolts = { version = "=0.15.2", features = ["prelude"] }
+libafl_bolts = { version = "=0.15.0", features = ["prelude"] }
 log = { version = "0.4.27", features = ["serde"] }
 num = { version = "0.4.2", default-features = false }
 num-derive = "0.4.2"
