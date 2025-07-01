@@ -15,7 +15,7 @@ fn main() {
         },
     );
 
-    let allow_list = ["ring 0.17.9"];
+    let allow_list = [];
 
     let dep_string = dependencies
         .expect("Failed getting dependencies")
