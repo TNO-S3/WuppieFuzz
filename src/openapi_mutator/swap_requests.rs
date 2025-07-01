@@ -78,3 +78,88 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use indexmap::IndexMap;
+    use libafl::mutators::{MutationResult, Mutator};
+
+    use crate::{
+        input::{
+            parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
+        },
+        state::tests::TestOpenApiFuzzerState,
+    };
+
+    use super::SwapRequestsMutator;
+
+    /// Tests whether the mutator correctly swaps two simple requests.
+    #[test]
+    fn swap_simple_requests() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let test_request_1 = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+            let test_request_2 = OpenApiRequest {
+                method: Method::Delete,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+
+            let mut input = OpenApiInput(vec![test_request_1, test_request_2]);
+            let mut mutator = SwapRequestsMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Mutated);
+            assert_eq!(input.0[0].method, Method::Delete);
+            assert_eq!(input.0[1].method, Method::Get);
+        }
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly breaks any references when swapping requests.
+    #[test]
+    fn remove_references_when_swapping() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut parameters = IndexMap::new();
+            parameters.insert(
+                ("id".to_string(), ParameterKind::Query),
+                ParameterContents::Reference {
+                    request_index: 1,
+                    parameter_name: "id".to_string(),
+                },
+            );
+            let has_param = OpenApiRequest {
+                method: Method::Get,
+                path: "/with-query-parameter".to_string(),
+                body: Body::Empty,
+                parameters,
+            };
+
+            let has_return_value = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+
+            let mut input = OpenApiInput(vec![has_return_value, has_param]);
+            let mut mutator = SwapRequestsMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Mutated);
+            assert!(input.0[0]
+                .get_mut_parameter("id", ParameterKind::Query)
+                .expect("Could not find parameter after request removal")
+                .bytes()
+                .is_some());
+        }
+        Ok(())
+    }
+}
