@@ -387,16 +387,21 @@ pub mod tests {
     use libafl::state::HasRand;
     use libafl_bolts::rands::StdRand;
     use openapiv3::OpenAPI;
+
     use super::HasRandAndOpenAPI;
 
     pub struct TestOpenApiFuzzerState {
         rand: StdRand,
-        openapi: OpenAPI
+        openapi: OpenAPI,
     }
 
     impl TestOpenApiFuzzerState {
         /// The paths that occur in the spec provided by this test state.
-        pub const PATHS: [&'static str; 3] = ["/simple", "/with-path-parameter/{id}", "/with-query-parameter"];
+        pub const PATHS: [&'static str; 3] = [
+            "/simple",
+            "/with-path-parameter/{id}",
+            "/with-query-parameter",
+        ];
 
         pub fn new() -> Self {
             const DUMMY_SPEC: &'static str = r#"
@@ -454,7 +459,8 @@ pub mod tests {
 
             Self {
                 rand: StdRand::new(),
-                openapi: serde_yaml::from_str(DUMMY_SPEC).expect("Failed to parse dummy OpenAPI spec"),
+                openapi: serde_yaml::from_str(DUMMY_SPEC)
+                    .expect("Failed to parse dummy OpenAPI spec"),
             }
         }
     }
