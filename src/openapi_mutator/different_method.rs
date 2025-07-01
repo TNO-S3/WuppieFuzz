@@ -58,7 +58,8 @@ where
 
         let random_input = rand.choose(&mut input.0).unwrap();
 
-        let available_methods: Vec<(&str, Option<usize>)> = match self.method_mutation_strategy {
+        let mut available_methods: Vec<(&str, Option<usize>)> = match self.method_mutation_strategy
+        {
             MethodMutationStrategy::FollowSpec => {
                 // Find the operations in the API with this input's path, and select one
                 // with a different method than the current input's method, if available
@@ -87,6 +88,8 @@ where
             ],
         };
 
+        available_methods
+            .retain(|&(method, _)| !method.eq_ignore_ascii_case(&random_input.method.to_string()));
         if available_methods.is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -105,5 +108,67 @@ where
         input.assert_valid(self.name());
 
         Ok(MutationResult::Mutated)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use indexmap::IndexMap;
+    use libafl::mutators::Mutator;
+
+    use super::DifferentMethodMutator;
+    use crate::{
+        configuration::MethodMutationStrategy,
+        input::{Body, Method, OpenApiInput, OpenApiRequest},
+        state::tests::TestOpenApiFuzzerState,
+    };
+
+    /// Tests whether the mutator correctly assigns a different method when using
+    /// when using MethodMutationStrategy::Common5.
+    #[test]
+    fn different_method_common5() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let test_request = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+            let mut input = OpenApiInput(vec![test_request]);
+            let mut mutator = DifferentMethodMutator {
+                method_mutation_strategy: MethodMutationStrategy::Common5,
+            };
+
+            mutator.mutate(&mut state, &mut input)?;
+
+            assert_ne!(input.0[0].method, Method::Get);
+        }
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly assigns a different method within the spec
+    /// when using MethodMutationStrategy::FollowSpec.
+    #[test]
+    fn different_method_follow_spec() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let test_request = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+            let mut input = OpenApiInput(vec![test_request]);
+            let mut mutator = DifferentMethodMutator {
+                method_mutation_strategy: MethodMutationStrategy::FollowSpec,
+            };
+
+            mutator.mutate(&mut state, &mut input)?;
+
+            assert_eq!(input.0[0].method, Method::Delete);
+        }
+
+        Ok(())
     }
 }

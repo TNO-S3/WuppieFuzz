@@ -67,3 +67,109 @@ where
         Ok(MutationResult::Mutated)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use indexmap::IndexMap;
+    use libafl::mutators::{MutationResult, Mutator};
+
+    use super::RemoveRequestMutator;
+    use crate::{
+        input::{
+            parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
+        },
+        state::tests::TestOpenApiFuzzerState,
+    };
+
+    /// Tests whether the mutator correctly removes a request from a list of 10 requests.
+    #[test]
+    fn remove_request() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let test_request = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+            let mut input = OpenApiInput(vec![test_request; 10]);
+            let mut mutator = RemoveRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+
+            assert_eq!(input.0.len(), 9);
+            assert_eq!(result, MutationResult::Mutated);
+        }
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly keeps the request if it's the only one in the input.
+    #[test]
+    fn keep_single_request() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let test_request = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+            let mut input = OpenApiInput(vec![test_request]);
+            let mut mutator = RemoveRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+
+            assert_eq!(input.0.len(), 1);
+            assert_eq!(result, MutationResult::Skipped);
+        }
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly fixes any references that may have changed due to the removal of a request.
+    #[test]
+    fn fix_references_when_removing() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut parameters = IndexMap::new();
+            parameters.insert(
+                ("id".to_string(), ParameterKind::Query),
+                ParameterContents::Reference {
+                    request_index: 1,
+                    parameter_name: "id".to_string(),
+                },
+            );
+            let has_param = OpenApiRequest {
+                method: Method::Get,
+                path: "/with-query-parameter".to_string(),
+                body: Body::Empty,
+                parameters,
+            };
+
+            let has_return_value = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+
+            let mut input =
+                OpenApiInput(vec![has_return_value.clone(), has_return_value, has_param]);
+            let mut mutator = RemoveRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Mutated);
+
+            if input.0[1].path == "/with-query-parameter" {
+                // If the first simple request was removed, we would expect a reference_index of 0.
+                // But if the second simple request was removed, we would expect the parameter to have been changed to ParameterContents::Bytes.
+                let parameter = input.0[1]
+                    .get_mut_parameter("id", ParameterKind::Query)
+                    .expect("Could not find parameter after request removal");
+                assert!(parameter
+                    .reference_index()
+                    .map_or(true, |&mut idx| idx == 0));
+            }
+        }
+        Ok(())
+    }
+}

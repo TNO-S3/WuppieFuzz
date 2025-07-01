@@ -78,3 +78,44 @@ where
         Ok(MutationResult::Skipped)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use indexmap::IndexMap;
+    use libafl::mutators::{MutationResult, Mutator};
+
+    use super::DifferentPathMutator;
+    use crate::{
+        input::{Body, Method, OpenApiInput, OpenApiRequest},
+        state::tests::TestOpenApiFuzzerState,
+    };
+
+    /// Tests whether the mutator correctly changes the path of a request.
+    #[test]
+    fn mutate_path() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let test_request = OpenApiRequest {
+                method: Method::Get,
+                path: "/with-query-parameter".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+
+            let mut input = OpenApiInput(vec![test_request]);
+            let mut mutator = DifferentPathMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+
+            let new_path = input.0[0].path.as_str();
+            assert!(new_path == "/with-path-parameter/{id}" || new_path == "/simple");
+            assert!(
+                input.0[0].method == Method::Get
+                    || (new_path == "/simple" && input.0[0].method == Method::Delete)
+            );
+            assert_eq!(result, MutationResult::Mutated);
+        }
+
+        Ok(())
+    }
+}
