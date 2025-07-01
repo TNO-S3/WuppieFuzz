@@ -60,11 +60,11 @@ use std::{
 
 use ahash::RandomState;
 use indexmap::{
-    map::{Iter, ValuesMut},
     IndexMap,
+    map::{Iter, ValuesMut},
 };
-use libafl::{corpus::CorpusId, inputs::Input, Error};
-use libafl_bolts::{fs::write_file_atomic, rands::Rand, HasLen};
+use libafl::{Error, corpus::CorpusId, inputs::Input};
+use libafl_bolts::{HasLen, fs::write_file_atomic, rands::Rand};
 use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
 
 use self::parameter::ParameterKind;
@@ -247,7 +247,10 @@ impl OpenApiRequest {
                         todo!("Trying to create form body from bytes: {:?}", val)
                     }
                     ParameterContents::Array(_) | ParameterContents::LeafValue(_) => {
-                        panic!("Form bodies must not be of type array or leaf, but interpretable as key-value objects.\nOffending body: {}", body);
+                        panic!(
+                            "Form bodies must not be of type array or leaf, but interpretable as key-value objects.\nOffending body: {}",
+                            body
+                        );
                     }
                 }
                 Some(reqwest::blocking::Body::from(encoded.finish()))

@@ -8,7 +8,7 @@ use libafl::{
     alloc::fmt::Debug,
     monitors::{AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue},
 };
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use libafl_bolts::{ClientId, current_time, format_duration_hms};
 use serde_json::json;
 
 use crate::configuration::{Configuration, OutputFormat};

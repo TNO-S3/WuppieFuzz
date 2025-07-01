@@ -2,7 +2,7 @@
 
 use std::{
     convert::{TryFrom, TryInto},
-    io::{prelude::*, Error, ErrorKind, Result},
+    io::{Error, ErrorKind, Result, prelude::*},
 };
 
 use byteorder::{BigEndian, ByteOrder, LittleEndian};

@@ -12,6 +12,7 @@ use anyhow::{Context, Result};
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
+    ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
     corpus::{Corpus, OnDiskCorpus},
     events::{Event, EventFirer, SimpleEventManager},
     executors::{Executor, ExitKind, HasObservers},
@@ -24,24 +25,23 @@ use libafl::{
     mutators::StdScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+        IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
     },
     stages::{CalibrationStage, StdPowerMutationalStage},
     state::{HasCorpus, HasExecutions},
-    ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
 };
 use libafl_bolts::{
     current_nanos, current_time,
     prelude::OwnedMutSlice,
     rands::StdRand,
-    tuples::{tuple_list, MatchName},
+    tuples::{MatchName, tuple_list},
 };
 use log::{error, info};
 use openapiv3::OpenAPI;
 
 use crate::{
     configuration::Configuration,
-    coverage_clients::{endpoint::EndpointCoverageClient, CoverageClient},
+    coverage_clients::{CoverageClient, endpoint::EndpointCoverageClient},
     executor::SequenceExecutor,
     input::OpenApiInput,
     monitors::CoverageMonitor,

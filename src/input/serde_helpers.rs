@@ -4,14 +4,14 @@
 //! and the request body, but internally they are the same type. This requires a
 //! conversion to an intermediate type, which happens in this module.
 
-use base64::{engine::general_purpose::STANDARD as base64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as base64};
 use indexmap::IndexMap;
 use serde::{
     de::{self, Deserialize, Deserializer},
     ser::{Serialize, Serializer},
 };
 
-use super::{parameter::ParameterKind, Body, Method, OpenApiRequest, ParameterContents};
+use super::{Body, Method, OpenApiRequest, ParameterContents, parameter::ParameterKind};
 
 pub(crate) fn serialize_bytes_to_b64<S>(bi: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where

@@ -5,15 +5,15 @@ pub mod dependency_graph;
 use std::{
     collections::hash_map::DefaultHasher,
     convert::TryInto,
-    fs::{self, create_dir_all, File},
+    fs::{self, File, create_dir_all},
     hash::{Hash, Hasher},
     io::Write,
     path::{Path, PathBuf},
 };
 
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
     HasMetadata,
+    corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
 };
 use openapiv3::OpenAPI;
 
@@ -113,7 +113,10 @@ fn write_corpus_report(input_vector: &[OpenApiInput], report_path: &Path) -> std
         file,
         "# Corpus graph based on OpenAPI spec generated inputs\n"
     )?;
-    writeln!(file, "This markdown document can be rendered using a Mermaid plugin. It demonstrates the generated sequences of API requests.\n")?;
+    writeln!(
+        file,
+        "This markdown document can be rendered using a Mermaid plugin. It demonstrates the generated sequences of API requests.\n"
+    )?;
     writeln!(file, "```mermaid")?;
     writeln!(file, "graph LR;")?;
 

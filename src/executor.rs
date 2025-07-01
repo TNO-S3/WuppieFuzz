@@ -5,19 +5,19 @@ use std::{
     borrow::Cow,
     marker::PhantomData,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
 };
 
 use libafl::{
+    Error,
     events::{Event, EventFirer, EventProcessor, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
     state::{HasExecutions, Stoppable},
-    Error,
 };
 use libafl_bolts::prelude::RefIndexable;
 use log::{debug, error};
@@ -26,17 +26,17 @@ use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
 
 use crate::{
-    authentication::{build_http_client, Authentication},
+    authentication::{Authentication, build_http_client},
     configuration::{Configuration, CrashCriterion},
-    coverage_clients::{endpoint::EndpointCoverageClient, CoverageClient},
+    coverage_clients::{CoverageClient, endpoint::EndpointCoverageClient},
     input::OpenApiInput,
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
-        validate_response::{validate_response, Response},
+        validate_response::{Response, validate_response},
     },
     parameter_feedback::ParameterFeedback,
-    reporting::{sqlite::MySqLite, Reporting},
+    reporting::{Reporting, sqlite::MySqLite},
 };
 
 /// How often to print a new log line
@@ -197,14 +197,18 @@ where
 
                     if response.status().is_server_error() {
                         exit_kind = ExitKind::Crash;
-                        log::debug!("OpenAPI-input resulted in server error response, ignoring rest of request chain.");
+                        log::debug!(
+                            "OpenAPI-input resulted in server error response, ignoring rest of request chain."
+                        );
                         break 'chain;
                     } else {
                         if self.config.crash_criterion == CrashCriterion::AllErrors {
                             if let Err(validation_err) =
                                 validate_response(self.api, &request, &response)
                             {
-                                log::debug!("OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain.");
+                                log::debug!(
+                                    "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
+                                );
                                 exit_kind = ExitKind::Crash;
                                 break 'chain;
                             }

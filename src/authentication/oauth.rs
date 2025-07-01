@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Error};
-use base64::{engine::general_purpose::STANDARD as base64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as base64};
 use itertools::Itertools;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, SET_COOKIE};
 use serde::{Deserialize, Serialize};

@@ -3,7 +3,7 @@ use std::{borrow::Cow, fs::File, path::Path, sync::Arc};
 use anyhow::{Context, Result};
 use cookie_store::{Cookie, RawCookie};
 use openapiv3::OpenAPI;
-use reqwest::header::{HeaderMap, IntoHeaderName, AUTHORIZATION};
+use reqwest::header::{AUTHORIZATION, HeaderMap, IntoHeaderName};
 use url::Url;
 
 use crate::{configuration::Configuration, header};

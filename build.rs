@@ -2,7 +2,7 @@
 
 use std::{env, fs::File, io::Write, path::Path};
 
-use cargo_license::{get_dependencies_from_cargo_lock, GetDependenciesOpt};
+use cargo_license::{GetDependenciesOpt, get_dependencies_from_cargo_lock};
 
 fn main() {
     let dependencies = get_dependencies_from_cargo_lock(

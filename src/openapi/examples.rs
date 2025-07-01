@@ -9,7 +9,7 @@ use openapiv3::{
     OpenAPI, Operation, Parameter, ParameterData, RefOr, Schema, SchemaKind, StringFormat, Type,
 };
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
-use rand::{prelude::Distribution, Rng};
+use rand::{Rng, prelude::Distribution};
 use regex::Regex;
 use serde_json::Value;
 use unicode_truncate::UnicodeTruncateStr;
@@ -17,7 +17,7 @@ use unicode_truncate::UnicodeTruncateStr;
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
     initial_corpus::dependency_graph::ParameterMatching,
-    input::{parameter::ParameterKind, Body, OpenApiInput, OpenApiRequest, ParameterContents},
+    input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
 };
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest
@@ -78,11 +78,15 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
         },
         // TODO: create other body types, or document why not
         SchemaKind::Type(unimplemented_type) => {
-            log::warn!("Cannot create an example body for schema type {unimplemented_type:?}. Using empty body.");
+            log::warn!(
+                "Cannot create an example body for schema type {unimplemented_type:?}. Using empty body."
+            );
             None
         }
         ref unimplemented_kind => {
-            log::warn!("Cannot create an example body for schema kind {unimplemented_kind:?}. Using empty body.");
+            log::warn!(
+                "Cannot create an example body for schema kind {unimplemented_kind:?}. Using empty body."
+            );
             None
         }
     }

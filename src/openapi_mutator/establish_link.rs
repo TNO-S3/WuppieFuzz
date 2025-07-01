@@ -5,8 +5,8 @@ use std::borrow::Cow;
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
-    mutators::{MutationResult, Mutator},
     Error,
+    mutators::{MutationResult, Mutator},
 };
 use libafl_bolts::Named;
 

@@ -92,7 +92,9 @@ pub fn verify_auth(api: OpenAPI) -> Result<()> {
                     println!(
                         "\n\nTip: for less verbose logging, set the flag \"--log-level=warn\""
                     );
-                    println!("=============================================================================");
+                    println!(
+                        "============================================================================="
+                    );
                     bail!("Could not authenticate: 401 Unauthorized");
                 }
                 // println!("\tResponse: {:?}", r.status());

@@ -2,14 +2,14 @@
 //! collect coverage on Ruby targets.
 
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     fmt::Debug,
     path::Path,
 };
 
 use reqwest::{
-    blocking::{Client, Response},
     Url,
+    blocking::{Client, Response},
 };
 
 use super::CoverageClient;

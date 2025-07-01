@@ -4,7 +4,7 @@ use anyhow::Context;
 use chrono::SecondsFormat;
 use libafl::corpus::{InMemoryOnDiskCorpus, OnDiskCorpus};
 use log::info;
-use rusqlite::{named_params, Connection};
+use rusqlite::{Connection, named_params};
 
 use crate::{
     configuration::Configuration,

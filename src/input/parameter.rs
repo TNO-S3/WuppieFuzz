@@ -3,7 +3,7 @@ use std::{
     fmt::{Debug, Display, Formatter, Result},
 };
 
-use base64::{display::Base64Display, engine::general_purpose::STANDARD, Engine as _};
+use base64::{Engine as _, display::Base64Display, engine::general_purpose::STANDARD};
 use indexmap::IndexMap;
 use libafl_bolts::rands::Rand;
 use openapiv3::Parameter;
@@ -147,10 +147,7 @@ impl ParameterContents {
     /// Returns the mutable index of a `reference` variant of a `ParameterContents`.
     pub fn reference_index(&mut self) -> Option<&mut usize> {
         match self {
-            ParameterContents::Reference {
-                request_index,
-                ..
-            } => Some(request_index),
+            ParameterContents::Reference { request_index, .. } => Some(request_index),
             _ => None,
         }
     }

@@ -4,7 +4,7 @@
 use std::{
     cmp,
     collections::HashMap,
-    fs::{create_dir_all, read_dir, File},
+    fs::{File, create_dir_all, read_dir},
     io::prelude::*,
     net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
@@ -17,8 +17,8 @@ use libafl::Error;
 use crate::{
     configuration::{Configuration, CoverageConfiguration},
     coverage_clients::{
-        read_utilities::{read_byte_vec, read_char},
         CoverageClient, MAP_SIZE,
+        read_utilities::{read_byte_vec, read_char},
     },
 };
 extern crate num;
@@ -195,7 +195,7 @@ impl LcovCoverageClient {
             _ => {
                 return Err(Error::unknown(format!(
                     "Invalid or unsupported type: {block_type:?}"
-                )))
+                )));
             }
         })
     }
@@ -298,7 +298,9 @@ impl LcovCoverageClient {
                 source_dir: Some(source_dir),
             } => source_dir,
             _ => {
-                unreachable!("Coverage client is Lcov, but the configuration specifies a different format or does not specify a source directory.")
+                unreachable!(
+                    "Coverage client is Lcov, but the configuration specifies a different format or does not specify a source directory."
+                )
             }
         };
         let lcov_html_path = report_path.join("lcov");

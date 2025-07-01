@@ -6,6 +6,7 @@ use std::{
 };
 
 use libafl::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     feedbacks::StateInitializer,
     inputs::Input,
@@ -15,14 +16,13 @@ use libafl::{
         HasCorpus, HasExecutions, HasImported, HasLastFoundTime, HasLastReportTime, HasMaxSize,
         HasRand, HasSolutions, HasStartTime, Stoppable,
     },
-    Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{
     rands::Rand,
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
 use openapiv3::OpenAPI;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///

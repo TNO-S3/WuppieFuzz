@@ -3,9 +3,9 @@ use std::path::Path;
 use std::ptr::write_volatile;
 
 use anyhow::Result;
-use libafl::inputs::Input;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
+use libafl::inputs::Input;
 use log::{error, info, warn};
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
-        validate_response::{validate_response, Response},
+        validate_response::{Response, validate_response},
     },
     parameter_feedback::ParameterFeedback,
 };

@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{value_parser, Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum, value_parser};
 use libafl::schedulers::powersched::BaseSchedule;
 use serde::Deserialize;
 
@@ -667,8 +667,8 @@ mod tests {
     use std::{convert::TryInto, num::NonZeroU64};
 
     use super::{
-        parse_socket_addr, Configuration, CoverageConfiguration, CoverageFormat, OutputFormat,
-        PartialConfiguration, DEFAULT_REQUEST_TIMEOUT,
+        Configuration, CoverageConfiguration, CoverageFormat, DEFAULT_REQUEST_TIMEOUT,
+        OutputFormat, PartialConfiguration, parse_socket_addr,
     };
 
     #[test]
@@ -743,7 +743,10 @@ mod tests {
 
         match tried_config1 {
             Ok(_) => panic!("Incorrect StoredConfig was accepted as Config!"),
-            Err(e) => assert_eq!(e.to_string(), "A coverage report is requested for Jacoco coverage, but this requires the jacoco_class_dir parameter to be set"),
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "A coverage report is requested for Jacoco coverage, but this requires the jacoco_class_dir parameter to be set"
+            ),
         }
 
         let stored_config2: PartialConfiguration = PartialConfiguration {
@@ -758,7 +761,10 @@ mod tests {
 
         match tried_config2 {
             Ok(_) => panic!("Incorrect StoredConfig was accepted as Config!"),
-            Err(e) => assert_eq!(e.to_string(), "A coverage report is requested, but this requires the source_dir parameter to be set"),
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "A coverage report is requested, but this requires the source_dir parameter to be set"
+            ),
         }
     }
 

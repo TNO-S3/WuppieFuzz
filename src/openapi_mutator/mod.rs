@@ -10,20 +10,20 @@ use std::borrow::Cow;
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
+    Error,
     corpus::Corpus,
     inputs::{BytesInput, HasMutatorBytes, Input},
     mutators::{MutationResult, Mutator},
     state::HasRand,
-    Error,
 };
 use libafl_bolts::{
+    Named,
     rands::Rand,
     tuples::{tuple_list, tuple_list_type},
-    Named,
 };
 
 use crate::{
-    input::{new_rand_input, parameter::SimpleValue, OpenApiInput, ParameterContents},
+    input::{OpenApiInput, ParameterContents, new_rand_input, parameter::SimpleValue},
     state::OpenApiFuzzerState,
 };
 
@@ -301,7 +301,9 @@ fn mutate_parameter_contents<S: HasRand>(
         ParameterContents::Object(obj_properties) => {
             random_element = match state.rand_mut().choose(obj_properties.values_mut()) {
                 None => {
-                    log::info!("Tried to mutate empty object; skipping. If this happens a lot WuppieFuzz may need improvement on this.");
+                    log::info!(
+                        "Tried to mutate empty object; skipping. If this happens a lot WuppieFuzz may need improvement on this."
+                    );
                     return Ok(MutationResult::Skipped);
                 }
                 Some(element) => element,
@@ -318,7 +320,7 @@ fn mutate_parameter_contents<S: HasRand>(
             };
         }
         ParameterContents::LeafValue(leaf) => {
-            return Ok(mutate_leaf_value(state, contents_mutator, leaf))
+            return Ok(mutate_leaf_value(state, contents_mutator, leaf));
         }
         ParameterContents::Bytes(contents) => {
             // The ASCII mutators operate on the LibAFL `BytesInput` type. This requires
@@ -340,7 +342,9 @@ fn mutate_parameter_contents<S: HasRand>(
         ),
     }
     if let ParameterContents::Reference { .. } = random_element {
-        log::warn!("Tried to mutate nested reference. If this happens a lot some solution should be implemented here. Skipping for now.");
+        log::warn!(
+            "Tried to mutate nested reference. If this happens a lot some solution should be implemented here. Skipping for now."
+        );
         Ok(MutationResult::Skipped)
     } else {
         // This was nested in an array or object, recursively mutate
