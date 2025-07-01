@@ -189,7 +189,7 @@ impl Authentication {
     }
 
     /// Return the last Autorization header value, without refreshing it if expired.
-    pub fn last_header(&self) -> Option<Cow<str>> {
+    pub fn last_header(&self) -> Option<Cow<'_, str>> {
         match self {
             Authentication::Raw(text) => Some(Cow::from(text)),
             Authentication::Basic(config) => Some(Cow::from(format!("Basic {config}"))),

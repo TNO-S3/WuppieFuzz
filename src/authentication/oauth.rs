@@ -149,7 +149,7 @@ struct Claims {
 
 fn decode_base64_url(data: &str) -> Result<Vec<u8>, Error> {
     let mut base64_data = data.replace('-', "+").replace('_', "/");
-    while base64_data.len() % 4 != 0 {
+    while !base64_data.len().is_multiple_of(4) {
         base64_data.push('=');
     }
     base64

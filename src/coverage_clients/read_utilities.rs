@@ -57,7 +57,7 @@ pub fn read_u64be(readable: &mut dyn Read) -> Result<u64> {
 /// Reads an array of boolean values preceded by a varint length
 pub fn read_bool_array(readable: &mut dyn Read) -> Result<Vec<u8>> {
     let bool_len = read_var_int(readable)?;
-    let buf_len = bool_len / 8 + u32::from(bool_len % 8 != 0); // Div round up
+    let buf_len = bool_len / 8 + u32::from(!bool_len.is_multiple_of(8)); // Div round up
     let mut probe_buf: Vec<u8> = vec![0; usize::try_from(buf_len).unwrap()];
     readable.read_exact(&mut probe_buf)?;
     Ok(probe_buf)

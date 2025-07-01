@@ -201,16 +201,15 @@ where
                         );
                         break 'chain;
                     } else {
-                        if self.config.crash_criterion == CrashCriterion::AllErrors {
-                            if let Err(validation_err) =
+                        if self.config.crash_criterion == CrashCriterion::AllErrors
+                            && let Err(validation_err) =
                                 validate_response(self.api, &request, &response)
-                            {
-                                log::debug!(
-                                    "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
-                                );
-                                exit_kind = ExitKind::Crash;
-                                break 'chain;
-                            }
+                        {
+                            log::debug!(
+                                "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
+                            );
+                            exit_kind = ExitKind::Crash;
+                            break 'chain;
                         }
                         if response.status().is_success() {
                             parameter_feedback.process_response(request_index, response);

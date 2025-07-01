@@ -529,7 +529,7 @@ fn enforce_length_bounds(
     string: &str,
     min_length: Option<usize>,
     max_length: Option<usize>,
-) -> Cow<str> {
+) -> Cow<'_, str> {
     let mut result = Cow::from(string);
     if let Some(min) = min_length {
         *result.to_mut() += &"A".repeat(min);

@@ -110,7 +110,7 @@ impl ParameterContents {
     /// If this is the `contents` variant, the contained object is serialized into
     /// a new `Vec<u8>`.
     /// If this is an unresolved reference, `None` is returned.
-    pub fn bytes(&self) -> Option<Cow<[u8]>> {
+    pub fn bytes(&self) -> Option<Cow<'_, [u8]>> {
         match self {
             ParameterContents::Object(v) => {
                 let mut json_map = Map::new();
@@ -176,7 +176,7 @@ impl ParameterContents {
     }
 
     /// Returns the parameter value for use in a URL.
-    pub fn to_url_encoding(&self) -> Cow<str> {
+    pub fn to_url_encoding(&self) -> Cow<'_, str> {
         match self {
             ParameterContents::Bytes(bytes) => urlencoding::encode_binary(bytes),
             ParameterContents::LeafValue(SimpleValue::String(string)) => {

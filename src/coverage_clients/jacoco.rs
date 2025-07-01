@@ -313,13 +313,13 @@ fn create_or_clear_dump_directory(jacoco_dump_output_dir: Option<&PathBuf>) -> R
         // check if directory contains files of the form r"jacoco_d+.exec"
         let entries = read_dir(dir_path)?;
         for entry in entries.flatten() {
-            if let Some(file_name) = entry.file_name().to_str() {
-                if file_name.starts_with("jacoco") {
-                    let mut path = PathBuf::new();
-                    path.push(dir_path);
-                    path.push(entry.path());
-                    remove_file(path)?;
-                }
+            if let Some(file_name) = entry.file_name().to_str()
+                && file_name.starts_with("jacoco")
+            {
+                let mut path = PathBuf::new();
+                path.push(dir_path);
+                path.push(entry.path());
+                remove_file(path)?;
             }
         }
     }

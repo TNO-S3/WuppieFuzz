@@ -313,7 +313,7 @@ impl<'a> DependencyGraph<'a> {
     pub fn subgraph(
         &self,
         nodes: &[NodeIndex],
-    ) -> DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx> {
+    ) -> DiGraph<QualifiedOperation<'a>, ParameterMatching<'_>, DefaultIx> {
         let mut subgraph = self.graph.clone();
         subgraph.retain_nodes(|_, node| nodes.binary_search(&node).is_ok());
         subgraph
