@@ -74,9 +74,15 @@ where
 
 #[cfg(test)]
 mod test {
+    use indexmap::IndexMap;
     use libafl::mutators::{MutationResult, Mutator};
 
-    use crate::{input::OpenApiInput, state::tests::TestOpenApiFuzzerState};
+    use crate::{
+        input::{
+            parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
+        },
+        state::tests::TestOpenApiFuzzerState,
+    };
 
     use super::DuplicateRequestMutator;
 
@@ -91,7 +97,80 @@ mod test {
             let result = mutator.mutate(&mut state, &mut input)?;
             assert_eq!(result, MutationResult::Skipped);
         }
-        
+
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly duplicates a "simple" request (i.e. no parameters or body).
+    #[test]
+    fn duplicate_request_simple() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let request = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+
+            let mut input = OpenApiInput(vec![request]);
+            let mut mutator = DuplicateRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Mutated);
+            assert_eq!(input.0[0].path, input.0[1].path);
+            assert_eq!(input.0[0].method, input.0[1].method);
+            assert_eq!(
+                input.0[0].body_content_type(),
+                input.0[1].body_content_type()
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly duplicates a request containing a parameter reference.
+    #[test]
+    fn duplicate_request_with_reference() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut parameters = IndexMap::new();
+            parameters.insert(
+                ("id".to_string(), ParameterKind::Query),
+                ParameterContents::Reference {
+                    request_index: 0,
+                    parameter_name: "id".to_string(),
+                },
+            );
+            let has_param = OpenApiRequest {
+                method: Method::Get,
+                path: "/with-query-parameter".to_string(),
+                body: Body::Empty,
+                parameters,
+            };
+
+            let has_return_value = OpenApiRequest {
+                method: Method::Get,
+                path: "/simple".to_string(),
+                body: Body::Empty,
+                parameters: IndexMap::new(),
+            };
+
+            let mut input = OpenApiInput(vec![has_return_value, has_param]);
+            let mut mutator = DuplicateRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Mutated);
+            let new_request = &mut input.0[2];
+            if new_request.path == "/with-query-parameter" {
+                let parameter = new_request
+                    .get_mut_parameter("id", ParameterKind::Query)
+                    .expect("Parameter was not correctly duplicated");
+                assert!(parameter.is_reference());
+                assert_eq!(parameter.reference_index().copied(), Some(0));
+            }
+        }
+
         Ok(())
     }
 }
