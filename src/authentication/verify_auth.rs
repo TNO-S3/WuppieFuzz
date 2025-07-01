@@ -13,7 +13,7 @@ fn send_request(
     let t_response = match client.get(url).send() {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("Request error: {}", e);
+            eprintln!("Request error: {e}");
             return Err(e);
         }
     };
@@ -80,7 +80,7 @@ pub fn verify_auth(api: OpenAPI) -> Result<()> {
         let url = server.url.clone() + path;
         let t_response = send_request(client.clone(), &url);
         if log::log_enabled!(Info) {
-            println!("Path: {}", path);
+            println!("Path: {path}");
         }
         match t_response {
             Ok(r) => {
@@ -92,7 +92,9 @@ pub fn verify_auth(api: OpenAPI) -> Result<()> {
                     println!(
                         "\n\nTip: for less verbose logging, set the flag \"--log-level=warn\""
                     );
-                    println!("=============================================================================");
+                    println!(
+                        "============================================================================="
+                    );
                     bail!("Could not authenticate: 401 Unauthorized");
                 }
                 // println!("\tResponse: {:?}", r.status());

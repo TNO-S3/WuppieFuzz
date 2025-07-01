@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose::STANDARD as base64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as base64};
 
 /// Login configuration to be sent with each request.
 #[derive(Debug, Clone, serde::Deserialize)]

@@ -6,16 +6,16 @@ use std::{borrow::Cow, convert::TryInto};
 use indexmap::IndexMap;
 pub use libafl::mutators::mutations::*;
 use libafl::{
-    mutators::{MutationResult, Mutator},
     Error,
+    mutators::{MutationResult, Mutator},
 };
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{Named, rands::Rand};
 use openapiv3::{OpenAPI, RequestBody};
 
 use crate::{
     input::{
-        new_rand_input, parameter::ParameterKind, Body, OpenApiInput, OpenApiRequest,
-        ParameterContents,
+        Body, OpenApiInput, OpenApiRequest, ParameterContents, new_rand_input,
+        parameter::ParameterKind,
     },
     openapi::JsonContent,
     state::HasRandAndOpenAPI,

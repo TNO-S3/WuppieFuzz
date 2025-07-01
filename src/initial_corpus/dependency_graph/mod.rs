@@ -7,9 +7,9 @@ mod toposort;
 /// the same meaning (edges). The dependency graph module attempts to build such a graph.
 use std::{
     cmp::Ordering,
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{HashMap, hash_map::DefaultHasher},
     fmt::Display,
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     hash::{Hash, Hasher},
     io::Write,
     path::Path,
@@ -26,15 +26,15 @@ use petgraph::{
 
 use self::{
     normalize::{
-        normalize_parameters, normalize_request_body, normalize_response, ParameterNormalization,
+        ParameterNormalization, normalize_parameters, normalize_request_body, normalize_response,
     },
-    toposort::{toposort, Cycle},
+    toposort::{Cycle, toposort},
 };
 use crate::{
-    input::{parameter::ParameterKind, Method, OpenApiInput, ParameterContents},
+    input::{Method, OpenApiInput, ParameterContents, parameter::ParameterKind},
     openapi::{
-        examples::{example_from_qualified_operation, openapi_inputs_from_ops},
         QualifiedOperation,
+        examples::{example_from_qualified_operation, openapi_inputs_from_ops},
     },
 };
 
@@ -59,7 +59,7 @@ pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
                 let mut inputs =
                     openapi_inputs_from_ops(api, ops.clone().into_iter(), &subgraph, &idxs)
                         .inspect_err(|err| {
-                            log::warn!("{} - falling back to single example generation.", err);
+                            log::warn!("{err} - falling back to single example generation.");
                         })
                         .unwrap_or(vec![openapi_example_input_from_ops(api, ops.into_iter())]);
                 inputs.iter_mut().for_each(|input| {
@@ -84,7 +84,10 @@ fn ops_from_subgraph<'a>(
         Ok(nodes) => nodes,
         Err(cycle) => {
             let operation = &subgraph[cycle.node_id()];
-            warn!("While building initial corpus from the API specification, found operation with a self-cycle {} {}", operation.method, operation.path);
+            warn!(
+                "While building initial corpus from the API specification, found operation with a self-cycle {} {}",
+                operation.method, operation.path
+            );
             return Err(cycle);
         }
     };
@@ -251,7 +254,10 @@ impl<'a> DependencyGraph<'a> {
         let mut file = File::create(corpus_file)?;
 
         writeln!(file, "# Dependency graph based on OpenAPI spec\n")?;
-        writeln!(file, "This markdown document can be rendered using a Mermaid plugin. It demonstrates the discovered dependencies between API requests.\n")?;
+        writeln!(
+            file,
+            "This markdown document can be rendered using a Mermaid plugin. It demonstrates the discovered dependencies between API requests.\n"
+        )?;
         writeln!(file, "```mermaid")?;
         writeln!(file, "graph LR;")?;
 
@@ -307,7 +313,7 @@ impl<'a> DependencyGraph<'a> {
     pub fn subgraph(
         &self,
         nodes: &[NodeIndex],
-    ) -> DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx> {
+    ) -> DiGraph<QualifiedOperation<'a>, ParameterMatching<'_>, DefaultIx> {
         let mut subgraph = self.graph.clone();
         subgraph.retain_nodes(|_, node| nodes.binary_search(&node).is_ok());
         subgraph

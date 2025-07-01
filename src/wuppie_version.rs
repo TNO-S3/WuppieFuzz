@@ -41,7 +41,6 @@ pub fn print_sbom() {
 
     let sbom = include_str!(concat!(env!("OUT_DIR"), "/SBOM.txt"));
     print!(
-        "Software Bill of Materials including license notice\n---------------------------------------------------\n{}",
-        sbom
+        "Software Bill of Materials including license notice\n---------------------------------------------------\n{sbom}"
     );
 }

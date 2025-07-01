@@ -4,12 +4,12 @@
 use std::borrow::Cow;
 
 use libafl::{
+    Error,
     inputs::{BytesInput, ResizableMutator},
     mutators::{MutationResult, Mutator},
     state::HasRand,
-    Error,
 };
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{Named, rands::Rand};
 
 /// Interesting values to randomly insert into string parameter values.
 /// These are designed to catch parser errors and SQL injections.

@@ -2,7 +2,7 @@
 
 use std::{env, fs::File, io::Write, path::Path};
 
-use cargo_license::{get_dependencies_from_cargo_lock, GetDependenciesOpt};
+use cargo_license::{GetDependenciesOpt, get_dependencies_from_cargo_lock};
 
 fn main() {
     let dependencies = get_dependencies_from_cargo_lock(
@@ -15,7 +15,7 @@ fn main() {
         },
     );
 
-    let allow_list = ["ring 0.17.9"];
+    let allow_list = [];
 
     let dep_string = dependencies
         .expect("Failed getting dependencies")

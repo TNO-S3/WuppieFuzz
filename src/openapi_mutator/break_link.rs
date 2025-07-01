@@ -6,9 +6,9 @@ use std::borrow::Cow;
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
+    Error,
     mutators::{MutationResult, Mutator},
     state::HasRand,
-    Error,
 };
 use libafl_bolts::Named;
 

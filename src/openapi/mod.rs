@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use indexmap::IndexMap;
 use openapiv3::{MediaType, OpenAPI, Operation, PathItem, VersionedOpenAPI};
 
-use crate::input::{method::InvalidMethodError, Method};
+use crate::input::{Method, method::InvalidMethodError};
 
 pub mod build_request;
 pub mod curl_request;

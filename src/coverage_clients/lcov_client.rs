@@ -4,7 +4,7 @@
 use std::{
     cmp,
     collections::HashMap,
-    fs::{create_dir_all, read_dir, File},
+    fs::{File, create_dir_all, read_dir},
     io::prelude::*,
     net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
@@ -17,8 +17,8 @@ use libafl::Error;
 use crate::{
     configuration::{Configuration, CoverageConfiguration},
     coverage_clients::{
-        read_utilities::{read_byte_vec, read_char},
         CoverageClient, MAP_SIZE,
+        read_utilities::{read_byte_vec, read_char},
     },
 };
 extern crate num;
@@ -195,7 +195,7 @@ impl LcovCoverageClient {
             _ => {
                 return Err(Error::unknown(format!(
                     "Invalid or unsupported type: {block_type:?}"
-                )))
+                )));
             }
         })
     }
@@ -240,7 +240,7 @@ impl LcovCoverageClient {
             create_dir_all(lcov_dump_dir)?;
             let lcov_dump_path = lcov_dump_dir.join(self.nth_coverage_dump.to_string());
             let mut lcov_file = File::create(lcov_dump_path)?;
-            write!(lcov_file, "{}", latest_coverage_str)?;
+            write!(lcov_file, "{latest_coverage_str}")?;
         }
         let mut source_path: PathBuf = PathBuf::new();
         let records = Reader::new(&mut coverage_slice).collect::<Result<Vec<_>, _>>();
@@ -298,7 +298,9 @@ impl LcovCoverageClient {
                 source_dir: Some(source_dir),
             } => source_dir,
             _ => {
-                unreachable!("Coverage client is Lcov, but the configuration specifies a different format or does not specify a source directory.")
+                unreachable!(
+                    "Coverage client is Lcov, but the configuration specifies a different format or does not specify a source directory."
+                )
             }
         };
         let lcov_html_path = report_path.join("lcov");
@@ -347,7 +349,7 @@ impl CoverageClient for LcovCoverageClient {
     fn fetch_coverage(&mut self, reset: bool) {
         let cov_bytes = self.fetch_coverage_internal(reset);
         if let Err(err) = self.process_coverage_bytes(cov_bytes, &self.lcov_dump_dir.clone()) {
-            panic!("Error processing coverage bytes: {}", err);
+            panic!("Error processing coverage bytes: {err}");
         }
         self.nth_coverage_dump += 1;
     }

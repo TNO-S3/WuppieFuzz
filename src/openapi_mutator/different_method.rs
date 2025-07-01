@@ -5,14 +5,14 @@ use std::{borrow::Cow, convert::TryInto};
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
-    mutators::{MutationResult, Mutator},
     Error,
+    mutators::{MutationResult, Mutator},
 };
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{Named, rands::Rand};
 
 use crate::{
     configuration::{Configuration, MethodMutationStrategy},
-    input::{fix_input_parameters, OpenApiInput},
+    input::{OpenApiInput, fix_input_parameters},
     openapi::find_method_indices_for_path,
     state::HasRandAndOpenAPI,
 };
@@ -93,10 +93,7 @@ where
 
         let (new_method, http_method_idx) = rand.choose(available_methods).unwrap();
         random_input.method = new_method.try_into().unwrap_or_else(|_| {
-            panic!(
-                "Tried to mutate into non-existing HTTP method {}",
-                new_method
-            )
+            panic!("Tried to mutate into non-existing HTTP method {new_method}")
         });
 
         if self.method_mutation_strategy == MethodMutationStrategy::FollowSpec {

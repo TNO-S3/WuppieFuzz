@@ -5,11 +5,11 @@ use std::borrow::Cow;
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
+    Error,
     mutators::{MutationResult, Mutator},
     state::HasRand,
-    Error,
 };
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{Named, rands::Rand};
 
 use crate::input::OpenApiInput;
 
@@ -57,10 +57,10 @@ where
             param.break_reference_if_target(state.rand_mut(), |i| i == random_index);
             // We have to decrement the reference target by one if it is larger than
             // the random_index (but param might not be a reference anymore, so check!)
-            if let Some(reference_index) = param.reference_index() {
-                if *reference_index > random_index {
-                    *reference_index -= 1
-                }
+            if let Some(reference_index) = param.reference_index()
+                && *reference_index > random_index
+            {
+                *reference_index -= 1
             }
         }
         input.assert_valid(self.name());

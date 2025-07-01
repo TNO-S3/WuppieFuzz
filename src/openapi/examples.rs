@@ -9,7 +9,7 @@ use openapiv3::{
     OpenAPI, Operation, Parameter, ParameterData, RefOr, Schema, SchemaKind, StringFormat, Type,
 };
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
-use rand::{prelude::Distribution, Rng};
+use rand::{Rng, prelude::Distribution};
 use regex::Regex;
 use serde_json::Value;
 use unicode_truncate::UnicodeTruncateStr;
@@ -17,7 +17,7 @@ use unicode_truncate::UnicodeTruncateStr;
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
     initial_corpus::dependency_graph::ParameterMatching,
-    input::{parameter::ParameterKind, Body, OpenApiInput, OpenApiRequest, ParameterContents},
+    input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
 };
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest
@@ -53,7 +53,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
     let schema = media_type.schema.as_ref()?.resolve(api);
 
     match &schema.kind {
-        SchemaKind::Type(Type::Object(ref obj)) => {
+        SchemaKind::Type(Type::Object(obj)) => {
             let body_map: IndexMap<String, ParameterContents> = obj
                 .properties
                 .iter()
@@ -69,7 +69,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
                 .collect();
             Some(body_map.into())
         }
-        SchemaKind::Type(Type::Array(ref arr)) => match &arr.items {
+        SchemaKind::Type(Type::Array(arr)) => match &arr.items {
             Some(items) => {
                 let result = items.resolve(api);
                 Some(ParameterContents::from(example_from_schema(api, result)?))
@@ -77,12 +77,16 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
             None => None,
         },
         // TODO: create other body types, or document why not
-        SchemaKind::Type(ref unimplemented_type) => {
-            log::warn!("Cannot create an example body for schema type {unimplemented_type:?}. Using empty body.");
+        SchemaKind::Type(unimplemented_type) => {
+            log::warn!(
+                "Cannot create an example body for schema type {unimplemented_type:?}. Using empty body."
+            );
             None
         }
         ref unimplemented_kind => {
-            log::warn!("Cannot create an example body for schema kind {unimplemented_kind:?}. Using empty body.");
+            log::warn!(
+                "Cannot create an example body for schema kind {unimplemented_kind:?}. Using empty body."
+            );
             None
         }
     }
@@ -525,7 +529,7 @@ fn enforce_length_bounds(
     string: &str,
     min_length: Option<usize>,
     max_length: Option<usize>,
-) -> Cow<str> {
+) -> Cow<'_, str> {
     let mut result = Cow::from(string);
     if let Some(min) = min_length {
         *result.to_mut() += &"A".repeat(min);
@@ -804,13 +808,10 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
                 {
                     return vec![serde_json::Value::String(sample)];
                 }
-                log::warn!(
-                    "Could not generate an example string that matches the regex {}",
-                    pattern
-                );
+                log::warn!("Could not generate an example string that matches the regex {pattern}");
             }
             Err(err) => {
-                log::warn!("Broken regex pattern {}, Error message: {}", pattern, err);
+                log::warn!("Broken regex pattern {pattern}, Error message: {err}");
             }
         }
     }
@@ -869,8 +870,7 @@ pub fn openapi_inputs_from_ops<'a>(
         .fold(1, |acc, elem| acc * elem.len());
     if total_combinations > 10000 {
         return Err(format!(
-            "Corpus generation would try to create {} inputs, fall back to simple examples.",
-            total_combinations
+            "Corpus generation would try to create {total_combinations} inputs, fall back to simple examples."
         ));
     }
     if concrete_requests.is_empty() {

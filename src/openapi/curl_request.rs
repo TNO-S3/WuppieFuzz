@@ -26,7 +26,7 @@ impl std::fmt::Display for CurlRequest<'_> {
                     .expect("stream body not expected from static request"),
                 &STANDARD,
             );
-            writeln!(fmt, "echo {} | \\", wrapper)?;
+            writeln!(fmt, "echo {wrapper} | \\")?;
             writeln!(fmt, "base64 --decode | \\")?;
         }
 
@@ -37,7 +37,7 @@ impl std::fmt::Display for CurlRequest<'_> {
         }
         for (key, value) in self.0.headers() {
             if let Ok(text) = value.to_str() {
-                write!(fmt, " \\\n    --header '{}: {}'", key, text)?
+                write!(fmt, " \\\n    --header '{key}: {text}'")?
             } else {
                 write!(
                     fmt,

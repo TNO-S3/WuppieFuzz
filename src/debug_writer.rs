@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// Helper type to allow components to write to the debug log using the Write
 /// interface. Only outputs its data when it is dropped, since the debug log
 /// inserts decoration at the start of each line, and users of `write` are not

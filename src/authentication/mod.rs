@@ -3,7 +3,7 @@ use std::{borrow::Cow, fs::File, path::Path, sync::Arc};
 use anyhow::{Context, Result};
 use cookie_store::{Cookie, RawCookie};
 use openapiv3::OpenAPI;
-use reqwest::header::{HeaderMap, IntoHeaderName, AUTHORIZATION};
+use reqwest::header::{AUTHORIZATION, HeaderMap, IntoHeaderName};
 use url::Url;
 
 use crate::{configuration::Configuration, header};
@@ -189,7 +189,7 @@ impl Authentication {
     }
 
     /// Return the last Autorization header value, without refreshing it if expired.
-    pub fn last_header(&self) -> Option<Cow<str>> {
+    pub fn last_header(&self) -> Option<Cow<'_, str>> {
         match self {
             Authentication::Raw(text) => Some(Cow::from(text)),
             Authentication::Basic(config) => Some(Cow::from(format!("Basic {config}"))),

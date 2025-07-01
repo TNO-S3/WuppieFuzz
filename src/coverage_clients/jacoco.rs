@@ -2,8 +2,8 @@
 //! to collect coverage from Java targets.
 
 use std::{
-    collections::{hash_map::Entry, HashMap},
-    fs::{create_dir_all, read_dir, remove_file, DirBuilder, OpenOptions},
+    collections::{HashMap, hash_map::Entry},
+    fs::{DirBuilder, OpenOptions, create_dir_all, read_dir, remove_file},
     io::prelude::*,
     net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
@@ -18,8 +18,8 @@ use log::trace;
 use crate::{
     configuration::{Configuration, CoverageConfiguration},
     coverage_clients::{
-        read_utilities::{read_bool_array, read_cesu8, read_char, read_u64be},
         CoverageClient, MAP_SIZE,
+        read_utilities::{read_bool_array, read_cesu8, read_char, read_u64be},
     },
 };
 
@@ -176,7 +176,7 @@ impl<'a> JacocoCoverageClient<'a> {
                 .write(true)
                 .truncate(true)
                 .open(&file_path)
-                .unwrap_or_else(|err| panic!("Could not create file {:?}: {err}", file_path));
+                .unwrap_or_else(|err| panic!("Could not create file {file_path:?}: {err}"));
 
             let bytes = self.latest_coverage_information.as_slice();
             // remove the block CmdOk
@@ -236,7 +236,7 @@ impl<'a> JacocoCoverageClient<'a> {
             _ => {
                 return Err(Error::unknown(format!(
                     "Invalid or unsupported type: {block_type:?}"
-                )))
+                )));
             }
         })
     }
@@ -313,13 +313,13 @@ fn create_or_clear_dump_directory(jacoco_dump_output_dir: Option<&PathBuf>) -> R
         // check if directory contains files of the form r"jacoco_d+.exec"
         let entries = read_dir(dir_path)?;
         for entry in entries.flatten() {
-            if let Some(file_name) = entry.file_name().to_str() {
-                if file_name.starts_with("jacoco") {
-                    let mut path = PathBuf::new();
-                    path.push(dir_path);
-                    path.push(entry.path());
-                    remove_file(path)?;
-                }
+            if let Some(file_name) = entry.file_name().to_str()
+                && file_name.starts_with("jacoco")
+            {
+                let mut path = PathBuf::new();
+                path.push(dir_path);
+                path.push(entry.path());
+                remove_file(path)?;
             }
         }
     }
@@ -374,13 +374,17 @@ impl CoverageClient for JacocoCoverageClient<'_> {
                 ..
             } => (source_dir, jacoco_class_dir),
             _ => {
-                unreachable!("Coverage client is Jacoco, but there is no configuration for Jacoco or the source and class dir are missing")
+                unreachable!(
+                    "Coverage client is Jacoco, but there is no configuration for Jacoco or the source and class dir are missing"
+                )
             }
         };
 
         let jacoco_dump_dir = match &self.jacoco_dump_output_dir {
             Some(path) => path,
-            None => unreachable!("Trying to generate a Jacoco report, but there is no directory with Jacoco dump files")
+            None => unreachable!(
+                "Trying to generate a Jacoco report, but there is no directory with Jacoco dump files"
+            ),
         };
 
         let jacoco_exec_path = jacoco_dump_dir.join("jacoco_report.exec");
@@ -435,7 +439,7 @@ fn segment_matches_prefix(prefix_filter: &Option<String>, segment: &JacocoCovera
 
 #[cfg(test)]
 mod tests {
-    use super::{segment_matches_prefix, JacocoCoverageSegment};
+    use super::{JacocoCoverageSegment, segment_matches_prefix};
 
     #[test]
     fn filter_test_success() {

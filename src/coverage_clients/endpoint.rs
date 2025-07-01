@@ -11,14 +11,14 @@
 
 use std::{
     convert::TryFrom,
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     io::Write,
     path::Path,
     sync::{Arc, Mutex},
 };
 
-use build_html::{escape_html, Container, ContainerType, Html, HtmlContainer, HtmlPage};
-use indexmap::{map::Entry, IndexMap};
+use build_html::{Container, ContainerType, Html, HtmlContainer, HtmlPage, escape_html};
+use indexmap::{IndexMap, map::Entry};
 use openapiv3::{OpenAPI, StatusCode};
 
 use super::{CoverageClient, MAP_SIZE};

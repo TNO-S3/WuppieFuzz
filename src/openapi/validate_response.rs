@@ -152,17 +152,16 @@ impl std::fmt::Display for ValidationError {
                 fmt,
                 "Operation {method} {path} does not occur in specification"
             ),
-            ValidationError::StatusNotSpecified { got } => write!(
-                fmt,
-                "Returned HTTP status {got} not allowed for this path"
-            ),
-            ValidationError::ResponseReferenceBroken { reference, inner_err } => write!(
-                fmt,
-                "Response model {reference} unresolvable: {inner_err}"
-            ),
-            ValidationError::ResponseObjectIncorrect { msg: err_msg } => write!(
-                fmt, "Response object incorrect: {err_msg}"
-            ),
+            ValidationError::StatusNotSpecified { got } => {
+                write!(fmt, "Returned HTTP status {got} not allowed for this path")
+            }
+            ValidationError::ResponseReferenceBroken {
+                reference,
+                inner_err,
+            } => write!(fmt, "Response model {reference} unresolvable: {inner_err}"),
+            ValidationError::ResponseObjectIncorrect { msg: err_msg } => {
+                write!(fmt, "Response object incorrect: {err_msg}")
+            }
             ValidationError::ResponseMalformedJSON { error } => {
                 write!(fmt, "Error parsing response as JSON: {error}")
             }
@@ -170,9 +169,7 @@ impl std::fmt::Display for ValidationError {
                 fmt,
                 "Unexpected response body content. content-length: {content_length}"
             ),
-            ValidationError::ResponseEnumIncorrect {
-                incorrect_variant,
-            } => write!(
+            ValidationError::ResponseEnumIncorrect { incorrect_variant } => write!(
                 fmt,
                 "Response enumeration has non-existent variant {incorrect_variant}"
             ),
@@ -183,7 +180,8 @@ impl std::fmt::Display for ValidationError {
             ValidationError::SchemaIsAny(schema_str) => write!(
                 fmt,
                 "The specification accepts any schema for this response, which is too flexible for us to validate. \
-                Make sure the schema specifies a type!\nSchema description: {schema_str}"),
+                Make sure the schema specifies a type!\nSchema description: {schema_str}"
+            ),
         }
     }
 }
@@ -288,7 +286,9 @@ fn validate_object_against_schema(
                 Ok(())
             } else {
                 Err(ValidationError::ResponseObjectIncorrect {
-                    msg: format!("Response content {response_contents:?} did not match against exactly one expected schema")
+                    msg: format!(
+                        "Response content {response_contents:?} did not match against exactly one expected schema"
+                    ),
                 })
             }
         }
@@ -312,7 +312,7 @@ fn validate_object_against_schema(
             }
         }
         openapiv3::SchemaKind::Any(schema) => {
-            Err(ValidationError::SchemaIsAny(format!("{:?}", schema)))
+            Err(ValidationError::SchemaIsAny(format!("{schema:?}")))
         }
     }
 }

@@ -5,15 +5,15 @@ pub mod dependency_graph;
 use std::{
     collections::hash_map::DefaultHasher,
     convert::TryInto,
-    fs::{self, create_dir_all, File},
+    fs::{self, File, create_dir_all},
     hash::{Hash, Hasher},
     io::Write,
     path::{Path, PathBuf},
 };
 
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
     HasMetadata,
+    corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
 };
 use openapiv3::OpenAPI;
 
@@ -47,7 +47,7 @@ pub fn generate_corpus_to_files(api: &OpenAPI, corpus_dir: &Path, report_path: O
     let inputs = initial_corpus_from_api(api);
     log::debug!("Writing corpus to file...");
     if let Err(e) = write_corpus_to_files(&inputs, corpus_dir) {
-        log::warn!("Error writing corpus to file: {}", e);
+        log::warn!("Error writing corpus to file: {e}");
     } else {
         log::info!("Wrote generated corpus to {corpus_dir:?}");
     }
@@ -81,7 +81,7 @@ pub fn write_corpus_to_files(
 pub fn print_starting_corpus(filename: &Path) {
     match load_starting_corpus(filename) {
         Ok(res) => log::debug!("{res:?}"),
-        Err(err) => log::error!("Error: {}", err),
+        Err(err) => log::error!("Error: {err}"),
     }
 }
 
@@ -113,7 +113,10 @@ fn write_corpus_report(input_vector: &[OpenApiInput], report_path: &Path) -> std
         file,
         "# Corpus graph based on OpenAPI spec generated inputs\n"
     )?;
-    writeln!(file, "This markdown document can be rendered using a Mermaid plugin. It demonstrates the generated sequences of API requests.\n")?;
+    writeln!(
+        file,
+        "This markdown document can be rendered using a Mermaid plugin. It demonstrates the generated sequences of API requests.\n"
+    )?;
     writeln!(file, "```mermaid")?;
     writeln!(file, "graph LR;")?;
 
@@ -172,10 +175,9 @@ fn fill_corpus_from_file(
                 }
             }
         }
-        Err(err) => log::warn!(
-            "Error loading initial corpus, will generate random inputs instead: {}",
-            err
-        ),
+        Err(err) => {
+            log::warn!("Error loading initial corpus, will generate random inputs instead: {err}")
+        }
     };
 }
 

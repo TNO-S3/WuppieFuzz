@@ -5,7 +5,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
 use crate::{
     authentication,
-    input::{parameter::ParameterKind, OpenApiRequest},
+    input::{OpenApiRequest, parameter::ParameterKind},
 };
 
 /// Build a request to a path from the API using the input values.

@@ -5,13 +5,13 @@ use std::{borrow::Cow, convert::TryInto};
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
-    mutators::{MutationResult, Mutator},
     Error,
+    mutators::{MutationResult, Mutator},
 };
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{Named, rands::Rand};
 
 use crate::{
-    input::{fix_input_parameters, OpenApiInput},
+    input::{OpenApiInput, fix_input_parameters},
     state::HasRandAndOpenAPI,
 };
 
@@ -63,8 +63,7 @@ where
                 }
                 random_input.method = new_method.try_into().unwrap_or_else(|_| {
                     panic!(
-                        "Picked unsupported HTTP method {} from the OpenAPI specification",
-                        new_method
+                        "Picked unsupported HTTP method {new_method} from the OpenAPI specification"
                     )
                 });
                 new_path.clone_into(&mut random_input.path);

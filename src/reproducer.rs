@@ -3,9 +3,9 @@ use std::path::Path;
 use std::ptr::write_volatile;
 
 use anyhow::Result;
-use libafl::inputs::Input;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
+use libafl::inputs::Input;
 use log::{error, info, warn};
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
-        validate_response::{validate_response, Response},
+        validate_response::{Response, validate_response},
     },
     parameter_feedback::ParameterFeedback,
 };
@@ -43,13 +43,12 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
     let mut parameter_feedback = ParameterFeedback::new(inputs.0.len());
 
     for (request_index, request) in inputs.0.iter().enumerate() {
-        info!("\n-----\nSending request: \n{}", request);
+        info!("\n-----\nSending request: \n{request}");
 
         let mut request = request.clone();
         if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
             error!(
-                "Cannot instantiate request: missing value for backreferenced parameter: {}",
-                error
+                "Cannot instantiate request: missing value for backreferenced parameter: {error}"
             );
             continue;
         };
@@ -64,14 +63,11 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
         .map(|builder| builder.build())
         {
             Err(message) => {
-                warn!(
-                    "Could not generate a HTTP request from this input: {}. Skipping ...",
-                    message
-                );
+                warn!("Could not generate a HTTP request from this input: {message}. Skipping ...");
                 continue;
             }
             Ok(Err(message)) => {
-                error!("Error building the request: {}", message);
+                error!("Error building the request: {message}");
                 break;
             }
             Ok(Ok(request)) => {
@@ -89,17 +85,17 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
                 if response.status().is_server_error() {
                     warn!("Crash reported by server: {}", response.status());
                     if let Ok(text) = response.text() {
-                        info!("Response contents printed below: \n{}", text)
+                        info!("Response contents printed below: \n{text}")
                     }
                     break;
                 } else {
                     info!("Request successful ({})", response.status());
                     match validate_response(&api, &request, &response) {
                         Ok(()) => info!("Response matches specification"),
-                        Err(e) => warn!("Validation error: {}", e),
+                        Err(e) => warn!("Validation error: {e}"),
                     }
                     if let Ok(text) = response.text() {
-                        info!("Response contents printed below: \n{}", text)
+                        info!("Response contents printed below: \n{text}")
                     }
                     if response.status().is_success() {
                         parameter_feedback.process_response(request_index, response);
@@ -107,7 +103,7 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
                 }
             }
             Err(e) => {
-                error!("Error sending the request: {}", e);
+                error!("Error sending the request: {e}");
                 break;
             }
         }

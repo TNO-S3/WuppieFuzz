@@ -5,19 +5,19 @@ use std::{
     borrow::Cow,
     marker::PhantomData,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
 };
 
 use libafl::{
+    Error,
     events::{Event, EventFirer, EventProcessor, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
     state::{HasExecutions, Stoppable},
-    Error,
 };
 use libafl_bolts::prelude::RefIndexable;
 use log::{debug, error};
@@ -26,17 +26,17 @@ use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
 
 use crate::{
-    authentication::{build_http_client, Authentication},
+    authentication::{Authentication, build_http_client},
     configuration::{Configuration, CrashCriterion},
-    coverage_clients::{endpoint::EndpointCoverageClient, CoverageClient},
+    coverage_clients::{CoverageClient, endpoint::EndpointCoverageClient},
     input::OpenApiInput,
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
-        validate_response::{validate_response, Response},
+        validate_response::{Response, validate_response},
     },
     parameter_feedback::ParameterFeedback,
-    reporting::{sqlite::MySqLite, Reporting},
+    reporting::{Reporting, sqlite::MySqLite},
 };
 
 /// How often to print a new log line
@@ -133,11 +133,10 @@ where
         log::debug!("Sending {} requests", inputs.0.len());
         'chain: for (request_index, request) in inputs.0.iter().enumerate() {
             let mut request = request.clone();
-            log::trace!("OpenAPI request:\n{:#?}", request);
+            log::trace!("OpenAPI request:\n{request:#?}");
             if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
                 debug!(
-                    "Cannot instantiate request: missing value for backreferenced parameter: {}. Maybe the earlier request crashed?",
-                    error
+                    "Cannot instantiate request: missing value for backreferenced parameter: {error}. Maybe the earlier request crashed?"
                 );
                 break 'chain;
             };
@@ -197,17 +196,20 @@ where
 
                     if response.status().is_server_error() {
                         exit_kind = ExitKind::Crash;
-                        log::debug!("OpenAPI-input resulted in server error response, ignoring rest of request chain.");
+                        log::debug!(
+                            "OpenAPI-input resulted in server error response, ignoring rest of request chain."
+                        );
                         break 'chain;
                     } else {
-                        if self.config.crash_criterion == CrashCriterion::AllErrors {
-                            if let Err(validation_err) =
+                        if self.config.crash_criterion == CrashCriterion::AllErrors
+                            && let Err(validation_err) =
                                 validate_response(self.api, &request, &response)
-                            {
-                                log::debug!("OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain.");
-                                exit_kind = ExitKind::Crash;
-                                break 'chain;
-                            }
+                        {
+                            log::debug!(
+                                "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
+                            );
+                            exit_kind = ExitKind::Crash;
+                            break 'chain;
                         }
                         if response.status().is_success() {
                             parameter_feedback.process_response(request_index, response);
@@ -217,7 +219,7 @@ where
                 Err(transport_error) => {
                     self.reporter
                         .report_response_error(&transport_error.to_string(), reporter_request_id);
-                    error!("{}", transport_error);
+                    error!("{transport_error}");
                     exit_kind = ExitKind::Timeout;
                     break;
                 }
@@ -305,7 +307,7 @@ where
                 .unwrap_or(false)
         {
             if let Err(e) = event_manager.fire(state, Event::Stop) {
-                error!("Err: failed to fire event{:?}", e);
+                error!("Err: failed to fire event{e:?}");
             }
             state.request_stop();
         }
@@ -380,7 +382,7 @@ fn update_stats<EM>(
             phantom: PhantomData,
         },
     ) {
-        error!("Err: failed to fire event {name}: {:?}", e)
+        error!("Err: failed to fire event {name}: {e:?}")
     }
 }
 
