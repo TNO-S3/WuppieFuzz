@@ -131,7 +131,7 @@ impl Body {
                 Body::Empty
             }
             Err(reference) => {
-                panic!("API specification contains broken reference {}", reference)
+                panic!("API specification contains broken reference {reference}")
             }
         }
     }
@@ -248,8 +248,7 @@ impl OpenApiRequest {
                     }
                     ParameterContents::Array(_) | ParameterContents::LeafValue(_) => {
                         panic!(
-                            "Form bodies must not be of type array or leaf, but interpretable as key-value objects.\nOffending body: {}",
-                            body
+                            "Form bodies must not be of type array or leaf, but interpretable as key-value objects.\nOffending body: {body}"
                         );
                     }
                 }
@@ -569,8 +568,7 @@ impl OpenApiInput {
             let refers_to = *param.reference_index().unwrap();
             if refers_to >= appears_in {
                 panic!(
-                    "Request chain is invalid: request {} refers to request {} ({})",
-                    appears_in, refers_to, message
+                    "Request chain is invalid: request {appears_in} refers to request {refers_to} ({message})"
                 )
             }
         }

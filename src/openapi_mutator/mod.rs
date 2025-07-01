@@ -289,6 +289,7 @@ fn mutate_string<S: HasRand>(
     MutationResult::Mutated
 }
 
+#[allow(clippy::needless_late_init)]
 /// Mutate parameter contents in-place
 fn mutate_parameter_contents<S: HasRand>(
     param_contents: &mut ParameterContents,

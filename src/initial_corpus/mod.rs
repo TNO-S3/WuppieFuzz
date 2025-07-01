@@ -47,7 +47,7 @@ pub fn generate_corpus_to_files(api: &OpenAPI, corpus_dir: &Path, report_path: O
     let inputs = initial_corpus_from_api(api);
     log::debug!("Writing corpus to file...");
     if let Err(e) = write_corpus_to_files(&inputs, corpus_dir) {
-        log::warn!("Error writing corpus to file: {}", e);
+        log::warn!("Error writing corpus to file: {e}");
     } else {
         log::info!("Wrote generated corpus to {corpus_dir:?}");
     }
@@ -81,7 +81,7 @@ pub fn write_corpus_to_files(
 pub fn print_starting_corpus(filename: &Path) {
     match load_starting_corpus(filename) {
         Ok(res) => log::debug!("{res:?}"),
-        Err(err) => log::error!("Error: {}", err),
+        Err(err) => log::error!("Error: {err}"),
     }
 }
 
@@ -175,10 +175,9 @@ fn fill_corpus_from_file(
                 }
             }
         }
-        Err(err) => log::warn!(
-            "Error loading initial corpus, will generate random inputs instead: {}",
-            err
-        ),
+        Err(err) => {
+            log::warn!("Error loading initial corpus, will generate random inputs instead: {err}")
+        }
     };
 }
 

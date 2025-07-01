@@ -312,7 +312,7 @@ fn validate_object_against_schema(
             }
         }
         openapiv3::SchemaKind::Any(schema) => {
-            Err(ValidationError::SchemaIsAny(format!("{:?}", schema)))
+            Err(ValidationError::SchemaIsAny(format!("{schema:?}")))
         }
     }
 }

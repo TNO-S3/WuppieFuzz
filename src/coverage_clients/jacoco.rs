@@ -176,7 +176,7 @@ impl<'a> JacocoCoverageClient<'a> {
                 .write(true)
                 .truncate(true)
                 .open(&file_path)
-                .unwrap_or_else(|err| panic!("Could not create file {:?}: {err}", file_path));
+                .unwrap_or_else(|err| panic!("Could not create file {file_path:?}: {err}"));
 
             let bytes = self.latest_coverage_information.as_slice();
             // remove the block CmdOk

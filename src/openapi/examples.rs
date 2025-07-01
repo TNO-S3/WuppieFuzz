@@ -808,13 +808,10 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
                 {
                     return vec![serde_json::Value::String(sample)];
                 }
-                log::warn!(
-                    "Could not generate an example string that matches the regex {}",
-                    pattern
-                );
+                log::warn!("Could not generate an example string that matches the regex {pattern}");
             }
             Err(err) => {
-                log::warn!("Broken regex pattern {}, Error message: {}", pattern, err);
+                log::warn!("Broken regex pattern {pattern}, Error message: {err}");
             }
         }
     }
@@ -873,8 +870,7 @@ pub fn openapi_inputs_from_ops<'a>(
         .fold(1, |acc, elem| acc * elem.len());
     if total_combinations > 10000 {
         return Err(format!(
-            "Corpus generation would try to create {} inputs, fall back to simple examples.",
-            total_combinations
+            "Corpus generation would try to create {total_combinations} inputs, fall back to simple examples."
         ));
     }
     if concrete_requests.is_empty() {

@@ -2,7 +2,7 @@
 
 use std::{
     convert::{TryFrom, TryInto},
-    io::{Error, ErrorKind, Result, prelude::*},
+    io::{Error, Result, prelude::*},
 };
 
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
@@ -26,7 +26,7 @@ pub fn read_cesu8(readable: &mut dyn Read) -> Result<(usize, String)> {
     readable.read_exact(&mut utf_buf)?;
     total_read += cesu8_len as usize;
 
-    let s = from_java_cesu8(&utf_buf).map_err(|e| Error::new(ErrorKind::Other, e))?;
+    let s = from_java_cesu8(&utf_buf).map_err(Error::other)?;
     Ok((total_read, s.into_owned()))
 }
 

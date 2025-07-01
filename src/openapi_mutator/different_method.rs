@@ -93,10 +93,7 @@ where
 
         let (new_method, http_method_idx) = rand.choose(available_methods).unwrap();
         random_input.method = new_method.try_into().unwrap_or_else(|_| {
-            panic!(
-                "Tried to mutate into non-existing HTTP method {}",
-                new_method
-            )
+            panic!("Tried to mutate into non-existing HTTP method {new_method}")
         });
 
         if self.method_mutation_strategy == MethodMutationStrategy::FollowSpec {

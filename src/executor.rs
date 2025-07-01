@@ -133,11 +133,10 @@ where
         log::debug!("Sending {} requests", inputs.0.len());
         'chain: for (request_index, request) in inputs.0.iter().enumerate() {
             let mut request = request.clone();
-            log::trace!("OpenAPI request:\n{:#?}", request);
+            log::trace!("OpenAPI request:\n{request:#?}");
             if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
                 debug!(
-                    "Cannot instantiate request: missing value for backreferenced parameter: {}. Maybe the earlier request crashed?",
-                    error
+                    "Cannot instantiate request: missing value for backreferenced parameter: {error}. Maybe the earlier request crashed?"
                 );
                 break 'chain;
             };
@@ -221,7 +220,7 @@ where
                 Err(transport_error) => {
                     self.reporter
                         .report_response_error(&transport_error.to_string(), reporter_request_id);
-                    error!("{}", transport_error);
+                    error!("{transport_error}");
                     exit_kind = ExitKind::Timeout;
                     break;
                 }
@@ -309,7 +308,7 @@ where
                 .unwrap_or(false)
         {
             if let Err(e) = event_manager.fire(state, Event::Stop) {
-                error!("Err: failed to fire event{:?}", e);
+                error!("Err: failed to fire event{e:?}");
             }
             state.request_stop();
         }
@@ -384,7 +383,7 @@ fn update_stats<EM>(
             phantom: PhantomData,
         },
     ) {
-        error!("Err: failed to fire event {name}: {:?}", e)
+        error!("Err: failed to fire event {name}: {e:?}")
     }
 }
 

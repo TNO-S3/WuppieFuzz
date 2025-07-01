@@ -240,7 +240,7 @@ impl LcovCoverageClient {
             create_dir_all(lcov_dump_dir)?;
             let lcov_dump_path = lcov_dump_dir.join(self.nth_coverage_dump.to_string());
             let mut lcov_file = File::create(lcov_dump_path)?;
-            write!(lcov_file, "{}", latest_coverage_str)?;
+            write!(lcov_file, "{latest_coverage_str}")?;
         }
         let mut source_path: PathBuf = PathBuf::new();
         let records = Reader::new(&mut coverage_slice).collect::<Result<Vec<_>, _>>();
@@ -349,7 +349,7 @@ impl CoverageClient for LcovCoverageClient {
     fn fetch_coverage(&mut self, reset: bool) {
         let cov_bytes = self.fetch_coverage_internal(reset);
         if let Err(err) = self.process_coverage_bytes(cov_bytes, &self.lcov_dump_dir.clone()) {
-            panic!("Error processing coverage bytes: {}", err);
+            panic!("Error processing coverage bytes: {err}");
         }
         self.nth_coverage_dump += 1;
     }

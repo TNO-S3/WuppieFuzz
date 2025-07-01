@@ -59,7 +59,7 @@ pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
                 let mut inputs =
                     openapi_inputs_from_ops(api, ops.clone().into_iter(), &subgraph, &idxs)
                         .inspect_err(|err| {
-                            log::warn!("{} - falling back to single example generation.", err);
+                            log::warn!("{err} - falling back to single example generation.");
                         })
                         .unwrap_or(vec![openapi_example_input_from_ops(api, ops.into_iter())]);
                 inputs.iter_mut().for_each(|input| {

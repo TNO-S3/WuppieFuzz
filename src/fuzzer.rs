@@ -61,7 +61,7 @@ pub fn fuzz() -> Result<()> {
     let api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let mon = CoverageMonitor::new(|s| info!("{}", s));
+    let mon = CoverageMonitor::new(|s| info!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -180,7 +180,7 @@ pub fn fuzz() -> Result<()> {
             forward_id: None,
         },
     ) {
-        error!("Err: failed to fire event{:?}", e)
+        error!("Err: failed to fire event{e:?}")
     }
 
     // Executed every corpus entry at least once for gathering a proper view on the initial coverage as mutations
@@ -221,7 +221,7 @@ pub fn fuzz() -> Result<()> {
                 phantom: PhantomData,
             },
         ) {
-            error!("Err: failed to fire event{:?}", e)
+            error!("Err: failed to fire event{e:?}")
         }
     }
 

@@ -63,8 +63,7 @@ where
                 }
                 random_input.method = new_method.try_into().unwrap_or_else(|_| {
                     panic!(
-                        "Picked unsupported HTTP method {} from the OpenAPI specification",
-                        new_method
+                        "Picked unsupported HTTP method {new_method} from the OpenAPI specification"
                     )
                 });
                 new_path.clone_into(&mut random_input.path);
