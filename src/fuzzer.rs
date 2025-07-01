@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
@@ -33,7 +34,7 @@ use libafl_bolts::{
     tuples::{MatchName, tuple_list},
 };
 use log::{error, info};
-use openapiv3::OpenAPI;
+use openapiv3::{OpenAPI, Server};
 
 use crate::{
     configuration::Configuration,
@@ -54,7 +55,17 @@ pub fn fuzz() -> Result<()> {
     crate::setup_logging(config);
     let report_path = config.report.then(generate_report_path);
 
-    let api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+    // Override the `servers` field in the OpenAPI specification if a server override
+    // was specified on the CLI.
+    let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+    if let Some(server_override) = &config.target {
+        api.servers = vec![Server {
+            url: server_override.to_string(),
+            description: None,
+            variables: None,
+            extensions: IndexMap::new(),
+        }];
+    }
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let mon = CoverageMonitor::new(|s| info!("{s}"));
