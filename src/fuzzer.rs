@@ -189,12 +189,14 @@ pub fn fuzz() -> Result<()> {
         let input = initial_corpus_cloned
             .cloned_input_for_id(input_id)
             .expect("Failed to load input");
-        executor.run_target(&mut fuzzer, &mut state, &mut mgr, &input)?;
+        let exit_kind = executor.run_target(&mut fuzzer, &mut state, &mut mgr, &input)?;
+        let exec_input_result = ExecuteInputResult::new(true, false);
         fuzzer.process_execution(
             &mut state,
             &mut mgr,
             &input,
-            &ExecuteInputResult::None,
+            &exec_input_result,
+            &exit_kind,
             executor.observers_mut().deref_mut(),
         )?;
     }

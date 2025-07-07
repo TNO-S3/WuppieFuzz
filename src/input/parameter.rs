@@ -1,10 +1,10 @@
 use std::{
     borrow::Cow,
+    collections::BTreeMap,
     fmt::{Debug, Display, Formatter, Result},
 };
 
 use base64::{Engine as _, display::Base64Display, engine::general_purpose::STANDARD};
-use indexmap::IndexMap;
 use libafl_bolts::rands::Rand;
 use openapiv3::Parameter;
 use reqwest::header::HeaderValue;
@@ -22,7 +22,7 @@ use super::new_rand_input;
 ///
 /// See also: dependency graph module
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
 pub enum SimpleValue {
     Null,
     Bool(bool),
@@ -59,7 +59,7 @@ impl Display for SimpleValue {
 }
 
 /// The contents of a parameter or of the body of an HTTP request made by the fuzzer.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
 #[serde(tag = "DataType", content = "Contents")]
 pub enum ParameterContents {
     /// If the parameter type is one of `object`, `array` or `leaf_value`, it is a
@@ -67,7 +67,7 @@ pub enum ParameterContents {
     /// Mutators can attempt to mutate it using knowledge of the type, i.e. numbers
     /// will always be mutated into other numbers, and array elements can be shuffled.
     #[serde(rename = "Object")]
-    Object(IndexMap<String, ParameterContents>),
+    Object(BTreeMap<String, ParameterContents>),
     #[serde(rename = "Array")]
     Array(Vec<ParameterContents>),
     #[serde(rename = "PrimitiveValue")]
@@ -226,8 +226,8 @@ impl Display for ParameterContents {
     }
 }
 
-impl From<IndexMap<String, ParameterContents>> for ParameterContents {
-    fn from(value: IndexMap<String, ParameterContents>) -> Self {
+impl From<BTreeMap<String, ParameterContents>> for ParameterContents {
+    fn from(value: BTreeMap<String, ParameterContents>) -> Self {
         ParameterContents::Object(value)
     }
 }

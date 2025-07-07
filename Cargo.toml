@@ -53,15 +53,15 @@ cookie = "0.18.1"
 cookie_store = "0.21.1"
 ctrlc = "3.4.7"
 env_logger = "0.11.8"
-indexmap = { version = "2.9.0", features = ["serde"] }
+indexmap = { version = "2.9.0", features = ["std", "serde"] }
 indicatif = "0.17.11"
 iter-read = "1.0.1"
 itertools = "0.14.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.4.0"
 lcov = "0.8"
-libafl = { version = "=0.15.0", features = ["clap"] }
-libafl_bolts = { version = "=0.15.0", features = ["prelude"] }
+libafl = { version = "=0.15.2", features = ["clap"] }
+libafl_bolts = { version = "=0.15.2", features = ["prelude"] }
 log = { version = "0.4.27", features = ["serde"] }
 num = { version = "0.4.2", default-features = false }
 num-derive = "0.4.2"

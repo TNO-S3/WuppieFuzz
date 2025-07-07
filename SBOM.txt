@@ -109,9 +109,9 @@ colorchoice 1.0.4
 compact_str 0.8.1
 	licensed under "MIT"
 	by Parker Timmerman <parker@parkertimmerman.com>
-console 0.16.0
+console 0.15.11
 	licensed under "MIT"
-	by unspecified authors
+	by Armin Ronacher <armin.ronacher@active-4.com>
 const_format 0.2.34
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
@@ -139,7 +139,10 @@ crossterm 0.28.1
 crossterm_winapi 0.9.1
 	licensed under "MIT"
 	by T. Post
-ctor 0.2.9
+ctor 0.4.2
+	licensed under "Apache-2.0 OR MIT"
+	by Matt Mastracci <matthew@mastracci.com>
+ctor-proc-macro 0.0.5
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
 ctrlc 3.4.7
@@ -163,6 +166,12 @@ displaydoc 0.2.5
 document-features 0.2.11
 	licensed under "Apache-2.0 OR MIT"
 	by Slint Developers <info@slint.dev>
+dtor 0.0.6
+	licensed under "Apache-2.0 OR MIT"
+	by Matt Mastracci <matthew@mastracci.com>
+dtor-proc-macro 0.0.5
+	licensed under "Apache-2.0 OR MIT"
+	by Matt Mastracci <matthew@mastracci.com>
 either 1.15.0
 	licensed under "Apache-2.0 OR MIT"
 	by bluss
@@ -202,7 +211,7 @@ fallible-iterator 0.3.0
 fallible-streaming-iterator 0.1.9
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
-fastbloom 0.8.0
+fastbloom 0.9.0
 	licensed under "Apache-2.0 OR MIT"
 	by tomtomwombat
 fastrand 2.3.0
@@ -226,6 +235,9 @@ foreign-types-shared 0.1.1
 form_urlencoded 1.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
+fs2 0.4.3
+	licensed under "Apache-2.0 OR MIT"
+	by Dan Burkert <dan@danburkert.com>
 futures-channel 0.3.31
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -334,7 +346,7 @@ idna_adapter 1.2.1
 indexmap 2.10.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-indicatif 0.17.12
+indicatif 0.17.11
 	licensed under "MIT"
 	by unspecified authors
 indoc 2.0.6
@@ -343,6 +355,9 @@ indoc 2.0.6
 instability 0.3.7
 	licensed under "MIT"
 	by Stephen M. Coakley <me@stephencoakley.com>|The Ratatui Developers
+io-uring 0.7.8
+	licensed under "Apache-2.0 OR MIT"
+	by quininer <quininer@live.com>
 ipnet 2.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by Kris Price <kris@krisprice.nz>
@@ -385,10 +400,10 @@ lazy_static 1.5.0
 lcov 0.8.1
 	licensed under "Apache-2.0 OR MIT"
 	by gifnksm <makoto.nksm+github@gmail.com>
-libafl 0.15.0
+libafl 0.15.2
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libafl_bolts 0.15.0
+libafl_bolts 0.15.2
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
 libafl_derive 0.15.3
@@ -484,6 +499,9 @@ num_enum 0.7.4
 num_enum_derive 0.7.4
 	licensed under "Apache-2.0 OR BSD-3-Clause OR MIT"
 	by Daniel Wagner-Hall <dawagner@gmail.com>|Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>|Vincent Esche <regexident@gmail.com>
+number_prefix 0.4.0
+	licensed under "MIT"
+	by Benjamin Sago <ogham@bsago.me>
 object 0.36.7
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -571,9 +589,6 @@ rand 0.9.1
 rand_chacha 0.9.0
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers|The CryptoCorrosion Contributors
-rand_core 0.6.4
-	licensed under "Apache-2.0 OR MIT"
-	by The Rand Project Developers|The Rust Project Developers
 rand_core 0.9.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers
@@ -595,7 +610,7 @@ regex-automata 0.4.9
 regex-syntax 0.8.5
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-reqwest 0.12.21
+reqwest 0.12.22
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 reqwest_cookie_store 0.8.0
@@ -757,7 +772,7 @@ time-macros 0.2.22
 tinystr 0.8.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-tokio 1.45.1
+tokio 1.46.1
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
 tokio-native-tls 0.3.1
@@ -793,10 +808,10 @@ try-lock 0.2.5
 tuple_list 0.1.3
 	licensed under "MIT"
 	by Valerii Lashmanov <vflashm@gmail.com>
-typed-builder 0.20.1
+typed-builder 0.21.0
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
-typed-builder-macro 0.20.1
+typed-builder-macro 0.21.0
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
 typeid 1.0.3
@@ -826,9 +841,6 @@ unicode-width 0.2.0
 unicode-xid 0.2.6
 	licensed under "Apache-2.0 OR MIT"
 	by erick.tryzelaar <erick.tryzelaar@gmail.com>|kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
-unit-prefix 0.5.1
-	licensed under "MIT"
-	by Fabio Valentini <decathorpe@gmail.com>|Benjamin Sago <ogham@bsago.me>
 unsafe-libyaml 0.2.11
 	licensed under "MIT"
 	by David Tolnay <dtolnay@gmail.com>

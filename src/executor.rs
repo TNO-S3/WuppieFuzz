@@ -13,9 +13,9 @@ use std::{
 
 use libafl::{
     Error,
-    events::{Event, EventFirer, EventProcessor, EventRestarter},
+    events::{Event, EventFirer, EventRestarter, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
     state::{HasExecutions, Stoppable},
 };
@@ -230,14 +230,14 @@ where
         (exit_kind, performed_requests)
     }
 
-    fn pre_exec<EM, FZ>(
+    fn pre_exec<EM>(
         &mut self,
         state: &mut FuzzerState,
         _input: &OpenApiInput,
         event_manager: &mut EM,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<OpenApiInput, FuzzerState> + EventProcessor<EM, FuzzerState, FZ>,
+        EM: EventFirer<OpenApiInput, FuzzerState> + SendExiting, // + EventProcessor<EM, FuzzerState, FZ>,
     {
         if state.stop_requested() {
             state.discard_stop_request();
@@ -322,9 +322,8 @@ where
 
 impl<EM, FZ, OT> Executor<EM, OpenApiInput, FuzzerState, FZ> for SequenceExecutor<'_, OT>
 where
-    EM: EventFirer<OpenApiInput, FuzzerState>
-        + EventRestarter<FuzzerState>
-        + EventProcessor<EM, FuzzerState, FZ>,
+    EM: EventFirer<OpenApiInput, FuzzerState> + EventRestarter<FuzzerState> + SendExiting,
+    // + EventProcessor<EM, FuzzerState, FZ>,
     OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     fn run_target(

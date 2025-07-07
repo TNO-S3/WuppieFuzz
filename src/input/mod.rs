@@ -52,17 +52,17 @@
 
 use std::{
     borrow::Cow,
+    collections::{
+        BTreeMap,
+        btree_map::{Iter, ValuesMut},
+    },
     fs::File,
-    hash::{BuildHasher, Hasher},
+    hash::{BuildHasher, Hash, Hasher},
     io::Read,
     path::Path,
 };
 
 use ahash::RandomState;
-use indexmap::{
-    IndexMap,
-    map::{Iter, ValuesMut},
-};
 use libafl::{Error, corpus::CorpusId, inputs::Input};
 use libafl_bolts::{HasLen, fs::write_file_atomic, rands::Rand};
 use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
@@ -81,7 +81,7 @@ mod serde_helpers;
 /// contains a body and/or named parameters. These can contain concrete values or
 /// references to responses from requests made earlier; see documentation for
 /// `ParameterContents` for more information.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
 #[serde(
     into = "serde_helpers::SerializableOpenApiRequest",
     from = "serde_helpers::SerializableOpenApiRequest"
@@ -91,10 +91,10 @@ pub struct OpenApiRequest {
     pub path: String,
 
     pub body: Body,
-    pub parameters: IndexMap<(String, ParameterKind), ParameterContents>,
+    pub parameters: BTreeMap<(String, ParameterKind), ParameterContents>,
 }
 
-#[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
 pub enum Body {
     #[default]
     Empty,
@@ -325,7 +325,7 @@ impl std::fmt::Display for OpenApiRequest {
 
 /// The main input type for the fuzzer is a series of HTTP requests, represented
 /// by this type.
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Hash)]
 pub struct OpenApiInput(pub Vec<OpenApiRequest>);
 
 pub enum IterWrapper<'a> {
@@ -516,18 +516,24 @@ impl OpenApiInput {
                     Body::Empty | Body::TextPlain(_) => {
                         log::warn!("Marked body parameter in request {idx} with name {name} for replacement,
                                     but the body is Empty or TextPlain!");
-                        continue
-                    },
+                        continue;
+                    }
                     Body::ApplicationJson(contents) | Body::XWwwFormUrlencoded(contents) => {
                         match contents {
-                            ParameterContents::Object(obj_param) => &mut obj_param[&name],
+                            ParameterContents::Object(obj_param) => obj_param
+                                .get_mut(&name)
+                                .unwrap()
+                                .break_reference_if_target(rand, |_| true),
                             // Note that a Reference parameter is not by itself named, but must be the value in an Object parameter.
                             // The parameter_name-field in a Reference only identifies the target of the Reference.
-                            ParameterContents::Reference { parameter_name, request_index } => {
+                            ParameterContents::Reference {
+                                parameter_name,
+                                request_index,
+                            } => {
                                 log::warn!("Marked body parameter in request {idx} with name {name} for replacement.
                                         The body's immediate contents are however an (unnamed) reference, pointing to a parameter
                                         with name {parameter_name} in request {request_index}.");
-                                continue
+                                continue;
                             }
                             // Note that Array fields currently cannot be addressed as variable parameters.
                             // Therefore, Arrays currently should not contain any references.
@@ -539,24 +545,27 @@ impl OpenApiInput {
                                         request_idx, name, parameter_kind triplet. Therefore we cannot resolve the reference.");
                                     }
                                 }
-                                continue
+                                continue;
                             }
                             ParameterContents::LeafValue(_) => {
                                 log::warn!("Marked body parameter in request {idx} with name {name} for replacement,
                                             but the body is a LeafValue: {contents}");
-                                continue
-                            },
+                                continue;
+                            }
                             ParameterContents::Bytes(_) => {
                                 log::warn!("Marked body parameter in request {idx} with name {name} for replacement,
                                             but the body is of type Bytes: {contents}");
-                                continue
-                            },
+                                continue;
+                            }
                         }
                     }
                 },
-                _ => &mut self.0[idx].parameters[&(name, kind)],
+                _ => self.0[idx]
+                    .parameters
+                    .get_mut(&(name, kind))
+                    .unwrap()
+                    .break_reference_if_target(rand, |_| true),
             }
-            .break_reference_if_target(rand, |_| true);
         }
     }
 
@@ -646,7 +655,7 @@ where
     // Make a new set of parameter values by taking existing values that are still
     // relevant, and making up random new ones if none exist
     let (rand, api) = state.rand_mut_and_openapi();
-    let mut new_params: IndexMap<(String, ParameterKind), ParameterContents> = api
+    let new_params: BTreeMap<(String, ParameterKind), ParameterContents> = api
         .operations()
         .nth(operation)
         .expect("fix_input_parameters called with out of bounds operation index")
@@ -660,7 +669,7 @@ where
         .map(|(name, kind)| {
             let key = (name, kind);
             // Remove *AND RETURN*, meaning we *keep* the parameter for this key
-            input.parameters.swap_remove_entry(&key).unwrap_or_else(|| {
+            input.parameters.remove_entry(&key).unwrap_or_else(|| {
                 (
                     key,
                     ParameterContents::from(
@@ -670,7 +679,7 @@ where
             })
         })
         .collect();
-    new_params.sort_keys();
+    // new_params.sort_keys();
     input.parameters = new_params;
 }
 
@@ -685,8 +694,8 @@ impl std::fmt::Display for OpenApiInput {
 
 #[cfg(test)]
 mod tests {
-    use indexmap::IndexMap;
     use serde_json::json;
+    use std::collections::BTreeMap;
 
     use super::{Body, Method, OpenApiRequest, ParameterContents};
 
@@ -707,7 +716,7 @@ mod tests {
             method: Method::Post,
             path: "/".to_owned(),
             body: form_body,
-            parameters: IndexMap::new(),
+            parameters: BTreeMap::new(),
         };
         let bodified = openapi_request
             .reqwest_body()
