@@ -106,4 +106,12 @@ where
 
         Ok(MutationResult::Mutated)
     }
+
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<libafl::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        todo!()
+    }
 }

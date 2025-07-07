@@ -8,7 +8,8 @@ use libafl::monitors::stats::{
     AggregatorOps, ClientStats, ClientStatsManager, UserStats, UserStatsValue,
 };
 use libafl::{alloc::fmt::Debug, monitors::Monitor};
-use libafl_bolts::{ClientId, current_time, format_duration_hms};
+use libafl_bolts::Error;
+use libafl_bolts::{ClientId, current_time, format_duration};
 use serde_json::json;
 
 use crate::configuration::{Configuration, OutputFormat};
@@ -42,32 +43,12 @@ impl<F> Monitor for CoverageMonitor<F>
 where
     F: FnMut(String),
 {
-    // /// the client monitor, mutable
-    // fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-    //     &mut self.client_stats
-    // }
-
-    // /// the client monitor
-    // fn client_stats(&self) -> &[ClientStats] {
-    //     &self.client_stats
-    // }
-
-    // /// Time this fuzzing run stated
-    // fn start_time(&self) -> time::Duration {
-    //     self.start_time
-    // }
-
-    // /// Set the time this fuzzing run stated
-    // fn set_start_time(&mut self, time: time::Duration) {
-    //     self.start_time = time
-    // }
-
     fn display(
         &mut self,
         client_stats_mgr: &mut ClientStatsManager,
         event_msg: &str,
         _sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         let config = Configuration::must_get();
         let total_time = current_time() - self.start_time;
         let objective_size;
@@ -81,11 +62,11 @@ where
             corpus_size = global_stats.corpus_size;
             execs_per_sec_pretty = global_stats.execs_per_sec_pretty.to_owned();
         }
-        let client_stats = &client_stats_mgr.client_stats()[0];
+        let client_stats = &client_stats_mgr.client_stats()[&ClientId(0)];
         let output_string = match config.output_format {
             OutputFormat::Json => json!({
                 "event_msg": event_msg,
-                "run_time": format_duration_hms(&(current_time() - self.start_time)),
+                "run_time": format_duration(&(current_time() - self.start_time)),
                 "objectives": objective_size,
                 "executed_sequences": total_execs,
                 "sequences_per_sec": self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
@@ -100,28 +81,24 @@ where
                 format!(
                     "[{}] New 'crash' observed! After run time: {}, total number of objectives reached: {}",
                     event_msg,
-                    format_duration_hms(&(current_time() - self.start_time)),
+                    format_duration(&(current_time() - self.start_time)),
                     objective_size,
                 )
             } else if event_msg == "Testcase" {
                 match total_execs {
                     0 => format!(
-                            "[{}] Starting corpus loaded! Initial corpus size: {}",
-                            event_msg,
-                            corpus_size,
+                            "[{event_msg}] Starting corpus loaded! Initial corpus size: {corpus_size}"
                         ),
                     _ => format!(
-                            "[{}] The testing corpus expanded! After run time: {}, total corpus size: {}",
-                            event_msg,
-                            format_duration_hms(&(current_time() - self.start_time)),
-                            corpus_size,
+                            "[{event_msg}] The testing corpus expanded! After run time: {}, total corpus size: {corpus_size}",
+                            format_duration(&(current_time() - self.start_time)),
                         ),
                 }
             } else {
                 format!(
                     "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}",
                     event_msg,
-                    format_duration_hms(&total_time),
+                    format_duration(&total_time),
                     corpus_size,
                     objective_size,
                     total_execs,
@@ -134,6 +111,7 @@ where
             }
         }};
         (self.print_fn)(output_string);
+        Ok(())
     }
 }
 

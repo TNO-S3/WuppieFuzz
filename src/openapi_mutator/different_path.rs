@@ -77,4 +77,12 @@ where
         // contains two identical paths. Still, it's best not to hang.
         Ok(MutationResult::Skipped)
     }
+
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<libafl::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        todo!()
+    }
 }

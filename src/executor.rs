@@ -13,13 +13,13 @@ use std::{
 
 use libafl::{
     Error,
-    events::{Event, EventFirer, EventRestarter, SendExiting},
+    events::{Event, EventFirer, EventRestarter, EventWithStats, ExecStats, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
     state::{HasExecutions, Stoppable},
 };
-use libafl_bolts::prelude::RefIndexable;
+use libafl_bolts::{current_time, prelude::RefIndexable};
 use log::{debug, error};
 use openapiv3::OpenAPI;
 use reqwest::blocking::Client;
@@ -283,10 +283,12 @@ where
             );
         }
 
-        let current_time = Instant::now();
-        let diff = current_time.duration_since(self.last_window_time).as_secs();
+        let current_instant = Instant::now();
+        let diff = current_instant
+            .duration_since(self.last_window_time)
+            .as_secs();
         if diff > CLIENT_STATS_TIME_WINDOW_SECS {
-            self.last_window_time = current_time;
+            self.last_window_time = current_instant;
             // send the request stats to the event manager for use in the monitor
             update_stats(
                 state,
@@ -306,7 +308,13 @@ where
                 .map(|timeout| Instant::now() - self.starting_time > timeout)
                 .unwrap_or(false)
         {
-            if let Err(e) = event_manager.fire(state, Event::Stop) {
+            if let Err(e) = event_manager.fire(
+                state,
+                EventWithStats::new(
+                    Event::Stop,
+                    ExecStats::new(current_time(), *state.executions()),
+                ),
+            ) {
                 error!("Err: failed to fire event{e:?}");
             }
             state.request_stop();
@@ -375,11 +383,14 @@ fn update_stats<EM>(
 {
     if let Err(e) = event_manager.fire(
         state,
-        Event::UpdateUserStats {
-            name: Cow::Borrowed(name),
-            value: UserStats::new(value, AggregatorOps::None),
-            phantom: PhantomData,
-        },
+        EventWithStats::new(
+            Event::UpdateUserStats {
+                name: Cow::Borrowed(name),
+                value: UserStats::new(value, AggregatorOps::None),
+                phantom: PhantomData,
+            },
+            ExecStats::new(current_time(), *state.executions()),
+        ),
     ) {
         error!("Err: failed to fire event {name}: {e:?}")
     }

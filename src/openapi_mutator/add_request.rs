@@ -94,6 +94,14 @@ where
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
     }
+
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<libafl::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        todo!()
+    }
 }
 
 fn field_names(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>> {

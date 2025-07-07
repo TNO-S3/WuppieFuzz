@@ -179,7 +179,7 @@ impl OpenApiRequest {
                     resolve_single_parameter(body, parameter_values)?;
                 }
                 ParameterContents::Object(obj_contents) => {
-                    for (_key, nested_parameter) in obj_contents {
+                    for nested_parameter in obj_contents.values_mut() {
                         resolve_single_parameter(nested_parameter, parameter_values)?;
                     }
                 }
@@ -679,7 +679,6 @@ where
             })
         })
         .collect();
-    // new_params.sort_keys();
     input.parameters = new_params;
 }
 
