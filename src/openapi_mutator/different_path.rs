@@ -6,6 +6,7 @@ use std::{borrow::Cow, convert::TryInto};
 pub use libafl::mutators::mutations::*;
 use libafl::{
     Error,
+    corpus::CorpusId,
     mutators::{MutationResult, Mutator},
 };
 use libafl_bolts::{Named, rands::Rand};
@@ -78,11 +79,7 @@ where
         Ok(MutationResult::Skipped)
     }
 
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _new_corpus_id: Option<libafl::corpus::CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
 }
