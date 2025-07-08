@@ -693,8 +693,9 @@ impl std::fmt::Display for OpenApiInput {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
     use std::collections::BTreeMap;
+
+    use serde_json::json;
 
     use super::{Body, Method, OpenApiRequest, ParameterContents};
 

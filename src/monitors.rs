@@ -4,12 +4,14 @@
 use core::{time, time::Duration};
 use std::{borrow::Cow, fmt};
 
-use libafl::monitors::stats::{
-    AggregatorOps, ClientStats, ClientStatsManager, UserStats, UserStatsValue,
+use libafl::{
+    alloc::fmt::Debug,
+    monitors::{
+        Monitor,
+        stats::{AggregatorOps, ClientStats, ClientStatsManager, UserStats, UserStatsValue},
+    },
 };
-use libafl::{alloc::fmt::Debug, monitors::Monitor};
-use libafl_bolts::Error;
-use libafl_bolts::{ClientId, current_time, format_duration};
+use libafl_bolts::{ClientId, Error, current_time, format_duration};
 use serde_json::json;
 
 use crate::configuration::{Configuration, OutputFormat};
