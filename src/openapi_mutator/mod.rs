@@ -200,7 +200,7 @@ where
         _state: &mut S,
         _new_corpus_id: Option<libafl::corpus::CorpusId>,
     ) -> Result<(), Error> {
-        todo!()
+        Ok(())
     }
 }
 

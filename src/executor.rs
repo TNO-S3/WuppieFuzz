@@ -237,7 +237,7 @@ where
         event_manager: &mut EM,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<OpenApiInput, FuzzerState> + SendExiting, // + EventProcessor<EM, FuzzerState, FZ>,
+        EM: EventFirer<OpenApiInput, FuzzerState> + SendExiting,
     {
         if state.stop_requested() {
             state.discard_stop_request();
@@ -331,7 +331,6 @@ where
 impl<EM, FZ, OT> Executor<EM, OpenApiInput, FuzzerState, FZ> for SequenceExecutor<'_, OT>
 where
     EM: EventFirer<OpenApiInput, FuzzerState> + EventRestarter<FuzzerState> + SendExiting,
-    // + EventProcessor<EM, FuzzerState, FZ>,
     OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     fn run_target(
