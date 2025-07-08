@@ -53,17 +53,13 @@ where
     ) -> Result<(), Error> {
         let config = Configuration::must_get();
         let total_time = current_time() - self.start_time;
-        let objective_size;
-        let total_execs;
-        let execs_per_sec_pretty;
-        let corpus_size;
-        {
-            let global_stats = client_stats_mgr.global_stats();
-            objective_size = global_stats.objective_size;
-            total_execs = global_stats.total_execs;
-            corpus_size = global_stats.corpus_size;
-            execs_per_sec_pretty = global_stats.execs_per_sec_pretty.to_owned();
-        }
+
+        let global_stats = client_stats_mgr.global_stats();
+        let objective_size = global_stats.objective_size;
+        let total_execs = global_stats.total_execs;
+        let corpus_size = global_stats.corpus_size;
+        let execs_per_sec_pretty = global_stats.execs_per_sec_pretty.to_owned();
+
         let client_stats = &client_stats_mgr.client_stats()[&ClientId(0)];
         let output_string = match config.output_format {
             OutputFormat::Json => json!({
