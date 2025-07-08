@@ -170,9 +170,7 @@ mod test {
                 let parameter = input.0[1]
                     .get_mut_parameter("id", ParameterKind::Query)
                     .expect("Could not find parameter after request removal");
-                assert!(parameter
-                    .reference_index()
-                    .map_or(true, |&mut idx| idx == 0));
+                assert!(parameter.reference_index().is_none_or(|&mut idx| idx == 0));
             }
         }
         Ok(())

@@ -43,7 +43,6 @@ use log::warn;
 mod authentication;
 mod configuration;
 pub mod coverage_clients;
-mod debug_writer;
 pub mod executor;
 mod fuzzer;
 pub mod header;

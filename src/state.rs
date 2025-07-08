@@ -404,7 +404,7 @@ pub mod tests {
         ];
 
         pub fn new() -> Self {
-            const DUMMY_SPEC: &'static str = r#"
+            const DUMMY_SPEC: &str = r#"
             openapi: 3.0.4
             info:
                 title: Dummy API
