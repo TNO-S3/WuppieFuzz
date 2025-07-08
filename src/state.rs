@@ -11,10 +11,10 @@ use libafl::{
     feedbacks::StateInitializer,
     inputs::Input,
     schedulers::powersched::SchedulerMetadata,
-    stages::{HasCurrentStageId, StageId},
+    stages::StageId,
     state::{
-        HasCorpus, HasExecutions, HasImported, HasLastFoundTime, HasLastReportTime, HasMaxSize,
-        HasRand, HasSolutions, HasStartTime, Stoppable,
+        HasCorpus, HasCurrentStageId, HasExecutions, HasImported, HasLastFoundTime,
+        HasLastReportTime, HasMaxSize, HasRand, HasSolutions, HasStartTime, Stoppable,
     },
 };
 use libafl_bolts::{

@@ -2,9 +2,12 @@
 //! fuzzing target during normal fuzzing operation. These functions need an OpenAPI struct
 //! to generate realistic requests for the given target.
 
-use std::{borrow::Cow, collections::VecDeque, f64::consts::PI};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, VecDeque},
+    f64::consts::PI,
+};
 
-use indexmap::IndexMap;
 use openapiv3::{
     OpenAPI, Operation, Parameter, ParameterData, RefOr, Schema, SchemaKind, StringFormat, Type,
 };
@@ -54,7 +57,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
 
     match &schema.kind {
         SchemaKind::Type(Type::Object(obj)) => {
-            let body_map: IndexMap<String, ParameterContents> = obj
+            let body_map: BTreeMap<String, ParameterContents> = obj
                 .properties
                 .iter()
                 .filter_map(|(param, ref_or_schema)| {
@@ -149,7 +152,7 @@ fn example_parameter_value(api: &OpenAPI, par_data: &ParameterData) -> Result<Va
 fn example_parameters(
     api: &OpenAPI,
     operation: &Operation,
-) -> IndexMap<(String, ParameterKind), ParameterContents> {
+) -> BTreeMap<(String, ParameterKind), ParameterContents> {
     operation
         .parameters
         .iter()
@@ -177,9 +180,9 @@ fn all_interesting_parameters(
     operation: &Operation,
     api: &OpenAPI,
     single_valued: &[&Parameter],
-) -> Vec<IndexMap<(String, ParameterKind), ParameterContents>> {
+) -> Vec<BTreeMap<(String, ParameterKind), ParameterContents>> {
     // For each parameter in the operation, generate a list of plausible values
-    let param_combinations: IndexMap<(String, ParameterKind), Vec<ParameterContents>> = operation
+    let param_combinations: BTreeMap<(String, ParameterKind), Vec<ParameterContents>> = operation
         .parameters
         .iter()
         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
@@ -234,13 +237,13 @@ fn all_interesting_parameters(
 
     // Now, attempt to create *every possible combination* of these possible values.
     // This means if the possible values are x=1, 2; y=3, 4; you get [1,3] [1,4] [2,3]
-    // and [2,4]. This is represented as a list of IndexMaps. Each IndexMap would map
+    // and [2,4]. This is represented as a list of BTreeMaps. Each BTreeMap would map
     // a parameter to a value, e.g. {x->2, y->3}.
     // We'd like this to be sort-of bounded. Experimentally, that means a maximum of
     // 100 combinations. So each `param_values` must have a len such that the
     // product of all lengths is less than this 100.
     let max_param_values = 100f64.powf(1.0 / param_combinations.len() as f64).floor() as usize;
-    let mut maps = vec![IndexMap::new()];
+    let mut maps = vec![BTreeMap::new()];
     for (key, param_values) in param_combinations.into_iter() {
         let mut new_maps = vec![];
         for map in maps {
@@ -442,7 +445,7 @@ fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&s
     };
 
     // Make a mapping "path to api schema" -> "variant name" for the variants
-    let mut mapping: IndexMap<String, String> = IndexMap::new();
+    let mut mapping: BTreeMap<String, String> = BTreeMap::new();
     // Collect variants and default names from OneOf/AnyOf
     if let openapiv3::SchemaKind::OneOf { one_of: variants }
     | openapiv3::SchemaKind::AnyOf { any_of: variants } = &schema.kind
@@ -924,14 +927,14 @@ fn all_interesting_inputs_for_qualified_operation(
                     method: operation.method,
                     path: operation.path.to_owned(),
                     body: Body::build(api, operation.operation, Some(body)),
-                    parameters: IndexMap::default(),
+                    parameters: BTreeMap::default(),
                 })
                 .collect(),
             None => vec![OpenApiRequest {
                 method: operation.method,
                 path: operation.path.to_owned(),
                 body: Body::build(api, operation.operation, None),
-                parameters: IndexMap::default(),
+                parameters: BTreeMap::default(),
             }],
         }
     } else {

@@ -6,6 +6,7 @@ use std::borrow::Cow;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     Error,
+    corpus::CorpusId,
     mutators::{MutationResult, Mutator},
 };
 use libafl_bolts::Named;
@@ -100,5 +101,9 @@ where
 
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
+    }
+
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }

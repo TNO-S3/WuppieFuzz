@@ -1,12 +1,12 @@
 //! Mutates a request series by adding a new request to it. The new request is taken
 //! at random from the API specification.
 
-use std::{borrow::Cow, convert::TryInto};
+use std::{borrow::Cow, collections::BTreeMap, convert::TryInto};
 
-use indexmap::IndexMap;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     Error,
+    corpus::CorpusId,
     mutators::{MutationResult, Mutator},
 };
 use libafl_bolts::{Named, rands::Rand};
@@ -60,7 +60,7 @@ where
             api.operations().nth(new_path_i).unwrap();
         let (method, path) = (new_method.try_into().unwrap(), new_path.to_owned());
 
-        let mut parameters: IndexMap<(String, ParameterKind), ParameterContents> = new_op
+        let parameters: BTreeMap<(String, ParameterKind), ParameterContents> = new_op
             .parameters
             .iter()
             // Keep only concrete values and valid references
@@ -69,8 +69,7 @@ where
             .map(|param| (param.data.name.clone(), param.into()))
             .map(|name_kind| (name_kind, ParameterContents::Bytes(new_rand_input(rand))))
             .collect();
-        parameters.sort_keys();
-        let body_contents: Option<IndexMap<String, ParameterContents>> = new_op
+        let body_contents: Option<BTreeMap<String, ParameterContents>> = new_op
             .request_body
             .as_ref()
             .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
@@ -95,6 +94,10 @@ where
 
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
+    }
+
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }
 

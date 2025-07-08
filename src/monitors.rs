@@ -6,9 +6,12 @@ use std::{borrow::Cow, fmt};
 
 use libafl::{
     alloc::fmt::Debug,
-    monitors::{AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue},
+    monitors::{
+        Monitor,
+        stats::{AggregatorOps, ClientStats, ClientStatsManager, UserStats, UserStatsValue},
+    },
 };
-use libafl_bolts::{ClientId, current_time, format_duration_hms};
+use libafl_bolts::{ClientId, Error, current_time, format_duration};
 use serde_json::json;
 
 use crate::configuration::{Configuration, OutputFormat};
@@ -42,40 +45,33 @@ impl<F> Monitor for CoverageMonitor<F>
 where
     F: FnMut(String),
 {
-    /// the client monitor, mutable
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_stats
-    }
-
-    /// the client monitor
-    fn client_stats(&self) -> &[ClientStats] {
-        &self.client_stats
-    }
-
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> time::Duration {
-        self.start_time
-    }
-
-    /// Set the time this fuzzing run stated
-    fn set_start_time(&mut self, time: time::Duration) {
-        self.start_time = time
-    }
-
-    fn display(&mut self, event_msg: &str, _sender_id: ClientId) {
+    fn display(
+        &mut self,
+        client_stats_mgr: &mut ClientStatsManager,
+        event_msg: &str,
+        _sender_id: ClientId,
+    ) -> Result<(), Error> {
         let config = Configuration::must_get();
         let total_time = current_time() - self.start_time;
+
+        let global_stats = client_stats_mgr.global_stats();
+        let objective_size = global_stats.objective_size;
+        let total_execs = global_stats.total_execs;
+        let corpus_size = global_stats.corpus_size;
+        let execs_per_sec_pretty = global_stats.execs_per_sec_pretty.to_owned();
+
+        let client_stats = &client_stats_mgr.client_stats()[&ClientId(0)];
         let output_string = match config.output_format {
             OutputFormat::Json => json!({
                 "event_msg": event_msg,
-                "run_time": format_duration_hms(&(current_time() - self.start_time)),
-                "objectives": self.objective_size(),
-                "executed_sequences": self.total_execs(),
-                "sequences_per_sec": self.req_execs_per_sec(self.total_execs()),
-                "requests": Self::req_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
-                "requests_per_sec": Self::req_sec_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
-                "coverage": Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
-                "endpoint_coverage": Self::end_cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                "run_time": format_duration(&(current_time() - self.start_time)),
+                "objectives": objective_size,
+                "executed_sequences": total_execs,
+                "sequences_per_sec": self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
+                "requests": Self::req_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                "requests_per_sec": Self::req_sec_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
+                "coverage": Self::cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                "endpoint_coverage": Self::end_cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
             })
             .to_string(),
             OutputFormat::HumanReadable => {
@@ -83,40 +79,37 @@ where
                 format!(
                     "[{}] New 'crash' observed! After run time: {}, total number of objectives reached: {}",
                     event_msg,
-                    format_duration_hms(&(current_time() - self.start_time)),
-                    self.objective_size(),
+                    format_duration(&(current_time() - self.start_time)),
+                    objective_size,
                 )
             } else if event_msg == "Testcase" {
-                match self.total_execs() {
+                match total_execs {
                     0 => format!(
-                            "[{}] Starting corpus loaded! Initial corpus size: {}",
-                            event_msg,
-                            self.corpus_size(),
+                            "[{event_msg}] Starting corpus loaded! Initial corpus size: {corpus_size}"
                         ),
                     _ => format!(
-                            "[{}] The testing corpus expanded! After run time: {}, total corpus size: {}",
-                            event_msg,
-                            format_duration_hms(&(current_time() - self.start_time)),
-                            self.corpus_size(),
+                            "[{event_msg}] The testing corpus expanded! After run time: {}, total corpus size: {corpus_size}",
+                            format_duration(&(current_time() - self.start_time)),
                         ),
                 }
             } else {
                 format!(
                     "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}",
                     event_msg,
-                    format_duration_hms(&total_time),
-                    self.corpus_size(),
-                    self.objective_size(),
-                    self.total_execs(),
-                    self.req_execs_per_sec(self.total_execs()),
-                    Self::req_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None)),
-                    Self::req_sec_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
-                    Self::cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
-                    Self::end_cov_stats(&self.client_stats()[0], &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                    format_duration(&total_time),
+                    corpus_size,
+                    objective_size,
+                    total_execs,
+                    self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
+                    Self::req_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None)),
+                    Self::req_sec_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
+                    Self::cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                    Self::end_cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
                 )
             }
         }};
         (self.print_fn)(output_string);
+        Ok(())
     }
 }
 
@@ -150,9 +143,9 @@ where
         client_stats.get_user_stats("requests").unwrap_or(default)
     }
 
-    fn req_execs_per_sec(&mut self, execs: u64) -> String {
+    fn req_execs_per_sec(&mut self, execs: u64, execs_per_sec_pretty: String) -> String {
         if self.last_execs < execs {
-            self.execs_per_sec = self.execs_per_sec_pretty();
+            self.execs_per_sec = execs_per_sec_pretty;
             self.last_execs = execs;
         }
         self.execs_per_sec.clone()

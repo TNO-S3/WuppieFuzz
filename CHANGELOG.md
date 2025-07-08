@@ -3,6 +3,8 @@
 ## Highlights
 
 ## Features
+- Updated [LibAFL](https://github.com/AFLplusplus/LibAFL) to 0.15.3 in
+  [#107](https://github.com/TNO-S3/WuppieFuzz/pull/107)
 
 ## Fixes
 

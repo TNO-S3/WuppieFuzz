@@ -2,7 +2,6 @@
 use std::ptr::write_volatile;
 use std::{
     fs::create_dir_all,
-    marker::PhantomData,
     ops::DerefMut,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -14,15 +13,12 @@ use libafl::Fuzzer; // This may be marked unused, but will make the compiler giv
 use libafl::{
     ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
     corpus::{Corpus, OnDiskCorpus},
-    events::{Event, EventFirer, SimpleEventManager},
+    events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::{Executor, ExitKind, HasObservers},
     feedback_or,
-    feedbacks::{
-        CrashFeedback, DifferentIsNovel, Feedback, MapFeedback, MaxMapFeedback, MaxReducer,
-        TimeFeedback,
-    },
+    feedbacks::{CrashFeedback, Feedback, MaxMapFeedback, TimeFeedback, simd::SimdMapFeedback},
     fuzzer::StdFuzzer,
-    mutators::StdScheduledMutator,
+    mutators::HavocScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
@@ -34,6 +30,7 @@ use libafl_bolts::{
     current_nanos, current_time,
     prelude::OwnedMutSlice,
     rands::StdRand,
+    simd::{SimdMaxReducer, vector::u8x16},
     tuples::{MatchName, tuple_list},
 };
 use log::{error, info};
@@ -151,7 +148,7 @@ pub fn fuzz() -> Result<()> {
         time_observer
     );
 
-    let mutator_openapi = StdScheduledMutator::new(havoc_mutations_openapi());
+    let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 
     // The order of the stages matter!
     let power = StdPowerMutationalStage::new(mutator_openapi);
@@ -170,15 +167,17 @@ pub fn fuzz() -> Result<()> {
     let corpus_size = state.corpus().count();
     if let Err(e) = mgr.fire(
         &mut state,
-        Event::NewTestcase {
-            input: OpenApiInput(vec![]),
-            observers_buf: None,
-            exit_kind: ExitKind::Ok,
-            corpus_size,
-            client_config: mgr.configuration(),
-            time: current_time(),
-            forward_id: None,
-        },
+        EventWithStats::new(
+            Event::NewTestcase {
+                input: OpenApiInput(vec![]),
+                observers_buf: None,
+                exit_kind: ExitKind::Ok,
+                corpus_size,
+                client_config: mgr.configuration(),
+                forward_id: None,
+            },
+            ExecStats::new(current_time(), 0),
+        ),
     ) {
         error!("Err: failed to fire event{e:?}")
     }
@@ -189,12 +188,14 @@ pub fn fuzz() -> Result<()> {
         let input = initial_corpus_cloned
             .cloned_input_for_id(input_id)
             .expect("Failed to load input");
-        executor.run_target(&mut fuzzer, &mut state, &mut mgr, &input)?;
+        let exit_kind = executor.run_target(&mut fuzzer, &mut state, &mut mgr, &input)?;
+        let exec_input_result = ExecuteInputResult::new(true, false);
         fuzzer.process_execution(
             &mut state,
             &mut mgr,
             &input,
-            &ExecuteInputResult::None,
+            &exec_input_result,
+            &exit_kind,
             executor.observers_mut().deref_mut(),
         )?;
     }
@@ -215,11 +216,7 @@ pub fn fuzz() -> Result<()> {
         let executions = *state.executions();
         if let Err(e) = mgr.fire(
             &mut state,
-            Event::UpdateExecStats {
-                time: current_time(),
-                executions,
-                phantom: PhantomData,
-            },
+            EventWithStats::new(Event::Heartbeat, ExecStats::new(current_time(), executions)),
         ) {
             error!("Err: failed to fire event{e:?}")
         }
@@ -235,7 +232,13 @@ pub fn fuzz() -> Result<()> {
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
-fn setup_endpoint_coverage<'a, S: HasNamedMetadata, EM: EventFirer<I, S>, I, OT: MatchName>(
+fn setup_endpoint_coverage<
+    'a,
+    S: HasNamedMetadata + HasExecutions,
+    EM: EventFirer<I, S>,
+    I,
+    OT: MatchName,
+>(
     api: OpenAPI,
 ) -> Result<
     (
@@ -259,11 +262,11 @@ fn setup_endpoint_coverage<'a, S: HasNamedMetadata, EM: EventFirer<I, S>, I, OT:
         )
     }
     .track_novelties();
-    let endpoint_coverage_feedback: MapFeedback<
+    let endpoint_coverage_feedback: SimdMapFeedback<
         ExplicitTracking<StdMapObserver<'_, u8, false>, false, true>,
-        DifferentIsNovel,
         StdMapObserver<'_, u8, false>,
-        MaxReducer,
+        SimdMaxReducer,
+        u8x16,
     > = MaxMapFeedback::new(&endpoint_coverage_observer);
     Ok((
         endpoint_coverage_client,
@@ -275,11 +278,11 @@ fn setup_endpoint_coverage<'a, S: HasNamedMetadata, EM: EventFirer<I, S>, I, OT:
 type LineCovClientObserverFeedback<'a> = (
     Box<dyn CoverageClient>,
     ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
-    MapFeedback<
+    SimdMapFeedback<
         ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
-        DifferentIsNovel,
         StdMapObserver<'a, u8, false>,
-        MaxReducer,
+        SimdMaxReducer,
+        u8x16,
     >,
 );
 
