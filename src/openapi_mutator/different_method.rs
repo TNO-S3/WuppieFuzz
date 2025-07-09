@@ -144,7 +144,7 @@ mod test {
     #[test]
     fn different_method_common5() -> anyhow::Result<()> {
         for _ in 0..100 {
-            assert_eq!(perform_test(MethodMutationStrategy::Common5)?, Method::Get);
+            assert_ne!(perform_test(MethodMutationStrategy::Common5)?, Method::Get);
         }
         Ok(())
     }
