@@ -87,7 +87,7 @@ mod test {
     use super::SwapRequestsMutator;
     use crate::{
         input::{
-            parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
+            Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
         },
         state::tests::TestOpenApiFuzzerState,
     };
@@ -153,11 +153,13 @@ mod test {
 
             let result = mutator.mutate(&mut state, &mut input)?;
             assert_eq!(result, MutationResult::Mutated);
-            assert!(input.0[0]
-                .get_mut_parameter("id", ParameterKind::Query)
-                .expect("Could not find parameter after request removal")
-                .bytes()
-                .is_some());
+            assert!(
+                input.0[0]
+                    .get_mut_parameter("id", ParameterKind::Query)
+                    .expect("Could not find parameter after request removal")
+                    .bytes()
+                    .is_some()
+            );
         }
         Ok(())
     }

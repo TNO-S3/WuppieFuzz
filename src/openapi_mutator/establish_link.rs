@@ -116,7 +116,7 @@ mod test {
     use super::EstablishLinkMutator;
     use crate::{
         input::{
-            parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
+            Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
         },
         state::tests::TestOpenApiFuzzerState,
     };

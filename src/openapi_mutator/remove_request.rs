@@ -81,7 +81,7 @@ mod test {
     use super::RemoveRequestMutator;
     use crate::{
         input::{
-            parameter::ParameterKind, Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
+            Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
         },
         state::tests::TestOpenApiFuzzerState,
     };
