@@ -81,7 +81,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use indexmap::IndexMap;
+    use std::collections::BTreeMap;
+
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::SwapRequestsMutator;
@@ -101,13 +102,13 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
             let test_request_2 = OpenApiRequest {
                 method: Method::Delete,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![test_request_1, test_request_2]);
@@ -126,7 +127,7 @@ mod test {
     fn remove_references_when_swapping() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = IndexMap::new();
+            let mut parameters = BTreeMap::new();
             parameters.insert(
                 ("id".to_string(), ParameterKind::Query),
                 ParameterContents::Reference {
@@ -145,7 +146,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![has_return_value, has_param]);

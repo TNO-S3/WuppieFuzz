@@ -75,7 +75,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use indexmap::IndexMap;
+    use std::collections::BTreeMap;
+
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::RemoveRequestMutator;
@@ -95,7 +96,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
             let mut input = OpenApiInput(vec![test_request; 10]);
             let mut mutator = RemoveRequestMutator;
@@ -117,7 +118,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
             let mut input = OpenApiInput(vec![test_request]);
             let mut mutator = RemoveRequestMutator;
@@ -135,7 +136,7 @@ mod test {
     fn fix_references_when_removing() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = IndexMap::new();
+            let mut parameters = BTreeMap::new();
             parameters.insert(
                 ("id".to_string(), ParameterKind::Query),
                 ParameterContents::Reference {
@@ -154,7 +155,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input =

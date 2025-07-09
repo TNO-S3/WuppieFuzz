@@ -74,7 +74,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use indexmap::IndexMap;
+    use std::collections::BTreeMap;
+
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::DuplicateRequestMutator;
@@ -109,7 +110,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![request]);
@@ -133,7 +134,7 @@ mod test {
     fn duplicate_request_with_reference() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = IndexMap::new();
+            let mut parameters = BTreeMap::new();
             parameters.insert(
                 ("id".to_string(), ParameterKind::Query),
                 ParameterContents::Reference {
@@ -152,7 +153,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![has_return_value, has_param]);

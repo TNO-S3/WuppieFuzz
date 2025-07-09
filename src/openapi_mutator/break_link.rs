@@ -67,7 +67,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use indexmap::IndexMap;
+    use std::collections::BTreeMap;
+
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::BreakLinkMutator;
@@ -83,7 +84,7 @@ mod test {
     fn break_link() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = IndexMap::new();
+            let mut parameters = BTreeMap::new();
             parameters.insert(
                 ("id".to_string(), ParameterKind::Query),
                 ParameterContents::Reference {
@@ -102,7 +103,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![has_return_value, has_param]);

@@ -110,7 +110,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use indexmap::IndexMap;
+    use std::collections::BTreeMap;
+
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::EstablishLinkMutator;
@@ -126,7 +127,7 @@ mod test {
     fn establish_link() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = IndexMap::new();
+            let mut parameters = BTreeMap::new();
             parameters.insert(
                 ("id".to_string(), ParameterKind::Query),
                 ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
@@ -142,7 +143,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![has_return_value, has_param]);
@@ -166,7 +167,7 @@ mod test {
         for _ in 0..100 {
             // In this case, the mutator should skip mutation because the parameters are in the wrong order
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = IndexMap::new();
+            let mut parameters = BTreeMap::new();
             parameters.insert(
                 ("id".to_string(), ParameterKind::Query),
                 ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
@@ -182,7 +183,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![has_param, has_return_value]);
@@ -197,14 +198,14 @@ mod test {
                 method: Method::Get,
                 path: "/with-query-parameter".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let has_return_value = OpenApiRequest {
                 method: Method::Delete,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![has_return_value, has_param]);

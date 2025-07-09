@@ -118,7 +118,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use indexmap::IndexMap;
+    use std::collections::BTreeMap;
+
     use libafl::mutators::Mutator;
 
     use super::DifferentMethodMutator;
@@ -138,7 +139,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
             let mut input = OpenApiInput(vec![test_request]);
             let mut mutator = DifferentMethodMutator {
@@ -162,7 +163,7 @@ mod test {
                 method: Method::Get,
                 path: "/simple".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
             let mut input = OpenApiInput(vec![test_request]);
             let mut mutator = DifferentMethodMutator {

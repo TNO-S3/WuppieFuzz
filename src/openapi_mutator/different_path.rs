@@ -86,7 +86,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use indexmap::IndexMap;
+    use std::collections::BTreeMap;
+
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::DifferentPathMutator;
@@ -104,7 +105,7 @@ mod test {
                 method: Method::Get,
                 path: "/with-query-parameter".to_string(),
                 body: Body::Empty,
-                parameters: IndexMap::new(),
+                parameters: BTreeMap::new(),
             };
 
             let mut input = OpenApiInput(vec![test_request]);
