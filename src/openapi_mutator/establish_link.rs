@@ -51,7 +51,7 @@ where
         // Build a list of (x, y),
         // x is the request index for which the response contains a parameter y
         // y is the parameter name
-        let request_index_and_parameter_name_pairs = dbg!(input.return_values(api));
+        let request_index_and_parameter_name_pairs = input.return_values(api);
         if request_index_and_parameter_name_pairs.is_empty() {
             return Ok(MutationResult::Skipped);
         }
