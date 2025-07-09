@@ -46,6 +46,9 @@ use establish_link::EstablishLinkMutator;
 pub mod string_interesting;
 use string_interesting::StringInterestingMutator;
 
+#[cfg(test)]
+pub mod test_helpers;
+
 /// Creates a tuple list containing all available mutators from this module.
 pub fn havoc_mutations_openapi<C, I, R, SC>() -> tuple_list_type!(
     OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,

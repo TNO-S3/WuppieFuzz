@@ -84,6 +84,7 @@ mod test {
         input::{
             Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
         },
+        openapi_mutator::test_helpers::simple_request,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -92,13 +93,8 @@ mod test {
     fn remove_request() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let test_request = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-            let mut input = OpenApiInput(vec![test_request; 10]);
+            let mut input = simple_request();
+            input.0.resize(10, input.0[0].clone());
             let mut mutator = RemoveRequestMutator;
 
             let result = mutator.mutate(&mut state, &mut input)?;
@@ -114,13 +110,7 @@ mod test {
     fn keep_single_request() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let test_request = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-            let mut input = OpenApiInput(vec![test_request]);
+            let mut input = simple_request();
             let mut mutator = RemoveRequestMutator;
 
             let result = mutator.mutate(&mut state, &mut input)?;

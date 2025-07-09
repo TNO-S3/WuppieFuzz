@@ -86,13 +86,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
 
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::DifferentPathMutator;
     use crate::{
-        input::{Body, Method, OpenApiInput, OpenApiRequest},
+        input::Method, openapi_mutator::test_helpers::simple_request,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -101,16 +100,11 @@ mod test {
     fn mutate_path() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let test_request = OpenApiRequest {
-                method: Method::Get,
-                path: "/with-query-parameter".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
 
-            let mut input = OpenApiInput(vec![test_request]);
+            let mut input = simple_request();
+            input.0[0].path = "/with-query-parameter".to_string();
+
             let mut mutator = DifferentPathMutator;
-
             let result = mutator.mutate(&mut state, &mut input)?;
 
             let new_path = input.0[0].path.as_str();

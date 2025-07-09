@@ -74,15 +74,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::DuplicateRequestMutator;
     use crate::{
-        input::{
-            Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
-        },
+        input::{OpenApiInput, parameter::ParameterKind},
+        openapi_mutator::test_helpers::{linked_requests, simple_request},
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -106,14 +103,7 @@ mod test {
     fn duplicate_request_simple() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let request = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-
-            let mut input = OpenApiInput(vec![request]);
+            let mut input = simple_request();
             let mut mutator = DuplicateRequestMutator;
 
             let result = mutator.mutate(&mut state, &mut input)?;
@@ -134,29 +124,7 @@ mod test {
     fn duplicate_request_with_reference() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = BTreeMap::new();
-            parameters.insert(
-                ("id".to_string(), ParameterKind::Query),
-                ParameterContents::Reference {
-                    request_index: 0,
-                    parameter_name: "id".to_string(),
-                },
-            );
-            let has_param = OpenApiRequest {
-                method: Method::Get,
-                path: "/with-query-parameter".to_string(),
-                body: Body::Empty,
-                parameters,
-            };
-
-            let has_return_value = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-
-            let mut input = OpenApiInput(vec![has_return_value, has_param]);
+            let mut input = linked_requests();
             let mut mutator = DuplicateRequestMutator;
 
             let result = mutator.mutate(&mut state, &mut input)?;

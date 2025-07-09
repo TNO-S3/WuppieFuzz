@@ -81,15 +81,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::SwapRequestsMutator;
     use crate::{
-        input::{
-            Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
-        },
+        input::{Method, parameter::ParameterKind},
+        openapi_mutator::test_helpers::{linked_requests, simple_request},
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -98,23 +95,14 @@ mod test {
     fn swap_simple_requests() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let test_request_1 = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-            let test_request_2 = OpenApiRequest {
-                method: Method::Delete,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
 
-            let mut input = OpenApiInput(vec![test_request_1, test_request_2]);
+            let mut input = simple_request();
+            input.0.push(input.0[0].clone());
+            input.0[1].method = Method::Delete;
+
             let mut mutator = SwapRequestsMutator;
-
             let result = mutator.mutate(&mut state, &mut input)?;
+
             assert_eq!(result, MutationResult::Mutated);
             assert_eq!(input.0[0].method, Method::Delete);
             assert_eq!(input.0[1].method, Method::Get);
@@ -127,29 +115,7 @@ mod test {
     fn remove_references_when_swapping() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = BTreeMap::new();
-            parameters.insert(
-                ("id".to_string(), ParameterKind::Query),
-                ParameterContents::Reference {
-                    request_index: 1,
-                    parameter_name: "id".to_string(),
-                },
-            );
-            let has_param = OpenApiRequest {
-                method: Method::Get,
-                path: "/with-query-parameter".to_string(),
-                body: Body::Empty,
-                parameters,
-            };
-
-            let has_return_value = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-
-            let mut input = OpenApiInput(vec![has_return_value, has_param]);
+            let mut input = linked_requests();
             let mut mutator = SwapRequestsMutator;
 
             let result = mutator.mutate(&mut state, &mut input)?;

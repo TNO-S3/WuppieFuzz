@@ -118,26 +118,18 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
 
     use libafl::mutators::Mutator;
 
     use super::DifferentMethodMutator;
     use crate::{
-        configuration::MethodMutationStrategy,
-        input::{Body, Method, OpenApiInput, OpenApiRequest},
-        state::tests::TestOpenApiFuzzerState,
+        configuration::MethodMutationStrategy, input::Method,
+        openapi_mutator::test_helpers::simple_request, state::tests::TestOpenApiFuzzerState,
     };
 
     fn perform_test(strategy: MethodMutationStrategy) -> anyhow::Result<Method> {
         let mut state = TestOpenApiFuzzerState::new();
-        let test_request = OpenApiRequest {
-            method: Method::Get,
-            path: "/simple".to_string(),
-            body: Body::Empty,
-            parameters: BTreeMap::new(),
-        };
-        let mut input = OpenApiInput(vec![test_request]);
+        let mut input = simple_request();
         let mut mutator = DifferentMethodMutator {
             method_mutation_strategy: strategy,
         };

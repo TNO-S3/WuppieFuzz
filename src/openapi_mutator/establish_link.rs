@@ -110,15 +110,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::EstablishLinkMutator;
     use crate::{
-        input::{
-            Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
-        },
+        input::{Method, ParameterContents, parameter::ParameterKind},
+        openapi_mutator::test_helpers::linked_requests,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -127,29 +124,16 @@ mod test {
     fn establish_link() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = BTreeMap::new();
-            parameters.insert(
-                ("id".to_string(), ParameterKind::Query),
+
+            let mut input = linked_requests();
+            input.0[1].parameters.insert(
+                ("id".into(), ParameterKind::Query),
                 ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
             );
-            let has_param = OpenApiRequest {
-                method: Method::Get,
-                path: "/with-query-parameter".to_string(),
-                body: Body::Empty,
-                parameters,
-            };
 
-            let has_return_value = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-
-            let mut input = OpenApiInput(vec![has_return_value, has_param]);
             let mut mutator = EstablishLinkMutator;
-
             let result = mutator.mutate(&mut state, &mut input)?;
+
             assert_eq!(result, MutationResult::Mutated);
             let parameter = input.0[1]
                 .get_mut_parameter("id", ParameterKind::Query)
@@ -167,50 +151,27 @@ mod test {
         for _ in 0..100 {
             // In this case, the mutator should skip mutation because the parameters are in the wrong order
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = BTreeMap::new();
-            parameters.insert(
-                ("id".to_string(), ParameterKind::Query),
+            let mut input = linked_requests();
+            input.0[1].parameters.insert(
+                ("id".into(), ParameterKind::Query),
                 ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
             );
-            let has_param = OpenApiRequest {
-                method: Method::Get,
-                path: "/with-query-parameter".to_string(),
-                body: Body::Empty,
-                parameters,
-            };
+            input.0.swap(0, 1);
 
-            let has_return_value = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-
-            let mut input = OpenApiInput(vec![has_param, has_return_value]);
             let mut mutator = EstablishLinkMutator;
-
             let result = mutator.mutate(&mut state, &mut input)?;
             assert_eq!(result, MutationResult::Skipped);
 
             // In this case, the mutator should skip mutation because has_return_value has the wrong method
             let mut state = TestOpenApiFuzzerState::new();
-            let has_param = OpenApiRequest {
-                method: Method::Get,
-                path: "/with-query-parameter".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
+            let mut input = linked_requests();
+            input.0[1].parameters.insert(
+                ("id".into(), ParameterKind::Query),
+                ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
+            );
+            input.0[0].method = Method::Delete;
 
-            let has_return_value = OpenApiRequest {
-                method: Method::Delete,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-
-            let mut input = OpenApiInput(vec![has_return_value, has_param]);
             let mut mutator = EstablishLinkMutator;
-
             let result = mutator.mutate(&mut state, &mut input)?;
             assert_eq!(result, MutationResult::Skipped);
         }
