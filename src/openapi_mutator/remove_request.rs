@@ -75,16 +75,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::RemoveRequestMutator;
     use crate::{
-        input::{
-            Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
-        },
-        openapi_mutator::test_helpers::simple_request,
+        input::{ParameterContents, parameter::ParameterKind},
+        openapi_mutator::test_helpers::{linked_requests, simple_request},
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -126,32 +122,17 @@ mod test {
     fn fix_references_when_removing() -> anyhow::Result<()> {
         for _ in 0..100 {
             let mut state = TestOpenApiFuzzerState::new();
-            let mut parameters = BTreeMap::new();
-            parameters.insert(
+            let mut input = linked_requests();
+            input.0.insert(0, input.0[0].clone());
+            input.0[2].parameters.insert(
                 ("id".to_string(), ParameterKind::Query),
                 ParameterContents::Reference {
                     request_index: 1,
                     parameter_name: "id".to_string(),
                 },
             );
-            let has_param = OpenApiRequest {
-                method: Method::Get,
-                path: "/with-query-parameter".to_string(),
-                body: Body::Empty,
-                parameters,
-            };
 
-            let has_return_value = OpenApiRequest {
-                method: Method::Get,
-                path: "/simple".to_string(),
-                body: Body::Empty,
-                parameters: BTreeMap::new(),
-            };
-
-            let mut input =
-                OpenApiInput(vec![has_return_value.clone(), has_return_value, has_param]);
             let mut mutator = RemoveRequestMutator;
-
             let result = mutator.mutate(&mut state, &mut input)?;
             assert_eq!(result, MutationResult::Mutated);
 

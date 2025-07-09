@@ -86,7 +86,6 @@ where
 
 #[cfg(test)]
 mod test {
-
     use libafl::mutators::{MutationResult, Mutator};
 
     use super::DifferentPathMutator;

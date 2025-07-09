@@ -118,7 +118,6 @@ where
 
 #[cfg(test)]
 mod test {
-
     use libafl::mutators::Mutator;
 
     use super::DifferentMethodMutator;
