@@ -100,9 +100,9 @@ cobs 0.3.0
 colorchoice 1.0.4
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-console 0.15.11
+console 0.16.0
 	licensed under "MIT"
-	by Armin Ronacher <armin.ronacher@active-4.com>
+	by unspecified authors
 const_format 0.2.34
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
@@ -280,7 +280,7 @@ hyper-rustls 0.27.7
 hyper-tls 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-hyper-util 0.1.14
+hyper-util 0.1.15
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 iana-time-zone 0.1.63
@@ -319,7 +319,7 @@ idna_adapter 1.2.1
 indexmap 2.10.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-indicatif 0.17.11
+indicatif 0.18.0
 	licensed under "MIT"
 	by unspecified authors
 io-uring 0.7.8
@@ -385,7 +385,7 @@ libc 0.2.174
 libm 0.2.15
 	licensed under "MIT"
 	by Jorge Aparicio <jorge@japaric.io>
-libsqlite3-sys 0.33.0
+libsqlite3-sys 0.35.0
 	licensed under "MIT"
 	by The rusqlite developers
 linux-raw-sys 0.9.4
@@ -463,9 +463,6 @@ num_enum 0.7.4
 num_enum_derive 0.7.4
 	licensed under "Apache-2.0 OR BSD-3-Clause OR MIT"
 	by Daniel Wagner-Hall <dawagner@gmail.com>|Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>|Vincent Esche <regexident@gmail.com>
-number_prefix 0.4.0
-	licensed under "MIT"
-	by Benjamin Sago <ogham@bsago.me>
 object 0.36.7
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -577,7 +574,7 @@ reqwest_cookie_store 0.8.0
 ring 0.17.14
 	licensed under "Apache-2.0 AND ISC"
 	by unspecified authors
-rusqlite 0.35.0
+rusqlite 0.37.0
 	licensed under "MIT"
 	by The rusqlite developers
 rustc-demangle 0.1.25
@@ -769,12 +766,15 @@ unicode-segmentation 1.12.0
 unicode-truncate 2.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Aetf <aetf@unlimitedcodeworks.xyz>
-unicode-width 0.2.0
+unicode-width 0.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
 unicode-xid 0.2.6
 	licensed under "Apache-2.0 OR MIT"
 	by erick.tryzelaar <erick.tryzelaar@gmail.com>|kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
+unit-prefix 0.5.1
+	licensed under "MIT"
+	by Fabio Valentini <decathorpe@gmail.com>|Benjamin Sago <ogham@bsago.me>
 unsafe-libyaml 0.2.11
 	licensed under "MIT"
 	by David Tolnay <dtolnay@gmail.com>
