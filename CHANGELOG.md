@@ -3,10 +3,14 @@
 ## Highlights
 
 ## Features
-- Updated [LibAFL](https://github.com/AFLplusplus/LibAFL) to 0.15.3 in
-  [#107](https://github.com/TNO-S3/WuppieFuzz/pull/107)
+
+- Added unit tests for mutators in 
+  [#100](https://github.com/TNO-S3/WuppieFuzz/pull/100)
 
 ## Fixes
+
+- Updated [LibAFL](https://github.com/AFLplusplus/LibAFL) to 0.15.3 in
+  [#107](https://github.com/TNO-S3/WuppieFuzz/pull/107)
 
 # v1.2.0 (2025-02-21)
 

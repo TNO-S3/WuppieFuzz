@@ -59,7 +59,8 @@ where
 
         let random_input = rand.choose(&mut input.0).unwrap();
 
-        let available_methods: Vec<(&str, Option<usize>)> = match self.method_mutation_strategy {
+        let mut available_methods: Vec<(&str, Option<usize>)> = match self.method_mutation_strategy
+        {
             MethodMutationStrategy::FollowSpec => {
                 // Find the operations in the API with this input's path, and select one
                 // with a different method than the current input's method, if available
@@ -88,6 +89,8 @@ where
             ],
         };
 
+        available_methods
+            .retain(|&(method, _)| !method.eq_ignore_ascii_case(&random_input.method.to_string()));
         if available_methods.is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -109,6 +112,53 @@ where
     }
 
     fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use libafl::mutators::Mutator;
+
+    use super::DifferentMethodMutator;
+    use crate::{
+        configuration::MethodMutationStrategy, input::Method,
+        openapi_mutator::test_helpers::simple_request, state::tests::TestOpenApiFuzzerState,
+    };
+
+    fn perform_test(strategy: MethodMutationStrategy) -> anyhow::Result<Method> {
+        let mut state = TestOpenApiFuzzerState::new();
+        let mut input = simple_request();
+        let mut mutator = DifferentMethodMutator {
+            method_mutation_strategy: strategy,
+        };
+
+        mutator.mutate(&mut state, &mut input)?;
+
+        Ok(input.0[0].method)
+    }
+
+    /// Tests whether the mutator correctly assigns a different method when using
+    /// when using MethodMutationStrategy::Common5.
+    #[test]
+    fn different_method_common5() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            assert_ne!(perform_test(MethodMutationStrategy::Common5)?, Method::Get);
+        }
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly assigns a different method within the spec
+    /// when using MethodMutationStrategy::FollowSpec.
+    #[test]
+    fn different_method_follow_spec() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            assert_eq!(
+                perform_test(MethodMutationStrategy::FollowSpec)?,
+                Method::Delete
+            );
+        }
+
         Ok(())
     }
 }

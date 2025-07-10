@@ -107,3 +107,75 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use libafl::mutators::{MutationResult, Mutator};
+
+    use super::EstablishLinkMutator;
+    use crate::{
+        input::{Method, ParameterContents, parameter::ParameterKind},
+        openapi_mutator::test_helpers::linked_requests,
+        state::tests::TestOpenApiFuzzerState,
+    };
+
+    /// Tests whether the mutator correctly a link between an earlier request (to /simple) and a later parameter (id).
+    #[test]
+    fn establish_link() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+
+            let mut input = linked_requests();
+            input.0[1].parameters.insert(
+                ("id".into(), ParameterKind::Query),
+                ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
+            );
+
+            let mut mutator = EstablishLinkMutator;
+            let result = mutator.mutate(&mut state, &mut input)?;
+
+            assert_eq!(result, MutationResult::Mutated);
+            let parameter = input.0[1]
+                .get_mut_parameter("id", ParameterKind::Query)
+                .expect("Request got the wrong parameter");
+            assert!(parameter.is_reference());
+            assert_eq!(parameter.reference_index().copied(), Some(0));
+        }
+
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly skips mutation in cases where no link can be established.
+    #[test]
+    fn skip_establish_link() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            // In this case, the mutator should skip mutation because the parameters are in the wrong order
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut input = linked_requests();
+            input.0[1].parameters.insert(
+                ("id".into(), ParameterKind::Query),
+                ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
+            );
+            input.0.swap(0, 1);
+
+            let mut mutator = EstablishLinkMutator;
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Skipped);
+
+            // In this case, the mutator should skip mutation because has_return_value has the wrong method
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut input = linked_requests();
+            input.0[1].parameters.insert(
+                ("id".into(), ParameterKind::Query),
+                ParameterContents::Bytes(vec![0x0, 0x1, 0x2]),
+            );
+            input.0[0].method = Method::Delete;
+
+            let mut mutator = EstablishLinkMutator;
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Skipped);
+        }
+
+        Ok(())
+    }
+}

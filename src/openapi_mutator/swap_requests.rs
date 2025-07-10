@@ -78,3 +78,56 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use libafl::mutators::{MutationResult, Mutator};
+
+    use super::SwapRequestsMutator;
+    use crate::{
+        input::{Method, parameter::ParameterKind},
+        openapi_mutator::test_helpers::{linked_requests, simple_request},
+        state::tests::TestOpenApiFuzzerState,
+    };
+
+    /// Tests whether the mutator correctly swaps two simple requests.
+    #[test]
+    fn swap_simple_requests() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+
+            let mut input = simple_request();
+            input.0.push(input.0[0].clone());
+            input.0[1].method = Method::Delete;
+
+            let mut mutator = SwapRequestsMutator;
+            let result = mutator.mutate(&mut state, &mut input)?;
+
+            assert_eq!(result, MutationResult::Mutated);
+            assert_eq!(input.0[0].method, Method::Delete);
+            assert_eq!(input.0[1].method, Method::Get);
+        }
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly breaks any references when swapping requests.
+    #[test]
+    fn remove_references_when_swapping() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut input = linked_requests();
+            let mut mutator = SwapRequestsMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Mutated);
+            assert!(
+                input.0[0]
+                    .get_mut_parameter("id", ParameterKind::Query)
+                    .expect("Could not find parameter after request removal")
+                    .bytes()
+                    .is_some()
+            );
+        }
+        Ok(())
+    }
+}

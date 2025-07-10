@@ -381,3 +381,107 @@ where
         (&mut self.rand, &self.api)
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use libafl::state::HasRand;
+    use libafl_bolts::rands::StdRand;
+    use openapiv3::OpenAPI;
+
+    use super::HasRandAndOpenAPI;
+
+    pub struct TestOpenApiFuzzerState {
+        rand: StdRand,
+        openapi: OpenAPI,
+    }
+
+    impl TestOpenApiFuzzerState {
+        /// The paths that occur in the spec provided by this test state.
+        pub const PATHS: [&'static str; 3] = [
+            "/simple",
+            "/with-path-parameter/{id}",
+            "/with-query-parameter",
+        ];
+
+        pub fn new() -> Self {
+            const DUMMY_SPEC: &str = r#"
+            openapi: 3.0.4
+            info:
+                title: Dummy API
+                description: Dummy OpenAPI spec used to test the mutators
+                version: 0.1.0
+
+            paths:
+                /simple:
+                    get:
+                        responses:
+                            "200":
+                                description: OK
+                                content:
+                                    application/json:
+                                        schema:
+                                            type: object
+                                            properties:
+                                                id:
+                                                    type: integer
+                                                    description: The user ID.
+                    delete:
+                        responses:
+                            "200":
+                                description: OK
+                /with-path-parameter/{id}:
+                    get:
+                        responses:
+                            "200":
+                                description: OK
+                        parameters:
+                            - name: id
+                              in: path
+                              description: ID
+                              required: true
+                              schema:
+                                  type: integer
+                                  format: int64
+                /with-query-parameter:
+                    get:
+                        responses:
+                            "200":
+                                description: OK
+                        parameters:
+                            - name: id
+                              in: query
+                              description: ID
+                              required: true
+                              schema:
+                                  type: integer
+                                  format: int64
+            "#;
+
+            Self {
+                rand: StdRand::new(),
+                openapi: serde_yaml::from_str(DUMMY_SPEC)
+                    .expect("Failed to parse dummy OpenAPI spec"),
+            }
+        }
+    }
+
+    impl HasRandAndOpenAPI for TestOpenApiFuzzerState {
+        type Rand = StdRand;
+
+        fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &openapiv3::OpenAPI) {
+            (&mut self.rand, &self.openapi)
+        }
+    }
+
+    impl HasRand for TestOpenApiFuzzerState {
+        type Rand = StdRand;
+
+        fn rand(&self) -> &Self::Rand {
+            &self.rand
+        }
+
+        fn rand_mut(&mut self) -> &mut Self::Rand {
+            &mut self.rand
+        }
+    }
+}
