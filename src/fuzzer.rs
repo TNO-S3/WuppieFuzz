@@ -16,7 +16,7 @@ use libafl::{
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::{Executor, ExitKind, HasObservers},
     feedback_or,
-    feedbacks::{CrashFeedback, Feedback, MaxMapFeedback, TimeFeedback, simd::SimdMapFeedback},
+    feedbacks::{CrashFeedback, Feedback, MaxMapFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
@@ -30,7 +30,6 @@ use libafl_bolts::{
     current_nanos, current_time,
     prelude::OwnedMutSlice,
     rands::StdRand,
-    simd::{SimdMaxReducer, vector::u8x16},
     tuples::{MatchName, tuple_list},
 };
 use log::{error, info};
@@ -262,11 +261,9 @@ fn setup_endpoint_coverage<
         )
     }
     .track_novelties();
-    let endpoint_coverage_feedback: SimdMapFeedback<
+    let endpoint_coverage_feedback: MaxMapFeedback<
         ExplicitTracking<StdMapObserver<'_, u8, false>, false, true>,
         StdMapObserver<'_, u8, false>,
-        SimdMaxReducer,
-        u8x16,
     > = MaxMapFeedback::new(&endpoint_coverage_observer);
     Ok((
         endpoint_coverage_client,
@@ -278,11 +275,9 @@ fn setup_endpoint_coverage<
 type LineCovClientObserverFeedback<'a> = (
     Box<dyn CoverageClient>,
     ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
-    SimdMapFeedback<
+    MaxMapFeedback<
         ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
         StdMapObserver<'a, u8, false>,
-        SimdMaxReducer,
-        u8x16,
     >,
 );
 
