@@ -171,7 +171,6 @@ impl<'a> JacocoCoverageClient<'a> {
             let file_path = output_dir.join("jacoco_all.exec");
             let mut file = OpenOptions::new()
                 .create(true)
-                .write(true)
                 .append(true)
                 .truncate(false)
                 .open(&file_path)
