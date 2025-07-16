@@ -4,13 +4,15 @@
 
 ## Features
 
-- Added unit tests for mutators in 
+- Added unit tests for mutators in
   [#100](https://github.com/TNO-S3/WuppieFuzz/pull/100)
 
 ## Fixes
 
 - Updated [LibAFL](https://github.com/AFLplusplus/LibAFL) to 0.15.3 in
   [#107](https://github.com/TNO-S3/WuppieFuzz/pull/107)
+- Use a single file to store Jacoco exec data in
+  [#114](https://github.com/TNO-S3/WuppieFuzz/pull/114).
 
 # v1.2.0 (2025-02-21)
 
