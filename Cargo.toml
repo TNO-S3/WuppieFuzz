@@ -48,7 +48,7 @@ build_html = "2.6.0"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
 chrono = "0.4.41"
-clap = { version = "4.5.38", features = ["cargo", "derive", "env"] }
+clap = { version = "4.5.41", features = ["cargo", "derive", "env"] }
 cookie = "0.18.1"
 cookie_store = "0.21.1"
 ctrlc = "3.4.7"
