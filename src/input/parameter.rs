@@ -10,7 +10,7 @@ use openapiv3::Parameter;
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
-use super::new_rand_input;
+use super::utils::new_rand_input;
 
 /// Structs that help describe parameters to HTTP requests in a way that the fuzzer can still
 /// mutate and reason about. The ParameterKind enum describes the places a parameter can occur
