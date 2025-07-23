@@ -1,10 +1,12 @@
 use std::path::Path;
 
 use anyhow::Result;
+use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::inputs::Input;
 use log::{error, info, warn};
+use openapiv3::Server;
 
 use crate::{
     authentication::build_http_client,
@@ -22,12 +24,22 @@ use crate::{
 pub fn reproduce(input_file: &Path) -> Result<()> {
     let config = Configuration::get().map_err(anyhow::Error::msg)?;
     crate::setup_logging(config);
-    let api = crate::get_api_spec(
+    let mut api = crate::get_api_spec(
         config
             .openapi_spec
             .as_ref()
             .ok_or_else(|| anyhow!("No OpenAPI specification given"))?,
     )?;
+    // Override the `servers` field in the OpenAPI specification if a server override
+    // was specified on the CLI.
+    if let Some(server_override) = &config.target {
+        api.servers = vec![Server {
+            url: server_override.to_string(),
+            description: None,
+            variables: None,
+            extensions: IndexMap::new(),
+        }];
+    }
     let inputs = OpenApiInput::from_file(input_file)?;
 
     let (mut authentication, cookie_store, client) = build_http_client(&api)?;

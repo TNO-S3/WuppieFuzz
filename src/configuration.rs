@@ -48,6 +48,10 @@ pub enum Commands {
         /// OpenAPI specification
         #[arg(long, value_parser, value_name = "OPENAPI_SPEC.YAML")]
         openapi_spec: Option<PathBuf>,
+        /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
+        /// but you can use this option to override it.
+        #[arg(value_parser=verify_url, long)]
+        target: Option<Url>,
         /// How to log in to the API server. The value should be the name of a YAML file
         /// that contains the login configuration. See login.md for information on how
         /// to build one.
@@ -91,6 +95,10 @@ pub enum Commands {
         /// The OpenAPI specification of the program under test
         #[arg(long, value_name = "OPENAPI_SPEC.YAML")]
         openapi_spec: Option<PathBuf>,
+        /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
+        /// but you can use this option to override it.
+        #[arg(value_parser=verify_url, long)]
+        target: Option<Url>,
         /// How to log in to the API server. The value should be the name of a YAML file
         /// that contains the login configuration. See login.md for information on how
         /// to build one.
@@ -230,12 +238,14 @@ impl Commands {
         match self {
             Commands::VerifyAuth {
                 openapi_spec,
+                target,
                 authentication,
                 header,
                 log_level,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
+                target,
                 authentication,
                 header,
                 log_level,
@@ -243,12 +253,14 @@ impl Commands {
             }),
             Commands::Reproduce {
                 openapi_spec,
+                target,
                 authentication,
                 header,
                 log_level,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
+                target,
                 authentication,
                 header,
                 log_level,
