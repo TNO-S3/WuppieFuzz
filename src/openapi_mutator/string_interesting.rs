@@ -5,6 +5,7 @@ use std::borrow::Cow;
 
 use libafl::{
     Error,
+    corpus::CorpusId,
     inputs::{BytesInput, ResizableMutator},
     mutators::{MutationResult, Mutator},
     state::HasRand,
@@ -46,5 +47,9 @@ where
         input.resize(0, 0);
         input.extend(state.rand_mut().choose(INTERESTING_STR).unwrap());
         Ok(MutationResult::Mutated)
+    }
+
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }

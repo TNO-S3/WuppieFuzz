@@ -1,6 +1,4 @@
 use std::path::Path;
-#[cfg(windows)]
-use std::ptr::write_volatile;
 
 use anyhow::Result;
 #[allow(unused_imports)]

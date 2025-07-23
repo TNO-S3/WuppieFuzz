@@ -48,20 +48,20 @@ build_html = "2.6.0"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
 chrono = "0.4.41"
-clap = { version = "4.5.38", features = ["cargo", "derive", "env"] }
+clap = { version = "4.5.41", features = ["cargo", "derive", "env"] }
 cookie = "0.18.1"
 cookie_store = "0.21.1"
 ctrlc = "3.4.7"
 env_logger = "0.11.8"
 indexmap = { version = "2.9.0", features = ["serde"] }
-indicatif = "0.17.11"
+indicatif = "0.18.0"
 iter-read = "1.0.1"
 itertools = "0.14.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.4.0"
 lcov = "0.8"
-libafl = { version = "=0.15.0", features = ["clap"] }
-libafl_bolts = { version = "=0.15.0", features = ["prelude"] }
+libafl = { version = "=0.15.3", features = ["clap"] }
+libafl_bolts = { version = "=0.15.3", features = ["prelude"] }
 log = { version = "0.4.27", features = ["serde"] }
 num = { version = "0.4.2", default-features = false }
 num-derive = "0.4.2"
@@ -76,7 +76,7 @@ rand_regex = "0.18.1"
 regex = "1.11.1"
 reqwest = { version = "0.12.15", features = ["blocking", "json"] }
 reqwest_cookie_store = "0.8.0"
-rusqlite = { version = "0.35.0", features = ["bundled"] }
+rusqlite = { version = "0.37.0", features = ["bundled"] }
 serde = { version = "1.0", default-features = false, features = [
     "alloc",
     "derive",

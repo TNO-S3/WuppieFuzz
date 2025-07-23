@@ -6,6 +6,7 @@ use std::borrow::Cow;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     Error,
+    corpus::CorpusId,
     mutators::{MutationResult, Mutator},
     state::HasRand,
 };
@@ -65,5 +66,85 @@ where
         }
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
+    }
+
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use libafl::mutators::{MutationResult, Mutator};
+
+    use super::RemoveRequestMutator;
+    use crate::{
+        input::{ParameterContents, parameter::ParameterKind},
+        openapi_mutator::test_helpers::{linked_requests, simple_request},
+        state::tests::TestOpenApiFuzzerState,
+    };
+
+    /// Tests whether the mutator correctly removes a request from a list of 10 requests.
+    #[test]
+    fn remove_request() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut input = simple_request();
+            input.0.resize(10, input.0[0].clone());
+            let mut mutator = RemoveRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+
+            assert_eq!(input.0.len(), 9);
+            assert_eq!(result, MutationResult::Mutated);
+        }
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly keeps the request if it's the only one in the input.
+    #[test]
+    fn keep_single_request() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut input = simple_request();
+            let mut mutator = RemoveRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+
+            assert_eq!(input.0.len(), 1);
+            assert_eq!(result, MutationResult::Skipped);
+        }
+        Ok(())
+    }
+
+    /// Tests whether the mutator correctly fixes any references that may have changed due to the removal of a request.
+    #[test]
+    fn fix_references_when_removing() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut input = linked_requests();
+            input.0.insert(0, input.0[0].clone());
+            input.0[2].parameters.insert(
+                ("id".to_string(), ParameterKind::Query),
+                ParameterContents::Reference {
+                    request_index: 1,
+                    parameter_name: "id".to_string(),
+                },
+            );
+
+            let mut mutator = RemoveRequestMutator;
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Mutated);
+
+            if input.0[1].path == "/with-query-parameter" {
+                // If the first simple request was removed, we would expect a reference_index of 0.
+                // But if the second simple request was removed, we would expect the parameter to have been changed to ParameterContents::Bytes.
+                let parameter = input.0[1]
+                    .get_mut_parameter("id", ParameterKind::Query)
+                    .expect("Could not find parameter after request removal");
+                assert!(parameter.reference_index().is_none_or(|&mut idx| idx == 0));
+            }
+        }
+        Ok(())
     }
 }

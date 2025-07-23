@@ -1,12 +1,12 @@
 //! Mutates a request series by adding a new request to it. The new request is taken
 //! at random from the API specification.
 
-use std::{borrow::Cow, convert::TryInto};
+use std::{borrow::Cow, collections::BTreeMap, convert::TryInto};
 
-use indexmap::IndexMap;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     Error,
+    corpus::CorpusId,
     mutators::{MutationResult, Mutator},
 };
 use libafl_bolts::{Named, rands::Rand};
@@ -60,7 +60,7 @@ where
             api.operations().nth(new_path_i).unwrap();
         let (method, path) = (new_method.try_into().unwrap(), new_path.to_owned());
 
-        let mut parameters: IndexMap<(String, ParameterKind), ParameterContents> = new_op
+        let parameters: BTreeMap<(String, ParameterKind), ParameterContents> = new_op
             .parameters
             .iter()
             // Keep only concrete values and valid references
@@ -69,8 +69,7 @@ where
             .map(|param| (param.data.name.clone(), param.into()))
             .map(|name_kind| (name_kind, ParameterContents::Bytes(new_rand_input(rand))))
             .collect();
-        parameters.sort_keys();
-        let body_contents: Option<IndexMap<String, ParameterContents>> = new_op
+        let body_contents: Option<BTreeMap<String, ParameterContents>> = new_op
             .request_body
             .as_ref()
             .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
@@ -96,6 +95,10 @@ where
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
     }
+
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 fn field_names(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>> {
@@ -111,5 +114,42 @@ fn field_names(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>>
             Some(obj.properties.keys().cloned().collect())
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use libafl::mutators::{MutationResult, Mutator};
+
+    use super::AddRequestMutator;
+    use crate::{
+        input::{Method, OpenApiInput},
+        state::tests::TestOpenApiFuzzerState,
+    };
+
+    /// Tests whether the mutator adds a valid request (including parameters, if required for the chosen request).
+    #[test]
+    fn add_correct_request() -> anyhow::Result<()> {
+        for _ in 0..100 {
+            let mut state = TestOpenApiFuzzerState::new();
+            let mut input = OpenApiInput(vec![]);
+            let mut mutator = AddRequestMutator;
+
+            let result = mutator.mutate(&mut state, &mut input)?;
+            assert_eq!(result, MutationResult::Mutated);
+            assert_eq!(input.0.len(), 1);
+            assert!(TestOpenApiFuzzerState::PATHS.contains(&input.0[0].path.as_str()));
+            assert!(
+                input.0[0].method == Method::Get
+                    || (input.0[0].path == "/simple" && input.0[0].method == Method::Delete)
+            );
+            if input.0[0].path == "/with-query-parameter"
+                || input.0[0].path == "/with-path-parameter/{id}"
+            {
+                assert!(input.0[0].contains_parameter("id"));
+            }
+        }
+
+        Ok(())
     }
 }

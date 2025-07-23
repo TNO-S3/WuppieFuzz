@@ -4,8 +4,9 @@
 //! and the request body, but internally they are the same type. This requires a
 //! conversion to an intermediate type, which happens in this module.
 
+use std::collections::BTreeMap;
+
 use base64::{Engine as _, engine::general_purpose::STANDARD as base64};
-use indexmap::IndexMap;
 use serde::{
     de::{self, Deserialize, Deserializer},
     ser::{Serialize, Serializer},
@@ -36,8 +37,8 @@ pub struct SerializableOpenApiRequest {
 
     #[serde(default, skip_serializing_if = "Body::is_empty")]
     body: Body,
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    parameters: IndexMap<(String, ParameterKind), ParameterContents>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    parameters: BTreeMap<(String, ParameterKind), ParameterContents>,
 }
 
 impl From<OpenApiRequest> for SerializableOpenApiRequest {
