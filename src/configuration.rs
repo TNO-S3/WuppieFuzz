@@ -696,7 +696,7 @@ fn parse_socket_addr(arg: &str) -> Result<SocketAddr, io::Error> {
 
 fn verify_url(arg: &str) -> anyhow::Result<Url> {
     let url = url::Url::parse(arg)?;
-    if url.scheme().is_empty() {
+    if !url.scheme().starts_with("http") {
         bail!("The given URL does not start with a scheme (http(s)://)")
     }
     if url.host().is_none() {
