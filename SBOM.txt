@@ -82,13 +82,13 @@ cfg-if 1.0.1
 chrono 0.4.41
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.40
+clap 4.5.41
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.40
+clap_builder 4.5.41
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_derive 4.5.40
+clap_derive 4.5.41
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.5
