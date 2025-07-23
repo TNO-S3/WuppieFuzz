@@ -29,6 +29,7 @@ pub struct Cli {
 }
 
 /// The list of supported subcommands.
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand)]
 pub enum Commands {
     /// Print the version and exit
