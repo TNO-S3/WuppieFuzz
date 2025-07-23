@@ -127,8 +127,7 @@ pub enum Commands {
 
         /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
         /// but you can use this option to override it.
-        // TODO: add URL validation
-        #[arg(value_parser, long)]
+        #[arg(value_parser=verify_url, long)]
         target: Option<Url>,
 
         /// The host address of the coverage agent from which the coverage map can be obtained.
@@ -681,6 +680,17 @@ fn parse_socket_addr(arg: &str) -> Result<SocketAddr, io::Error> {
         ErrorKind::InvalidInput,
         "Could not parse socket address",
     ))
+}
+
+fn verify_url(arg: &str) -> anyhow::Result<Url> {
+    let url = url::Url::parse(arg)?;
+    if url.scheme().is_empty() {
+        bail!("The given URL does not start with a scheme (http(s)://)")
+    }
+    if url.host().is_none() {
+        bail!("The given URL does not seem to contain a hostname")
+    }
+    Ok(url)
 }
 
 #[cfg(test)]
