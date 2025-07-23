@@ -36,9 +36,11 @@ use anyhow::Result;
 use clap::Parser;
 use configuration::{Commands, OutputFormat};
 use env_logger::{Builder, Env};
+use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use log::warn;
+use openapiv3::Server;
 
 mod authentication;
 mod configuration;
@@ -70,7 +72,17 @@ pub fn main() -> Result<()> {
         Commands::VerifyAuth { .. } => {
             let config = &Configuration::get().map_err(anyhow::Error::msg)?;
             setup_logging(config);
-            let api = get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+            let mut api = get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+            // Override the `servers` field in the OpenAPI specification if a server override
+            // was specified on the CLI.
+            if let Some(server_override) = &config.target {
+                api.servers = vec![Server {
+                    url: server_override.as_str().trim_end_matches('/').to_string(),
+                    description: None,
+                    variables: None,
+                    extensions: IndexMap::new(),
+                }];
+            }
             authentication::verify_authentication(*api)
         }
         Commands::OutputCorpus {

@@ -9,6 +9,7 @@ use std::{
 use clap::{Parser, Subcommand, ValueEnum, value_parser};
 use libafl::schedulers::powersched::BaseSchedule;
 use serde::Deserialize;
+use url::Url;
 
 const DEFAULT_REQUEST_TIMEOUT: u64 = 30000;
 const DEFAULT_METHOD_MUTATION_STRATEGY: MethodMutationStrategy = MethodMutationStrategy::FollowSpec;
@@ -28,6 +29,7 @@ pub struct Cli {
 }
 
 /// The list of supported subcommands.
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand)]
 pub enum Commands {
     /// Print the version and exit
@@ -46,6 +48,10 @@ pub enum Commands {
         /// OpenAPI specification
         #[arg(long, value_parser, value_name = "OPENAPI_SPEC.YAML")]
         openapi_spec: Option<PathBuf>,
+        /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
+        /// but you can use this option to override it.
+        #[arg(value_parser=verify_url, long)]
+        target: Option<Url>,
         /// How to log in to the API server. The value should be the name of a YAML file
         /// that contains the login configuration. See login.md for information on how
         /// to build one.
@@ -89,6 +95,10 @@ pub enum Commands {
         /// The OpenAPI specification of the program under test
         #[arg(long, value_name = "OPENAPI_SPEC.YAML")]
         openapi_spec: Option<PathBuf>,
+        /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
+        /// but you can use this option to override it.
+        #[arg(value_parser=verify_url, long)]
+        target: Option<Url>,
         /// How to log in to the API server. The value should be the name of a YAML file
         /// that contains the login configuration. See login.md for information on how
         /// to build one.
@@ -122,6 +132,11 @@ pub enum Commands {
         /// The path to an initial corpus given as a directory with yaml files.
         #[arg(short, long, id = "initial_corpus", value_name = "CORPUS_DIRECTORY")]
         initial_corpus: Option<PathBuf>,
+
+        /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
+        /// but you can use this option to override it.
+        #[arg(value_parser=verify_url, long)]
+        target: Option<Url>,
 
         /// The host address of the coverage agent from which the coverage map can be obtained.
         /// Can be either a hostname or an IP address, and must include a port.
@@ -223,12 +238,14 @@ impl Commands {
         match self {
             Commands::VerifyAuth {
                 openapi_spec,
+                target,
                 authentication,
                 header,
                 log_level,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
+                target,
                 authentication,
                 header,
                 log_level,
@@ -236,12 +253,14 @@ impl Commands {
             }),
             Commands::Reproduce {
                 openapi_spec,
+                target,
                 authentication,
                 header,
                 log_level,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
+                target,
                 authentication,
                 header,
                 log_level,
@@ -250,6 +269,7 @@ impl Commands {
             Commands::Fuzz {
                 openapi_spec,
                 initial_corpus,
+                target: server,
                 coverage_host,
                 coverage_format,
                 timeout,
@@ -269,6 +289,7 @@ impl Commands {
             } => Ok(PartialConfiguration {
                 openapi_spec,
                 initial_corpus,
+                target: server,
                 coverage_host,
                 coverage_format,
                 timeout,
@@ -311,6 +332,11 @@ struct PartialConfiguration {
     /// The path to an initial corpus given as a directory with yaml files.
     #[clap(short, long, id = "initial_corpus", value_name = "CORPUS_DIRECTORY")]
     pub initial_corpus: Option<PathBuf>,
+
+    /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
+    /// but you can use this option to override it.
+    #[arg(value_parser, long)]
+    pub target: Option<Url>,
 
     /// The host address of the coverage agent from which the coverage map can be obtained.
     /// Can be either a hostname or an IP address, and must include a port.
@@ -447,6 +473,10 @@ pub struct Configuration {
     /// The path to an initial corpus given as a directory with yaml files.
     pub initial_corpus: Option<PathBuf>,
 
+    /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
+    /// but you can use this option to override it.
+    pub target: Option<Url>,
+
     /// The host address of the coverage agent from which the coverage map can be obtained.
     /// Can be either a hostname or an IP address, and must include a port.
     pub coverage_host: Option<SocketAddr>,
@@ -557,6 +587,7 @@ impl TryFrom<PartialConfiguration> for Configuration {
         Ok(Self {
             openapi_spec: value.openapi_spec,
             initial_corpus: value.initial_corpus,
+            target: value.target,
             coverage_host: value.coverage_host,
             coverage_configuration: match value.coverage_format {
                 Some(CoverageFormat::Jacoco) => CoverageConfiguration::Jacoco {
@@ -618,6 +649,7 @@ impl PartialConfiguration {
         *self = PartialConfiguration {
             openapi_spec: other.openapi_spec.or(self.openapi_spec.take()),
             initial_corpus: other.initial_corpus.or(self.initial_corpus.take()),
+            target: other.target.or(self.target.take()),
             coverage_host: other.coverage_host.or(self.coverage_host.take()),
             coverage_format: other.coverage_format.or(self.coverage_format.take()),
             timeout: other.timeout.or(self.timeout.take()),
@@ -660,6 +692,17 @@ fn parse_socket_addr(arg: &str) -> Result<SocketAddr, io::Error> {
         ErrorKind::InvalidInput,
         "Could not parse socket address",
     ))
+}
+
+fn verify_url(arg: &str) -> anyhow::Result<Url> {
+    let url = url::Url::parse(arg)?;
+    if !url.scheme().starts_with("http") {
+        bail!("The given URL does not start with a scheme (http(s)://)")
+    }
+    if url.host().is_none() {
+        bail!("The given URL does not seem to contain a hostname")
+    }
+    Ok(url)
 }
 
 #[cfg(test)]
