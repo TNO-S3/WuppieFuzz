@@ -60,7 +60,7 @@ pub fn fuzz() -> Result<()> {
     let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
     if let Some(server_override) = &config.target {
         api.servers = vec![Server {
-            url: server_override.to_string(),
+            url: server_override.as_str().trim_end_matches('/').to_string(),
             description: None,
             variables: None,
             extensions: IndexMap::new(),

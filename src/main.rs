@@ -77,7 +77,7 @@ pub fn main() -> Result<()> {
             // was specified on the CLI.
             if let Some(server_override) = &config.target {
                 api.servers = vec![Server {
-                    url: server_override.to_string(),
+                    url: server_override.as_str().trim_end_matches('/').to_string(),
                     description: None,
                     variables: None,
                     extensions: IndexMap::new(),
