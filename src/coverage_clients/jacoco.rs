@@ -61,7 +61,6 @@ pub struct JacocoCoverageClient<'a> {
     latest_coverage_information: Vec<u8>,
     jacoco_dump_output_dir: Option<PathBuf>,
     jacoco_prefix_filter: &'a Option<String>,
-    dump_index: usize,
 }
 
 struct JacocoCoverageSegment {
@@ -135,7 +134,6 @@ impl<'a> JacocoCoverageClient<'a> {
             latest_coverage_information: Vec::new(),
             jacoco_dump_output_dir,
             jacoco_prefix_filter: jacoco_prefix,
-            dump_index: 0,
         };
         Ok(result)
     }
@@ -168,13 +166,13 @@ impl<'a> JacocoCoverageClient<'a> {
 
     fn dump_jacoco_coverage_to_file(&mut self) {
         if let Some(ref output_dir) = self.jacoco_dump_output_dir {
-            let file_path = output_dir.join(format!("jacoco_{}.exec", self.dump_index));
-            self.dump_index += 1;
-
+            // Coverage is all written to the same file; jacoco coverage
+            // can simply be concatenated. We merge everything afterwards.
+            let file_path = output_dir.join("jacoco_all.exec");
             let mut file = OpenOptions::new()
                 .create(true)
-                .write(true)
-                .truncate(true)
+                .append(true)
+                .truncate(false)
                 .open(&file_path)
                 .unwrap_or_else(|err| panic!("Could not create file {file_path:?}: {err}"));
 
@@ -386,9 +384,7 @@ impl CoverageClient for JacocoCoverageClient<'_> {
                 "Trying to generate a Jacoco report, but there is no directory with Jacoco dump files"
             ),
         };
-
-        let jacoco_exec_path = jacoco_dump_dir.join("jacoco_report.exec");
-
+        let jacoco_merged_path = jacoco_dump_dir.join("jacoco_merged.exec");
         std::process::Command::new("java")
             .args(["-jar", "coverage_agents/java/jacococli.jar"])
             .arg("merge")
@@ -399,7 +395,7 @@ impl CoverageClient for JacocoCoverageClient<'_> {
                     .map(|entry| entry.path()),
             )
             .arg("--destfile")
-            .arg(&jacoco_exec_path)
+            .arg(&jacoco_merged_path)
             .status()
             .expect("Could not generate jacoco report, merge command of the jacococli.jar failed.");
 
@@ -415,7 +411,7 @@ impl CoverageClient for JacocoCoverageClient<'_> {
             .arg(source_dir)
             .arg("--html")
             .arg(jacoco_html_path)
-            .arg(jacoco_exec_path)
+            .arg(jacoco_merged_path)
             .status()
             .expect(
                 "Could not generate jacoco report, report command of the jacococli.jar failed.",
