@@ -306,7 +306,29 @@ fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
             .iter()
             .filter_map(|ref_or_schema| example_from_schema(api, ref_or_schema.resolve(api)))
             .next(),
-        _ => None,
+        openapiv3::SchemaKind::AllOf { all_of } => {
+            // If only a single property is in this AllOf, return an example from it.
+            if all_of.len() == 1 {
+                example_from_schema(api, all_of[0].resolve(api))
+            } else {
+                log::warn!(
+                    "Examples for SchemaKind::AllOf are not supported with more than one Schema."
+                );
+                None
+            }
+        }
+        openapiv3::SchemaKind::Any(_) => {
+            log::warn!(
+                "Examples for SchemaKind::Any are not supported - the kind is too flexible."
+            );
+            None
+        }
+        openapiv3::SchemaKind::Not { not: _ } => {
+            log::warn!(
+                "Examples for SchemaKind::Not are not supported - it is unclear what to generate."
+            );
+            None
+        }
     }
 }
 
@@ -325,7 +347,6 @@ fn interesting_params_from_schema(
         ignore_reference.push(reference);
     }
     let schema = schema.resolve(api);
-
     if schema.data.read_only {
         // schema property may only be sent in responses, never in requests.
         return vec![];
