@@ -288,6 +288,13 @@ fn interesting_params_from_media_type(
     result
 }
 
+fn log_schema_debug(schema: &Schema) {
+    if !log::log_enabled!(log::Level::Debug) {
+        log::warn!("To output the schema, run with --log-level=debug.");
+    }
+    log::debug!("{:?}", schema);
+}
+
 // Attempts to build a value that matches the given schema using default values
 fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
     if schema.data.read_only {
@@ -311,22 +318,27 @@ fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
             if all_of.len() == 1 {
                 example_from_schema(api, all_of[0].resolve(api))
             } else {
-                log::warn!(
-                    "Examples for SchemaKind::AllOf are not supported with more than one Schema."
-                );
+                log::warn!(concat!(
+                    "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
+                    "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
+                ));
+                log_schema_debug(schema);
                 None
             }
         }
         openapiv3::SchemaKind::Any(_) => {
             log::warn!(
-                "Examples for SchemaKind::Any are not supported - the kind is too flexible."
+                "Generating example parameters for this schema is not supported, it's too flexible."
             );
+            log_schema_debug(schema);
             None
         }
         openapiv3::SchemaKind::Not { not: _ } => {
-            log::warn!(
-                "Examples for SchemaKind::Not are not supported - it is unclear what to generate."
-            );
+            log::warn!(concat!(
+                "Generating example parameters for negated schemas is not supported, it is unclear what to generate. ",
+                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not"
+            ));
+            log_schema_debug(schema);
             None
         }
     }
