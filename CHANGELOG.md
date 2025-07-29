@@ -6,8 +6,10 @@
 
 - Added unit tests for mutators in
   [#100](https://github.com/TNO-S3/WuppieFuzz/pull/100)
-- Adds support for overriding the target server from the CLI in 
+- Adds support for overriding the target server from the CLI in
   [#111](https://github.com/TNO-S3/WuppieFuzz/pull/111)
+- Generate example parameters for the OpenAPI `allOf` keyword with just a
+  single schema in [#118](https://github.com/TNO-S3/WuppieFuzz/pull/118)
 
 ## Fixes
 

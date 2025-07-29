@@ -288,6 +288,13 @@ fn interesting_params_from_media_type(
     result
 }
 
+fn log_schema_debug(schema: &Schema) {
+    if !log::log_enabled!(log::Level::Debug) {
+        log::warn!("To output the schema, run with --log-level=debug.");
+    }
+    log::debug!("{schema:?}");
+}
+
 // Attempts to build a value that matches the given schema using default values
 fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
     if schema.data.read_only {
@@ -306,7 +313,34 @@ fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
             .iter()
             .filter_map(|ref_or_schema| example_from_schema(api, ref_or_schema.resolve(api)))
             .next(),
-        _ => None,
+        openapiv3::SchemaKind::AllOf { all_of } => {
+            // If only a single property is in this AllOf, return an example from it.
+            if all_of.len() == 1 {
+                example_from_schema(api, all_of[0].resolve(api))
+            } else {
+                log::warn!(concat!(
+                    "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
+                    "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
+                ));
+                log_schema_debug(schema);
+                None
+            }
+        }
+        openapiv3::SchemaKind::Any(_) => {
+            log::warn!(
+                "Generating example parameters for this schema is not supported, it's too flexible."
+            );
+            log_schema_debug(schema);
+            None
+        }
+        openapiv3::SchemaKind::Not { not: _ } => {
+            log::warn!(concat!(
+                "Generating example parameters for negated schemas is not supported, it is unclear what to generate. ",
+                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not"
+            ));
+            log_schema_debug(schema);
+            None
+        }
     }
 }
 
@@ -325,7 +359,6 @@ fn interesting_params_from_schema(
         ignore_reference.push(reference);
     }
     let schema = schema.resolve(api);
-
     if schema.data.read_only {
         // schema property may only be sent in responses, never in requests.
         return vec![];
