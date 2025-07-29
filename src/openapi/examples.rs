@@ -292,7 +292,7 @@ fn log_schema_debug(schema: &Schema) {
     if !log::log_enabled!(log::Level::Debug) {
         log::warn!("To output the schema, run with --log-level=debug.");
     }
-    log::debug!("{:?}", schema);
+    log::debug!("{schema:?}");
 }
 
 // Attempts to build a value that matches the given schema using default values
