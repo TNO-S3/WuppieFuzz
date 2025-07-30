@@ -15,7 +15,6 @@ use std::{
     path::Path,
 };
 
-use log::warn;
 use openapiv3::{OpenAPI, StatusCode};
 use petgraph::{
     prelude::{DiGraph, NodeIndex},
@@ -84,9 +83,10 @@ fn ops_from_subgraph<'a>(
         Ok(nodes) => nodes,
         Err(cycle) => {
             let operation = &subgraph[cycle.node_id()];
-            warn!(
+            log::warn!(
                 "While building initial corpus from the API specification, found operation with a self-cycle {} {}",
-                operation.method, operation.path
+                operation.method,
+                operation.path
             );
             return Err(cycle);
         }

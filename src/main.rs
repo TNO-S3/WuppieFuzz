@@ -89,11 +89,16 @@ pub fn main() -> Result<()> {
             corpus_directory,
             openapi_spec,
             report_path,
-        } => Ok(initial_corpus::generate_corpus_to_files(
-            &*get_api_spec(openapi_spec)?,
-            corpus_directory,
-            report_path.as_deref(),
-        )),
+            log_level: _,
+        } => {
+            let config = &Configuration::get().map_err(anyhow::Error::msg)?;
+            setup_logging(config);
+            Ok(initial_corpus::generate_corpus_to_files(
+                &*get_api_spec(openapi_spec)?,
+                corpus_directory,
+                report_path.as_deref(),
+            ))
+        }
         Commands::Reproduce { crash_file, .. } => reproducer::reproduce(crash_file),
         Commands::Fuzz { .. } => fuzzer::fuzz(),
     }

@@ -81,6 +81,12 @@ pub enum Commands {
         /// inferred relationships between the endpoints and their parameters
         #[arg(long, value_parser, value_name = "REPORTS/")]
         report_path: Option<PathBuf>,
+        // Manually added possible values below, since automatically showing possible values of an external (remote) enum
+        // such as log::LevelFilter is not well supported.
+        // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
+        /// Log level to output. This flag takes precedence over the environment variable. [possible values: off, error, warn, debug, info, trace]
+        #[arg(value_parser = clap::value_parser!(log::LevelFilter), long, value_enum, env = "LOG_LEVEL", ignore_case = true)]
+        log_level: Option<log::LevelFilter>,
     },
     /// Reproduce a crash file generated during an earlier fuzzing run
     Reproduce {
@@ -306,14 +312,24 @@ impl Commands {
                 log_level,
                 jacoco_class_prefix,
             }),
+            Commands::OutputCorpus {
+                corpus_directory: _,
+                openapi_spec,
+                report_path: _,
+                log_level,
+            } => Ok(PartialConfiguration {
+                openapi_spec: Some(openapi_spec),
+                log_level,
+                ..Default::default()
+            }),
             _ => Err(anyhow!(
-                "Tried to generate fuzzer configuration from a non-fuzz command line"
+                "Tried to generate a configuration for an unsupported command"
             )),
         }
     }
 }
 
-/// PartialConfiguration is a representation of a fuzzer configuration, obtained from the
+/// PartialConfiguration is a representation of a WupieFuzz configuration, obtained from the
 /// CLI or from a configuration file.
 ///
 /// Partial configurations are only one source, e.g. config file or command line.
