@@ -69,7 +69,10 @@ use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
 
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
-use crate::{parameter_feedback::ParameterFeedback, state::HasRandAndOpenAPI};
+use crate::{
+    input::parameter::ParameterAccess, parameter_feedback::ParameterFeedback,
+    state::HasRandAndOpenAPI,
+};
 
 pub mod method;
 pub mod parameter;
@@ -91,7 +94,7 @@ pub struct OpenApiRequest {
     pub path: String,
 
     pub body: Body,
-    pub parameters: BTreeMap<(String, ParameterKind), ParameterContents>,
+    pub parameters: BTreeMap<(ParameterAccess, ParameterKind), ParameterContents>,
 }
 
 #[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
@@ -153,14 +156,14 @@ impl OpenApiRequest {
         ) -> Result<(), libafl::Error> {
             if let ParameterContents::Reference {
                 request_index,
-                parameter_name,
+                parameter_access,
             } = parameter
             {
                 let resolved_backref = parameter_values
-                    .get(*request_index, parameter_name)
+                    .get(*request_index, parameter_access)
                     .ok_or_else(|| {
                         libafl::Error::unknown(format!(
-                            "invalid backreference to {request_index}:{parameter_name}"
+                            "invalid backreference to {request_index}:{parameter_access}"
                         ))
                     })?;
                 *parameter = ParameterContents::from(resolved_backref.clone());
@@ -218,10 +221,10 @@ impl OpenApiRequest {
                                     match first_level_concrete {
                                         // String must be handled separately, otherwise it gets surrounded by quotes.
                                         parameter::SimpleValue::String(inner_str) => {
-                                            encoded.append_pair(pair.0, inner_str)
+                                            encoded.append_pair(&pair.0.to_string(), inner_str)
                                         }
                                         _ => encoded.append_pair(
-                                            pair.0,
+                                            &pair.0.to_string(),
                                             first_level_concrete.to_string().as_str(),
                                         ),
                                     }
@@ -229,13 +232,13 @@ impl OpenApiRequest {
                                 ParameterContents::Array(inner_array) => encoded.extend_pairs(
                                     inner_array
                                         .iter()
-                                        .map(|element| (pair.0, element.to_string())),
+                                        .map(|element| (pair.0.to_string(), element.to_string())),
                                 ),
-                                ParameterContents::Object(inner_map) => encoded.extend_pairs(
-                                    inner_map
-                                        .iter()
-                                        .map(|(field, value)| (field, value.to_string())),
-                                ),
+                                ParameterContents::Object(inner_map) => {
+                                    encoded.extend_pairs(inner_map.iter().map(|(field, value)| {
+                                        (field.to_string(), value.to_string())
+                                    }))
+                                }
                                 _ => &mut encoded,
                             };
                         }
@@ -271,7 +274,7 @@ impl OpenApiRequest {
     /// If none exists, checks the body for a field with the given name.
     pub fn get_mut_parameter<'a>(
         &'a mut self,
-        name: &str,
+        name: &ParameterAccess,
         kind: ParameterKind,
     ) -> Option<&'a mut ParameterContents> {
         // Can't use or_else with a closure because you'd have to move self
@@ -299,7 +302,7 @@ impl OpenApiRequest {
     }
 
     /// Returns whether this request contains a parameter with the given name
-    pub fn contains_parameter(&self, find_name: &str) -> bool {
+    pub fn contains_parameter(&self, find_name: &ParameterAccess) -> bool {
         self.parameters
             .iter()
             .any(|((name, _), _)| name == find_name)
@@ -330,15 +333,17 @@ pub struct OpenApiInput(pub Vec<OpenApiRequest>);
 
 pub enum IterWrapper<'a> {
     WithOption(Option<&'a ParameterContents>),
-    WithIter(Iter<'a, String, ParameterContents>),
+    WithIter(Iter<'a, ParameterAccess, ParameterContents>),
 }
 
 impl<'a> Iterator for IterWrapper<'a> {
-    type Item = (Cow<'a, String>, &'a ParameterContents);
+    type Item = (Cow<'a, ParameterAccess>, &'a ParameterContents);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            IterWrapper::WithOption(o) => o.take().map(|c| (Cow::Owned(String::new()), c)),
+            IterWrapper::WithOption(o) => o
+                .take()
+                .map(|c| (Cow::Owned(ParameterAccess::new(vec![])), c)),
             IterWrapper::WithIter(i) => i.next().map(|(s, c)| (Cow::Borrowed(s), c)),
         }
     }
@@ -346,7 +351,7 @@ impl<'a> Iterator for IterWrapper<'a> {
 
 pub enum ParamContentsAtLevel0Wrapper<'a> {
     SimpleOption(Option<&'a mut ParameterContents>),
-    InObject(ValuesMut<'a, String, ParameterContents>),
+    InObject(ValuesMut<'a, ParameterAccess, ParameterContents>),
     InArray(std::slice::IterMut<'a, ParameterContents>),
 }
 
@@ -409,7 +414,15 @@ impl OpenApiInput {
     /// (request idx, param name, param location, target request idx, target name)
     pub fn reference_parameters(
         &self,
-    ) -> impl Iterator<Item = (usize, String, ParameterKind, usize, String)> + '_ {
+    ) -> impl Iterator<
+        Item = (
+            usize,
+            ParameterAccess,
+            ParameterKind,
+            usize,
+            ParameterAccess,
+        ),
+    > + '_ {
         self.0
             .iter()
             .enumerate()
@@ -440,8 +453,8 @@ impl OpenApiInput {
                     .filter_map(|(n, k, v)| match v {
                         ParameterContents::Reference {
                             request_index,
-                            parameter_name,
-                        } => Some(((n, k), (request_index, parameter_name))),
+                            parameter_access,
+                        } => Some(((n, k), (request_index, parameter_access))),
                         _ => None,
                     })
                     .map(move |((n, k), (ti, tn))| {
@@ -452,7 +465,7 @@ impl OpenApiInput {
 
     /// Returns an iterator that yields all named return values from all
     /// requests, along with the index of the request they appear in.
-    pub fn return_values<'a>(&self, api: &'a OpenAPI) -> Vec<(usize, &'a str)> {
+    pub fn return_values<'a>(&self, api: &'a OpenAPI) -> Vec<(usize, ParameterAccess)> {
         self.0
             .iter()
             .enumerate()
@@ -478,11 +491,15 @@ impl OpenApiInput {
                     })
                     // Finally if the schema is an object, extract its field names
                     .filter_map(|schema| match schema.resolve(api).kind {
-                        SchemaKind::Type(Type::Object(ref obj)) => Some(obj.properties.keys()),
+                        SchemaKind::Type(Type::Object(ref obj)) => Some(
+                            obj.properties
+                                .keys()
+                                .map(|s| ParameterAccess::from(s.clone())),
+                        ),
                         _ => None,
                     })
                     .flatten()
-                    .map(move |resps| (i, resps.as_ref()))
+                    .map(move |resps| (i, resps))
             })
             .collect()
     }
@@ -527,12 +544,12 @@ impl OpenApiInput {
                             // Note that a Reference parameter is not by itself named, but must be the value in an Object parameter.
                             // The parameter_name-field in a Reference only identifies the target of the Reference.
                             ParameterContents::Reference {
-                                parameter_name,
                                 request_index,
+                                parameter_access,
                             } => {
                                 log::warn!("Marked body parameter in request {idx} with name {name} for replacement.
                                         The body's immediate contents are however an (unnamed) reference, pointing to a parameter
-                                        with name {parameter_name} in request {request_index}.");
+                                        with name {parameter_access} in request {request_index}.");
                                 continue;
                             }
                             // Note that Array fields currently cannot be addressed as variable parameters.
@@ -602,7 +619,7 @@ impl Input for OpenApiInput {
             hasher.write(request.method.as_bytes());
             hasher.write(request.path.as_bytes());
             for (name, value) in &request.parameters {
-                hasher.write(name.0.as_bytes());
+                hasher.write(name.0.to_string().as_bytes());
                 hasher.write(&[name.1 as u8]);
                 hasher.write(value.to_string().as_bytes());
             }
@@ -648,7 +665,7 @@ where
     // Make a new set of parameter values by taking existing values that are still
     // relevant, and making up random new ones if none exist
     let (rand, api) = state.rand_mut_and_openapi();
-    let new_params: BTreeMap<(String, ParameterKind), ParameterContents> = api
+    let new_params: BTreeMap<(ParameterAccess, ParameterKind), ParameterContents> = api
         .operations()
         .nth(operation)
         .expect("fix_input_parameters called with out of bounds operation index")
@@ -658,7 +675,7 @@ where
         // Keep only concrete values and valid references
         .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
         // Convert to (parameter_name, parameter_kind) tuples
-        .map(|param| (param.data.name.clone(), param.into()))
+        .map(|param| (param.data.name.clone().into(), param.into()))
         .map(|(name, kind)| {
             let key = (name, kind);
             // Remove *AND RETURN*, meaning we *keep* the parameter for this key

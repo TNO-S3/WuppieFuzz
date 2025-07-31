@@ -36,7 +36,7 @@ pub fn build_request_from_input(
         match kind {
             ParameterKind::Query => query_params.push((name, value.to_url_encoding())),
             ParameterKind::Header => {
-                if let Ok(header_name) = HeaderName::from_bytes(name.as_bytes()) {
+                if let Ok(header_name) = HeaderName::from_bytes(name.to_string().as_bytes()) {
                     header_params.insert(header_name, value.to_header_value());
                 }
             }
@@ -49,7 +49,9 @@ pub fn build_request_from_input(
                     )
                 }
             }
-            ParameterKind::Cookie => cookie_params.push(Cookie::new(name, value.to_cookie_value())),
+            ParameterKind::Cookie => {
+                cookie_params.push(Cookie::new(name.to_string(), value.to_cookie_value()))
+            }
             ParameterKind::Body => unimplemented!("Body parameters are not supposed to occur here"),
         }
     }

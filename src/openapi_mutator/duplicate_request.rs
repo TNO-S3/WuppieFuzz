@@ -132,7 +132,7 @@ mod test {
             let new_request = &mut input.0[2];
             if new_request.path == "/with-query-parameter" {
                 let parameter = new_request
-                    .get_mut_parameter("id", ParameterKind::Query)
+                    .get_mut_parameter(&"id".into(), ParameterKind::Query)
                     .expect("Parameter was not correctly duplicated");
                 assert!(parameter.is_reference());
                 assert_eq!(parameter.reference_index().copied(), Some(0));

@@ -9,8 +9,10 @@
 //! later refers to an 'artist_id', there is an opportunity to match it to the 'id' found
 //! earlier.
 
+use std::default;
+
 use openapiv3::{
-    MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, SchemaKind,
+    MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, Schema, SchemaKind,
 };
 use porter_stemmer::stem;
 
@@ -18,13 +20,13 @@ use crate::{input::parameter::ParameterKind, openapi::JsonContent};
 
 /// A parameter name saved in two variants: the canonical name appearing in the spec,
 /// and the normalized form used for matching input and output parameters
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParameterNormalization<'a> {
-    pub name: &'a str,
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ParameterNormalization {
+    pub name: String,
     pub normalized: String,
 }
 
-impl<'a> ParameterNormalization<'a> {
+impl ParameterNormalization {
     /// Creates a new ParameterNormalization based on the parameter name given as `name`
     /// and an optional context. The context is understood to be the name of the object
     /// and the parameter name is then one of its properties. The normalization of
@@ -33,7 +35,7 @@ impl<'a> ParameterNormalization<'a> {
     /// Both the name and the context are 'stemmed', i.e. reduced to a base grammatical
     /// form, so the normalization is the same if a word is sometimes plural, or British
     /// and American spellings are mixed.
-    pub fn new(name: &'a str, context: Option<&str>) -> Self {
+    pub fn new(name: String, context: Option<&str>) -> Self {
         match context {
             Some(context) => {
                 // Catch the case where the context word is also included in the name,
@@ -45,18 +47,38 @@ impl<'a> ParameterNormalization<'a> {
                     Some(i) if (i != 0 && i != last && stem(context) == stem(&name[..i])) => {
                         &name[i + 1..]
                     }
-                    _ => name,
+                    _ => &name,
                 };
 
                 Self {
-                    name,
+                    name: name.clone(),
                     normalized: stem(context) + "|" + &stem(no_context_name),
                 }
             }
             None => Self {
-                name,
-                normalized: stem(name),
+                name: name.clone(),
+                normalized: stem(&name),
             },
+        }
+    }
+
+    pub fn new_nested(names: Vec<&str>, context: Option<&str>) -> Self {
+        // Consider only the last name as the name, and consider other names as context.
+        // This avoids the problem that stemming long words (as the ParameterNormalization does)
+        // truncates them. Long term we need a much better solution.
+        match names.len() {
+            0 => Self::new("".into(), context),
+            1 => Self::new(names[0].into(), context),
+            _ => {
+                let mut context_names = names.clone();
+                let last_name = context_names.split_off(names.len() - 1)[0].into();
+                let mut total_context = vec![];
+                if let Some(context_str) = context {
+                    total_context.push(context_str);
+                    total_context.extend(context_names);
+                }
+                Self::new(last_name, Some(&total_context.join("||")))
+            }
         }
     }
 }
@@ -67,7 +89,7 @@ pub fn normalize_parameters<'a>(
     api: &'a OpenAPI,
     path: &str,
     operation: &'a Operation,
-) -> Vec<(ParameterNormalization<'a>, ParameterKind)> {
+) -> Vec<(ParameterNormalization, ParameterKind)> {
     operation
         .parameters
         .iter()
@@ -82,14 +104,17 @@ pub fn normalize_parameters<'a>(
 ///
 /// A suitable context word is taken from the corresponding operation, and
 /// its stem is prepended to the stemmed parameter name.
-fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNormalization<'a> {
+fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNormalization {
     // extract a context word if possible
     match parameter.kind {
         // For a query parameter /resource?id=18, we want to extract
         // the 'resource' part as the context word, and return as the name
         // stem('resource') + "id"
         openapiv3::ParameterKind::Query { .. } => {
-            return ParameterNormalization::new(&parameter.data.name, path_context_component(path));
+            return ParameterNormalization::new(
+                parameter.data.name.clone(),
+                path_context_component(path),
+            );
         }
         // For a path parameter /resource/{id}/..., we want to extract
         // the 'resource' part as the context word, and return as the name
@@ -100,7 +125,7 @@ fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNor
         openapiv3::ParameterKind::Path { .. } => {
             if let Some(end) = path.find(&format!("/{{{}}}", parameter.data.name)) {
                 return ParameterNormalization::new(
-                    &parameter.data.name,
+                    parameter.data.name.clone(),
                     path_context_component(&path[..end]),
                 );
             }
@@ -111,7 +136,7 @@ fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNor
     // If we reach this point, either the spec didn't contain the data we
     // expect based on the OpenAPI specification, or it's a parameter kind
     // we can't find context for. Just return the "id" string.
-    ParameterNormalization::new(&parameter.data.name, None)
+    ParameterNormalization::new(parameter.data.name.clone(), None)
 }
 
 /// Normalizes response parameters.
@@ -125,7 +150,7 @@ pub fn normalize_response<'a>(
     api: &'a OpenAPI,
     path: &str,
     response: &'a Response,
-) -> Option<Vec<ParameterNormalization<'a>>> {
+) -> Option<Vec<ParameterNormalization>> {
     normalize_media_type(api, path, response.content.get_json_content()?)
 }
 
@@ -140,7 +165,7 @@ pub fn normalize_request_body<'a>(
     api: &'a OpenAPI,
     path: &str,
     body: &'a RequestBody,
-) -> Option<Vec<ParameterNormalization<'a>>> {
+) -> Option<Vec<ParameterNormalization>> {
     normalize_media_type(api, path, body.content.get_json_content()?)
 }
 
@@ -150,32 +175,79 @@ fn normalize_media_type<'a>(
     api: &'a OpenAPI,
     path: &str,
     media_type: &'a MediaType,
-) -> Option<Vec<ParameterNormalization<'a>>> {
+) -> Option<Vec<ParameterNormalization>> {
     let schema = media_type.schema.as_ref()?.resolve(api);
+    normalize_schema(api, path, schema)
+}
+
+fn normalize_schema<'a>(
+    api: &'a OpenAPI,
+    path: &str,
+    schema: &'a Schema,
+) -> Option<Vec<ParameterNormalization>> {
     match schema.kind {
-        SchemaKind::Type(openapiv3::Type::Object(ref o)) => Some(normalize_object_type(path, o)),
+        SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
+            Some(normalize_object_type(api, path, o))
+        }
         SchemaKind::Type(openapiv3::Type::Array(ref a)) => {
             let inner_schema = a.items.as_ref()?.resolve(api);
             match inner_schema.kind {
                 SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-                    Some(normalize_object_type(path, o))
+                    Some(normalize_object_type(api, path, o))
                 }
                 // No support for nested arrays - semantic meaning not obvious
                 _ => None,
             }
+        }
+        SchemaKind::Type(_) => {
+            // Other types do not have a name, return an empty vec so their key in the
+            // enclosing object/array is still included.
+            Some(vec![])
         }
         _ => None,
     }
 }
 
 fn normalize_object_type<'a>(
+    api: &'a OpenAPI,
     path: &str,
     object_type: &'a ObjectType,
-) -> Vec<ParameterNormalization<'a>> {
+) -> Vec<ParameterNormalization> {
+    log::warn!(
+        "Normalizing object type for path {path}:\n{:#?}",
+        object_type.properties.keys()
+    );
     object_type
         .properties
         .keys()
-        .map(|key| ParameterNormalization::new(key, path_context_component(path)))
+        .flat_map(|key| {
+            let mut normalized_params = vec![ParameterNormalization::new(
+                key.to_owned(),
+                path_context_component(path),
+            )];
+            let nested_schema = object_type.properties[key].resolve(api);
+            match nested_schema.kind {
+                SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
+                    for (subkey, subschema) in nested_schema.properties() {
+                        let subschema_resolved = subschema.resolve(api);
+                        let normalized_subs = normalize_schema(api, path, subschema_resolved).unwrap_or_default();
+                        normalized_params.push(ParameterNormalization::new_nested(vec![key, subkey], path_context_component(path)));
+                        normalized_params.extend(
+                            normalized_subs.into_iter().map(
+                                |item| ParameterNormalization::new_nested(
+                                    vec![key, subkey, &item.normalized],
+                                    path_context_component(path))
+                            )
+                        )
+                    }
+                }
+                _ => {
+                    log::error!("Ignoring schema {:#?} during normalize_object_type, only SchemaKind::Type with Object inside is considered.", nested_schema);
+                    ()
+                },
+            }
+            normalized_params
+        })
         .collect()
 }
 
@@ -199,52 +271,59 @@ mod tests {
     fn test_parameter_normalization_new() {
         assert_eq!(
             ParameterNormalization {
-                name: "widget",
+                name: "widget".into(),
                 normalized: "widget".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widget", None)
+            ParameterNormalization::new("widget".into(), None)
         );
         assert_eq!(
             ParameterNormalization {
-                name: "widgets",
+                name: "widgets".into(),
                 normalized: "widget".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widgets", None)
+            ParameterNormalization::new("widgets".into(), None)
         );
         assert_eq!(
             ParameterNormalization {
-                name: "widget",
+                name: "widget".into(),
                 normalized: "aircraft|widget".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widget", Some("aircraft"))
+            ParameterNormalization::new("widget".into(), Some("aircraft"))
         );
         assert_eq!(
             ParameterNormalization {
-                name: "widget",
+                name: "widget".into(),
                 normalized: "aircraft|widget".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widget", Some("aircrafts"))
+            ParameterNormalization::new("widget".into(), Some("aircrafts"))
         );
         assert_eq!(
             ParameterNormalization {
-                name: "country_id",
+                name: "country_id".into(),
                 normalized: "countri|id".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("country_id", Some("countries"))
+            ParameterNormalization::new("country_id".into(), Some("countries"))
         );
         assert_eq!(
             ParameterNormalization {
-                name: "id",
+                name: "id".into(),
                 normalized: "countri|id".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("id", Some("countries"))
+            ParameterNormalization::new("id".into(), Some("countries"))
         );
         assert_eq!(
             ParameterNormalization {
-                name: "widget_id",
+                name: "widget_id".into(),
                 normalized: "countri|widget_id".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widget_id", Some("countries"))
+            ParameterNormalization::new("widget_id".into(), Some("countries"))
         );
     }
 
