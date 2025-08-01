@@ -12,6 +12,8 @@ use serde::{
     ser::{Serialize, Serializer},
 };
 
+use crate::input::parameter::ParameterAccess;
+
 use super::{Body, Method, OpenApiRequest, ParameterContents, parameter::ParameterKind};
 
 pub(crate) fn serialize_bytes_to_b64<S>(bi: &[u8], serializer: S) -> Result<S::Ok, S::Error>
@@ -38,7 +40,7 @@ pub struct SerializableOpenApiRequest {
     #[serde(default, skip_serializing_if = "Body::is_empty")]
     body: Body,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    parameters: BTreeMap<(String, ParameterKind), ParameterContents>,
+    parameters: BTreeMap<(ParameterAccess, ParameterKind), ParameterContents>,
 }
 
 impl From<OpenApiRequest> for SerializableOpenApiRequest {

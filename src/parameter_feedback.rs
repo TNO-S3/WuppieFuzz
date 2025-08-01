@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde_json::Value;
 
 use crate::{
-    input::{Body, Method, OpenApiRequest, ParameterContents::Object},
+    input::{Body, Method, OpenApiRequest, ParameterContents::Object, parameter::ParameterAccess},
     openapi::validate_response::Response,
 };
 
@@ -11,10 +11,10 @@ use crate::{
 /// are made. This allows the harness to insert the values in subsequent requests
 /// if a parameter contains a backreference to an earlier request.
 #[derive(Debug, Clone)]
-pub struct ParameterFeedback(Vec<HashMap<String, Value>>);
+pub struct ParameterFeedback(Vec<HashMap<ParameterAccess, Value>>);
 
-impl From<&Vec<HashMap<String, Value>>> for ParameterFeedback {
-    fn from(collection: &Vec<HashMap<String, Value>>) -> Self {
+impl From<&Vec<HashMap<ParameterAccess, Value>>> for ParameterFeedback {
+    fn from(collection: &Vec<HashMap<ParameterAccess, Value>>) -> Self {
         Self(collection.clone())
     }
 }
@@ -44,12 +44,12 @@ impl ParameterFeedback {
     }
 
     /// Returns the value saved for the given request
-    pub fn get(&self, request_index: usize, param: &str) -> Option<&Value> {
+    pub fn get(&self, request_index: usize, param: &ParameterAccess) -> Option<&Value> {
         // Tuple indexing leads to clones... Better to implement as double hashmap?
         self.0.get(request_index)?.get(param)
     }
 
-    pub fn contains(&self, request_index: usize, param: &str) -> bool {
+    pub fn contains(&self, request_index: usize, param: &ParameterAccess) -> bool {
         self.0
             .get(request_index)
             .map(|m| m.contains_key(param))
@@ -58,7 +58,7 @@ impl ParameterFeedback {
 
     /// Adds the given parameter/value combination to memory. Returns whether successful
     /// (if the request index is out of bounds, false is returned).
-    pub fn set(&mut self, request_index: usize, param: String, value: Value) -> bool {
+    pub fn set(&mut self, request_index: usize, param: ParameterAccess, value: Value) -> bool {
         self.0
             .get_mut(request_index)
             .map(|m| m.insert(param, value))
@@ -77,7 +77,7 @@ impl ParameterFeedback {
             // Objects in responses: save all field/value combinations
             Ok(serde_json::Value::Object(hashmap)) => {
                 for (param, value) in hashmap.into_iter() {
-                    self.set(request_index, param, value);
+                    self.set(request_index, param.into(), value);
                 }
             }
             // Arrays in responses: take the first element, which should be an object,
@@ -87,7 +87,7 @@ impl ParameterFeedback {
             Ok(serde_json::Value::Array(vec)) => {
                 if let Some(serde_json::Value::Object(hashmap)) = vec.into_iter().next() {
                     for (param, value) in hashmap.into_iter() {
-                        self.set(request_index, param, value);
+                        self.set(request_index, param.into(), value);
                     }
                 }
             }
@@ -95,7 +95,7 @@ impl ParameterFeedback {
         }
         // We also record the values of any Set-Cookie headers
         for (name, value) in response.cookies() {
-            self.set(request_index, name, serde_json::Value::String(value));
+            self.set(request_index, name.into(), serde_json::Value::String(value));
         }
     }
 

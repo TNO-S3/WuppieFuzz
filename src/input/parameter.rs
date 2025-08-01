@@ -58,6 +58,91 @@ impl Display for SimpleValue {
     }
 }
 
+#[derive(
+    Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
+)]
+pub enum ParameterAccessElement {
+    Name(String),
+    Offset(usize),
+}
+
+impl From<String> for ParameterAccessElement {
+    fn from(value: String) -> Self {
+        if value.chars().all(|c| c.is_digit(10)) {
+            Self::Offset(value.parse().unwrap())
+        } else {
+            Self::Name(value)
+        }
+    }
+}
+
+impl From<String> for ParameterAccess {
+    fn from(value: String) -> Self {
+        Self::new(
+            value
+                .split("||")
+                .map(String::from)
+                .map(ParameterAccessElement::from)
+                .collect::<Vec<ParameterAccessElement>>(),
+        )
+    }
+}
+
+impl From<&str> for ParameterAccess {
+    fn from(value: &str) -> Self {
+        Self::new(
+            value
+                .split("||")
+                .map(String::from)
+                .map(ParameterAccessElement::from)
+                .collect::<Vec<ParameterAccessElement>>(),
+        )
+    }
+}
+
+#[derive(
+    Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
+)]
+pub struct ParameterAccess {
+    elements: Vec<ParameterAccessElement>,
+    str_repr: String,
+}
+
+impl ParameterAccess {
+    pub fn new(elements: Vec<ParameterAccessElement>) -> Self {
+        let mut result = Self {
+            elements: elements,
+            str_repr: "".to_string(),
+        };
+        result.str_repr = result.to_string();
+        result
+    }
+}
+
+impl Display for ParameterAccess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "{}",
+            self.elements
+                .clone()
+                .into_iter()
+                .map(|x| match &x {
+                    ParameterAccessElement::Name(name) => name.clone(),
+                    ParameterAccessElement::Offset(offset) => offset.to_string(),
+                })
+                .collect::<Vec<String>>()
+                .join("||")
+        )
+    }
+}
+
+impl AsRef<str> for ParameterAccess {
+    fn as_ref(&self) -> &str {
+        &self.str_repr
+    }
+}
+
 /// The contents of a parameter or of the body of an HTTP request made by the fuzzer.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
 #[serde(tag = "DataType", content = "Contents")]
@@ -67,7 +152,7 @@ pub enum ParameterContents {
     /// Mutators can attempt to mutate it using knowledge of the type, i.e. numbers
     /// will always be mutated into other numbers, and array elements can be shuffled.
     #[serde(rename = "Object")]
-    Object(BTreeMap<String, ParameterContents>),
+    Object(BTreeMap<ParameterAccess, ParameterContents>),
     #[serde(rename = "Array")]
     Array(Vec<ParameterContents>),
     #[serde(rename = "PrimitiveValue")]
@@ -95,7 +180,7 @@ pub enum ParameterContents {
         #[serde(rename = "request")]
         request_index: usize,
         #[serde(rename = "parameter_name")]
-        parameter_name: String,
+        parameter_access: ParameterAccess,
     },
 }
 
@@ -115,7 +200,7 @@ impl ParameterContents {
             ParameterContents::Object(v) => {
                 let mut json_map = Map::new();
                 for (k, v) in v.iter() {
-                    json_map.insert(k.clone(), v.to_value());
+                    json_map.insert(k.clone().to_string(), v.to_value());
                 }
                 Some(Value::Object(json_map).to_string().into_bytes().into())
             }
@@ -157,7 +242,7 @@ impl ParameterContents {
             ParameterContents::Object(content) => {
                 let mut json_map = Map::new();
                 for (key, val) in content {
-                    json_map.insert(key.clone(), val.to_value());
+                    json_map.insert(key.clone().to_string(), val.to_value());
                 }
                 Value::Object(json_map)
             }
@@ -220,14 +305,17 @@ impl Display for ParameterContents {
             ParameterContents::Bytes(bi) => Base64Display::new(bi, &STANDARD).fmt(f),
             ParameterContents::Reference {
                 request_index,
-                parameter_name,
-            } => write!(f, "parameter {parameter_name} from request {request_index}"),
+                parameter_access,
+            } => write!(
+                f,
+                "parameter {parameter_access} from request {request_index}"
+            ),
         }
     }
 }
 
-impl From<BTreeMap<String, ParameterContents>> for ParameterContents {
-    fn from(value: BTreeMap<String, ParameterContents>) -> Self {
+impl From<BTreeMap<ParameterAccess, ParameterContents>> for ParameterContents {
+    fn from(value: BTreeMap<ParameterAccess, ParameterContents>) -> Self {
         ParameterContents::Object(value)
     }
 }
@@ -263,7 +351,7 @@ impl From<Value> for ParameterContents {
             Value::Object(content) => Self::Object(
                 content
                     .into_iter()
-                    .map(|(key, val)| (key, ParameterContents::from(val)))
+                    .map(|(key, val)| (key.into(), ParameterContents::from(val)))
                     .collect(),
             ),
         }
