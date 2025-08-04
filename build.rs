@@ -6,10 +6,11 @@ use cargo_license::{GetDependenciesOpt, get_dependencies_from_cargo_lock};
 
 fn main() {
     let dependencies = get_dependencies_from_cargo_lock(
-        Default::default(),
-        GetDependenciesOpt {
+        &Default::default(),
+        &GetDependenciesOpt {
             avoid_dev_deps: true,
             avoid_build_deps: true,
+            avoid_proc_macros: true,
             direct_deps_only: false,
             root_only: false,
         },

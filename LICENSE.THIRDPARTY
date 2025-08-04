@@ -29,7 +29,6 @@ the following restrictions:
 Components:
 
 - const_format
-- const_format_proc_macros
 - const_panic
 
 ===============================================================================
