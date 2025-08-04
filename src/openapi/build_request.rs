@@ -1,5 +1,5 @@
 use anyhow::Context;
-use cookie::Cookie;
+use reqwest_cookie_store::RawCookie as Cookie;
 use openapiv3::OpenAPI;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
