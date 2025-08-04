@@ -87,7 +87,7 @@ mod test {
             assert_eq!(result, MutationResult::Mutated);
             assert!(
                 input.0[1]
-                    .get_mut_parameter("id", ParameterKind::Query)
+                    .get_mut_parameter(&"id".into(), ParameterKind::Query)
                     .expect("Could not find parameter after request removal")
                     .bytes()
                     .is_some()
