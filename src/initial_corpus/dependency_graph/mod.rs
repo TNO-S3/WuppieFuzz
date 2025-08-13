@@ -146,12 +146,12 @@ fn add_references_to_openapi_input(
         // placeholder Value based on e.g. an example or its type) into a Reference to
         // the parameter of the same name and kind in the source.
         if let Some(x) = openapi_input.0[target_index].get_mut_parameter(
-            &edge.weight().name_input.clone().into(),
+            &edge.weight().name_input.clone(),
             edge.weight().kind_input,
         ) {
             *x = ParameterContents::Reference {
                 request_index: source_index,
-                parameter_access: edge.weight().name_output.clone().into(),
+                parameter_access: edge.weight().name_output.clone(),
             };
         }
     }
@@ -367,9 +367,8 @@ fn find_links<'a>(
     outputs_from_1: &'a [ParameterNormalization],
     inputs_to_2: &'a [(ParameterNormalization, ParameterKind)],
 ) -> Vec<ParameterMatching> {
-    log::warn!("OUTPUTS:\n{:#?}\n", outputs_from_1);
-    log::warn!("INPUTS:\n{:#?}\n", inputs_to_2);
     // Return the first input to 2 that is returned from 1
+    
     inputs_to_2
         .iter()
         .filter_map(|input| {
@@ -379,10 +378,9 @@ fn find_links<'a>(
                     .find(|output| {
                         output.normalized == input.0.normalized || output.name == input.0.name
                     })?
-                    .name
-                    .clone()
-                    .into(),
-                name_input: input.0.name.clone().into(),
+                    .nested_context
+                    .clone(),
+                name_input: input.0.nested_context.clone(),
                 normalized: input.0.normalized.clone(),
                 kind_input: input.1,
             })
@@ -399,27 +397,6 @@ fn inout_params<'a>(
     Vec<(ParameterNormalization, ParameterKind)>,
     Vec<ParameterNormalization>,
 ) {
-    let test: Vec<_> = op
-        .operation
-        .responses
-        .responses
-        .iter()
-        .filter(|(status_code, _)| status_is_2xx(status_code))
-        .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
-        .collect();
-    log::error!("TEST\n{:#?}", test);
-    let test2: Vec<_> = op
-        .operation
-        .responses
-        .responses
-        .iter()
-        .filter(|(status_code, _)| status_is_2xx(status_code))
-        .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
-        .filter_map(|response| normalize_response(api, op.path, response))
-        .flatten() // Combine all 2XX responses, if multiple
-        .collect();
-    log::error!("TEST2\n{:#?}", test2);
-
     // Outputs from a request are all field names from the response body. Collect them.
     let mut output_fields: Vec<_> = op
         .operation
@@ -434,10 +411,6 @@ fn inout_params<'a>(
 
     // Inputs to a request are all parameters. Collect those.
     let mut input_fields = normalize_parameters(api, op.path, op.operation);
-    log::warn!(
-        "INPUT FIELDS:\n{:#?}\n\n**********************",
-        input_fields
-    );
 
     // For POST requests, also consider input parameters as output parameters!
     // (Choose your own name or ID and still be able to use it in later GET requests etc)
@@ -452,7 +425,6 @@ fn inout_params<'a>(
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
         .find_map(|body| normalize_request_body(api, op.path, body))
         .unwrap_or_default();
-    log::error!("FINAL body fields: {:#?}", body_fields);
     if op.method == Method::Post {
         output_fields.extend(body_fields);
     } else {

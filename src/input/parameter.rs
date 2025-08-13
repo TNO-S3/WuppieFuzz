@@ -5,8 +5,9 @@ use std::{
 };
 
 use base64::{Engine as _, display::Base64Display, engine::general_purpose::STANDARD};
+use itertools::Itertools;
 use libafl_bolts::rands::Rand;
-use openapiv3::Parameter;
+use openapiv3::{Parameter, Schema};
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
@@ -66,9 +67,22 @@ pub enum ParameterAccessElement {
     Offset(usize),
 }
 
+impl Display for ParameterAccessElement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ParameterAccessElement::Name(name) => name.clone(),
+                ParameterAccessElement::Offset(offset) => offset.to_string(),
+            }
+        )
+    }
+}
+
 impl From<String> for ParameterAccessElement {
     fn from(value: String) -> Self {
-        if value.chars().all(|c| c.is_digit(10)) {
+        if value.chars().all(|c| c.is_ascii_digit()) {
             Self::Offset(value.parse().unwrap())
         } else {
             Self::Name(value)
@@ -78,9 +92,17 @@ impl From<String> for ParameterAccessElement {
 
 impl From<String> for ParameterAccess {
     fn from(value: String) -> Self {
+        // Split off the context, we only want keys/offsets in the object/arrays
+        let string_split = value.split("//");
+        let split_len = string_split.clone().count();
+        if split_len > 2 {
+            log::error!("Bad parameter access: {value:?}");
+        }
+        // TODO: Add test, could split_len == 0?
         Self::new(
-            value
-                .split("||")
+            string_split
+                .skip(split_len - 1)
+                .flat_map(|element| element.split('/'))
                 .map(String::from)
                 .map(ParameterAccessElement::from)
                 .collect::<Vec<ParameterAccessElement>>(),
@@ -92,7 +114,7 @@ impl From<&str> for ParameterAccess {
     fn from(value: &str) -> Self {
         Self::new(
             value
-                .split("||")
+                .split("//")
                 .map(String::from)
                 .map(ParameterAccessElement::from)
                 .collect::<Vec<ParameterAccessElement>>(),
@@ -101,21 +123,62 @@ impl From<&str> for ParameterAccess {
 }
 
 #[derive(
-    Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
+    Default,
+    Clone,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
 )]
 pub struct ParameterAccess {
-    elements: Vec<ParameterAccessElement>,
-    str_repr: String,
+    pub elements: Vec<ParameterAccessElement>,
+    as_ref_repr: String,
 }
 
 impl ParameterAccess {
     pub fn new(elements: Vec<ParameterAccessElement>) -> Self {
         let mut result = Self {
-            elements: elements,
-            str_repr: "".to_string(),
+            elements: elements.clone(),
+            as_ref_repr: elements.into_iter().map(|x| x.to_string()).join(""),
         };
-        result.str_repr = result.to_string();
+        result.as_ref_repr = result.to_string();
         result
+    }
+
+    pub fn parameter_accesses_from_schema(
+        parent_access: ParameterAccess,
+        schema: &openapiv3::RefOr<Schema>,
+        api: &openapiv3::OpenAPI,
+    ) -> Vec<ParameterAccess> {
+        match schema.resolve(api).kind {
+            openapiv3::SchemaKind::Type(openapiv3::Type::Object(ref obj)) => obj
+                .properties
+                .iter()
+                .flat_map(|(name, child_schema)| {
+                    let mut accesses = vec![];
+                    let current_access =
+                        parent_access.with_new_element(ParameterAccessElement::Name(name.clone()));
+                    accesses.push(current_access.clone());
+                    accesses.extend(Self::parameter_accesses_from_schema(
+                        current_access,
+                        child_schema,
+                        api,
+                    ));
+                    accesses
+                })
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    pub fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {
+        let mut elements = self.elements.clone();
+        elements.push(new_element);
+        Self::new(elements)
     }
 }
 
@@ -127,19 +190,16 @@ impl Display for ParameterAccess {
             self.elements
                 .clone()
                 .into_iter()
-                .map(|x| match &x {
-                    ParameterAccessElement::Name(name) => name.clone(),
-                    ParameterAccessElement::Offset(offset) => offset.to_string(),
-                })
+                .map(|x| x.to_string())
                 .collect::<Vec<String>>()
-                .join("||")
+                .join("/")
         )
     }
 }
 
 impl AsRef<str> for ParameterAccess {
     fn as_ref(&self) -> &str {
-        &self.str_repr
+        &self.as_ref_repr
     }
 }
 

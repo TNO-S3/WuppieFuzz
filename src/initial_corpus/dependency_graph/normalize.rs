@@ -9,14 +9,15 @@
 //! later refers to an 'artist_id', there is an opportunity to match it to the 'id' found
 //! earlier.
 
-use std::default;
-
 use openapiv3::{
     MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, Schema, SchemaKind,
 };
 use porter_stemmer::stem;
 
-use crate::{input::parameter::ParameterKind, openapi::JsonContent};
+use crate::{
+    input::parameter::{ParameterAccess, ParameterAccessElement, ParameterKind},
+    openapi::JsonContent,
+};
 
 /// A parameter name saved in two variants: the canonical name appearing in the spec,
 /// and the normalized form used for matching input and output parameters
@@ -24,6 +25,8 @@ use crate::{input::parameter::ParameterKind, openapi::JsonContent};
 pub struct ParameterNormalization {
     pub name: String,
     pub normalized: String,
+    pub path_context: Option<String>,
+    pub nested_context: ParameterAccess,
 }
 
 impl ParameterNormalization {
@@ -35,50 +38,21 @@ impl ParameterNormalization {
     /// Both the name and the context are 'stemmed', i.e. reduced to a base grammatical
     /// form, so the normalization is the same if a word is sometimes plural, or British
     /// and American spellings are mixed.
-    pub fn new(name: String, context: Option<&str>) -> Self {
-        match context {
-            Some(context) => {
-                // Catch the case where the context word is also included in the name,
-                // like `widget_id` for context `widgets`. Often, this same value is then
-                // called `id` in other context, such as when part of a `Widget` object
-                // in a body.
-                let last = name.len() - 1;
-                let no_context_name = match name.find('_') {
-                    Some(i) if (i != 0 && i != last && stem(context) == stem(&name[..i])) => {
-                        &name[i + 1..]
-                    }
-                    _ => &name,
-                };
-
-                Self {
-                    name: name.clone(),
-                    normalized: stem(context) + "|" + &stem(no_context_name),
-                }
-            }
-            None => Self {
-                name: name.clone(),
-                normalized: stem(&name),
-            },
-        }
-    }
-
-    pub fn new_nested(names: Vec<&str>, context: Option<&str>) -> Self {
-        // Consider only the last name as the name, and consider other names as context.
-        // This avoids the problem that stemming long words (as the ParameterNormalization does)
-        // truncates them. Long term we need a much better solution.
-        match names.len() {
-            0 => Self::new("".into(), context),
-            1 => Self::new(names[0].into(), context),
-            _ => {
-                let mut context_names = names.clone();
-                let last_name = context_names.split_off(names.len() - 1)[0].into();
-                let mut total_context = vec![];
-                if let Some(context_str) = context {
-                    total_context.push(context_str);
-                    total_context.extend(context_names);
-                }
-                Self::new(last_name, Some(&total_context.join("||")))
-            }
+    ///
+    /// In general, the context is the URL-path and the name is the name of the parameter.
+    /// For Body parameters, the name is a '/'-separated list of names and indices
+    /// to identify a parameter (like in ParameterAccess).
+    pub fn new(nested_access: ParameterAccess, path_context: Option<String>) -> Self {
+        let normal_name = nested_access
+            .elements
+            .last()
+            .unwrap_or(&ParameterAccessElement::Name("".to_owned()))
+            .to_string();
+        Self {
+            name: normal_name.clone(),
+            normalized: stem(&normal_name),
+            path_context,
+            nested_context: nested_access,
         }
     }
 }
@@ -104,7 +78,7 @@ pub fn normalize_parameters<'a>(
 ///
 /// A suitable context word is taken from the corresponding operation, and
 /// its stem is prepended to the stemmed parameter name.
-fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNormalization {
+fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalization {
     // extract a context word if possible
     match parameter.kind {
         // For a query parameter /resource?id=18, we want to extract
@@ -112,7 +86,7 @@ fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNor
         // stem('resource') + "id"
         openapiv3::ParameterKind::Query { .. } => {
             return ParameterNormalization::new(
-                parameter.data.name.clone(),
+                parameter.data.name.clone().into(),
                 path_context_component(path),
             );
         }
@@ -125,7 +99,7 @@ fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNor
         openapiv3::ParameterKind::Path { .. } => {
             if let Some(end) = path.find(&format!("/{{{}}}", parameter.data.name)) {
                 return ParameterNormalization::new(
-                    parameter.data.name.clone(),
+                    parameter.data.name.clone().into(),
                     path_context_component(&path[..end]),
                 );
             }
@@ -136,7 +110,7 @@ fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNor
     // If we reach this point, either the spec didn't contain the data we
     // expect based on the OpenAPI specification, or it's a parameter kind
     // we can't find context for. Just return the "id" string.
-    ParameterNormalization::new(parameter.data.name.clone(), None)
+    ParameterNormalization::new(parameter.data.name.clone().into(), None)
 }
 
 /// Normalizes response parameters.
@@ -213,37 +187,32 @@ fn normalize_object_type<'a>(
     path: &str,
     object_type: &'a ObjectType,
 ) -> Vec<ParameterNormalization> {
-    log::warn!(
-        "Normalizing object type for path {path}:\n{:#?}",
-        object_type.properties.keys()
-    );
     object_type
         .properties
         .keys()
         .flat_map(|key| {
             let mut normalized_params = vec![ParameterNormalization::new(
-                key.to_owned(),
+                key.to_owned().into(),
                 path_context_component(path),
             )];
             let nested_schema = object_type.properties[key].resolve(api);
             match nested_schema.kind {
-                SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
+                SchemaKind::Type(openapiv3::Type::Object(ref _o )) => {
                     for (subkey, subschema) in nested_schema.properties() {
                         let subschema_resolved = subschema.resolve(api);
                         let normalized_subs = normalize_schema(api, path, subschema_resolved).unwrap_or_default();
-                        normalized_params.push(ParameterNormalization::new_nested(vec![key, subkey], path_context_component(path)));
+                        normalized_params.push(ParameterNormalization::new(ParameterAccess::new(vec![key.to_owned().into(), subkey.to_owned().into()]), path_context_component(path)));
                         normalized_params.extend(
                             normalized_subs.into_iter().map(
-                                |item| ParameterNormalization::new_nested(
-                                    vec![key, subkey, &item.normalized],
+                                |item| ParameterNormalization::new(
+                                    ParameterAccess::new([key, subkey, &item.normalized].iter().map(|s| s.to_string().into()).collect()),
                                     path_context_component(path))
                             )
                         )
                     }
                 }
                 _ => {
-                    log::error!("Ignoring schema {:#?} during normalize_object_type, only SchemaKind::Type with Object inside is considered.", nested_schema);
-                    ()
+                    log::debug!("Ignoring schema {nested_schema:#?} during normalize_object_type, only SchemaKind::Type with Object inside is considered.");
                 },
             }
             normalized_params
@@ -257,9 +226,10 @@ fn normalize_object_type<'a>(
 /// For a path like /albums/{album_id}/songs, you get songs, so the answer is songs.
 /// This function chooses splits the path at {parameters}, and from the last section
 /// chooses the first component.
-fn path_context_component(path: &str) -> Option<&str> {
+fn path_context_component(path: &str) -> Option<String> {
     path.rsplit('}')
         .flat_map(|series| series.split('/'))
+        .map(|x| x.to_owned())
         .find(|component| !component.is_empty() && !component.starts_with('{'))
 }
 
@@ -291,7 +261,7 @@ mod tests {
                 normalized: "aircraft|widget".into(),
                 ..Default::default()
             },
-            ParameterNormalization::new("widget".into(), Some("aircraft"))
+            ParameterNormalization::new("widget".into(), Some("aircraft".to_owned()))
         );
         assert_eq!(
             ParameterNormalization {
@@ -299,7 +269,7 @@ mod tests {
                 normalized: "aircraft|widget".into(),
                 ..Default::default()
             },
-            ParameterNormalization::new("widget".into(), Some("aircrafts"))
+            ParameterNormalization::new("widget".into(), Some("aircrafts".to_owned()))
         );
         assert_eq!(
             ParameterNormalization {
@@ -307,7 +277,7 @@ mod tests {
                 normalized: "countri|id".into(),
                 ..Default::default()
             },
-            ParameterNormalization::new("country_id".into(), Some("countries"))
+            ParameterNormalization::new("country_id".into(), Some("countries".to_owned()))
         );
         assert_eq!(
             ParameterNormalization {
@@ -315,7 +285,7 @@ mod tests {
                 normalized: "countri|id".into(),
                 ..Default::default()
             },
-            ParameterNormalization::new("id".into(), Some("countries"))
+            ParameterNormalization::new("id".into(), Some("countries".to_owned()))
         );
         assert_eq!(
             ParameterNormalization {
@@ -323,22 +293,40 @@ mod tests {
                 normalized: "countri|widget_id".into(),
                 ..Default::default()
             },
-            ParameterNormalization::new("widget_id".into(), Some("countries"))
+            ParameterNormalization::new("widget_id".into(), Some("countries".to_owned()))
         );
     }
 
     #[test]
     fn test_path_last_component() {
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/"));
-        assert_eq!(Some("bbb"), path_context_component("/bbb"));
-        assert_eq!(Some("bbb"), path_context_component("/bbb/"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/{ccc}"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/{ccc}/"));
-        assert_eq!(Some("ccc"), path_context_component("/aaa/{bbb}/ccc"));
-        assert_eq!(Some("ccc"), path_context_component("/aaa/{bbb}/ccc/"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/{ccc}"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/{ccc}/"));
+        assert_eq!(Some("aaa".to_owned()), path_context_component("/aaa/bbb"));
+        assert_eq!(Some("aaa".to_owned()), path_context_component("/aaa/bbb/"));
+        assert_eq!(Some("bbb".to_owned()), path_context_component("/bbb"));
+        assert_eq!(Some("bbb".to_owned()), path_context_component("/bbb/"));
+        assert_eq!(
+            Some("aaa".to_owned()),
+            path_context_component("/aaa/bbb/{ccc}")
+        );
+        assert_eq!(
+            Some("aaa".to_owned()),
+            path_context_component("/aaa/bbb/{ccc}/")
+        );
+        assert_eq!(
+            Some("ccc".to_owned()),
+            path_context_component("/aaa/{bbb}/ccc")
+        );
+        assert_eq!(
+            Some("ccc".to_owned()),
+            path_context_component("/aaa/{bbb}/ccc/")
+        );
+        assert_eq!(
+            Some("aaa".to_owned()),
+            path_context_component("/aaa/bbb/{ccc}")
+        );
+        assert_eq!(
+            Some("aaa".to_owned()),
+            path_context_component("/aaa/bbb/{ccc}/")
+        );
         assert_eq!(None, path_context_component(""));
         assert_eq!(None, path_context_component("/"));
         assert_eq!(None, path_context_component("/{aaa}"));

@@ -65,7 +65,7 @@ use std::{
 use ahash::RandomState;
 use libafl::{Error, corpus::CorpusId, inputs::Input};
 use libafl_bolts::{HasLen, fs::write_file_atomic, rands::Rand};
-use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
+use openapiv3::{OpenAPI, Operation};
 
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
@@ -94,6 +94,8 @@ pub struct OpenApiRequest {
     pub path: String,
 
     pub body: Body,
+    // TODO: make this use String keys again?
+    // Also, have a separate BTreeMap for each parameter kind (use Kind as key in enclosing BTreeMap)
     pub parameters: BTreeMap<(ParameterAccess, ParameterKind), ParameterContents>,
 }
 
@@ -221,10 +223,10 @@ impl OpenApiRequest {
                                     match first_level_concrete {
                                         // String must be handled separately, otherwise it gets surrounded by quotes.
                                         parameter::SimpleValue::String(inner_str) => {
-                                            encoded.append_pair(&pair.0.to_string(), inner_str)
+                                            encoded.append_pair(pair.0.as_ref(), inner_str)
                                         }
                                         _ => encoded.append_pair(
-                                            &pair.0.to_string(),
+                                            pair.0.as_ref(),
                                             first_level_concrete.to_string().as_str(),
                                         ),
                                     }
@@ -463,10 +465,12 @@ impl OpenApiInput {
             })
     }
 
-    /// Returns an iterator that yields all named return values from all
+    /// Returns an iterator that yields all (named) return value names from all
     /// requests, along with the index of the request they appear in.
-    pub fn return_values<'a>(&self, api: &'a OpenAPI) -> Vec<(usize, ParameterAccess)> {
-        self.0
+    pub fn return_values(&self, api: &OpenAPI) -> Vec<(usize, ParameterAccess)> {
+        
+        self
+            .0
             .iter()
             .enumerate()
             // Find the request's corresponding operation in the API spec
@@ -490,15 +494,13 @@ impl OpenApiInput {
                         })
                     })
                     // Finally if the schema is an object, extract its field names
-                    .filter_map(|schema| match schema.resolve(api).kind {
-                        SchemaKind::Type(Type::Object(ref obj)) => Some(
-                            obj.properties
-                                .keys()
-                                .map(|s| ParameterAccess::from(s.clone())),
-                        ),
-                        _ => None,
+                    .flat_map(|x| {
+                        ParameterAccess::parameter_accesses_from_schema(
+                            ParameterAccess::new(vec![]),
+                            x,
+                            api,
+                        )
                     })
-                    .flatten()
                     .map(move |resps| (i, resps))
             })
             .collect()
