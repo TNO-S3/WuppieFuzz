@@ -3373,8 +3373,6 @@ dependencies = [
  "cesu8",
  "chrono",
  "clap",
- "cookie",
- "cookie_store",
  "ctrlc",
  "env_logger 0.11.8",
  "indexmap",
