@@ -31,7 +31,7 @@ anstyle-query 1.1.3
 anstyle-wincon 3.0.9
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-anyhow 1.0.98
+anyhow 1.0.99
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 atomic-waker 1.1.2
@@ -70,10 +70,10 @@ cfg-if 1.0.1
 chrono 0.4.41
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.42
+clap 4.5.45
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.42
+clap_builder 4.5.44
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.5
@@ -415,7 +415,7 @@ object 0.36.7
 once_cell_polyfill 1.70.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-openapiv3-extended 6.0.0
+openapiv3-extended 6.0.1
 	licensed under "Apache-2.0 OR MIT"
 	by Kurt Wolf <kurtwolfbuilds@gmail.com>
 openssl 0.10.73
@@ -502,7 +502,7 @@ regex-automata 0.4.9
 regex-syntax 0.8.5
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-reqwest 0.12.22
+reqwest 0.12.23
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 reqwest_cookie_store 0.8.2
