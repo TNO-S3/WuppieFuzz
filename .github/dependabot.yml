@@ -5,6 +5,8 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 1
+    allow:
+      - dependency-type: "all"  # includes indirect dependencies
     groups:
       all-dependencies:
         patterns:
