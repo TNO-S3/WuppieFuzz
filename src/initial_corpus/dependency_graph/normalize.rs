@@ -124,8 +124,14 @@ pub fn normalize_response<'a>(
     api: &'a OpenAPI,
     path: &str,
     response: &'a Response,
+    parent_context: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
-    normalize_media_type(api, path, response.content.get_json_content()?)
+    normalize_media_type(
+        api,
+        path,
+        response.content.get_json_content()?,
+        parent_context,
+    )
 }
 
 /// Normalizes request body parameters.
@@ -139,8 +145,9 @@ pub fn normalize_request_body<'a>(
     api: &'a OpenAPI,
     path: &str,
     body: &'a RequestBody,
+    parent_context: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
-    normalize_media_type(api, path, body.content.get_json_content()?)
+    normalize_media_type(api, path, body.content.get_json_content()?, parent_context)
 }
 
 /// MediaType is the internal type used for objects, both input (POST) and
@@ -149,25 +156,27 @@ fn normalize_media_type<'a>(
     api: &'a OpenAPI,
     path: &str,
     media_type: &'a MediaType,
+    parent_context: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
     let schema = media_type.schema.as_ref()?.resolve(api);
-    normalize_schema(api, path, schema)
+    normalize_schema(api, path, schema, parent_context)
 }
 
 fn normalize_schema<'a>(
     api: &'a OpenAPI,
     path: &str,
     schema: &'a Schema,
+    parent_context: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
-    match schema.kind {
-        SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-            Some(normalize_object_type(api, path, o))
+    match &schema.kind {
+        SchemaKind::Type(openapiv3::Type::Object(o)) => {
+            Some(normalize_object_type(api, path, o, parent_context))
         }
-        SchemaKind::Type(openapiv3::Type::Array(ref a)) => {
+        SchemaKind::Type(openapiv3::Type::Array(a)) => {
             let inner_schema = a.items.as_ref()?.resolve(api);
             match inner_schema.kind {
                 SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-                    Some(normalize_object_type(api, path, o))
+                    Some(normalize_object_type(api, path, o, parent_context))
                 }
                 // No support for nested arrays - semantic meaning not obvious
                 _ => None,
@@ -178,6 +187,31 @@ fn normalize_schema<'a>(
             // enclosing object/array is still included.
             Some(vec![])
         }
+        openapiv3::SchemaKind::AllOf { all_of } => {
+            // If only a single property is in this AllOf, return an example from it.
+            if all_of.len() == 1 {
+                normalize_schema(api, path, all_of[0].resolve(api), parent_context)
+            } else {
+                log::warn!(concat!(
+                    "Normalizing example parameters for the allOf keyword with more than one schema is not supported. ",
+                    "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
+                ));
+                None
+            }
+        }
+        openapiv3::SchemaKind::Any(_) => {
+            log::warn!(
+                "Normalizing example parameters for this schema is not supported, it's too flexible."
+            );
+            None
+        }
+        openapiv3::SchemaKind::Not { not: _ } => {
+            log::warn!(concat!(
+                "Normalizing example parameters for negated schemas is not supported, it is unclear what to generate. ",
+                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not"
+            ));
+            None
+        }
         _ => None,
     }
 }
@@ -186,35 +220,60 @@ fn normalize_object_type<'a>(
     api: &'a OpenAPI,
     path: &str,
     object_type: &'a ObjectType,
+    parent_context: ParameterAccess,
 ) -> Vec<ParameterNormalization> {
     object_type
         .properties
         .keys()
         .flat_map(|key| {
             let mut normalized_params = vec![ParameterNormalization::new(
-                key.to_owned().into(),
+                parent_context
+                    .clone()
+                    .with_new_element(key.to_owned().into()),
                 path_context_component(path),
             )];
             let nested_schema = object_type.properties[key].resolve(api);
-            match nested_schema.kind {
-                SchemaKind::Type(openapiv3::Type::Object(ref _o )) => {
-                    for (subkey, subschema) in nested_schema.properties() {
-                        let subschema_resolved = subschema.resolve(api);
-                        let normalized_subs = normalize_schema(api, path, subschema_resolved).unwrap_or_default();
-                        normalized_params.push(ParameterNormalization::new(ParameterAccess::new(vec![key.to_owned().into(), subkey.to_owned().into()]), path_context_component(path)));
-                        normalized_params.extend(
-                            normalized_subs.into_iter().map(
-                                |item| ParameterNormalization::new(
-                                    ParameterAccess::new([key, subkey, &item.normalized].iter().map(|s| s.to_string().into()).collect()),
-                                    path_context_component(path))
-                            )
-                        )
-                    }
-                }
-                _ => {
-                    log::debug!("Ignoring schema {nested_schema:#?} during normalize_object_type, only SchemaKind::Type with Object inside is considered.");
-                },
-            }
+            let nested_params = normalize_schema(
+                api,
+                path,
+                nested_schema,
+                parent_context
+                    .clone()
+                    .with_new_element(key.to_owned().into()),
+            )
+            .unwrap_or_default();
+            // log::error!("Nested params:\n{:#?}", nested_params);
+            normalized_params.extend(nested_params);
+            // match nested_schema.kind {
+            //     SchemaKind::Type(openapiv3::Type::Object(ref _o)) => {
+            //         for (subkey, subschema) in nested_schema.properties() {
+            //             let subschema_resolved = subschema.resolve(api);
+            //             let normalized_subs =
+            //                 normalize_schema(api, path, subschema_resolved).unwrap_or_default();
+            //             normalized_params.push(ParameterNormalization::new(
+            //                 ParameterAccess::new(vec![
+            //                     key.to_owned().into(),
+            //                     subkey.to_owned().into(),
+            //                 ]),
+            //                 path_context_component(path),
+            //             ));
+            //             normalized_params.extend(normalized_subs.into_iter().map(|item| {
+            //                 ParameterNormalization::new(
+            //                     ParameterAccess::new(
+            //                         [key, subkey, &item.normalized]
+            //                             .iter()
+            //                             .map(|s| s.to_string().into())
+            //                             .collect(),
+            //                     ),
+            //                     path_context_component(path),
+            //                 )
+            //             }))
+            //         }
+            //     }
+            //     _ => {
+            //         // log::debug!("Ignoring schema {nested_schema:#?} during normalize_object_type, only SchemaKind::Type with Object inside is considered.");
+            //     }
+            // }
             normalized_params
         })
         .collect()

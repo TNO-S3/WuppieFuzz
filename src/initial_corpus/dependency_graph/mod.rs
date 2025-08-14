@@ -86,8 +86,9 @@ fn ops_from_subgraph<'a>(
         Ok(nodes) => nodes,
         Err(cycle) => {
             let operation = &subgraph[cycle.node_id()];
-            log::warn!(
-                "While building initial corpus from the API specification, found operation with a self-cycle {} {}",
+            // TODO: early-exit with this error, or support cycles
+            log::error!(
+                "While building initial corpus from the API specification, found operation with a (self-)cycle {} {}",
                 operation.method,
                 operation.path
             );
@@ -145,10 +146,9 @@ fn add_references_to_openapi_input(
         // Turn the parameter of the edge's target (which at this point got a concrete
         // placeholder Value based on e.g. an example or its type) into a Reference to
         // the parameter of the same name and kind in the source.
-        if let Some(x) = openapi_input.0[target_index].get_mut_parameter(
-            &edge.weight().name_input.clone(),
-            edge.weight().kind_input,
-        ) {
+        if let Some(x) = openapi_input.0[target_index]
+            .get_mut_parameter(&edge.weight().name_input.clone(), edge.weight().kind_input)
+        {
             *x = ParameterContents::Reference {
                 request_index: source_index,
                 parameter_access: edge.weight().name_output.clone(),
@@ -202,14 +202,15 @@ impl<'a> DependencyGraph<'a> {
             .map(NodeIndex::new)
             .map(|n| inout_params(api, &graph[n]))
             .collect();
+        log::debug!("{:#?}", inout_params);
 
         // Find edges (parameters in common) between all nodes (operations)
         for op_left in graph.node_indices() {
             for op_right in graph.node_indices() {
                 // Prevent self-cycles
-                if op_left == op_right {
-                    continue;
-                }
+                // if op_left == op_right {
+                //     continue;
+                // }
                 // Enforce CRUD order
                 if (graph[op_left].method.cmp(&graph[op_right].method)) == Ordering::Greater {
                     continue;
@@ -368,7 +369,9 @@ fn find_links<'a>(
     inputs_to_2: &'a [(ParameterNormalization, ParameterKind)],
 ) -> Vec<ParameterMatching> {
     // Return the first input to 2 that is returned from 1
-    
+    log::debug!("Find links: outputs_from_1:\n{:#?}", outputs_from_1);
+    log::debug!("Find links: inputs_from_2:\n{:#?}", inputs_to_2);
+
     inputs_to_2
         .iter()
         .filter_map(|input| {
@@ -405,7 +408,9 @@ fn inout_params<'a>(
         .iter()
         .filter(|(status_code, _)| status_is_2xx(status_code))
         .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
-        .filter_map(|response| normalize_response(api, op.path, response))
+        .filter_map(|response| {
+            normalize_response(api, op.path, response, ParameterAccess::new(vec![]))
+        })
         .flatten() // Combine all 2XX responses, if multiple
         .collect();
 
@@ -423,17 +428,17 @@ fn inout_params<'a>(
         .request_body
         .iter()
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
-        .find_map(|body| normalize_request_body(api, op.path, body))
+        .find_map(|body| normalize_request_body(api, op.path, body, ParameterAccess::new(vec![])))
         .unwrap_or_default();
+    log::debug!("Body fields: {:#?}", body_fields);
     if op.method == Method::Post {
-        output_fields.extend(body_fields);
-    } else {
-        input_fields.extend(
-            body_fields
-                .into_iter()
-                .map(|param| (param, ParameterKind::Body)),
-        );
+        output_fields.extend(body_fields.clone());
     }
+    input_fields.extend(
+        body_fields
+            .into_iter()
+            .map(|param| (param, ParameterKind::Body)),
+    );
 
     (input_fields, output_fields)
 }
