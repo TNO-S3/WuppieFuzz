@@ -10,21 +10,26 @@
 //! earlier.
 
 use openapiv3::{
-    MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, SchemaKind,
+    MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, Schema, SchemaKind,
 };
 use porter_stemmer::stem;
 
-use crate::{input::parameter::ParameterKind, openapi::JsonContent};
+use crate::{
+    input::parameter::{ParameterAccess, ParameterAccessElement, ParameterKind},
+    openapi::JsonContent,
+};
 
 /// A parameter name saved in two variants: the canonical name appearing in the spec,
 /// and the normalized form used for matching input and output parameters
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParameterNormalization<'a> {
-    pub name: &'a str,
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ParameterNormalization {
+    pub name: String,
     pub normalized: String,
+    pub path_context: Option<String>,
+    pub nested_context: ParameterAccess,
 }
 
-impl<'a> ParameterNormalization<'a> {
+impl ParameterNormalization {
     /// Creates a new ParameterNormalization based on the parameter name given as `name`
     /// and an optional context. The context is understood to be the name of the object
     /// and the parameter name is then one of its properties. The normalization of
@@ -33,30 +38,21 @@ impl<'a> ParameterNormalization<'a> {
     /// Both the name and the context are 'stemmed', i.e. reduced to a base grammatical
     /// form, so the normalization is the same if a word is sometimes plural, or British
     /// and American spellings are mixed.
-    pub fn new(name: &'a str, context: Option<&str>) -> Self {
-        match context {
-            Some(context) => {
-                // Catch the case where the context word is also included in the name,
-                // like `widget_id` for context `widgets`. Often, this same value is then
-                // called `id` in other context, such as when part of a `Widget` object
-                // in a body.
-                let last = name.len() - 1;
-                let no_context_name = match name.find('_') {
-                    Some(i) if (i != 0 && i != last && stem(context) == stem(&name[..i])) => {
-                        &name[i + 1..]
-                    }
-                    _ => name,
-                };
-
-                Self {
-                    name,
-                    normalized: stem(context) + "|" + &stem(no_context_name),
-                }
-            }
-            None => Self {
-                name,
-                normalized: stem(name),
-            },
+    ///
+    /// In general, the context is the URL-path and the name is the name of the parameter.
+    /// For Body parameters, the name is a '/'-separated list of names and indices
+    /// to identify a parameter (like in ParameterAccess).
+    pub fn new(nested_access: ParameterAccess, path_context: Option<String>) -> Self {
+        let normal_name = nested_access
+            .elements
+            .last()
+            .unwrap_or(&ParameterAccessElement::Name("".to_owned()))
+            .to_string();
+        Self {
+            name: normal_name.clone(),
+            normalized: stem(&normal_name),
+            path_context,
+            nested_context: nested_access,
         }
     }
 }
@@ -67,7 +63,7 @@ pub fn normalize_parameters<'a>(
     api: &'a OpenAPI,
     path: &str,
     operation: &'a Operation,
-) -> Vec<(ParameterNormalization<'a>, ParameterKind)> {
+) -> Vec<(ParameterNormalization, ParameterKind)> {
     operation
         .parameters
         .iter()
@@ -82,14 +78,17 @@ pub fn normalize_parameters<'a>(
 ///
 /// A suitable context word is taken from the corresponding operation, and
 /// its stem is prepended to the stemmed parameter name.
-fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNormalization<'a> {
+fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalization {
     // extract a context word if possible
     match parameter.kind {
         // For a query parameter /resource?id=18, we want to extract
         // the 'resource' part as the context word, and return as the name
         // stem('resource') + "id"
         openapiv3::ParameterKind::Query { .. } => {
-            return ParameterNormalization::new(&parameter.data.name, path_context_component(path));
+            return ParameterNormalization::new(
+                parameter.data.name.clone().into(),
+                path_context_component(path),
+            );
         }
         // For a path parameter /resource/{id}/..., we want to extract
         // the 'resource' part as the context word, and return as the name
@@ -100,7 +99,7 @@ fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNor
         openapiv3::ParameterKind::Path { .. } => {
             if let Some(end) = path.find(&format!("/{{{}}}", parameter.data.name)) {
                 return ParameterNormalization::new(
-                    &parameter.data.name,
+                    parameter.data.name.clone().into(),
                     path_context_component(&path[..end]),
                 );
             }
@@ -111,7 +110,7 @@ fn normalize_parameter<'a>(path: &str, parameter: &'a Parameter) -> ParameterNor
     // If we reach this point, either the spec didn't contain the data we
     // expect based on the OpenAPI specification, or it's a parameter kind
     // we can't find context for. Just return the "id" string.
-    ParameterNormalization::new(&parameter.data.name, None)
+    ParameterNormalization::new(parameter.data.name.clone().into(), None)
 }
 
 /// Normalizes response parameters.
@@ -125,8 +124,14 @@ pub fn normalize_response<'a>(
     api: &'a OpenAPI,
     path: &str,
     response: &'a Response,
-) -> Option<Vec<ParameterNormalization<'a>>> {
-    normalize_media_type(api, path, response.content.get_json_content()?)
+    parent_context: ParameterAccess,
+) -> Option<Vec<ParameterNormalization>> {
+    normalize_media_type(
+        api,
+        path,
+        response.content.get_json_content()?,
+        parent_context,
+    )
 }
 
 /// Normalizes request body parameters.
@@ -140,8 +145,9 @@ pub fn normalize_request_body<'a>(
     api: &'a OpenAPI,
     path: &str,
     body: &'a RequestBody,
-) -> Option<Vec<ParameterNormalization<'a>>> {
-    normalize_media_type(api, path, body.content.get_json_content()?)
+    parent_context: ParameterAccess,
+) -> Option<Vec<ParameterNormalization>> {
+    normalize_media_type(api, path, body.content.get_json_content()?, parent_context)
 }
 
 /// MediaType is the internal type used for objects, both input (POST) and
@@ -150,32 +156,126 @@ fn normalize_media_type<'a>(
     api: &'a OpenAPI,
     path: &str,
     media_type: &'a MediaType,
-) -> Option<Vec<ParameterNormalization<'a>>> {
+    parent_context: ParameterAccess,
+) -> Option<Vec<ParameterNormalization>> {
     let schema = media_type.schema.as_ref()?.resolve(api);
-    match schema.kind {
-        SchemaKind::Type(openapiv3::Type::Object(ref o)) => Some(normalize_object_type(path, o)),
-        SchemaKind::Type(openapiv3::Type::Array(ref a)) => {
+    normalize_schema(api, path, schema, parent_context)
+}
+
+fn normalize_schema<'a>(
+    api: &'a OpenAPI,
+    path: &str,
+    schema: &'a Schema,
+    parent_context: ParameterAccess,
+) -> Option<Vec<ParameterNormalization>> {
+    match &schema.kind {
+        SchemaKind::Type(openapiv3::Type::Object(o)) => {
+            Some(normalize_object_type(api, path, o, parent_context))
+        }
+        SchemaKind::Type(openapiv3::Type::Array(a)) => {
             let inner_schema = a.items.as_ref()?.resolve(api);
             match inner_schema.kind {
                 SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-                    Some(normalize_object_type(path, o))
+                    Some(normalize_object_type(api, path, o, parent_context))
                 }
                 // No support for nested arrays - semantic meaning not obvious
                 _ => None,
             }
+        }
+        SchemaKind::Type(_) => {
+            // Other types do not have a name, return an empty vec so their key in the
+            // enclosing object/array is still included.
+            Some(vec![])
+        }
+        openapiv3::SchemaKind::AllOf { all_of } => {
+            // If only a single property is in this AllOf, return an example from it.
+            if all_of.len() == 1 {
+                normalize_schema(api, path, all_of[0].resolve(api), parent_context)
+            } else {
+                log::warn!(concat!(
+                    "Normalizing example parameters for the allOf keyword with more than one schema is not supported. ",
+                    "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
+                ));
+                None
+            }
+        }
+        openapiv3::SchemaKind::Any(_) => {
+            log::warn!(
+                "Normalizing example parameters for this schema is not supported, it's too flexible."
+            );
+            None
+        }
+        openapiv3::SchemaKind::Not { not: _ } => {
+            log::warn!(concat!(
+                "Normalizing example parameters for negated schemas is not supported, it is unclear what to generate. ",
+                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not"
+            ));
+            None
         }
         _ => None,
     }
 }
 
 fn normalize_object_type<'a>(
+    api: &'a OpenAPI,
     path: &str,
     object_type: &'a ObjectType,
-) -> Vec<ParameterNormalization<'a>> {
+    parent_context: ParameterAccess,
+) -> Vec<ParameterNormalization> {
     object_type
         .properties
         .keys()
-        .map(|key| ParameterNormalization::new(key, path_context_component(path)))
+        .flat_map(|key| {
+            let mut normalized_params = vec![ParameterNormalization::new(
+                parent_context
+                    .clone()
+                    .with_new_element(key.to_owned().into()),
+                path_context_component(path),
+            )];
+            let nested_schema = object_type.properties[key].resolve(api);
+            let nested_params = normalize_schema(
+                api,
+                path,
+                nested_schema,
+                parent_context
+                    .clone()
+                    .with_new_element(key.to_owned().into()),
+            )
+            .unwrap_or_default();
+            // log::error!("Nested params:\n{:#?}", nested_params);
+            normalized_params.extend(nested_params);
+            // match nested_schema.kind {
+            //     SchemaKind::Type(openapiv3::Type::Object(ref _o)) => {
+            //         for (subkey, subschema) in nested_schema.properties() {
+            //             let subschema_resolved = subschema.resolve(api);
+            //             let normalized_subs =
+            //                 normalize_schema(api, path, subschema_resolved).unwrap_or_default();
+            //             normalized_params.push(ParameterNormalization::new(
+            //                 ParameterAccess::new(vec![
+            //                     key.to_owned().into(),
+            //                     subkey.to_owned().into(),
+            //                 ]),
+            //                 path_context_component(path),
+            //             ));
+            //             normalized_params.extend(normalized_subs.into_iter().map(|item| {
+            //                 ParameterNormalization::new(
+            //                     ParameterAccess::new(
+            //                         [key, subkey, &item.normalized]
+            //                             .iter()
+            //                             .map(|s| s.to_string().into())
+            //                             .collect(),
+            //                     ),
+            //                     path_context_component(path),
+            //                 )
+            //             }))
+            //         }
+            //     }
+            //     _ => {
+            //         // log::debug!("Ignoring schema {nested_schema:#?} during normalize_object_type, only SchemaKind::Type with Object inside is considered.");
+            //     }
+            // }
+            normalized_params
+        })
         .collect()
 }
 
@@ -185,9 +285,10 @@ fn normalize_object_type<'a>(
 /// For a path like /albums/{album_id}/songs, you get songs, so the answer is songs.
 /// This function chooses splits the path at {parameters}, and from the last section
 /// chooses the first component.
-fn path_context_component(path: &str) -> Option<&str> {
+fn path_context_component(path: &str) -> Option<String> {
     path.rsplit('}')
         .flat_map(|series| series.split('/'))
+        .map(|x| x.to_owned())
         .find(|component| !component.is_empty() && !component.starts_with('{'))
 }
 
@@ -199,67 +300,92 @@ mod tests {
     fn test_parameter_normalization_new() {
         assert_eq!(
             ParameterNormalization {
-                name: "widget",
+                name: "widget".into(),
                 normalized: "widget".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widget", None)
+            ParameterNormalization::new("widget".into(), None)
         );
         assert_eq!(
             ParameterNormalization {
-                name: "widgets",
+                name: "widgets".into(),
                 normalized: "widget".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widgets", None)
+            ParameterNormalization::new("widgets".into(), None)
         );
         assert_eq!(
             ParameterNormalization {
-                name: "widget",
+                name: "widget".into(),
                 normalized: "aircraft|widget".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widget", Some("aircraft"))
+            ParameterNormalization::new("widget".into(), Some("aircraft".to_owned()))
         );
         assert_eq!(
             ParameterNormalization {
-                name: "widget",
+                name: "widget".into(),
                 normalized: "aircraft|widget".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widget", Some("aircrafts"))
+            ParameterNormalization::new("widget".into(), Some("aircrafts".to_owned()))
         );
         assert_eq!(
             ParameterNormalization {
-                name: "country_id",
+                name: "country_id".into(),
                 normalized: "countri|id".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("country_id", Some("countries"))
+            ParameterNormalization::new("country_id".into(), Some("countries".to_owned()))
         );
         assert_eq!(
             ParameterNormalization {
-                name: "id",
+                name: "id".into(),
                 normalized: "countri|id".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("id", Some("countries"))
+            ParameterNormalization::new("id".into(), Some("countries".to_owned()))
         );
         assert_eq!(
             ParameterNormalization {
-                name: "widget_id",
+                name: "widget_id".into(),
                 normalized: "countri|widget_id".into(),
+                ..Default::default()
             },
-            ParameterNormalization::new("widget_id", Some("countries"))
+            ParameterNormalization::new("widget_id".into(), Some("countries".to_owned()))
         );
     }
 
     #[test]
     fn test_path_last_component() {
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/"));
-        assert_eq!(Some("bbb"), path_context_component("/bbb"));
-        assert_eq!(Some("bbb"), path_context_component("/bbb/"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/{ccc}"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/{ccc}/"));
-        assert_eq!(Some("ccc"), path_context_component("/aaa/{bbb}/ccc"));
-        assert_eq!(Some("ccc"), path_context_component("/aaa/{bbb}/ccc/"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/{ccc}"));
-        assert_eq!(Some("aaa"), path_context_component("/aaa/bbb/{ccc}/"));
+        assert_eq!(Some("aaa".to_owned()), path_context_component("/aaa/bbb"));
+        assert_eq!(Some("aaa".to_owned()), path_context_component("/aaa/bbb/"));
+        assert_eq!(Some("bbb".to_owned()), path_context_component("/bbb"));
+        assert_eq!(Some("bbb".to_owned()), path_context_component("/bbb/"));
+        assert_eq!(
+            Some("aaa".to_owned()),
+            path_context_component("/aaa/bbb/{ccc}")
+        );
+        assert_eq!(
+            Some("aaa".to_owned()),
+            path_context_component("/aaa/bbb/{ccc}/")
+        );
+        assert_eq!(
+            Some("ccc".to_owned()),
+            path_context_component("/aaa/{bbb}/ccc")
+        );
+        assert_eq!(
+            Some("ccc".to_owned()),
+            path_context_component("/aaa/{bbb}/ccc/")
+        );
+        assert_eq!(
+            Some("aaa".to_owned()),
+            path_context_component("/aaa/bbb/{ccc}")
+        );
+        assert_eq!(
+            Some("aaa".to_owned()),
+            path_context_component("/aaa/bbb/{ccc}/")
+        );
         assert_eq!(None, path_context_component(""));
         assert_eq!(None, path_context_component("/"));
         assert_eq!(None, path_context_component("/{aaa}"));

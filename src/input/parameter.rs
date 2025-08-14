@@ -5,8 +5,9 @@ use std::{
 };
 
 use base64::{Engine as _, display::Base64Display, engine::general_purpose::STANDARD};
+use itertools::Itertools;
 use libafl_bolts::rands::Rand;
-use openapiv3::Parameter;
+use openapiv3::{Parameter, Schema};
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
@@ -58,6 +59,150 @@ impl Display for SimpleValue {
     }
 }
 
+#[derive(
+    Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
+)]
+pub enum ParameterAccessElement {
+    Name(String),
+    Offset(usize),
+}
+
+impl Display for ParameterAccessElement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ParameterAccessElement::Name(name) => name.clone(),
+                ParameterAccessElement::Offset(offset) => offset.to_string(),
+            }
+        )
+    }
+}
+
+impl From<String> for ParameterAccessElement {
+    fn from(value: String) -> Self {
+        if value.chars().all(|c| c.is_ascii_digit()) {
+            Self::Offset(value.parse().unwrap())
+        } else {
+            Self::Name(value)
+        }
+    }
+}
+
+impl From<String> for ParameterAccess {
+    fn from(value: String) -> Self {
+        // Split off the context, we only want keys/offsets in the object/arrays
+        let string_split = value.split("//");
+        let split_len = string_split.clone().count();
+        if split_len > 2 {
+            log::error!("Bad parameter access: {value:?}");
+        }
+        // TODO: Add test, could split_len == 0?
+        Self::new(
+            string_split
+                .skip(split_len - 1)
+                .flat_map(|element| element.split('/'))
+                .map(String::from)
+                .map(ParameterAccessElement::from)
+                .collect::<Vec<ParameterAccessElement>>(),
+        )
+    }
+}
+
+impl From<&str> for ParameterAccess {
+    fn from(value: &str) -> Self {
+        Self::new(
+            value
+                .split("//")
+                .map(String::from)
+                .map(ParameterAccessElement::from)
+                .collect::<Vec<ParameterAccessElement>>(),
+        )
+    }
+}
+
+#[derive(
+    Default,
+    Clone,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+)]
+pub struct ParameterAccess {
+    pub elements: Vec<ParameterAccessElement>,
+    as_ref_repr: String,
+}
+
+impl ParameterAccess {
+    pub fn new(elements: Vec<ParameterAccessElement>) -> Self {
+        let mut result = Self {
+            elements: elements.clone(),
+            as_ref_repr: elements.into_iter().map(|x| x.to_string()).join(""),
+        };
+        result.as_ref_repr = result.to_string();
+        result
+    }
+
+    pub fn parameter_accesses_from_schema(
+        parent_access: ParameterAccess,
+        schema: &openapiv3::RefOr<Schema>,
+        api: &openapiv3::OpenAPI,
+    ) -> Vec<ParameterAccess> {
+        match schema.resolve(api).kind {
+            openapiv3::SchemaKind::Type(openapiv3::Type::Object(ref obj)) => obj
+                .properties
+                .iter()
+                .flat_map(|(name, child_schema)| {
+                    let mut accesses = vec![];
+                    let current_access =
+                        parent_access.with_new_element(ParameterAccessElement::Name(name.clone()));
+                    accesses.push(current_access.clone());
+                    accesses.extend(Self::parameter_accesses_from_schema(
+                        current_access,
+                        child_schema,
+                        api,
+                    ));
+                    accesses
+                })
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    pub fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {
+        let mut elements = self.elements.clone();
+        elements.push(new_element);
+        Self::new(elements)
+    }
+}
+
+impl Display for ParameterAccess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "{}",
+            self.elements
+                .clone()
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join("/")
+        )
+    }
+}
+
+impl AsRef<str> for ParameterAccess {
+    fn as_ref(&self) -> &str {
+        &self.as_ref_repr
+    }
+}
+
 /// The contents of a parameter or of the body of an HTTP request made by the fuzzer.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
 #[serde(tag = "DataType", content = "Contents")]
@@ -67,7 +212,7 @@ pub enum ParameterContents {
     /// Mutators can attempt to mutate it using knowledge of the type, i.e. numbers
     /// will always be mutated into other numbers, and array elements can be shuffled.
     #[serde(rename = "Object")]
-    Object(BTreeMap<String, ParameterContents>),
+    Object(BTreeMap<ParameterAccess, ParameterContents>),
     #[serde(rename = "Array")]
     Array(Vec<ParameterContents>),
     #[serde(rename = "PrimitiveValue")]
@@ -95,7 +240,7 @@ pub enum ParameterContents {
         #[serde(rename = "request")]
         request_index: usize,
         #[serde(rename = "parameter_name")]
-        parameter_name: String,
+        parameter_access: ParameterAccess,
     },
 }
 
@@ -115,7 +260,7 @@ impl ParameterContents {
             ParameterContents::Object(v) => {
                 let mut json_map = Map::new();
                 for (k, v) in v.iter() {
-                    json_map.insert(k.clone(), v.to_value());
+                    json_map.insert(k.clone().to_string(), v.to_value());
                 }
                 Some(Value::Object(json_map).to_string().into_bytes().into())
             }
@@ -157,7 +302,7 @@ impl ParameterContents {
             ParameterContents::Object(content) => {
                 let mut json_map = Map::new();
                 for (key, val) in content {
-                    json_map.insert(key.clone(), val.to_value());
+                    json_map.insert(key.clone().to_string(), val.to_value());
                 }
                 Value::Object(json_map)
             }
@@ -220,14 +365,17 @@ impl Display for ParameterContents {
             ParameterContents::Bytes(bi) => Base64Display::new(bi, &STANDARD).fmt(f),
             ParameterContents::Reference {
                 request_index,
-                parameter_name,
-            } => write!(f, "parameter {parameter_name} from request {request_index}"),
+                parameter_access,
+            } => write!(
+                f,
+                "parameter {parameter_access} from request {request_index}"
+            ),
         }
     }
 }
 
-impl From<BTreeMap<String, ParameterContents>> for ParameterContents {
-    fn from(value: BTreeMap<String, ParameterContents>) -> Self {
+impl From<BTreeMap<ParameterAccess, ParameterContents>> for ParameterContents {
+    fn from(value: BTreeMap<ParameterAccess, ParameterContents>) -> Self {
         ParameterContents::Object(value)
     }
 }
@@ -263,7 +411,7 @@ impl From<Value> for ParameterContents {
             Value::Object(content) => Self::Object(
                 content
                     .into_iter()
-                    .map(|(key, val)| (key, ParameterContents::from(val)))
+                    .map(|(key, val)| (key.into(), ParameterContents::from(val)))
                     .collect(),
             ),
         }

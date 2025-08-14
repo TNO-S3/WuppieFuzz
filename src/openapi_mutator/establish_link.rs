@@ -94,7 +94,7 @@ where
         // Make the link
         *random_link.0 = ParameterContents::Reference {
             request_index: request_index_and_parameter_name_pairs[random_link.1].0,
-            parameter_name: request_index_and_parameter_name_pairs[random_link.1]
+            parameter_access: request_index_and_parameter_name_pairs[random_link.1]
                 .1
                 .to_owned(),
         };
@@ -136,7 +136,7 @@ mod test {
 
             assert_eq!(result, MutationResult::Mutated);
             let parameter = input.0[1]
-                .get_mut_parameter("id", ParameterKind::Query)
+                .get_mut_parameter(&"id".into(), ParameterKind::Query)
                 .expect("Request got the wrong parameter");
             assert!(parameter.is_reference());
             assert_eq!(parameter.reference_index().copied(), Some(0));

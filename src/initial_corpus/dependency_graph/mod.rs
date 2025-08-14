@@ -30,7 +30,10 @@ use self::{
     toposort::{Cycle, toposort},
 };
 use crate::{
-    input::{Method, OpenApiInput, ParameterContents, parameter::ParameterKind},
+    input::{
+        Method, OpenApiInput, ParameterContents,
+        parameter::{ParameterAccess, ParameterKind},
+    },
     openapi::{
         QualifiedOperation,
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
@@ -77,14 +80,15 @@ pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
 /// from the subgraph. To let the caller keep track of the sorting, this function also
 /// returns a Vec of the NodeIndex items corresponding to the QualifiedOperations.
 fn ops_from_subgraph<'a>(
-    subgraph: &DiGraph<QualifiedOperation<'a>, ParameterMatching<'a>, DefaultIx>,
+    subgraph: &DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx>,
 ) -> Result<(Vec<QualifiedOperation<'a>>, Vec<NodeIndex>), Cycle<NodeIndex>> {
     let sorted_nodes = match toposort(subgraph, None) {
         Ok(nodes) => nodes,
         Err(cycle) => {
             let operation = &subgraph[cycle.node_id()];
-            log::warn!(
-                "While building initial corpus from the API specification, found operation with a self-cycle {} {}",
+            // TODO: early-exit with this error, or support cycles
+            log::error!(
+                "While building initial corpus from the API specification, found operation with a (self-)cycle {} {}",
                 operation.method,
                 operation.path
             );
@@ -143,17 +147,17 @@ fn add_references_to_openapi_input(
         // placeholder Value based on e.g. an example or its type) into a Reference to
         // the parameter of the same name and kind in the source.
         if let Some(x) = openapi_input.0[target_index]
-            .get_mut_parameter(edge.weight().name_input, edge.weight().kind_input)
+            .get_mut_parameter(&edge.weight().name_input.clone(), edge.weight().kind_input)
         {
             *x = ParameterContents::Reference {
                 request_index: source_index,
-                parameter_name: edge.weight().name_output.to_owned(),
+                parameter_access: edge.weight().name_output.clone(),
             };
         }
     }
 }
 
-type DepGraph<'a> = DiGraph<QualifiedOperation<'a>, ParameterMatching<'a>, DefaultIx>;
+type DepGraph<'a> = DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx>;
 
 /// A dependency graph defined on the operations of an API. The edges of the graph
 /// denote parameter dependencies: `O1 -> O2` means O1 returns a parameter that is
@@ -167,10 +171,10 @@ pub struct DependencyGraph<'a> {
 /// A parameter name saved in two variants: the canonical name appearing as the
 /// output parameter in the spec, the canonical name appearing as the input parameter
 /// in the spec.
-#[derive(Debug, Clone)]
-pub struct ParameterMatching<'a> {
-    name_output: &'a str,
-    pub(crate) name_input: &'a str,
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParameterMatching {
+    name_output: ParameterAccess,
+    pub(crate) name_input: ParameterAccess,
     normalized: String,
     pub(crate) kind_input: ParameterKind,
 }
@@ -198,14 +202,15 @@ impl<'a> DependencyGraph<'a> {
             .map(NodeIndex::new)
             .map(|n| inout_params(api, &graph[n]))
             .collect();
+        log::debug!("{:#?}", inout_params);
 
         // Find edges (parameters in common) between all nodes (operations)
         for op_left in graph.node_indices() {
             for op_right in graph.node_indices() {
                 // Prevent self-cycles
-                if op_left == op_right {
-                    continue;
-                }
+                // if op_left == op_right {
+                //     continue;
+                // }
                 // Enforce CRUD order
                 if (graph[op_left].method.cmp(&graph[op_right].method)) == Ordering::Greater {
                     continue;
@@ -313,7 +318,7 @@ impl<'a> DependencyGraph<'a> {
     pub fn subgraph(
         &self,
         nodes: &[NodeIndex],
-    ) -> DiGraph<QualifiedOperation<'a>, ParameterMatching<'_>, DefaultIx> {
+    ) -> DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx> {
         let mut subgraph = self.graph.clone();
         subgraph.retain_nodes(|_, node| nodes.binary_search(&node).is_ok());
         subgraph
@@ -360,19 +365,25 @@ impl Display for DependencyGraph<'_> {
 /// as an input parameter of operation 2. If they are linked, returns the parameter
 /// name in normalized form.
 fn find_links<'a>(
-    outputs_from_1: &[ParameterNormalization<'a>],
-    inputs_to_2: &[(ParameterNormalization<'a>, ParameterKind)],
-) -> Vec<ParameterMatching<'a>> {
+    outputs_from_1: &'a [ParameterNormalization],
+    inputs_to_2: &'a [(ParameterNormalization, ParameterKind)],
+) -> Vec<ParameterMatching> {
     // Return the first input to 2 that is returned from 1
+    log::debug!("Find links: outputs_from_1:\n{:#?}", outputs_from_1);
+    log::debug!("Find links: inputs_from_2:\n{:#?}", inputs_to_2);
+
     inputs_to_2
         .iter()
         .filter_map(|input| {
             Some(ParameterMatching {
                 name_output: outputs_from_1
                     .iter()
-                    .find(|output| output.normalized == input.0.normalized)?
-                    .name,
-                name_input: input.0.name,
+                    .find(|output| {
+                        output.normalized == input.0.normalized || output.name == input.0.name
+                    })?
+                    .nested_context
+                    .clone(),
+                name_input: input.0.nested_context.clone(),
                 normalized: input.0.normalized.clone(),
                 kind_input: input.1,
             })
@@ -386,8 +397,8 @@ fn inout_params<'a>(
     api: &'a OpenAPI,
     op: &QualifiedOperation<'a>,
 ) -> (
-    Vec<(ParameterNormalization<'a>, ParameterKind)>,
-    Vec<ParameterNormalization<'a>>,
+    Vec<(ParameterNormalization, ParameterKind)>,
+    Vec<ParameterNormalization>,
 ) {
     // Outputs from a request are all field names from the response body. Collect them.
     let mut output_fields: Vec<_> = op
@@ -397,7 +408,9 @@ fn inout_params<'a>(
         .iter()
         .filter(|(status_code, _)| status_is_2xx(status_code))
         .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
-        .filter_map(|response| normalize_response(api, op.path, response))
+        .filter_map(|response| {
+            normalize_response(api, op.path, response, ParameterAccess::new(vec![]))
+        })
         .flatten() // Combine all 2XX responses, if multiple
         .collect();
 
@@ -415,17 +428,17 @@ fn inout_params<'a>(
         .request_body
         .iter()
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
-        .find_map(|body| normalize_request_body(api, op.path, body))
+        .find_map(|body| normalize_request_body(api, op.path, body, ParameterAccess::new(vec![])))
         .unwrap_or_default();
+    log::debug!("Body fields: {:#?}", body_fields);
     if op.method == Method::Post {
-        output_fields.extend(body_fields);
-    } else {
-        input_fields.extend(
-            body_fields
-                .into_iter()
-                .map(|param| (param, ParameterKind::Body)),
-        );
+        output_fields.extend(body_fields.clone());
     }
+    input_fields.extend(
+        body_fields
+            .into_iter()
+            .map(|param| (param, ParameterKind::Body)),
+    );
 
     (input_fields, output_fields)
 }
