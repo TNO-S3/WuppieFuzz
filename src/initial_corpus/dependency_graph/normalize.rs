@@ -42,6 +42,8 @@ impl ParameterNormalization {
     /// In general, the context is the URL-path and the name is the name of the parameter.
     /// For Body parameters, the name is a '/'-separated list of names and indices
     /// to identify a parameter (like in ParameterAccess).
+    ///
+    /// TODO: make clear decisions how about exact meaning of context and document this.
     pub fn new(nested_access: ParameterAccess, path_context: Option<String>) -> Self {
         let normal_name = nested_access
             .elements
@@ -244,36 +246,6 @@ fn normalize_object_type<'a>(
             .unwrap_or_default();
             // log::error!("Nested params:\n{:#?}", nested_params);
             normalized_params.extend(nested_params);
-            // match nested_schema.kind {
-            //     SchemaKind::Type(openapiv3::Type::Object(ref _o)) => {
-            //         for (subkey, subschema) in nested_schema.properties() {
-            //             let subschema_resolved = subschema.resolve(api);
-            //             let normalized_subs =
-            //                 normalize_schema(api, path, subschema_resolved).unwrap_or_default();
-            //             normalized_params.push(ParameterNormalization::new(
-            //                 ParameterAccess::new(vec![
-            //                     key.to_owned().into(),
-            //                     subkey.to_owned().into(),
-            //                 ]),
-            //                 path_context_component(path),
-            //             ));
-            //             normalized_params.extend(normalized_subs.into_iter().map(|item| {
-            //                 ParameterNormalization::new(
-            //                     ParameterAccess::new(
-            //                         [key, subkey, &item.normalized]
-            //                             .iter()
-            //                             .map(|s| s.to_string().into())
-            //                             .collect(),
-            //                     ),
-            //                     path_context_component(path),
-            //                 )
-            //             }))
-            //         }
-            //     }
-            //     _ => {
-            //         // log::debug!("Ignoring schema {nested_schema:#?} during normalize_object_type, only SchemaKind::Type with Object inside is considered.");
-            //     }
-            // }
             normalized_params
         })
         .collect()

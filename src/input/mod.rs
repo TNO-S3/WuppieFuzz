@@ -156,21 +156,32 @@ impl OpenApiRequest {
             parameter: &mut ParameterContents,
             parameter_values: &ParameterFeedback,
         ) -> Result<(), libafl::Error> {
-            if let ParameterContents::Reference {
-                request_index,
-                parameter_access,
-            } = parameter
-            {
-                let resolved_backref = parameter_values
-                    .get(*request_index, parameter_access)
-                    .ok_or_else(|| {
+            match parameter {
+                ParameterContents::Reference {
+                    request_index,
+                    parameter_access,
+                } => {
+                    let resolved_backref = parameter_values
+                        .get(*request_index, parameter_access)
+                        .ok_or_else(|| {
                         libafl::Error::unknown(format!(
                             "invalid backreference to {request_index}:{parameter_access}"
                         ))
                     })?;
-                *parameter = ParameterContents::from(resolved_backref.clone());
+                    *parameter = ParameterContents::from(resolved_backref.clone());
+                }
+                ParameterContents::Object(obj_contents) => {
+                    for nested_parameter in obj_contents.values_mut() {
+                        resolve_single_parameter(nested_parameter, parameter_values)?;
+                    }
+                }
+                ParameterContents::Array(arr) => {
+                    for nested_parameter in arr {
+                        resolve_single_parameter(nested_parameter, parameter_values)?;
+                    }
+                }
+                ParameterContents::LeafValue(_) | ParameterContents::Bytes(_) => (),
             }
-
             Ok(())
         }
 
@@ -468,9 +479,7 @@ impl OpenApiInput {
     /// Returns an iterator that yields all (named) return value names from all
     /// requests, along with the index of the request they appear in.
     pub fn return_values(&self, api: &OpenAPI) -> Vec<(usize, ParameterAccess)> {
-        
-        self
-            .0
+        self.0
             .iter()
             .enumerate()
             // Find the request's corresponding operation in the API spec

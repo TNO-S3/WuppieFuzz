@@ -202,15 +202,14 @@ impl<'a> DependencyGraph<'a> {
             .map(NodeIndex::new)
             .map(|n| inout_params(api, &graph[n]))
             .collect();
-        log::debug!("{:#?}", inout_params);
 
         // Find edges (parameters in common) between all nodes (operations)
         for op_left in graph.node_indices() {
             for op_right in graph.node_indices() {
                 // Prevent self-cycles
-                // if op_left == op_right {
-                //     continue;
-                // }
+                if op_left == op_right {
+                    continue;
+                }
                 // Enforce CRUD order
                 if (graph[op_left].method.cmp(&graph[op_right].method)) == Ordering::Greater {
                     continue;
@@ -369,9 +368,6 @@ fn find_links<'a>(
     inputs_to_2: &'a [(ParameterNormalization, ParameterKind)],
 ) -> Vec<ParameterMatching> {
     // Return the first input to 2 that is returned from 1
-    log::debug!("Find links: outputs_from_1:\n{:#?}", outputs_from_1);
-    log::debug!("Find links: inputs_from_2:\n{:#?}", inputs_to_2);
-
     inputs_to_2
         .iter()
         .filter_map(|input| {
@@ -430,7 +426,6 @@ fn inout_params<'a>(
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
         .find_map(|body| normalize_request_body(api, op.path, body, ParameterAccess::new(vec![])))
         .unwrap_or_default();
-    log::debug!("Body fields: {:#?}", body_fields);
     if op.method == Method::Post {
         output_fields.extend(body_fields.clone());
     }

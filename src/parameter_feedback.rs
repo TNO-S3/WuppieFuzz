@@ -91,7 +91,13 @@ impl ParameterFeedback {
                     }
                 }
             }
-            _ => (),
+            _ => {
+                log::trace!(
+                    "Response was not an object or array: {:?}",
+                    response.json::<serde_json::Value>()
+                );
+                ()
+            }
         }
         // We also record the values of any Set-Cookie headers
         for (name, value) in response.cookies() {
