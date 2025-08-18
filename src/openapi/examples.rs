@@ -107,12 +107,11 @@ fn all_interesting_body_contents(
         .or_else(|| body.content.get_json_content())
         .or_else(|| body.content.get_www_form_content())?;
 
-    Some(
-        interesting_params_from_media_type(api, media_type)
-            .into_iter()
-            .map(ParameterContents::from)
-            .collect(),
-    )
+    let values = interesting_params_from_media_type(api, media_type);
+    if values.is_empty() {
+        return None;
+    }
+    Some(values.into_iter().map(ParameterContents::from).collect())
 }
 
 /// Create an example body from an operation. This function is meant for requests that do
@@ -900,6 +899,9 @@ pub fn openapi_inputs_from_ops<'a>(
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)
         })
         .collect();
+
+    assert_eq!(sorted_nodes.len(), concrete_requests.len());
+
     // deduplicate_same_reference_requests(&mut concrete_requests, &subgraph, &sorted_nodes);
     let total_combinations: usize = concrete_requests
         .iter()
@@ -939,6 +941,9 @@ pub fn openapi_inputs_from_ops<'a>(
             assert_eq!(chain.len(), chain_len);
         }
     }
+    for chain in &all_chains {
+        assert_eq!(chain.len(), sorted_nodes.len());
+    }
     Ok(all_chains.into_iter().map(OpenApiInput).collect())
 }
 
@@ -951,7 +956,7 @@ fn all_interesting_inputs_for_qualified_operation(
     // There may be multiple parameters, create an OpenApiRequest for each combination
     // of interesting values for these parameters.
     let combinations = all_interesting_parameters(operation.operation, api, single_valued);
-    if combinations.is_empty() {
+    let rv = if combinations.is_empty() {
         // There are no parameters, return the interesting bodies.
         match all_interesting_body_contents(api, operation.operation) {
             Some(bodies) => bodies
@@ -972,25 +977,33 @@ fn all_interesting_inputs_for_qualified_operation(
         }
     } else {
         match all_interesting_body_contents(api, operation.operation) {
-            Some(bodies) => bodies
-                .into_iter()
-                .flat_map(|body| std::iter::repeat(body).zip(&combinations))
-                .map(|(body, param_combination)| OpenApiRequest {
-                    method: operation.method,
-                    path: operation.path.to_owned(),
-                    body: Body::build(api, operation.operation, Some(body)),
-                    parameters: param_combination.clone(),
-                })
-                .collect(),
-            None => combinations
-                .into_iter()
-                .map(|combination| OpenApiRequest {
-                    method: operation.method,
-                    path: operation.path.to_owned(),
-                    body: Body::build(api, operation.operation, None),
-                    parameters: combination,
-                })
-                .collect(),
+            Some(bodies) => {
+                println!("some {}", bodies.len());
+                bodies
+                    .into_iter()
+                    .flat_map(|body| std::iter::repeat(body).zip(&combinations))
+                    .map(|(body, param_combination)| OpenApiRequest {
+                        method: operation.method,
+                        path: operation.path.to_owned(),
+                        body: Body::build(api, operation.operation, Some(body)),
+                        parameters: param_combination.clone(),
+                    })
+                    .collect()
+            }
+            None => {
+                println!("none");
+                combinations
+                    .into_iter()
+                    .map(|combination| OpenApiRequest {
+                        method: operation.method,
+                        path: operation.path.to_owned(),
+                        body: Body::build(api, operation.operation, None),
+                        parameters: combination,
+                    })
+                    .collect()
+            }
         }
-    }
+    };
+    assert_ne!(rv.len(), 0);
+    return rv;
 }
