@@ -1,9 +1,9 @@
 use std::{borrow::Cow, fs::File, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
-use cookie_store::{Cookie, RawCookie};
 use openapiv3::OpenAPI;
 use reqwest::header::{AUTHORIZATION, HeaderMap, IntoHeaderName};
+use reqwest_cookie_store::RawCookie;
 use url::Url;
 
 use crate::{configuration::Configuration, header};
@@ -139,32 +139,37 @@ impl Authentication {
         &mut self,
         server_url: &Url,
     ) -> Result<reqwest_cookie_store::CookieStore, anyhow::Error> {
+        let mut cookie_store = reqwest_cookie_store::CookieStore::default();
+        self.insert_raw_cookies(&mut cookie_store, server_url)
+            .context("Parsing cookie values from authentication file")?;
+        Ok(cookie_store)
+    }
+
+    fn insert_raw_cookies(
+        &mut self,
+        cookie_store: &mut reqwest_cookie_store::CookieStore,
+        server_url: &Url,
+    ) -> Result<(), anyhow::Error> {
         match self {
             Authentication::Cookie(cookies) => {
-                let cookies = cookies
+                cookies
                     .iter()
-                    .map(|c| Cookie::try_from_raw_cookie(c, server_url));
-                reqwest_cookie_store::CookieStore::from_cookies(cookies, true)
-                    .context("Parsing cookie values from authentication file")
+                    .map(|c| cookie_store.insert_raw(c, server_url))
+                    .collect::<Result<Vec<_>, _>>()?;
             }
             Authentication::OAuth(tokens) if tokens.mode == oauth::Mode::Cookie => {
-                reqwest_cookie_store::CookieStore::from_cookies(
-                    [
-                        Cookie::try_from_raw_cookie(
-                            &RawCookie::new("access_token", tokens.access_token()?),
-                            server_url,
-                        ),
-                        Cookie::try_from_raw_cookie(
-                            &RawCookie::new("refresh_token", tokens.refresh_token()?),
-                            server_url,
-                        ),
-                    ],
-                    true,
-                )
-                .context("Parsing cookie values from access token")
+                cookie_store.insert_raw(
+                    &RawCookie::new("access_token", tokens.access_token()?),
+                    server_url,
+                )?;
+                cookie_store.insert_raw(
+                    &RawCookie::new("refresh_token", tokens.refresh_token()?),
+                    server_url,
+                )?;
             }
-            _ => Ok(reqwest_cookie_store::CookieStore::default()),
+            _ => {}
         }
+        Ok(())
     }
 
     pub fn update_cookie_store(

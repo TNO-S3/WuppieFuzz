@@ -329,7 +329,7 @@ impl Commands {
     }
 }
 
-/// PartialConfiguration is a representation of a WupieFuzz configuration, obtained from the
+/// PartialConfiguration is a representation of a WuppieFuzz configuration, obtained from the
 /// CLI or from a configuration file.
 ///
 /// Partial configurations are only one source, e.g. config file or command line.

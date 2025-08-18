@@ -1,7 +1,7 @@
 use anyhow::Context;
-use cookie::Cookie;
 use openapiv3::OpenAPI;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest_cookie_store::RawCookie as Cookie;
 
 use crate::{
     authentication,

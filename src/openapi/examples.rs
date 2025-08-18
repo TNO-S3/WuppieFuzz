@@ -517,7 +517,7 @@ fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&s
         all_examples.extend(
             interesting_params_from_schema(
                 api,
-                &RefOr::Reference::<Schema> { reference: path },
+                &RefOr::Reference { reference: path },
                 ignore_names,
             )
             .into_iter()
