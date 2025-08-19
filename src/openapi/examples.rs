@@ -999,5 +999,5 @@ fn all_interesting_inputs_for_qualified_operation(
         }
     };
     assert_ne!(rv.len(), 0);
-    return rv;
+    rv
 }
