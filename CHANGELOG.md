@@ -18,6 +18,8 @@
   [#107](https://github.com/TNO-S3/WuppieFuzz/pull/107)
 - Use a single file to store Jacoco exec data in
   [#114](https://github.com/TNO-S3/WuppieFuzz/pull/114).
+- Fix a bug in corpus generation when no examples were found for a
+  request body [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
 
 # v1.2.0 (2025-02-21)
 
