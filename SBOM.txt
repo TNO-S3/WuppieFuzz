@@ -43,7 +43,7 @@ backtrace 0.3.75
 base64 0.22.1
 	licensed under "Apache-2.0 OR MIT"
 	by Marshall Pierce <marshall@mpierce.org>
-bitflags 2.9.1
+bitflags 2.9.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 build_html 2.6.0
@@ -98,6 +98,9 @@ cookie 0.18.1
 	licensed under "Apache-2.0 OR MIT"
 	by Sergio Benitez <sb@sergio.bz>|Alex Crichton <alex@alexcrichton.com>
 cookie_store 0.21.1
+	licensed under "Apache-2.0 OR MIT"
+	by Patrick Fernie <patrick.fernie@gmail.com>
+cookie_store 0.22.0
 	licensed under "Apache-2.0 OR MIT"
 	by Patrick Fernie <patrick.fernie@gmail.com>
 core-foundation 0.9.4
@@ -238,7 +241,7 @@ http-body-util 0.1.3
 httparse 1.10.1
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-hyper 1.6.0
+hyper 1.7.0
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 hyper-rustls 0.27.7
@@ -505,7 +508,7 @@ regex-syntax 0.8.5
 reqwest 0.12.23
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-reqwest_cookie_store 0.8.2
+reqwest_cookie_store 0.9.0
 	licensed under "Apache-2.0 OR MIT"
 	by Patrick Fernie <patrick.fernie@gmail.com>
 ring 0.17.14
@@ -538,7 +541,7 @@ safe_arch 0.7.4
 same-file 1.0.6
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-scc 2.3.4
+scc 2.4.0
 	licensed under "Apache-2.0"
 	by wvwwvwwv <wvwwvwwv@me.com>
 schannel 0.1.27
