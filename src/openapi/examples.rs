@@ -977,31 +977,25 @@ fn all_interesting_inputs_for_qualified_operation(
         }
     } else {
         match all_interesting_body_contents(api, operation.operation) {
-            Some(bodies) => {
-                println!("some {}", bodies.len());
-                bodies
-                    .into_iter()
-                    .flat_map(|body| std::iter::repeat(body).zip(&combinations))
-                    .map(|(body, param_combination)| OpenApiRequest {
-                        method: operation.method,
-                        path: operation.path.to_owned(),
-                        body: Body::build(api, operation.operation, Some(body)),
-                        parameters: param_combination.clone(),
-                    })
-                    .collect()
-            }
-            None => {
-                println!("none");
-                combinations
-                    .into_iter()
-                    .map(|combination| OpenApiRequest {
-                        method: operation.method,
-                        path: operation.path.to_owned(),
-                        body: Body::build(api, operation.operation, None),
-                        parameters: combination,
-                    })
-                    .collect()
-            }
+            Some(bodies) => bodies
+                .into_iter()
+                .flat_map(|body| std::iter::repeat(body).zip(&combinations))
+                .map(|(body, param_combination)| OpenApiRequest {
+                    method: operation.method,
+                    path: operation.path.to_owned(),
+                    body: Body::build(api, operation.operation, Some(body)),
+                    parameters: param_combination.clone(),
+                })
+                .collect(),
+            None => combinations
+                .into_iter()
+                .map(|combination| OpenApiRequest {
+                    method: operation.method,
+                    path: operation.path.to_owned(),
+                    body: Body::build(api, operation.operation, None),
+                    parameters: combination,
+                })
+                .collect(),
         }
     };
     assert_ne!(rv.len(), 0);
