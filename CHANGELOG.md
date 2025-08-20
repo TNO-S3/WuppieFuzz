@@ -20,6 +20,8 @@
   [#114](https://github.com/TNO-S3/WuppieFuzz/pull/114).
 - Fix a bug in corpus generation when no examples were found for a
   request body [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
+- Consider AnyOf and AllOf schemas for parameter backreferences if they
+  have exactly one element [#144](https://github.com/TNO-S3/WuppieFuzz/pull/144)
 
 # v1.2.0 (2025-02-21)
 
