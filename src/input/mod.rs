@@ -70,7 +70,7 @@ use openapiv3::{OpenAPI, Operation};
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
 use crate::{
-    input::parameter::{ParameterAccess, ParameterAccessElement},
+    initial_corpus::dependency_graph::parameter_access::{ParameterAccess, RequestParameterAccess},
     parameter_feedback::ParameterFeedback,
     state::HasRandAndOpenAPI,
 };
@@ -288,42 +288,30 @@ impl OpenApiRequest {
         }
     }
 
-    /// Returns a mutable reference to a parameter identified by its ParameterKind
-    /// and a ParameterAccess. Note that the ParameterAccess must consist of a single
-    /// ParameterAccessElement::Name(_) for all except ParameterKind::Body.
+    /// Returns a mutable reference to a parameter identified a RequestParameterAccess.
     pub fn get_mut_parameter<'a>(
         &'a mut self,
-        name: &ParameterAccess,
-        kind: ParameterKind,
+        req_parameter_access: &RequestParameterAccess,
     ) -> Option<&'a mut ParameterContents> {
         // Can't use or_else with a closure because you'd have to move self
         // which is not possible
         #[allow(clippy::or_fun_call)]
-        match kind {
-            ParameterKind::Path
-            | ParameterKind::Query
-            | ParameterKind::Header
-            | ParameterKind::Cookie => {
-                if let ParameterAccessElement::Name(parameter_name) = &name.elements[0] {
-                    self.parameters.get_mut(&(parameter_name.clone(), kind))
-                } else {
-                    None
-                }
-            }
-            ParameterKind::Body => match &mut self.body {
+        match &req_parameter_access {
+            RequestParameterAccess::Body(parameter_access) => match &mut self.body {
                 Body::Empty => None,
                 Body::TextPlain(text) => Some(text),
                 // For getting named parameters, we consider only first-level parameters in object values
                 // TODO: implement a way to address nested parameters and non-object parameters.
                 Body::ApplicationJson(parameters) | Body::XWwwFormUrlencoded(parameters) => {
-                    // if let ParameterContents::Object(obj_param) = parameters {
-                    //     obj_param.get_mut(name)
-                    // } else {
-                    //     None
-                    // }
-                    parameters.get_mut_parameter(name.clone())
+                    parameters.resolve_mut(&parameter_access)
                 }
             },
+            RequestParameterAccess::Query(name)
+            | RequestParameterAccess::Path(name)
+            | RequestParameterAccess::Header(name)
+            | RequestParameterAccess::Cookie(name) => self
+                .parameters
+                .get_mut(&(name.clone(), req_parameter_access.into())),
         }
     }
 

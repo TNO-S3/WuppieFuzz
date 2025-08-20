@@ -19,11 +19,8 @@ use unicode_truncate::UnicodeTruncateStr;
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
-    initial_corpus::dependency_graph::ParameterMatching,
-    input::{
-        Body, OpenApiInput, OpenApiRequest, ParameterContents,
-        parameter::{ParameterAccess, ParameterKind},
-    },
+    initial_corpus::dependency_graph::parameter_access::ParameterMatching,
+    input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
 };
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest
@@ -892,12 +889,7 @@ pub fn openapi_inputs_from_ops<'a>(
                         .parameters
                         .iter()
                         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-                        .filter(move |parameter| {
-                            let par_kind: ParameterKind = (*parameter).into();
-                            let par_data = &parameter.data;
-                            edge.weight().name_input.to_string() == par_data.name
-                                && par_kind == edge.weight().kind_input
-                        })
+                        .filter(move |parameter| edge.weight().name_input.matches(parameter))
                 })
                 .collect();
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)

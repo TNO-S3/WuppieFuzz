@@ -1,4 +1,5 @@
 mod normalize;
+pub mod parameter_access;
 mod toposort;
 
 /// The fuzzer wants to use outputs of previous requests (POST artist -> artistid)
@@ -30,10 +31,8 @@ use self::{
     toposort::{Cycle, toposort},
 };
 use crate::{
-    input::{
-        Method, OpenApiInput, ParameterContents,
-        parameter::{ParameterAccess, ParameterKind},
-    },
+    initial_corpus::dependency_graph::parameter_access::ParameterMatching,
+    input::{Method, OpenApiInput, ParameterContents, parameter::ParameterKind},
     openapi::{
         QualifiedOperation,
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
@@ -147,10 +146,9 @@ fn add_references_to_openapi_input(
         // placeholder Value based on e.g. an example or its type) into a Reference to
         // the parameter of the same name and kind in the source.
         log::debug!("{:#?}", openapi_input.0[target_index]);
-        if let Some(x) = openapi_input.0[target_index]
-            .get_mut_parameter(&edge.weight().name_input.clone(), edge.weight().kind_input)
+        if let Some(x) =
+            openapi_input.0[target_index].get_mut_parameter(&edge.weight().name_input.clone())
         {
-            log::error!("Setting RefEREnCe");
             *x = ParameterContents::Reference {
                 request_index: source_index,
                 parameter_access: edge.weight().name_output.clone(),
@@ -168,17 +166,6 @@ type DepGraph<'a> = DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx
 pub struct DependencyGraph<'a> {
     /// The API that the dependency graph is about.
     graph: DepGraph<'a>,
-}
-
-/// A parameter name saved in two variants: the canonical name appearing as the
-/// output parameter in the spec, the canonical name appearing as the input parameter
-/// in the spec.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParameterMatching {
-    name_output: ParameterAccess,
-    pub(crate) name_input: ParameterAccess,
-    normalized: String,
-    pub(crate) kind_input: ParameterKind,
 }
 
 impl<'a> DependencyGraph<'a> {

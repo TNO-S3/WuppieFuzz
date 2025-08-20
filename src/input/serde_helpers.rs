@@ -12,8 +12,6 @@ use serde::{
     ser::{Serialize, Serializer},
 };
 
-use crate::input::parameter::ParameterAccess;
-
 use super::{Body, Method, OpenApiRequest, ParameterContents, parameter::ParameterKind};
 
 pub(crate) fn serialize_bytes_to_b64<S>(bi: &[u8], serializer: S) -> Result<S::Ok, S::Error>

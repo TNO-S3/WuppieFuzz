@@ -89,7 +89,7 @@ where
             method,
             path,
             parameters,
-            body,
+            body_type: body,
         });
 
         input.assert_valid(self.name());

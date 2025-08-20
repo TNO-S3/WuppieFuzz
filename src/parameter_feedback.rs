@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::{
-    input::{Body, Method, OpenApiRequest, ParameterContents::Object, parameter::ParameterAccess},
+    initial_corpus::dependency_graph::parameter_access::ParameterAccess,
+    input::{Body, Method, OpenApiRequest, ParameterContents::Object},
     openapi::validate_response::Response,
 };
 
@@ -65,6 +66,33 @@ impl ParameterFeedback {
             .is_some()
     }
 
+    fn add_response_field(
+        &mut self,
+        request_index: usize,
+        parent_access: ParameterAccess,
+        field: serde_json::Value,
+    ) {
+        self.set(request_index, parent_access, field);
+        match field {
+            Value::Null => todo!(),
+            Value::Bool(_) => todo!(),
+            Value::Number(number) => todo!(),
+            Value::String(_) => todo!(),
+            Value::Array(values) => {
+                for (offset, value) in values.into_iter().enumerate() {
+                    let access = parent_access.with_new_element(offset.into());
+                    self.add_response_field(request_index, access, value);
+                }
+            }
+            Value::Object(map) => {
+                for (param, value) in map.into_iter() {
+                    let access = parent_access.with_new_element(param.into());
+                    self.add_response_field(request_index, access, value);
+                }
+            }
+        }
+    }
+
     /// Processes the values returned in a Response.
     ///
     /// The body is parsed as a json object or an array of objects, and if successful,
@@ -75,28 +103,11 @@ impl ParameterFeedback {
         // (e.g. id = 37) for use as parameters in later requests.
         match response.json::<serde_json::Value>() {
             // Objects in responses: save all field/value combinations
-            Ok(serde_json::Value::Object(hashmap)) => {
-                for (param, value) in hashmap.into_iter() {
-                    self.set(request_index, param.into(), value);
-                }
+            Ok(field) => {
+                self.add_response_field(request_index, ParameterAccess::new(vec![]), field)
             }
-            // Arrays in responses: take the first element, which should be an object,
-            // and save all field/value combinations.
-            // Since we can only save one value per field name per request, we can only
-            // keep one object worth of values, and we forget the rest.
-            Ok(serde_json::Value::Array(vec)) => {
-                if let Some(serde_json::Value::Object(hashmap)) = vec.into_iter().next() {
-                    for (param, value) in hashmap.into_iter() {
-                        self.set(request_index, param.into(), value);
-                    }
-                }
-            }
-            _ => {
-                log::trace!(
-                    "Response was not an object or array: {:?}",
-                    response.json::<serde_json::Value>()
-                );
-                ()
+            Err(e) => {
+                log::trace!("Error parsing response: {:?}", e);
             }
         }
         // We also record the values of any Set-Cookie headers

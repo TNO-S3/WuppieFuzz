@@ -14,10 +14,7 @@ use openapiv3::{
 };
 use porter_stemmer::stem;
 
-use crate::{
-    input::parameter::{ParameterAccess, ParameterAccessElement, ParameterKind},
-    openapi::JsonContent,
-};
+use crate::{input::parameter::ParameterKind, openapi::JsonContent};
 
 /// A parameter name saved in two variants: the canonical name appearing in the spec,
 /// and the normalized form used for matching input and output parameters
@@ -25,8 +22,7 @@ use crate::{
 pub struct ParameterNormalization {
     pub name: String,
     pub normalized: String,
-    pub path_context: Option<String>,
-    pub nested_context: ParameterAccess,
+    pub context: Option<String>,
 }
 
 impl ParameterNormalization {
@@ -44,17 +40,16 @@ impl ParameterNormalization {
     /// to identify a parameter (like in ParameterAccess).
     ///
     /// TODO: make clear decisions how about exact meaning of context and document this.
-    pub fn new(nested_access: ParameterAccess, path_context: Option<String>) -> Self {
-        let normal_name = nested_access
-            .elements
-            .last()
-            .unwrap_or(&ParameterAccessElement::Name("".to_owned()))
-            .to_string();
+    pub fn new(name: String, context: Option<String>) -> Self {
+        // let normal_name = nested_access
+        //     .elements
+        //     .last()
+        //     .unwrap_or(&ParameterAccessElement::Name("".to_owned()))
+        //     .to_string();
         Self {
-            name: normal_name.clone(),
-            normalized: stem(&normal_name),
-            path_context,
-            nested_context: nested_access,
+            normalized: stem(&name),
+            name,
+            context,
         }
     }
 }
@@ -124,16 +119,11 @@ fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalizat
 /// an "id" parameter returned from `PATCH /tank/{id}` is renamed to "tankid".
 pub fn normalize_response<'a>(
     api: &'a OpenAPI,
-    path: &str,
     response: &'a Response,
-    parent_context: ParameterAccess,
+    context: Option<String>,
+    // parent_context: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
-    normalize_media_type(
-        api,
-        path,
-        response.content.get_json_content()?,
-        parent_context,
-    )
+    normalize_media_type(api, response.content.get_json_content()?, context)
 }
 
 /// Normalizes request body parameters.
@@ -145,40 +135,37 @@ pub fn normalize_response<'a>(
 /// an "id" parameter sent to `POST /tank` is renamed to "tankid".
 pub fn normalize_request_body<'a>(
     api: &'a OpenAPI,
-    path: &str,
     body: &'a RequestBody,
-    parent_context: ParameterAccess,
+    context: Option<String>,
 ) -> Option<Vec<ParameterNormalization>> {
-    normalize_media_type(api, path, body.content.get_json_content()?, parent_context)
+    normalize_media_type(api, body.content.get_json_content()?, context)
 }
 
 /// MediaType is the internal type used for objects, both input (POST) and
 /// output (GET). This function normalizes the field names.
 fn normalize_media_type<'a>(
     api: &'a OpenAPI,
-    path: &str,
     media_type: &'a MediaType,
-    parent_context: ParameterAccess,
+    context: Option<String>,
 ) -> Option<Vec<ParameterNormalization>> {
     let schema = media_type.schema.as_ref()?.resolve(api);
-    normalize_schema(api, path, schema, parent_context)
+    normalize_schema(api, schema, context)
 }
 
 fn normalize_schema<'a>(
     api: &'a OpenAPI,
-    path: &str,
     schema: &'a Schema,
-    parent_context: ParameterAccess,
+    context: Option<String>,
 ) -> Option<Vec<ParameterNormalization>> {
     match &schema.kind {
         SchemaKind::Type(openapiv3::Type::Object(o)) => {
-            Some(normalize_object_type(api, path, o, parent_context))
+            Some(normalize_object_type(api, o, context))
         }
         SchemaKind::Type(openapiv3::Type::Array(a)) => {
             let inner_schema = a.items.as_ref()?.resolve(api);
             match inner_schema.kind {
                 SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-                    Some(normalize_object_type(api, path, o, parent_context))
+                    Some(normalize_object_type(api, o, context))
                 }
                 // No support for nested arrays - semantic meaning not obvious
                 _ => None,
@@ -192,7 +179,7 @@ fn normalize_schema<'a>(
         openapiv3::SchemaKind::AllOf { all_of } => {
             // If only a single property is in this AllOf, return an example from it.
             if all_of.len() == 1 {
-                normalize_schema(api, path, all_of[0].resolve(api), parent_context)
+                normalize_schema(api, all_of[0].resolve(api), context)
             } else {
                 log::warn!(concat!(
                     "Normalizing example parameters for the allOf keyword with more than one schema is not supported. ",
@@ -220,28 +207,23 @@ fn normalize_schema<'a>(
 
 fn normalize_object_type<'a>(
     api: &'a OpenAPI,
-    path: &str,
     object_type: &'a ObjectType,
-    parent_context: ParameterAccess,
+    context: Option<String>,
 ) -> Vec<ParameterNormalization> {
     object_type
         .properties
         .keys()
         .flat_map(|key| {
-            let mut normalized_params = vec![ParameterNormalization::new(
-                parent_context
-                    .clone()
-                    .with_new_element(key.to_owned().into()),
-                path_context_component(path),
-            )];
+            let mut normalized_params =
+                vec![ParameterNormalization::new(key.to_owned(), context.clone())];
             let nested_schema = object_type.properties[key].resolve(api);
             let nested_params = normalize_schema(
                 api,
-                path,
                 nested_schema,
-                parent_context
-                    .clone()
-                    .with_new_element(key.to_owned().into()),
+                // parent_context
+                //     .clone()
+                //     .with_new_element(key.to_owned().into()),
+                Some(key.to_owned()),
             )
             .unwrap_or_default();
             // log::error!("Nested params:\n{:#?}", nested_params);

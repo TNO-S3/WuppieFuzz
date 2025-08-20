@@ -4,15 +4,16 @@ use std::{
     fmt::{Debug, Display, Formatter, Result},
 };
 
-use anyhow::Error;
 use base64::{Engine as _, display::Base64Display, engine::general_purpose::STANDARD};
-use itertools::Itertools;
 use libafl_bolts::rands::Rand;
-use openapiv3::{Parameter, Schema};
+use openapiv3::Parameter;
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
 use super::utils::new_rand_input;
+use crate::initial_corpus::dependency_graph::parameter_access::{
+    ParameterAccess, ParameterAccessElement,
+};
 
 /// Structs that help describe parameters to HTTP requests in a way that the fuzzer can still
 /// mutate and reason about. The ParameterKind enum describes the places a parameter can occur
@@ -60,164 +61,6 @@ impl Display for SimpleValue {
     }
 }
 
-#[derive(
-    Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
-)]
-pub enum ParameterAccessElement {
-    Name(String),
-    Offset(usize),
-}
-
-impl Display for ParameterAccessElement {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ParameterAccessElement::Name(name) => name.clone(),
-                ParameterAccessElement::Offset(offset) => offset.to_string(),
-            }
-        )
-    }
-}
-
-impl From<String> for ParameterAccessElement {
-    fn from(value: String) -> Self {
-        if value.chars().all(|c| c.is_ascii_digit()) {
-            Self::Offset(value.parse().unwrap())
-        } else {
-            Self::Name(value)
-        }
-    }
-}
-
-impl From<String> for ParameterAccess {
-    fn from(value: String) -> Self {
-        // Split off the context, we only want keys/offsets in the object/arrays
-        let string_split = value.split("//");
-        let split_len = string_split.clone().count();
-        if split_len > 2 {
-            log::error!("Bad parameter access: {value:?}");
-        }
-        // TODO: Add test, could split_len == 0?
-        Self::new(
-            string_split
-                .skip(split_len - 1)
-                .flat_map(|element| element.split('/'))
-                .map(String::from)
-                .map(ParameterAccessElement::from)
-                .collect::<Vec<ParameterAccessElement>>(),
-        )
-    }
-}
-
-impl From<&str> for ParameterAccess {
-    fn from(value: &str) -> Self {
-        Self::new(
-            value
-                .split("//")
-                .map(String::from)
-                .map(ParameterAccessElement::from)
-                .collect::<Vec<ParameterAccessElement>>(),
-        )
-    }
-}
-
-impl From<&[ParameterAccessElement]> for ParameterAccess {
-    fn from(value: &[ParameterAccessElement]) -> Self {
-        Self::new(value.to_vec())
-    }
-}
-
-#[derive(
-    Default,
-    Clone,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-    Hash,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-)]
-pub struct ParameterAccess {
-    pub elements: Vec<ParameterAccessElement>,
-    // as_ref_repr: String,
-}
-
-impl ParameterAccess {
-    pub fn new(elements: Vec<ParameterAccessElement>) -> Self {
-        let mut result = Self {
-            elements: elements.clone(),
-            // as_ref_repr: elements.into_iter().map(|x| x.to_string()).join(""),
-        };
-        // result.as_ref_repr = result.to_string();
-        result
-    }
-
-    pub fn parameter_accesses_from_schema(
-        parent_access: ParameterAccess,
-        schema: &openapiv3::RefOr<Schema>,
-        api: &openapiv3::OpenAPI,
-    ) -> Vec<ParameterAccess> {
-        match schema.resolve(api).kind {
-            openapiv3::SchemaKind::Type(openapiv3::Type::Object(ref obj)) => obj
-                .properties
-                .iter()
-                .flat_map(|(name, child_schema)| {
-                    let mut accesses = vec![];
-                    let current_access =
-                        parent_access.with_new_element(ParameterAccessElement::Name(name.clone()));
-                    accesses.push(current_access.clone());
-                    accesses.extend(Self::parameter_accesses_from_schema(
-                        current_access,
-                        child_schema,
-                        api,
-                    ));
-                    accesses
-                })
-                .collect(),
-            _ => vec![],
-        }
-    }
-
-    pub fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {
-        let mut elements = self.elements.clone();
-        elements.push(new_element);
-        Self::new(elements)
-    }
-
-    pub fn into_parameter_name(&self) -> &str {
-        if let ParameterAccessElement::Name(name) = &self.elements[0] {
-            name
-        } else {
-            todo!("Need to decide on how to handle invalid conversion to parameter name")
-        }
-    }
-}
-
-impl Display for ParameterAccess {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(
-            f,
-            "{}",
-            self.elements
-                .clone()
-                .into_iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join("/")
-        )
-    }
-}
-
-// impl AsRef<str> for ParameterAccess {
-//     fn as_ref(&self) -> &str {
-//         &self.as_ref_repr
-//     }
-// }
-
 /// The contents of a parameter or of the body of an HTTP request made by the fuzzer.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
 #[serde(tag = "DataType", content = "Contents")]
@@ -264,27 +107,38 @@ impl ParameterContents {
         &mut self,
         parameter_access: ParameterAccess,
     ) -> Option<&mut ParameterContents> {
-        let (element, tail) = parameter_access.elements.split_first()?;
-        match self {
-            ParameterContents::Object(btree_map) => {
-                if let ParameterAccessElement::Name(name) = element {
-                    let nested = btree_map.get_mut(name)?;
-                    if tail.len() > 0 {
-                        nested.get_mut_parameter(tail.into())
+        if let Some((element, tail)) = parameter_access.elements.split_first() {
+            match self {
+                ParameterContents::Object(btree_map) => {
+                    if let ParameterAccessElement::Name(name) = element {
+                        let nested = btree_map.get_mut(name)?;
+                        if tail.len() > 0 {
+                            nested.get_mut_parameter(tail.into())
+                        } else {
+                            Some(nested)
+                        }
                     } else {
                         None
                     }
-                } else {
-                    None
                 }
+                ParameterContents::Array(items) => {
+                    if let ParameterAccessElement::Offset(index) = element {
+                        let nested = items.get_mut(*index)?;
+                        if tail.len() > 0 {
+                            nested.get_mut_parameter(tail.into())
+                        } else {
+                            Some(nested)
+                        }
+                    } else {
+                        None
+                    }
+                }
+                ParameterContents::LeafValue(_)
+                | ParameterContents::Bytes(_)
+                | ParameterContents::Reference { .. } => None,
             }
-            ParameterContents::Array(items) => todo!(),
-            ParameterContents::LeafValue(simple_value) => todo!(),
-            ParameterContents::Bytes(items) => todo!(),
-            ParameterContents::Reference {
-                request_index,
-                parameter_access,
-            } => todo!(),
+        } else {
+            Some(self)
         }
     }
 
@@ -396,6 +250,38 @@ impl ParameterContents {
             ParameterContents::Bytes(bytes) => mime_encode_bytes(bytes),
             _ => self.to_string(),
         }
+    }
+
+    pub fn resolve_mut(&mut self, path: &ParameterAccess) -> Option<&mut Self> {
+        let mut result = self;
+        for path_element in &path.elements {
+            match (result, path_element) {
+                (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
+                    result = mapping.get_mut(name)?
+                }
+                (ParameterContents::Array(vector), ParameterAccessElement::Offset(index)) => {
+                    result = vector.get_mut(*index)?
+                }
+                _ => return None,
+            }
+        }
+        Some(result)
+    }
+
+    pub fn resolve(&self, path: &ParameterAccess) -> Option<&Self> {
+        let mut result = self;
+        for path_element in &path.elements {
+            match (result, path_element) {
+                (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
+                    result = mapping.get(name)?
+                }
+                (ParameterContents::Array(vector), ParameterAccessElement::Offset(index)) => {
+                    result = vector.get(*index)?
+                }
+                _ => return None,
+            }
+        }
+        Some(result)
     }
 }
 
