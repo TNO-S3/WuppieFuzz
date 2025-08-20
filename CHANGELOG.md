@@ -20,6 +20,8 @@
   [#114](https://github.com/TNO-S3/WuppieFuzz/pull/114).
 - Fix a bug in corpus generation when no examples were found for a
   request body [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
+- Parameter matching for corpus generation now detects resource-id and
+  resourceId in addition to resource_id [#143](https://github.com/TNO-S3/WuppieFuzz/pull/143)
 
 # v1.2.0 (2025-02-21)
 
