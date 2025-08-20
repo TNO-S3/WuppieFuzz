@@ -251,6 +251,27 @@ mod tests {
             },
             ParameterNormalization::new("widget_id", Some("countries"))
         );
+        assert_eq!(
+            ParameterNormalization {
+                name: "pet-id",
+                normalized: "pet|id".into(),
+            },
+            ParameterNormalization::new("pet-id", Some("pets"))
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "petId",
+                normalized: "pet|id".into(),
+            },
+            ParameterNormalization::new("petId", Some("pets"))
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "petid",
+                normalized: "pet|id".into(),
+            },
+            ParameterNormalization::new("petid", Some("pet"))
+        );
     }
 
     #[test]
