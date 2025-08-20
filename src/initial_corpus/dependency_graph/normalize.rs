@@ -41,11 +41,16 @@ impl<'a> ParameterNormalization<'a> {
                 // called `id` in other context, such as when part of a `Widget` object
                 // in a body.
                 let last = name.len() - 1;
-                let no_context_name = match name.find('_') {
-                    Some(i) if (i != 0 && i != last && stem(context) == stem(&name[..i])) => {
-                        &name[i + 1..]
-                    }
-                    _ => name,
+                let no_context_name = if let Some(i) = name.find(['-', '_'])
+                    && (i != 0 && i != last && stem(context) == stem(&name[..i]))
+                {
+                    &name[i + 1..]
+                } else if ["id", "Id", "ID"].iter().any(|id| name.ends_with(id))
+                    && stem(context) == stem(&name[..name.len() - 2])
+                {
+                    "id"
+                } else {
+                    name
                 };
 
                 Self {
