@@ -27,6 +27,9 @@
   have exactly one element in [#144](https://github.com/TNO-S3/WuppieFuzz/pull/144)
 - Improved corpus loading and fixed fallback when corpus loading fails in
   [#147](https://github.com/TNO-S3/WuppieFuzz/pull/147)
+- Consider AnyOf and AllOf schemas for parameter backreferences if they
+  have exactly one element [#144](https://github.com/TNO-S3/WuppieFuzz/pull/144)
+>>>>>>> update changelog
 
 # v1.2.0 (2025-02-21)
 
