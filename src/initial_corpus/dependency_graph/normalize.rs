@@ -12,7 +12,6 @@
 use openapiv3::{
     MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, SchemaKind,
 };
-use porter_stemmer::stem;
 
 use crate::{input::parameter::ParameterKind, openapi::JsonContent};
 
@@ -196,6 +195,10 @@ fn path_context_component(path: &str) -> Option<&str> {
         .find(|component| !component.is_empty() && !component.starts_with('{'))
 }
 
+fn stem(name: &str) -> String {
+    porter_stemmer::stem(name).to_lowercase()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -271,6 +274,13 @@ mod tests {
                 normalized: "pet|id".into(),
             },
             ParameterNormalization::new("petid", Some("pet"))
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "PetID",
+                normalized: "pet|id".into(),
+            },
+            ParameterNormalization::new("PetID", Some("pet"))
         );
     }
 
