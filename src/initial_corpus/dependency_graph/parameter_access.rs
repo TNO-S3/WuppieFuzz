@@ -4,6 +4,7 @@ use std::{
 };
 
 use openapiv3::Schema;
+use serde::{Deserialize, Serialize};
 
 use crate::input::parameter::ParameterKind;
 
@@ -128,6 +129,27 @@ impl From<&[ParameterAccessElement]> for ParameterAccess {
     fn from(value: &[ParameterAccessElement]) -> Self {
         Self::new(value.to_vec())
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+pub enum ResponseParameterAccess {
+    Body(ParameterAccess),
+    Cookie(String),
+}
+
+impl ResponseParameterAccess {
+    fn simple_name(&self) -> &str {
+        match self {
+            Self::Body(_) => "",
+            Self::Cookie(name) => &name,
+        }
+    }
+
+    // pub fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {
+    //     let mut elements = self.elements.clone();
+    //     elements.push(new_element);
+    //     Self::new(elements)
+    // }
 }
 
 #[derive(Debug, Clone, PartialEq)]
