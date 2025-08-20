@@ -60,7 +60,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
 
     match &schema.kind {
         SchemaKind::Type(Type::Object(obj)) => {
-            let body_map: BTreeMap<ParameterAccess, ParameterContents> = obj
+            let body_map: BTreeMap<String, ParameterContents> = obj
                 .properties
                 .iter()
                 .filter_map(|(param, ref_or_schema)| {
@@ -155,7 +155,7 @@ fn example_parameter_value(api: &OpenAPI, par_data: &ParameterData) -> Result<Va
 fn example_parameters(
     api: &OpenAPI,
     operation: &Operation,
-) -> BTreeMap<(ParameterAccess, ParameterKind), ParameterContents> {
+) -> BTreeMap<(String, ParameterKind), ParameterContents> {
     operation
         .parameters
         .iter()
@@ -183,61 +183,60 @@ fn all_interesting_parameters(
     operation: &Operation,
     api: &OpenAPI,
     single_valued: &[&Parameter],
-) -> Vec<BTreeMap<(ParameterAccess, ParameterKind), ParameterContents>> {
+) -> Vec<BTreeMap<(String, ParameterKind), ParameterContents>> {
     // For each parameter in the operation, generate a list of plausible values
-    let param_combinations: BTreeMap<(ParameterAccess, ParameterKind), Vec<ParameterContents>> =
-        operation
-            .parameters
-            .iter()
-            .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-            .map(|parameter| {
-                let par_kind: ParameterKind = parameter.into();
-                let par_data = &parameter.data;
-                let mut interesting_combinations: Vec<Value> = vec![];
-                if single_valued.contains(&parameter) {
-                    if par_data.example.is_some() {
-                        interesting_combinations.push(par_data.example.clone().unwrap());
-                    } else {
-                        match example_parameter_value(api, par_data) {
-                            Ok(value) => interesting_combinations.push(value),
-                            Err(err) => {
-                                log::warn!(
-                                    "Failed to create single value for parameter {}: {}",
-                                    par_data.name,
-                                    err
-                                )
-                            }
+    let param_combinations: BTreeMap<(String, ParameterKind), Vec<ParameterContents>> = operation
+        .parameters
+        .iter()
+        .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
+        .map(|parameter| {
+            let par_kind: ParameterKind = parameter.into();
+            let par_data = &parameter.data;
+            let mut interesting_combinations: Vec<Value> = vec![];
+            if single_valued.contains(&parameter) {
+                if par_data.example.is_some() {
+                    interesting_combinations.push(par_data.example.clone().unwrap());
+                } else {
+                    match example_parameter_value(api, par_data) {
+                        Ok(value) => interesting_combinations.push(value),
+                        Err(err) => {
+                            log::warn!(
+                                "Failed to create single value for parameter {}: {}",
+                                par_data.name,
+                                err
+                            )
                         }
                     }
-                } else {
-                    // if this parameter is a reference target (it will get replaced with a reference)
-                    // only return a single possible value here to avoid duplication down the line.
-                    if let Some(example) = par_data.example.clone() {
-                        interesting_combinations.push(example);
-                    };
-                    match &(par_data.format) {
-                        openapiv3::ParameterSchemaOrContent::Schema(ref_or_schema) => {
-                            interesting_combinations.extend(interesting_params_from_schema(
-                                api,
-                                ref_or_schema,
-                                &[],
-                            ));
-                        }
-                        openapiv3::ParameterSchemaOrContent::Content(content) => {
-                            if let Some(media_type) = content.get("application/json") {
-                                interesting_combinations
-                                    .extend(interesting_params_from_media_type(api, media_type));
-                            }
-                        }
-                    };
                 }
-                let possible_values = interesting_combinations
-                    .into_iter()
-                    .map(ParameterContents::from)
-                    .collect();
-                ((par_data.name.clone().into(), par_kind), possible_values)
-            })
-            .collect();
+            } else {
+                // if this parameter is a reference target (it will get replaced with a reference)
+                // only return a single possible value here to avoid duplication down the line.
+                if let Some(example) = par_data.example.clone() {
+                    interesting_combinations.push(example);
+                };
+                match &(par_data.format) {
+                    openapiv3::ParameterSchemaOrContent::Schema(ref_or_schema) => {
+                        interesting_combinations.extend(interesting_params_from_schema(
+                            api,
+                            ref_or_schema,
+                            &[],
+                        ));
+                    }
+                    openapiv3::ParameterSchemaOrContent::Content(content) => {
+                        if let Some(media_type) = content.get("application/json") {
+                            interesting_combinations
+                                .extend(interesting_params_from_media_type(api, media_type));
+                        }
+                    }
+                };
+            }
+            let possible_values = interesting_combinations
+                .into_iter()
+                .map(ParameterContents::from)
+                .collect();
+            ((par_data.name.clone().into(), par_kind), possible_values)
+        })
+        .collect();
 
     // Now, attempt to create *every possible combination* of these possible values.
     // This means if the possible values are x=1, 2; y=3, 4; you get [1,3] [1,4] [2,3]

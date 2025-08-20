@@ -4,6 +4,7 @@ use std::{
     fmt::{Debug, Display, Formatter, Result},
 };
 
+use anyhow::Error;
 use base64::{Engine as _, display::Base64Display, engine::general_purpose::STANDARD};
 use itertools::Itertools;
 use libafl_bolts::rands::Rand;
@@ -122,6 +123,12 @@ impl From<&str> for ParameterAccess {
     }
 }
 
+impl From<&[ParameterAccessElement]> for ParameterAccess {
+    fn from(value: &[ParameterAccessElement]) -> Self {
+        Self::new(value.to_vec())
+    }
+}
+
 #[derive(
     Default,
     Clone,
@@ -136,16 +143,16 @@ impl From<&str> for ParameterAccess {
 )]
 pub struct ParameterAccess {
     pub elements: Vec<ParameterAccessElement>,
-    as_ref_repr: String,
+    // as_ref_repr: String,
 }
 
 impl ParameterAccess {
     pub fn new(elements: Vec<ParameterAccessElement>) -> Self {
         let mut result = Self {
             elements: elements.clone(),
-            as_ref_repr: elements.into_iter().map(|x| x.to_string()).join(""),
+            // as_ref_repr: elements.into_iter().map(|x| x.to_string()).join(""),
         };
-        result.as_ref_repr = result.to_string();
+        // result.as_ref_repr = result.to_string();
         result
     }
 
@@ -180,6 +187,14 @@ impl ParameterAccess {
         elements.push(new_element);
         Self::new(elements)
     }
+
+    pub fn into_parameter_name(&self) -> &str {
+        if let ParameterAccessElement::Name(name) = &self.elements[0] {
+            name
+        } else {
+            todo!("Need to decide on how to handle invalid conversion to parameter name")
+        }
+    }
 }
 
 impl Display for ParameterAccess {
@@ -197,11 +212,11 @@ impl Display for ParameterAccess {
     }
 }
 
-impl AsRef<str> for ParameterAccess {
-    fn as_ref(&self) -> &str {
-        &self.as_ref_repr
-    }
-}
+// impl AsRef<str> for ParameterAccess {
+//     fn as_ref(&self) -> &str {
+//         &self.as_ref_repr
+//     }
+// }
 
 /// The contents of a parameter or of the body of an HTTP request made by the fuzzer.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
@@ -212,7 +227,7 @@ pub enum ParameterContents {
     /// Mutators can attempt to mutate it using knowledge of the type, i.e. numbers
     /// will always be mutated into other numbers, and array elements can be shuffled.
     #[serde(rename = "Object")]
-    Object(BTreeMap<ParameterAccess, ParameterContents>),
+    Object(BTreeMap<String, ParameterContents>),
     #[serde(rename = "Array")]
     Array(Vec<ParameterContents>),
     #[serde(rename = "PrimitiveValue")]
@@ -245,6 +260,34 @@ pub enum ParameterContents {
 }
 
 impl ParameterContents {
+    pub fn get_mut_parameter(
+        &mut self,
+        parameter_access: ParameterAccess,
+    ) -> Option<&mut ParameterContents> {
+        let (element, tail) = parameter_access.elements.split_first()?;
+        match self {
+            ParameterContents::Object(btree_map) => {
+                if let ParameterAccessElement::Name(name) = element {
+                    let nested = btree_map.get_mut(name)?;
+                    if tail.len() > 0 {
+                        nested.get_mut_parameter(tail.into())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            ParameterContents::Array(items) => todo!(),
+            ParameterContents::LeafValue(simple_value) => todo!(),
+            ParameterContents::Bytes(items) => todo!(),
+            ParameterContents::Reference {
+                request_index,
+                parameter_access,
+            } => todo!(),
+        }
+    }
+
     /// Returns whether the `ParameterContents` is the `reference` variant.
     pub fn is_reference(&self) -> bool {
         matches!(self, ParameterContents::Reference { .. })
@@ -374,8 +417,8 @@ impl Display for ParameterContents {
     }
 }
 
-impl From<BTreeMap<ParameterAccess, ParameterContents>> for ParameterContents {
-    fn from(value: BTreeMap<ParameterAccess, ParameterContents>) -> Self {
+impl From<BTreeMap<String, ParameterContents>> for ParameterContents {
+    fn from(value: BTreeMap<String, ParameterContents>) -> Self {
         ParameterContents::Object(value)
     }
 }

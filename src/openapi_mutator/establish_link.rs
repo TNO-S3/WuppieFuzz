@@ -12,7 +12,7 @@ use libafl::{
 use libafl_bolts::Named;
 
 use crate::{
-    input::{OpenApiInput, ParameterContents},
+    input::{OpenApiInput, ParameterContents, parameter::ParameterAccessElement},
     state::HasRandAndOpenAPI,
 };
 
@@ -79,8 +79,13 @@ where
                         request_index_and_parameter_name_pairs
                             .iter()
                             // Find the first request index that had the desired parameter name in a response
-                            .position(|(request_index, rv_name)| {
-                                *request_index < current_request_index && name == rv_name
+                            .position(|(request_index, rv_parameter_access)| {
+                                let rv_name = rv_parameter_access.elements.last();
+                                if let Some(ParameterAccessElement::Name(rv_name)) = rv_name {
+                                    *request_index < current_request_index && name == rv_name
+                                } else {
+                                    false
+                                }
                             })
                             .map(|index_return_values| (param, index_return_values))
                     })

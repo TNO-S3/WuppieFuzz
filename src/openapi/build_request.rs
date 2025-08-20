@@ -29,10 +29,7 @@ pub fn build_request_from_input(
     );
     let mut query_params = Vec::new();
     let mut cookie_params = Vec::new();
-    for ((name, kind), value) in input // voor elke parameter in openapirequest
-        .parameters
-        .iter()
-    {
+    for ((name, kind), value) in input.parameters.iter() {
         match kind {
             ParameterKind::Query => query_params.push((name, value.to_url_encoding())),
             ParameterKind::Header => {

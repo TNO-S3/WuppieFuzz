@@ -117,7 +117,7 @@ impl ParameterFeedback {
                 if request.method == Method::Post =>
             {
                 for (param, value) in obj_contents {
-                    self.set(request_index, param, value.to_value());
+                    self.set(request_index, param.into(), value.to_value());
                 }
             }
             _ => (),

@@ -40,7 +40,7 @@ pub struct SerializableOpenApiRequest {
     #[serde(default, skip_serializing_if = "Body::is_empty")]
     body: Body,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    parameters: BTreeMap<(ParameterAccess, ParameterKind), ParameterContents>,
+    parameters: BTreeMap<(String, ParameterKind), ParameterContents>,
 }
 
 impl From<OpenApiRequest> for SerializableOpenApiRequest {

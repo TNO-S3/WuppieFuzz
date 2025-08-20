@@ -146,9 +146,11 @@ fn add_references_to_openapi_input(
         // Turn the parameter of the edge's target (which at this point got a concrete
         // placeholder Value based on e.g. an example or its type) into a Reference to
         // the parameter of the same name and kind in the source.
+        log::debug!("{:#?}", openapi_input.0[target_index]);
         if let Some(x) = openapi_input.0[target_index]
             .get_mut_parameter(&edge.weight().name_input.clone(), edge.weight().kind_input)
         {
+            log::error!("Setting RefEREnCe");
             *x = ParameterContents::Reference {
                 request_index: source_index,
                 parameter_access: edge.weight().name_output.clone(),

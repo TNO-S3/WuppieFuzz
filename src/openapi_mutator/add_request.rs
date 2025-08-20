@@ -60,7 +60,7 @@ where
             api.operations().nth(new_path_i).unwrap();
         let (method, path) = (new_method.try_into().unwrap(), new_path.to_owned());
 
-        let parameters: BTreeMap<(ParameterAccess, ParameterKind), ParameterContents> = new_op
+        let parameters: BTreeMap<(String, ParameterKind), ParameterContents> = new_op
             .parameters
             .iter()
             // Keep only concrete values and valid references
@@ -69,7 +69,7 @@ where
             .map(|param| (param.data.name.clone().into(), param.into()))
             .map(|name_kind| (name_kind, ParameterContents::Bytes(new_rand_input(rand))))
             .collect();
-        let body_contents: Option<BTreeMap<ParameterAccess, ParameterContents>> = new_op
+        let body_contents: Option<BTreeMap<String, ParameterContents>> = new_op
             .request_body
             .as_ref()
             .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
@@ -101,7 +101,7 @@ where
     }
 }
 
-fn field_accesses(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<ParameterAccess>> {
+fn field_accesses(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>> {
     match request_body
         .content
         .get_json_content()?
@@ -114,7 +114,7 @@ fn field_accesses(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<Param
             obj.properties
                 .keys()
                 .cloned()
-                .map(ParameterAccess::from)
+                // .map(ParameterAccess::from)
                 .collect(),
         ),
         _ => None,
@@ -150,7 +150,7 @@ mod test {
             if input.0[0].path == "/with-query-parameter"
                 || input.0[0].path == "/with-path-parameter/{id}"
             {
-                assert!(input.0[0].contains_parameter(&"id".into()));
+                assert!(input.0[0].contains_parameter("id"));
             }
         }
 
