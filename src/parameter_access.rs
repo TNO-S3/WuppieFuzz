@@ -112,6 +112,7 @@ impl ParameterAccessElements {
 
 impl Display for ParameterAccessElements {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        log::warn!("{:?}", self.0);
         write!(
             f,
             "{}",
@@ -144,6 +145,14 @@ impl ResponseParameterAccess {
             Self::Cookie(name) => &name,
         }
     }
+    pub fn get_body_access_elements(&self) -> Option<&ParameterAccessElements> {
+        if let Self::Body(elements) = self {
+            Some(elements)
+        } else {
+            log::warn!("Trying to get access elements from non-body RequestParameterAccess");
+            None
+        }
+    }
 }
 
 impl Display for ResponseParameterAccess {
@@ -174,6 +183,29 @@ impl RequestParameterAccess {
 
     pub fn matches(&self, param: &openapiv3::Parameter) -> bool {
         ParameterKind::from(param) == self.into() && param.name == self.simple_name()
+    }
+
+    pub fn create_of_kind(
+        kind: ParameterKind,
+        string_contents: Option<String>,
+        access_contents: Option<ParameterAccessElements>,
+    ) -> Self {
+        match kind {
+            ParameterKind::Path => Self::Path(string_contents.unwrap()),
+            ParameterKind::Query => Self::Query(string_contents.unwrap()),
+            ParameterKind::Header => Self::Header(string_contents.unwrap()),
+            ParameterKind::Cookie => Self::Cookie(string_contents.unwrap()),
+            ParameterKind::Body => Self::Body(access_contents.unwrap()),
+        }
+    }
+
+    pub fn get_body_access_elements(&self) -> Option<&ParameterAccessElements> {
+        if let Self::Body(elements) = self {
+            Some(elements)
+        } else {
+            log::warn!("Trying to get access elements from non-body RequestParameterAccess");
+            None
+        }
     }
 }
 
@@ -242,6 +274,26 @@ impl ParameterAccess {
             val
         } else {
             panic!("Called unwrap on a non-response variant");
+        }
+    }
+    pub(crate) fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {
+        match self {
+            ParameterAccess::Request(request_parameter_access) => match request_parameter_access {
+                RequestParameterAccess::Body(elements) => {
+                    Self::request_body(elements.with_new_element(new_element))
+                }
+                RequestParameterAccess::Query(name) => Self::request_query(name.clone()),
+                RequestParameterAccess::Path(name) => Self::request_path(name.clone()),
+                RequestParameterAccess::Header(name) => Self::request_header(name.clone()),
+                RequestParameterAccess::Cookie(name) => Self::request_cookie(name.clone()),
+            },
+            ParameterAccess::Response(response_parameter_access) => match response_parameter_access
+            {
+                ResponseParameterAccess::Body(elements) => {
+                    Self::response_body(elements.with_new_element(new_element))
+                }
+                ResponseParameterAccess::Cookie(name) => Self::response_cookie(name.clone()),
+            },
         }
     }
 }

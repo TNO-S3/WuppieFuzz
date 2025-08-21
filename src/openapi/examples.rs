@@ -889,7 +889,7 @@ pub fn openapi_inputs_from_ops<'a>(
                         .parameters
                         .iter()
                         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-                        .filter(move |parameter| edge.weight().name_input.matches(parameter))
+                        .filter(move |parameter| edge.weight().input_access.matches(parameter))
                 })
                 .collect();
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)

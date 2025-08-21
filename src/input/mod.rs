@@ -448,6 +448,7 @@ impl OpenApiInput {
                     .map(|((n, k), v)| (Cow::Borrowed(n), *k, v))
                     //.. then add any fields from the body as well ..
                     .chain(
+                        // TODO: also return nested (reference) parameters
                         match &openapi_request.body {
                             Body::Empty => IterWrapper::WithOption(None),
                             Body::TextPlain(text) => IterWrapper::WithOption(Some(text)),
@@ -472,7 +473,18 @@ impl OpenApiInput {
                         _ => None,
                     })
                     .map(move |((n, k), (ti, tn))| {
-                        (request_idx, n.into_owned().into(), *ti, tn.to_owned())
+                        (
+                            request_idx,
+                            RequestParameterAccess::create_of_kind(
+                                k,
+                                Some(n.clone().into_owned()),
+                                Some(ParameterAccessElements::from_elements(vec![
+                                    n.into_owned().into(),
+                                ])),
+                            ),
+                            *ti,
+                            tn.to_owned(),
+                        )
                     })
             })
     }
@@ -530,8 +542,8 @@ impl OpenApiInput {
                 // We do not have the response available at this point, so we cannot check whether
                 // the reference will actually be resolvable when we get the response.
                 |(src_idx, src_parameter_access, target_idx, target_parameter_access)| match (
-                    self.0.get(*src_idx),
-                    self.0.get(*target_idx),
+                    self.0.clone().get_mut(*src_idx),
+                    self.0.clone().get(*target_idx),
                 ) {
                     (None, None) | (None, Some(_)) | (Some(_), None) => true,
                     (Some(src), Some(_)) => src.get_mut_parameter(src_parameter_access).is_none(),
@@ -543,7 +555,7 @@ impl OpenApiInput {
             .collect();
 
         for (idx, parameter_access) in to_replace {
-            match parameter_access {
+            match &parameter_access {
                 RequestParameterAccess::Body(parameter_access_elements) => {
                     match &mut self.0[idx].body {
                         Body::Empty | Body::TextPlain(_) => {
@@ -554,7 +566,8 @@ impl OpenApiInput {
                         Body::ApplicationJson(contents) | Body::XWwwFormUrlencoded(contents) => {
                             match contents {
                                 ParameterContents::Object(obj_param) => {
-                                    let resolved = contents.resolve_mut(parameter_access).unwrap();
+                                    let resolved =
+                                        contents.resolve_mut(&parameter_access_elements).unwrap();
                                     resolved.break_reference_if_target(rand, |_| true);
                                 }
                                 // Note that a Reference parameter is not by itself named, but must be the value in an Object parameter.

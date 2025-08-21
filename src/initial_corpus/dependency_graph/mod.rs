@@ -396,7 +396,7 @@ fn inout_params<'a>(
     op: &QualifiedOperation<'a>,
 ) -> (Vec<ParameterNormalization>, Vec<ParameterNormalization>) {
     // Outputs from a request are all field names from the response body. Collect them.
-    let mut output_fields: Vec<_> = op
+    let output_fields: Vec<_> = op
         .operation
         .responses
         .responses
@@ -423,9 +423,9 @@ fn inout_params<'a>(
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
         .find_map(|body| normalize_request_body(api, body, path_context_component(op.path)))
         .unwrap_or_default();
-    if op.method == Method::Post {
-        output_fields.extend(body_fields.clone());
-    }
+    // if op.method == Method::Post {
+    //     output_fields.extend(body_fields.clone());
+    // }
     input_fields.extend(body_fields.into_iter());
 
     (input_fields, output_fields)

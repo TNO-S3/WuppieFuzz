@@ -224,7 +224,6 @@ where
                     break;
                 }
             }
-            parameter_feedback.process_post_request(request_index, request);
         }
         (exit_kind, performed_requests)
     }

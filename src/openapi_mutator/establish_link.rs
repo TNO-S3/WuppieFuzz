@@ -12,7 +12,8 @@ use libafl::{
 use libafl_bolts::Named;
 
 use crate::{
-    input::{OpenApiInput, ParameterContents, parameter::ParameterAccessElement},
+    input::{OpenApiInput, ParameterContents},
+    parameter_access::ParameterAccessElement,
     state::HasRandAndOpenAPI,
 };
 
@@ -80,7 +81,11 @@ where
                             .iter()
                             // Find the first request index that had the desired parameter name in a response
                             .position(|(request_index, rv_parameter_access)| {
-                                let rv_name = rv_parameter_access.elements.last();
+                                let rv_name = rv_parameter_access
+                                    .get_body_access_elements()
+                                    .unwrap()
+                                    .0
+                                    .last();
                                 if let Some(ParameterAccessElement::Name(rv_name)) = rv_name {
                                     *request_index < current_request_index && name == rv_name
                                 } else {
@@ -121,6 +126,7 @@ mod test {
     use crate::{
         input::{Method, ParameterContents, parameter::ParameterKind},
         openapi_mutator::test_helpers::linked_requests,
+        parameter_access::RequestParameterAccess,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -141,7 +147,7 @@ mod test {
 
             assert_eq!(result, MutationResult::Mutated);
             let parameter = input.0[1]
-                .get_mut_parameter(&"id".into(), ParameterKind::Query)
+                .get_mut_parameter(&RequestParameterAccess::Query("id".to_string()))
                 .expect("Request got the wrong parameter");
             assert!(parameter.is_reference());
             assert_eq!(parameter.reference_index().copied(), Some(0));

@@ -16,9 +16,8 @@ use porter_stemmer::stem;
 
 use crate::{
     initial_corpus::dependency_graph::path_context_component,
-    input::parameter::ParameterKind,
     openapi::JsonContent,
-    parameter_access::{ParameterAccess, ParameterAccessElements, RequestParameterAccess},
+    parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
 };
 
 pub(crate) enum ReqResp {
@@ -140,12 +139,14 @@ pub fn normalize_response<'a>(
     response: &'a Response,
     context: Option<String>,
 ) -> Option<Vec<ParameterNormalization>> {
-    normalize_media_type(
+    let result = normalize_media_type(
         api,
         response.content.get_json_content()?,
-        context,
+        context.clone(),
         ReqResp::Resp,
-    )
+    );
+    log::warn!("Context:\n{:?}\nNormalized:\n{:?}", context, result);
+    result
 }
 
 /// Normalizes request body parameters.
@@ -176,6 +177,7 @@ fn normalize_media_type<'a>(
         ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
         ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
     };
+    log::error!("ACCESS: {:?}", access);
     normalize_schema(
         api, schema, context, // req_resp,
         access,
@@ -247,23 +249,21 @@ fn normalize_object_type<'a>(
         .properties
         .keys()
         .flat_map(|key| {
+            let new_parameter_access =
+                parameter_access.with_new_element(ParameterAccessElement::Name(key.clone()));
             let mut normalized_params = vec![ParameterNormalization::new(
                 key.to_owned(),
                 context.clone(),
-                parameter_access.clone(),
+                new_parameter_access.clone(),
             )];
             let nested_schema = object_type.properties[key].resolve(api);
             let nested_params = normalize_schema(
                 api,
                 nested_schema,
-                // parent_context
-                //     .clone()
-                //     .with_new_element(key.to_owned().into()),
                 Some(key.to_owned()),
-                parameter_access.clone(),
+                new_parameter_access.clone(),
             )
             .unwrap_or_default();
-            // log::error!("Nested params:\n{:#?}", nested_params);
             normalized_params.extend(nested_params);
             normalized_params
         })

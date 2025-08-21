@@ -15,7 +15,7 @@ use openapiv3::{OpenAPI, RequestBody};
 use crate::{
     input::{
         Body, OpenApiInput, OpenApiRequest, ParameterContents, new_rand_input,
-        parameter::{ParameterAccess, ParameterKind},
+        parameter::ParameterKind,
     },
     openapi::JsonContent,
     state::HasRandAndOpenAPI,
@@ -89,7 +89,7 @@ where
             method,
             path,
             parameters,
-            body_type: body,
+            body,
         });
 
         input.assert_valid(self.name());

@@ -2,8 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use crate::input::{
-    Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
+use crate::{
+    input::{
+        Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
+    },
+    parameter_access::{ParameterAccessElements, ResponseParameterAccess},
 };
 
 /// Returns an input consisting of one request to the simple endpoint
@@ -11,7 +14,7 @@ pub fn simple_request() -> OpenApiInput {
     OpenApiInput(vec![OpenApiRequest {
         method: Method::Get,
         path: "/simple".to_string(),
-        body_type: Body::Empty,
+        body: Body::Empty,
         parameters: BTreeMap::new(),
     }])
 }
@@ -24,20 +27,22 @@ pub fn linked_requests() -> OpenApiInput {
         ("id".into(), ParameterKind::Query),
         ParameterContents::Reference {
             request_index: 0,
-            parameter_access: "id".into(),
+            parameter_access: ResponseParameterAccess::Body(
+                ParameterAccessElements::from_elements(vec!["id".to_string().into()]),
+            ),
         },
     );
     let has_param = OpenApiRequest {
         method: Method::Get,
         path: "/with-query-parameter".to_string(),
-        body_type: Body::Empty,
+        body: Body::Empty,
         parameters,
     };
 
     let has_return_value = OpenApiRequest {
         method: Method::Get,
         path: "/simple".to_string(),
-        body_type: Body::Empty,
+        body: Body::Empty,
         parameters: BTreeMap::new(),
     };
 

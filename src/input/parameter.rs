@@ -105,49 +105,53 @@ pub enum ParameterContents {
 }
 
 impl ParameterContents {
-    pub fn get_mut_parameter(
-        &mut self,
-        parameter_access: RequestParameterAccess,
-    ) -> Option<&mut ParameterContents> {
-        match parameter_access {
-            RequestParameterAccess::Body(parameter_access_elements) => {
-                if let Some((element, tail)) = parameter_access_elements.split_first() {
-                    match self {
-                        ParameterContents::Object(btree_map) => {
-                            if let ParameterAccessElement::Name(name) = element {
-                                let nested = btree_map.get_mut(name)?;
-                                if tail.len() > 0 {
-                                    nested.get_mut_parameter(tail.into())
-                                } else {
-                                    Some(nested)
-                                }
-                            } else {
-                                None
-                            }
-                        }
-                        ParameterContents::Array(items) => {
-                            if let ParameterAccessElement::Offset(index) = element {
-                                let nested = items.get_mut(*index)?;
-                                if tail.len() > 0 {
-                                    nested.get_mut_parameter(tail.into())
-                                } else {
-                                    Some(nested)
-                                }
-                            } else {
-                                None
-                            }
-                        }
-                        ParameterContents::LeafValue(_)
-                        | ParameterContents::Bytes(_)
-                        | ParameterContents::Reference { .. } => None,
-                    }
-                } else {
-                    Some(self)
-                }
-            }
-            _ => {}
-        }
-    }
+    // pub fn get_mut_parameter(
+    //     &mut self,
+    //     parameter_access: RequestParameterAccess,
+    // ) -> Option<&mut ParameterContents> {
+    //     match parameter_access {
+    //         RequestParameterAccess::Body(parameter_access_elements) => {
+    //             if let Some((element, tail)) = parameter_access_elements.0.split_first() {
+    //                 match self {
+    //                     ParameterContents::Object(btree_map) => {
+    //                         if let ParameterAccessElement::Name(name) = element {
+    //                             let nested = btree_map.get_mut(name)?;
+    //                             if tail.len() > 0 {
+    //                                 nested.get_mut_parameter(RequestParameterAccess::Body(
+    //                                     tail.into(),
+    //                                 ))
+    //                             } else {
+    //                                 Some(nested)
+    //                             }
+    //                         } else {
+    //                             None
+    //                         }
+    //                     }
+    //                     ParameterContents::Array(items) => {
+    //                         if let ParameterAccessElement::Offset(index) = element {
+    //                             let nested = items.get_mut(*index)?;
+    //                             if tail.len() > 0 {
+    //                                 nested.get_mut_parameter(RequestParameterAccess::Body(
+    //                                     tail.into(),
+    //                                 ))
+    //                             } else {
+    //                                 Some(nested)
+    //                             }
+    //                         } else {
+    //                             None
+    //                         }
+    //                     }
+    //                     ParameterContents::LeafValue(_)
+    //                     | ParameterContents::Bytes(_)
+    //                     | ParameterContents::Reference { .. } => None,
+    //                 }
+    //             } else {
+    //                 Some(self)
+    //             }
+    //         }
+    //         _ => None,
+    //     }
+    // }
 
     /// Returns whether the `ParameterContents` is the `reference` variant.
     pub fn is_reference(&self) -> bool {
@@ -277,7 +281,12 @@ impl ParameterContents {
 
     pub fn resolve(&self, path: &ParameterAccess) -> Option<&Self> {
         let mut result = self;
-        for path_element in &path.elements {
+        let elements = match path {
+            ParameterAccess::Request(access) => access.get_body_access_elements(),
+            ParameterAccess::Response(access) => access.get_body_access_elements(),
+        }
+        .unwrap();
+        for path_element in &elements.0 {
             match (result, path_element) {
                 (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
                     result = mapping.get(name)?
