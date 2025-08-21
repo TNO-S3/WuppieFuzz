@@ -15,7 +15,7 @@ use openapiv3::{OpenAPI, RequestBody};
 use crate::{
     input::{
         Body, OpenApiInput, OpenApiRequest, ParameterContents, new_rand_input,
-        parameter::ParameterKind,
+        parameter::{ParameterAccess, ParameterKind},
     },
     openapi::JsonContent,
     state::HasRandAndOpenAPI,
@@ -66,7 +66,7 @@ where
             // Keep only concrete values and valid references
             .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
             // Convert to (parameter_name, parameter_kind) tuples
-            .map(|param| (param.data.name.clone(), param.into()))
+            .map(|param| (param.data.name.clone().into(), param.into()))
             .map(|name_kind| (name_kind, ParameterContents::Bytes(new_rand_input(rand))))
             .collect();
         let body_contents: Option<BTreeMap<String, ParameterContents>> = new_op
@@ -74,7 +74,7 @@ where
             .as_ref()
             .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
             .map(|request_body| {
-                field_names(api, request_body)
+                field_accesses(api, request_body)
                     .unwrap_or_default()
                     .iter()
                     .map(|name| (name.clone(), ParameterContents::Bytes(new_rand_input(rand))))
@@ -89,7 +89,7 @@ where
             method,
             path,
             parameters,
-            body,
+            body_type: body,
         });
 
         input.assert_valid(self.name());
@@ -101,7 +101,7 @@ where
     }
 }
 
-fn field_names(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>> {
+fn field_accesses(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>> {
     match request_body
         .content
         .get_json_content()?
@@ -110,9 +110,13 @@ fn field_names(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>>
         .resolve(api)
         .kind
     {
-        openapiv3::SchemaKind::Type(openapiv3::Type::Object(ref obj)) => {
-            Some(obj.properties.keys().cloned().collect())
-        }
+        openapiv3::SchemaKind::Type(openapiv3::Type::Object(ref obj)) => Some(
+            obj.properties
+                .keys()
+                .cloned()
+                // .map(ParameterAccess::from)
+                .collect(),
+        ),
         _ => None,
     }
 }

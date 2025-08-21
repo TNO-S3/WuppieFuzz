@@ -11,7 +11,7 @@ pub fn simple_request() -> OpenApiInput {
     OpenApiInput(vec![OpenApiRequest {
         method: Method::Get,
         path: "/simple".to_string(),
-        body: Body::Empty,
+        body_type: Body::Empty,
         parameters: BTreeMap::new(),
     }])
 }
@@ -21,23 +21,23 @@ pub fn simple_request() -> OpenApiInput {
 pub fn linked_requests() -> OpenApiInput {
     let mut parameters = BTreeMap::new();
     parameters.insert(
-        ("id".to_string(), ParameterKind::Query),
+        ("id".into(), ParameterKind::Query),
         ParameterContents::Reference {
             request_index: 0,
-            parameter_name: "id".to_string(),
+            parameter_access: "id".into(),
         },
     );
     let has_param = OpenApiRequest {
         method: Method::Get,
         path: "/with-query-parameter".to_string(),
-        body: Body::Empty,
+        body_type: Body::Empty,
         parameters,
     };
 
     let has_return_value = OpenApiRequest {
         method: Method::Get,
         path: "/simple".to_string(),
-        body: Body::Empty,
+        body_type: Body::Empty,
         parameters: BTreeMap::new(),
     };
 

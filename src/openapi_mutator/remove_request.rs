@@ -125,10 +125,10 @@ mod test {
             let mut input = linked_requests();
             input.0.insert(0, input.0[0].clone());
             input.0[2].parameters.insert(
-                ("id".to_string(), ParameterKind::Query),
+                ("id".into(), ParameterKind::Query),
                 ParameterContents::Reference {
                     request_index: 1,
-                    parameter_name: "id".to_string(),
+                    parameter_access: "id".into(),
                 },
             );
 
@@ -140,7 +140,7 @@ mod test {
                 // If the first simple request was removed, we would expect a reference_index of 0.
                 // But if the second simple request was removed, we would expect the parameter to have been changed to ParameterContents::Bytes.
                 let parameter = input.0[1]
-                    .get_mut_parameter("id", ParameterKind::Query)
+                    .get_mut_parameter(&"id".into(), ParameterKind::Query)
                     .expect("Could not find parameter after request removal");
                 assert!(parameter.reference_index().is_none_or(|&mut idx| idx == 0));
             }

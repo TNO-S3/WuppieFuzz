@@ -10,6 +10,11 @@ use openapiv3::Parameter;
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
+use crate::parameter_access::{
+    ParameterAccess, ParameterAccessElement, ParameterAccessElements, RequestParameterAccess,
+    ResponseParameterAccess,
+};
+
 use super::utils::new_rand_input;
 
 /// Structs that help describe parameters to HTTP requests in a way that the fuzzer can still
@@ -95,11 +100,55 @@ pub enum ParameterContents {
         #[serde(rename = "request")]
         request_index: usize,
         #[serde(rename = "parameter_name")]
-        parameter_name: String,
+        parameter_access: ResponseParameterAccess,
     },
 }
 
 impl ParameterContents {
+    pub fn get_mut_parameter(
+        &mut self,
+        parameter_access: RequestParameterAccess,
+    ) -> Option<&mut ParameterContents> {
+        match parameter_access {
+            RequestParameterAccess::Body(parameter_access_elements) => {
+                if let Some((element, tail)) = parameter_access_elements.split_first() {
+                    match self {
+                        ParameterContents::Object(btree_map) => {
+                            if let ParameterAccessElement::Name(name) = element {
+                                let nested = btree_map.get_mut(name)?;
+                                if tail.len() > 0 {
+                                    nested.get_mut_parameter(tail.into())
+                                } else {
+                                    Some(nested)
+                                }
+                            } else {
+                                None
+                            }
+                        }
+                        ParameterContents::Array(items) => {
+                            if let ParameterAccessElement::Offset(index) = element {
+                                let nested = items.get_mut(*index)?;
+                                if tail.len() > 0 {
+                                    nested.get_mut_parameter(tail.into())
+                                } else {
+                                    Some(nested)
+                                }
+                            } else {
+                                None
+                            }
+                        }
+                        ParameterContents::LeafValue(_)
+                        | ParameterContents::Bytes(_)
+                        | ParameterContents::Reference { .. } => None,
+                    }
+                } else {
+                    Some(self)
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Returns whether the `ParameterContents` is the `reference` variant.
     pub fn is_reference(&self) -> bool {
         matches!(self, ParameterContents::Reference { .. })
@@ -115,7 +164,7 @@ impl ParameterContents {
             ParameterContents::Object(v) => {
                 let mut json_map = Map::new();
                 for (k, v) in v.iter() {
-                    json_map.insert(k.clone(), v.to_value());
+                    json_map.insert(k.clone().to_string(), v.to_value());
                 }
                 Some(Value::Object(json_map).to_string().into_bytes().into())
             }
@@ -157,7 +206,7 @@ impl ParameterContents {
             ParameterContents::Object(content) => {
                 let mut json_map = Map::new();
                 for (key, val) in content {
-                    json_map.insert(key.clone(), val.to_value());
+                    json_map.insert(key.clone().to_string(), val.to_value());
                 }
                 Value::Object(json_map)
             }
@@ -209,6 +258,38 @@ impl ParameterContents {
             _ => self.to_string(),
         }
     }
+
+    pub fn resolve_mut(&mut self, path: &ParameterAccessElements) -> Option<&mut Self> {
+        let mut result = self;
+        for path_element in &path.0 {
+            match (result, path_element) {
+                (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
+                    result = mapping.get_mut(name)?
+                }
+                (ParameterContents::Array(vector), ParameterAccessElement::Offset(index)) => {
+                    result = vector.get_mut(*index)?
+                }
+                _ => return None,
+            }
+        }
+        Some(result)
+    }
+
+    pub fn resolve(&self, path: &ParameterAccess) -> Option<&Self> {
+        let mut result = self;
+        for path_element in &path.elements {
+            match (result, path_element) {
+                (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
+                    result = mapping.get(name)?
+                }
+                (ParameterContents::Array(vector), ParameterAccessElement::Offset(index)) => {
+                    result = vector.get(*index)?
+                }
+                _ => return None,
+            }
+        }
+        Some(result)
+    }
 }
 
 impl Display for ParameterContents {
@@ -220,8 +301,11 @@ impl Display for ParameterContents {
             ParameterContents::Bytes(bi) => Base64Display::new(bi, &STANDARD).fmt(f),
             ParameterContents::Reference {
                 request_index,
-                parameter_name,
-            } => write!(f, "parameter {parameter_name} from request {request_index}"),
+                parameter_access,
+            } => write!(
+                f,
+                "parameter {parameter_access} from request {request_index}"
+            ),
         }
     }
 }
@@ -263,7 +347,7 @@ impl From<Value> for ParameterContents {
             Value::Object(content) => Self::Object(
                 content
                     .into_iter()
-                    .map(|(key, val)| (key, ParameterContents::from(val)))
+                    .map(|(key, val)| (key.into(), ParameterContents::from(val)))
                     .collect(),
             ),
         }

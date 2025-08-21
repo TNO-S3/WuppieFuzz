@@ -19,8 +19,8 @@ use unicode_truncate::UnicodeTruncateStr;
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
-    initial_corpus::dependency_graph::ParameterMatching,
     input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
+    parameter_access::ParameterMatching,
 };
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest
@@ -62,7 +62,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
                 .iter()
                 .filter_map(|(param, ref_or_schema)| {
                     Some((
-                        param.clone(),
+                        param.clone().into(),
                         ParameterContents::from(example_from_schema(
                             api,
                             ref_or_schema.resolve(api),
@@ -161,7 +161,7 @@ fn example_parameters(
             example_parameter_value(api, par_data)
                 .map(|value| {
                     (
-                        (par_data.name.clone(), par_kind),
+                        (par_data.name.clone().into(), par_kind),
                         ParameterContents::from(value),
                     )
                 })
@@ -230,7 +230,7 @@ fn all_interesting_parameters(
                 .into_iter()
                 .map(ParameterContents::from)
                 .collect();
-            ((par_data.name.clone(), par_kind), possible_values)
+            ((par_data.name.clone().into(), par_kind), possible_values)
         })
         .collect();
 
@@ -888,12 +888,7 @@ pub fn openapi_inputs_from_ops<'a>(
                         .parameters
                         .iter()
                         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-                        .filter(move |parameter| {
-                            let par_kind: ParameterKind = (*parameter).into();
-                            let par_data = &parameter.data;
-                            edge.weight().name_input == par_data.name
-                                && par_kind == edge.weight().kind_input
-                        })
+                        .filter(move |parameter| edge.weight().name_input.matches(parameter))
                 })
                 .collect();
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)
