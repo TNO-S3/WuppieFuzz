@@ -59,8 +59,6 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
     max_size: usize,
     /// The last time something new was found
     last_found_time: Duration,
-    // the last time that we report all stats
-    last_report_time: Option<Duration>,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -299,11 +297,11 @@ where
     SC: Corpus<I>,
 {
     fn last_report_time(&self) -> &Option<Duration> {
-        &self.last_report_time
+        todo!()
     }
 
     fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
-        &mut self.last_report_time
+        todo!()
     }
 }
 
@@ -356,7 +354,6 @@ where
             current_stage: None,
             current_corpus_id: None,
             last_found_time: Duration::default(),
-            last_report_time: None,
         };
         state.add_metadata(SchedulerMetadata::new(None));
 
