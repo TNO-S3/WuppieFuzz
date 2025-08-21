@@ -2,7 +2,6 @@
 use std::ptr::write_volatile;
 use std::{
     fs::create_dir_all,
-    ops::DerefMut,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -12,10 +11,10 @@ use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    ExecuteInputResult, ExecutionProcessor, HasNamedMetadata,
-    corpus::{Corpus, OnDiskCorpus},
+    HasNamedMetadata,
+    corpus::{Corpus, OnDiskCorpus, minimizer::MapCorpusMinimizer},
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::ExitKind,
     feedback_or,
     feedbacks::{CrashFeedback, Feedback, MaxMapFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
@@ -23,6 +22,7 @@ use libafl::{
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
+        testcase_score::CorpusPowerTestcaseScore,
     },
     stages::{CalibrationStage, StdPowerMutationalStage},
     state::{HasCorpus, HasExecutions},
@@ -102,9 +102,6 @@ pub fn fuzz() -> Result<()> {
         &report_path.as_deref(),
     );
 
-    // Needed to force load corpus
-    let initial_corpus_cloned = initial_corpus.clone();
-
     // Create a State from scratch
     let mut state = OpenApiFuzzerState::new(
         // RNG
@@ -148,6 +145,9 @@ pub fn fuzz() -> Result<()> {
         ),
     );
 
+    let minimizer: MapCorpusMinimizer<_, _, _, _, _, _, CorpusPowerTestcaseScore> =
+        MapCorpusMinimizer::new(&combined_map_observer);
+
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
 
@@ -173,6 +173,11 @@ pub fn fuzz() -> Result<()> {
         endpoint_coverage_client.clone(),
     )?;
 
+    log::info!("Start corpus minimization");
+    log::info!("Size before {}", state.corpus().count());
+    minimizer.minimize(&mut fuzzer, &mut executor, &mut mgr, &mut state)?;
+    log::info!("Size after {}", state.corpus().count());
+
     // Fire an event to print the initial corpus size
     let corpus_size = state.corpus().count();
     if let Err(e) = mgr.fire(
@@ -190,24 +195,6 @@ pub fn fuzz() -> Result<()> {
         ),
     ) {
         error!("Err: failed to fire event{e:?}")
-    }
-
-    // Executed every corpus entry at least once for gathering a proper view on the initial coverage as mutations
-    log::debug!("Start initial corpus loop");
-    for input_id in initial_corpus_cloned.ids() {
-        let input = initial_corpus_cloned
-            .cloned_input_for_id(input_id)
-            .expect("Failed to load input");
-        let exit_kind = executor.run_target(&mut fuzzer, &mut state, &mut mgr, &input)?;
-        let exec_input_result = ExecuteInputResult::new(true, false);
-        fuzzer.process_execution(
-            &mut state,
-            &mut mgr,
-            &input,
-            &exec_input_result,
-            &exit_kind,
-            executor.observers_mut().deref_mut(),
-        )?;
     }
 
     log::debug!("Start fuzzing loop");

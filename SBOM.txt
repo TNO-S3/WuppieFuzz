@@ -868,6 +868,12 @@ yoke 0.8.0
 yoke-derive 0.8.0
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
+z3 0.12.1
+	licensed under "MIT"
+	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>
+z3-sys 0.8.1
+	licensed under "MIT"
+	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>
 zerocopy 0.8.26
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
