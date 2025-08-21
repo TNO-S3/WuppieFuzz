@@ -170,13 +170,22 @@ pub fn fuzz() -> Result<()> {
         .equivalent(&crate::configuration::CoverageConfiguration::Endpoint)
     {
         log::debug!("Gathering initial code coverage");
-        // code_coverage_client.fetch_coverage(true);
-        let (hit, _) = code_coverage_client.max_coverage_ratio();
-        if hit == 0 {
-            error!(
-                "No initial code coverage of your target. This indicates an issue with the instrumentation. Please verify that you restarted your target."
-            );
-            std::process::exit(0);
+
+        match code_coverage_client.max_coverage_ratio() {
+            (0, _) => {
+                log::error!(
+                    "No initial code coverage detected. \
+                This likely indicates an issue with instrumentation. \
+                Please ensure your target was restarted and is properly instrumented."
+                );
+                std::process::exit(1);
+            }
+            (hit, total) => {
+                log::info!(
+                    "Initial code coverage successful: {hit}/{total} ({}%)",
+                    (hit * 100 + total / 2) / total
+                );
+            }
         }
     }
 
