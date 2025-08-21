@@ -10,7 +10,7 @@
 //! earlier.
 
 use openapiv3::{
-    MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, SchemaKind,
+    MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, Schema, SchemaKind,
 };
 use porter_stemmer::stem;
 
@@ -144,14 +144,13 @@ pub fn normalize_request_body<'a>(
     normalize_media_type(api, path, body.content.get_json_content()?)
 }
 
-/// MediaType is the internal type used for objects, both input (POST) and
-/// output (GET). This function normalizes the field names.
-fn normalize_media_type<'a>(
+/// Schema describes contents of objects and arrays. This function normalizes field
+/// names in a schema if it contains an object or an array of objects.
+fn normalize_schema<'a>(
     api: &'a OpenAPI,
     path: &str,
-    media_type: &'a MediaType,
+    schema: &'a Schema,
 ) -> Option<Vec<ParameterNormalization<'a>>> {
-    let schema = media_type.schema.as_ref()?.resolve(api);
     match schema.kind {
         SchemaKind::Type(openapiv3::Type::Object(ref o)) => Some(normalize_object_type(path, o)),
         SchemaKind::Type(openapiv3::Type::Array(ref a)) => {
@@ -164,8 +163,24 @@ fn normalize_media_type<'a>(
                 _ => None,
             }
         }
+        SchemaKind::AllOf { ref all_of } if all_of.len() == 1 => {
+            normalize_schema(api, path, all_of[0].resolve(api))
+        }
+        SchemaKind::AnyOf { ref any_of } if any_of.len() == 1 => {
+            normalize_schema(api, path, any_of[0].resolve(api))
+        }
         _ => None,
     }
+}
+
+/// MediaType is the internal type used for objects, both input (POST) and
+/// output (GET). This function normalizes the field names.
+fn normalize_media_type<'a>(
+    api: &'a OpenAPI,
+    path: &str,
+    media_type: &'a MediaType,
+) -> Option<Vec<ParameterNormalization<'a>>> {
+    normalize_schema(api, path, media_type.schema.as_ref()?.resolve(api))
 }
 
 fn normalize_object_type<'a>(
