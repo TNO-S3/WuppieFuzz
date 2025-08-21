@@ -287,6 +287,7 @@ fn setup_line_coverage<'a>(
 ) -> Result<LineCovClientObserverFeedback<'a>, anyhow::Error> {
     let mut code_coverage_client: Box<dyn CoverageClient> =
         crate::coverage_clients::get_coverage_client(config, report_path)?;
+    // This is very important, we want to fetch and reset the coverage before interacting with the target
     code_coverage_client.fetch_coverage(true);
     // Safety: libafl wants to read the coverage map directly that we also update in the harness;
     // this is only possible if it does not touch the map while the harness is running. We must
