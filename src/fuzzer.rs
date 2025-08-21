@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use indexmap::IndexMap;
+use indexmap::{Equivalent, IndexMap};
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
@@ -163,6 +163,22 @@ pub fn fuzz() -> Result<()> {
     // The order of the stages matter!
     let power = StdPowerMutationalStage::new(mutator_openapi);
     let mut stages = tuple_list!(calibration, power);
+
+    // APIs already create code coverage during boot. We check if the code coverage is non-zero. Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
+    if !config
+        .coverage_configuration
+        .equivalent(&crate::configuration::CoverageConfiguration::Endpoint)
+    {
+        log::debug!("Gathering initial code coverage");
+        // code_coverage_client.fetch_coverage(true);
+        let (hit, _) = code_coverage_client.max_coverage_ratio();
+        if hit == 0 {
+            error!(
+                "No initial code coverage of your target. This indicates an issue with the instrumentation. Please verify that you restarted your target."
+            );
+            std::process::exit(0);
+        }
+    }
 
     // Create the executor for an in-process function with just one observer
     let mut executor = SequenceExecutor::new(
