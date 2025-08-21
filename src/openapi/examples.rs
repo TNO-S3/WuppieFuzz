@@ -19,8 +19,8 @@ use unicode_truncate::UnicodeTruncateStr;
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
-    initial_corpus::dependency_graph::parameter_access::ParameterMatching,
     input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
+    parameter_access::ParameterMatching,
 };
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest

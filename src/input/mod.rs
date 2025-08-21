@@ -70,7 +70,9 @@ use openapiv3::{OpenAPI, Operation};
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
 use crate::{
-    initial_corpus::dependency_graph::parameter_access::{ParameterAccess, RequestParameterAccess},
+    parameter_access::{
+        ParameterAccess, ParameterAccessElements, RequestParameterAccess, ResponseParameterAccess,
+    },
     parameter_feedback::ParameterFeedback,
     state::HasRandAndOpenAPI,
 };
@@ -424,18 +426,15 @@ impl OpenApiInput {
     }
 
     /// This returns all reference parameters as follows:
-    /// (request idx, parameter access, parameter kind, target request idx, target parameter access)
-    /// Note that the target request does not need to have a kind specified, since we refer to the
-    /// response which only has a Body.
+    /// (request idx, request parameter access, target request idx, target parameter access)
     pub fn reference_parameters(
         &self,
     ) -> impl Iterator<
         Item = (
             usize,
-            ParameterAccess,
-            ParameterKind,
+            RequestParameterAccess,
             usize,
-            ParameterAccess,
+            ResponseParameterAccess,
         ),
     > + '_ {
         self.0
@@ -473,14 +472,14 @@ impl OpenApiInput {
                         _ => None,
                     })
                     .map(move |((n, k), (ti, tn))| {
-                        (request_idx, n.into_owned().into(), k, *ti, tn.to_owned())
+                        (request_idx, n.into_owned().into(), *ti, tn.to_owned())
                     })
             })
     }
 
     /// Returns an iterator that yields all (named) return value names from all
     /// requests, along with the index of the request they appear in.
-    pub fn return_values(&self, api: &OpenAPI) -> Vec<(usize, ParameterAccess)> {
+    pub fn return_values(&self, api: &OpenAPI) -> Vec<(usize, ResponseParameterAccess)> {
         self.0
             .iter()
             .enumerate()
@@ -506,13 +505,13 @@ impl OpenApiInput {
                     })
                     // Finally if the schema is an object, extract its field names
                     .flat_map(|x| {
-                        ParameterAccess::parameter_accesses_from_schema(
-                            ParameterAccess::new(vec![]),
+                        ParameterAccessElements::parameter_accesses_from_schema(
+                            ParameterAccessElements::new(),
                             x,
                             api,
                         )
                     })
-                    .map(move |resps| (i, resps))
+                    .map(move |resps| (i, ResponseParameterAccess::Body(resps)))
             })
             .collect()
     }
@@ -523,77 +522,88 @@ impl OpenApiInput {
     where
         R: Rand,
     {
-        let to_replace: Vec<_> =
-            self.reference_parameters()
-                .filter(
-                    // Select broken references: target request does not exist or does not
-                    // contain the referenced parameter name
-                    |(_, _, _, target_idx, target_parameter_access)| match self.0.get(*target_idx) {
-                        None => true,
-                        Some(request) => !request
-                            .contains_parameter(target_parameter_access.into_parameter_name()),
-                    },
-                )
-                // Reference is broken - replace (later... borrow checker forbids doing it here
-                // since it can't verify we don't mess up the loop from reference_parameters)
-                .map(|(source_idx, source_name, source_kind, _, _)| {
-                    (source_idx, source_name, source_kind)
-                })
-                .collect();
+        let to_replace: Vec<_> = self
+            .reference_parameters()
+            .filter(
+                // Select broken references: source- or target-request does not exist or the source
+                // request no longer has the reference parameter accessible.
+                // We do not have the response available at this point, so we cannot check whether
+                // the reference will actually be resolvable when we get the response.
+                |(src_idx, src_parameter_access, target_idx, target_parameter_access)| match (
+                    self.0.get(*src_idx),
+                    self.0.get(*target_idx),
+                ) {
+                    (None, None) | (None, Some(_)) | (Some(_), None) => true,
+                    (Some(src), Some(_)) => src.get_mut_parameter(src_parameter_access).is_none(),
+                },
+            )
+            // Reference is broken - replace (later... borrow checker forbids doing it here
+            // since it can't verify we don't mess up the loop from reference_parameters)
+            .map(|(source_idx, source_access, _, _)| (source_idx, source_access))
+            .collect();
 
-        for (idx, parameter_access, kind) in to_replace {
-            match kind {
-                ParameterKind::Body => match &mut self.0[idx].body {
-                    Body::Empty | Body::TextPlain(_) => {
-                        log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
-                                    but the body is Empty or TextPlain!");
-                        continue;
-                    }
-                    Body::ApplicationJson(contents) | Body::XWwwFormUrlencoded(contents) => {
-                        match contents {
-                            ParameterContents::Object(obj_param) => obj_param
-                                .get_mut(parameter_access.into_parameter_name())
-                                .unwrap()
-                                .break_reference_if_target(rand, |_| true),
-                            // Note that a Reference parameter is not by itself named, but must be the value in an Object parameter.
-                            // The parameter_name-field in a Reference only identifies the target of the Reference.
-                            ParameterContents::Reference {
-                                request_index,
-                                parameter_access,
-                            } => {
-                                log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement.
-                                        The body's immediate contents are however an (unnamed) reference, pointing to a parameter
-                                        with name {parameter_access} in request {request_index}.");
-                                continue;
-                            }
-                            // Note that Array fields currently cannot be addressed as variable parameters.
-                            // Therefore, Arrays currently should not contain any references.
-                            // If they do, we do not resolve them here.
-                            ParameterContents::Array(arr_param) => {
-                                for elem in arr_param.iter() {
-                                    if let ParameterContents::Reference { .. } = elem {
-                                        log::warn!("Array contains reference, but we cannot identify this with
-                                        request_idx, name, parameter_kind triplet. Therefore we cannot resolve the reference.");
-                                    }
+        for (idx, parameter_access) in to_replace {
+            match parameter_access {
+                RequestParameterAccess::Body(parameter_access_elements) => {
+                    match &mut self.0[idx].body {
+                        Body::Empty | Body::TextPlain(_) => {
+                            log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
+                            but the body is Empty or TextPlain!");
+                            continue;
+                        }
+                        Body::ApplicationJson(contents) | Body::XWwwFormUrlencoded(contents) => {
+                            match contents {
+                                ParameterContents::Object(obj_param) => {
+                                    let resolved = contents.resolve_mut(parameter_access).unwrap();
+                                    resolved.break_reference_if_target(rand, |_| true);
                                 }
-                                continue;
-                            }
-                            ParameterContents::LeafValue(_) => {
-                                log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
-                                            but the body is a LeafValue: {contents}");
-                                continue;
-                            }
-                            ParameterContents::Bytes(_) => {
-                                log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
-                                            but the body is of type Bytes: {contents}");
-                                continue;
+                                // Note that a Reference parameter is not by itself named, but must be the value in an Object parameter.
+                                // The parameter_name-field in a Reference only identifies the target of the Reference.
+                                ParameterContents::Reference {
+                                    request_index,
+                                    parameter_access,
+                                } => {
+                                    log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement.
+                                The body's immediate contents are however an (unnamed) reference, pointing to a parameter
+                                with name {parameter_access} in request {request_index}.");
+                                    continue;
+                                }
+                                // Note that Array fields currently cannot be addressed as variable parameters.
+                                // Therefore, Arrays currently should not contain any references.
+                                // If they do, we do not resolve them here.
+                                ParameterContents::Array(arr_param) => {
+                                    for elem in arr_param.iter() {
+                                        if let ParameterContents::Reference { .. } = elem {
+                                            log::warn!("Array contains reference, but we cannot identify this with
+                                request_idx, name, parameter_kind triplet. Therefore we cannot resolve the reference.");
+                                        }
+                                    }
+                                    continue;
+                                }
+                                ParameterContents::LeafValue(_) => {
+                                    log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
+                                    but the body is a LeafValue: {contents}");
+                                    continue;
+                                }
+                                ParameterContents::Bytes(_) => {
+                                    log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
+                                    but the body is of type Bytes: {contents}");
+                                    continue;
+                                }
                             }
                         }
                     }
-                },
+                }
+                // RequestParameterAccess::Query(_) => todo!(),
+                // RequestParameterAccess::Path(_) => todo!(),
+                // RequestParameterAccess::Header(_) => todo!(),
+                // RequestParameterAccess::Cookie(_) => todo!(),
                 _ => self.0[idx]
                     .parameters
-                    .get_mut(&(parameter_access.into_parameter_name().to_string(), kind))
+                    .get_mut(&(
+                        parameter_access.simple_name().to_string(),
+                        (&parameter_access).into(),
+                    ))
                     .unwrap()
                     .break_reference_if_target(rand, |_| true),
             }

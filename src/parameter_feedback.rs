@@ -1,13 +1,10 @@
 use std::collections::HashMap;
 
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::{
-    initial_corpus::dependency_graph::parameter_access::{
-        ParameterAccess, ResponseParameterAccess,
-    },
-    input::{Body, Method, OpenApiRequest, ParameterContents::Object},
     openapi::validate_response::Response,
+    parameter_access::{ParameterAccessElements, ResponseParameterAccess},
 };
 
 /// ParameterFeedbackMetadata collects parameter values from requests as they
@@ -121,7 +118,7 @@ impl ParameterFeedback {
             // Objects in responses: save all field/value combinations
             Ok(field) => self.add_response_parameter(
                 request_index,
-                ResponseParameterAccess::Body(ParameterAccess::new(vec![])),
+                ResponseParameterAccess::Body(ParameterAccessElements::new()),
                 field,
             ),
             Err(e) => {

@@ -117,7 +117,6 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
                 break;
             }
         }
-        parameter_feedback.process_post_request(request_index, request);
     }
     Ok(())
 }

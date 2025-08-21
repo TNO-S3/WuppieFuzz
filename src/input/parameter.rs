@@ -10,10 +10,12 @@ use openapiv3::Parameter;
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
-use super::utils::new_rand_input;
-use crate::initial_corpus::dependency_graph::parameter_access::{
-    ParameterAccess, ParameterAccessElement,
+use crate::parameter_access::{
+    ParameterAccess, ParameterAccessElement, ParameterAccessElements, RequestParameterAccess,
+    ResponseParameterAccess,
 };
+
+use super::utils::new_rand_input;
 
 /// Structs that help describe parameters to HTTP requests in a way that the fuzzer can still
 /// mutate and reason about. The ParameterKind enum describes the places a parameter can occur
@@ -98,47 +100,52 @@ pub enum ParameterContents {
         #[serde(rename = "request")]
         request_index: usize,
         #[serde(rename = "parameter_name")]
-        parameter_access: ParameterAccess,
+        parameter_access: ResponseParameterAccess,
     },
 }
 
 impl ParameterContents {
     pub fn get_mut_parameter(
         &mut self,
-        parameter_access: ParameterAccess,
+        parameter_access: RequestParameterAccess,
     ) -> Option<&mut ParameterContents> {
-        if let Some((element, tail)) = parameter_access.elements.split_first() {
-            match self {
-                ParameterContents::Object(btree_map) => {
-                    if let ParameterAccessElement::Name(name) = element {
-                        let nested = btree_map.get_mut(name)?;
-                        if tail.len() > 0 {
-                            nested.get_mut_parameter(tail.into())
-                        } else {
-                            Some(nested)
+        match parameter_access {
+            RequestParameterAccess::Body(parameter_access_elements) => {
+                if let Some((element, tail)) = parameter_access_elements.split_first() {
+                    match self {
+                        ParameterContents::Object(btree_map) => {
+                            if let ParameterAccessElement::Name(name) = element {
+                                let nested = btree_map.get_mut(name)?;
+                                if tail.len() > 0 {
+                                    nested.get_mut_parameter(tail.into())
+                                } else {
+                                    Some(nested)
+                                }
+                            } else {
+                                None
+                            }
                         }
-                    } else {
-                        None
-                    }
-                }
-                ParameterContents::Array(items) => {
-                    if let ParameterAccessElement::Offset(index) = element {
-                        let nested = items.get_mut(*index)?;
-                        if tail.len() > 0 {
-                            nested.get_mut_parameter(tail.into())
-                        } else {
-                            Some(nested)
+                        ParameterContents::Array(items) => {
+                            if let ParameterAccessElement::Offset(index) = element {
+                                let nested = items.get_mut(*index)?;
+                                if tail.len() > 0 {
+                                    nested.get_mut_parameter(tail.into())
+                                } else {
+                                    Some(nested)
+                                }
+                            } else {
+                                None
+                            }
                         }
-                    } else {
-                        None
+                        ParameterContents::LeafValue(_)
+                        | ParameterContents::Bytes(_)
+                        | ParameterContents::Reference { .. } => None,
                     }
+                } else {
+                    Some(self)
                 }
-                ParameterContents::LeafValue(_)
-                | ParameterContents::Bytes(_)
-                | ParameterContents::Reference { .. } => None,
             }
-        } else {
-            Some(self)
+            _ => {}
         }
     }
 
@@ -252,9 +259,9 @@ impl ParameterContents {
         }
     }
 
-    pub fn resolve_mut(&mut self, path: &ParameterAccess) -> Option<&mut Self> {
+    pub fn resolve_mut(&mut self, path: &ParameterAccessElements) -> Option<&mut Self> {
         let mut result = self;
-        for path_element in &path.elements {
+        for path_element in &path.0 {
             match (result, path_element) {
                 (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
                     result = mapping.get_mut(name)?

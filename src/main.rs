@@ -53,6 +53,7 @@ mod input;
 pub mod monitors;
 mod openapi;
 pub mod openapi_mutator;
+mod parameter_access;
 mod parameter_feedback;
 mod reporting;
 mod reproducer;
