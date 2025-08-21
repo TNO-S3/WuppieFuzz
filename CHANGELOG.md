@@ -10,7 +10,10 @@
   [#111](https://github.com/TNO-S3/WuppieFuzz/pull/111)
 - Generate example parameters for the OpenAPI `allOf` keyword with just a
   single schema in [#118](https://github.com/TNO-S3/WuppieFuzz/pull/118)
-- Support logging in the output-corpus subcommand in [#121](https://github.com/TNO-S3/WuppieFuzz/pull/121)
+- Support logging in the output-corpus subcommand in
+  [#121](https://github.com/TNO-S3/WuppieFuzz/pull/121)
+- Exit and notify user when instrumentation is not working in
+  [#145](https://github.com/TNO-S3/WuppieFuzz/pull/145)
 
 ## Fixes
 
@@ -19,7 +22,7 @@
 - Use a single file to store Jacoco exec data in
   [#114](https://github.com/TNO-S3/WuppieFuzz/pull/114).
 - Fix a bug in corpus generation when no examples were found for a
-  request body [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
+  request body in [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
 
 # v1.2.0 (2025-02-21)
 
