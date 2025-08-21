@@ -20,7 +20,6 @@ use libafl::{
     state::{HasExecutions, Stoppable},
 };
 use libafl_bolts::{current_time, prelude::RefIndexable};
-use log::{debug, error};
 use openapiv3::OpenAPI;
 use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
@@ -135,7 +134,7 @@ where
             let mut request = request.clone();
             log::trace!("OpenAPI request:\n{request:#?}");
             if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
-                debug!(
+                log::debug!(
                     "Cannot instantiate request: missing value for backreferenced parameter: {error}. Maybe the earlier request crashed?"
                 );
                 break 'chain;
@@ -148,7 +147,7 @@ where
                 &request,
             ) {
                 Err(err) => {
-                    error!("Error building request: {err}");
+                    log::error!("Error building request: {err}");
                     continue;
                 }
                 Ok(r) => r.timeout(Duration::from_millis(self.config.request_timeout)),
@@ -159,7 +158,7 @@ where
                 Err(err) => {
                     // We don't expect errors to occur in the reqwest builder. If one occurs,
                     // it's not the target's fault, so we don't set ExitKind::Crash or Timeout.
-                    error!("Error building request: {err}");
+                    log::error!("Error building request: {err}");
                     break;
                 }
             };
@@ -219,7 +218,7 @@ where
                 Err(transport_error) => {
                     self.reporter
                         .report_response_error(&transport_error.to_string(), reporter_request_id);
-                    error!("{transport_error}");
+                    log::error!("{transport_error}");
                     exit_kind = ExitKind::Timeout;
                     break;
                 }
@@ -315,7 +314,7 @@ where
                     ExecStats::new(current_time(), *state.executions()),
                 ),
             ) {
-                error!("Err: failed to fire event{e:?}");
+                log::error!("Err: failed to fire event{e:?}");
             }
             state.request_stop();
         }
@@ -391,7 +390,7 @@ fn update_stats<EM>(
             ExecStats::new(current_time(), *state.executions()),
         ),
     ) {
-        error!("Err: failed to fire event {name}: {e:?}")
+        log::error!("Err: failed to fire event {name}: {e:?}")
     }
 }
 
