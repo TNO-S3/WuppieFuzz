@@ -1363,8 +1363,7 @@ dependencies = [
 [[package]]
 name = "libafl"
 version = "0.15.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07dd8d2c0eadc478a759f6d3862eec49a6818a0316b415bb0d2638146b021738"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=113a5492618a4a5705c24d58e5ebceb51c5314f5#113a5492618a4a5705c24d58e5ebceb51c5314f5"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1403,8 +1402,7 @@ dependencies = [
 [[package]]
 name = "libafl_bolts"
 version = "0.15.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35162166ed6c0193089e6c23de536ef66c1644d987c1e590a581bd47f7988bb6"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=113a5492618a4a5705c24d58e5ebceb51c5314f5#113a5492618a4a5705c24d58e5ebceb51c5314f5"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1440,8 +1438,7 @@ dependencies = [
 [[package]]
 name = "libafl_derive"
 version = "0.15.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58c9e3b3732b73cc2ed22c84635894557b2cd01bcefe7a04ca44bf904033122a"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=113a5492618a4a5705c24d58e5ebceb51c5314f5#113a5492618a4a5705c24d58e5ebceb51c5314f5"
 dependencies = [
  "proc-macro2",
  "quote",
