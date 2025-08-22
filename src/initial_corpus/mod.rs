@@ -9,7 +9,6 @@ use std::{
     hash::{Hash, Hasher},
     io::Write,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use libafl::{
@@ -169,7 +168,6 @@ fn fill_corpus_from_file(
             print_starting_corpus(initial_corpus_path);
             for input in inputs {
                 let mut testcase = Testcase::new(input);
-                testcase.set_exec_time(Duration::from_secs(1));
                 testcase.add_metadata(SchedulerTestcaseMetadata::new(0));
                 match corpus.add(testcase) {
                     Ok(_) => (),
@@ -199,9 +197,6 @@ fn fill_corpus_from_api(
     for input in inputs {
         let mut testcase = Testcase::new(input);
         testcase.add_metadata(SchedulerTestcaseMetadata::new(0));
-        testcase.set_disabled(false);
-        testcase.set_exec_time(Duration::from_secs(1));
-        let _ = testcase.load_input(corpus);
         let _ = corpus.add(testcase);
     }
 }
