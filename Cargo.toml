@@ -58,8 +58,8 @@ itertools = "0.14.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.5.0"
 lcov = "0.8"
-libafl = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "7330c6745c1141dfc55ce246601f908ee98853a", features = ["clap", "cmin"] }
-libafl_bolts = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "7330c6745c1141dfc55ce246601f908ee98853a", features = ["prelude"] }
+libafl = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "23235fbd0be253641798a7e25f8ffb664872fdcf", features = ["clap", "cmin"] }
+libafl_bolts = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "23235fbd0be253641798a7e25f8ffb664872fdcf", features = ["prelude"] }
 log = { version = "0.4.27", features = ["serde"] }
 num = { version = "0.4.3", default-features = false }
 num-derive = "0.4.2"

@@ -157,11 +157,22 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bincode"
-version = "1.3.3"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
 dependencies = [
+ "bincode_derive",
  "serde",
+ "unty",
+]
+
+[[package]]
+name = "bincode_derive"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf95709a440f45e986983918d0e8a1f30a9b1df04918fc828670606804ac3c09"
+dependencies = [
+ "virtue",
 ]
 
 [[package]]
@@ -566,7 +577,7 @@ version = "3.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46f93780a459b7d656ef7f071fe699c4d3d2cb201c4b24d085b6ddc505276e73"
 dependencies = [
- "nix 0.30.1",
+ "nix",
  "windows-sys 0.59.0",
 ]
 
@@ -719,13 +730,13 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "fastbloom"
-version = "0.11.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dee0191af12b622a9263467105cda1a21f8e6cbc535b2fd49de829ca92794e32"
+checksum = "18c1ddb9231d8554c2d6bdf4cfaabf0c59251658c68b6c95cd52dd0c513a912a"
 dependencies = [
  "getrandom 0.3.3",
+ "libm",
  "siphasher",
- "wide",
 ]
 
 [[package]]
@@ -1362,8 +1373,8 @@ dependencies = [
 
 [[package]]
 name = "libafl"
-version = "0.15.3"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=7330c6745c1141dfc55ce246601f908ee98853a#7330c6745c1141dfc55ce246601f908ee98853ae"
+version = "0.15.4"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=23235fbd0be253641798a7e25f8ffb664872fdcf#23235fbd0be253641798a7e25f8ffb664872fdcf"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1382,7 +1393,7 @@ dependencies = [
  "libm",
  "log",
  "meminterval",
- "nix 0.29.0",
+ "nix",
  "num-traits",
  "postcard",
  "regex",
@@ -1401,8 +1412,8 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.15.3"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=7330c6745c1141dfc55ce246601f908ee98853a#7330c6745c1141dfc55ce246601f908ee98853ae"
+version = "0.15.4"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=23235fbd0be253641798a7e25f8ffb664872fdcf#23235fbd0be253641798a7e25f8ffb664872fdcf"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1416,7 +1427,7 @@ dependencies = [
  "log",
  "mach2",
  "miniz_oxide",
- "nix 0.29.0",
+ "nix",
  "num_enum",
  "once_cell",
  "postcard",
@@ -1437,8 +1448,8 @@ dependencies = [
 
 [[package]]
 name = "libafl_derive"
-version = "0.15.3"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=7330c6745c1141dfc55ce246601f908ee98853a#7330c6745c1141dfc55ce246601f908ee98853ae"
+version = "0.15.4"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=23235fbd0be253641798a7e25f8ffb664872fdcf#23235fbd0be253641798a7e25f8ffb664872fdcf"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1528,9 +1539,9 @@ dependencies = [
 
 [[package]]
 name = "mach2"
-version = "0.4.3"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d640282b302c0bb0a2a8e0233ead9035e3bed871f0b7e81fe4a1ec829765db44"
+checksum = "6a1b95cd5421ec55b445b5ae102f5ea0e768de1f82bd3001e11f426c269c3aea"
 dependencies = [
  "libc",
 ]
@@ -1611,19 +1622,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.29.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
-dependencies = [
- "bitflags",
- "cfg-if",
- "cfg_aliases",
- "libc",
- "memoffset",
-]
-
-[[package]]
-name = "nix"
 version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
@@ -1632,6 +1630,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -2950,6 +2949,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
+name = "unty"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
+
+[[package]]
 name = "url"
 version = "2.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3008,6 +3013,12 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "virtue"
+version = "0.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
 
 [[package]]
 name = "wait-timeout"
@@ -3141,16 +3152,6 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "wide"
-version = "0.7.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce5da8ecb62bcd8ec8b7ea19f69a51275e91299be594ea5cc6ef7819e16cd03"
-dependencies = [
- "bytemuck",
- "safe_arch",
 ]
 
 [[package]]
