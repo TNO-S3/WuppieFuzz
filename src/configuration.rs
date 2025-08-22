@@ -184,7 +184,7 @@ pub enum Commands {
         /// Must be one of {'follow-spec', 'common5', 'common7'},
         /// follow-spec: only mutate with methods from api specification
         /// common5: mutate with one of [get, post, put, patch, delete]
-        /// common7: mutatue with one of [get, post, put, patch, delete, head, trace]
+        /// common7: mutate with one of [get, post, put, patch, delete, head, trace]
         /// If omitted, only mutate with methods from api specification.
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
         method_mutation_strategy: Option<MethodMutationStrategy>,
