@@ -4,7 +4,6 @@ use std::{
     fs::create_dir_all,
     path::PathBuf,
     sync::{Arc, Mutex},
-    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result};
@@ -199,7 +198,6 @@ pub fn fuzz() -> Result<()> {
     }
 
     log::debug!("Start fuzzing loop");
-    let mut last_corpus_min = Instant::now();
     loop {
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) => (),
@@ -218,13 +216,6 @@ pub fn fuzz() -> Result<()> {
             EventWithStats::new(Event::Heartbeat, ExecStats::new(current_time(), executions)),
         ) {
             error!("Err: failed to fire event{e:?}")
-        }
-
-        // minimize corpus
-        if last_corpus_min.elapsed() >= Duration::from_secs(600) {
-            log::info!("10 minutes have passed. Minimizing corpus...");
-            minimizer.minimize(&mut fuzzer, &mut executor, &mut mgr, &mut state)?;
-            last_corpus_min = Instant::now();
         }
     }
 
