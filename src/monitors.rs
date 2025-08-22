@@ -92,6 +92,8 @@ where
                             format_duration(&(current_time() - self.start_time)),
                         ),
                 }
+            } else if event_msg == "UserStats" {
+                return Ok(())
             } else {
                 format!(
                     "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}",
