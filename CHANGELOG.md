@@ -27,6 +27,8 @@
   have exactly one element in [#144](https://github.com/TNO-S3/WuppieFuzz/pull/144)
 - Improved corpus loading and fixed fallback when corpus loading fails in
   [#147](https://github.com/TNO-S3/WuppieFuzz/pull/147)
+- Version hash compile-time instead of runtime in
+  [#151](https://github.com/TNO-S3/WuppieFuzz/pull/151)
 
 # v1.2.0 (2025-02-21)
 
