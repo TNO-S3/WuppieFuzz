@@ -31,7 +31,9 @@ pub fn load_starting_corpus(
     for file in fs::read_dir(corpus_dir)? {
         let file = file?;
         let file_name = file.file_name();
-        let file_name_str = file_name.to_str().expect("Invalid utf-8 encountered in filenames in the corpus directory");
+        let file_name_str = file_name
+            .to_str()
+            .expect("Invalid utf-8 encountered in filenames in the corpus directory");
         match file_name_str.starts_with('.') {
             true => log::debug!("File {file_name_str} is ignored as it starts with a '.'"),
             false => {
