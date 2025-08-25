@@ -173,7 +173,9 @@ pub fn fuzz() -> Result<()> {
                 log::error!(
                     "No initial code coverage detected. \
                 This likely indicates an issue with instrumentation. \
-                Please ensure your target was restarted and is properly instrumented."
+                You specified {} as coverage tooling. \
+                Please ensure your target was restarted and is properly instrumented.",
+                    config.coverage_configuration.type_str()
                 );
                 std::process::exit(1);
             }
