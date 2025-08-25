@@ -12,6 +12,8 @@
   single schema in [#118](https://github.com/TNO-S3/WuppieFuzz/pull/118)
 - Support logging in the output-corpus subcommand in [#121](https://github.com/TNO-S3/WuppieFuzz/pull/121)
 - Corpus minimization added in [#146](https://github.com/TNO-S3/WuppieFuzz/pull/146)
+- Exit and notify user when instrumentation is not working in
+  [#145](https://github.com/TNO-S3/WuppieFuzz/pull/145)
 
 ## Fixes
 
@@ -20,9 +22,11 @@
 - Use a single file to store Jacoco exec data in
   [#114](https://github.com/TNO-S3/WuppieFuzz/pull/114).
 - Fix a bug in corpus generation when no examples were found for a
-  request body [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
+  request body in [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
 - Consider AnyOf and AllOf schemas for parameter backreferences if they
-  have exactly one element [#144](https://github.com/TNO-S3/WuppieFuzz/pull/144)
+  have exactly one element in [#144](https://github.com/TNO-S3/WuppieFuzz/pull/144)
+- Improved corpus loading and fixed fallback when corpus loading fails in
+  [#147](https://github.com/TNO-S3/WuppieFuzz/pull/147)
 
 # v1.2.0 (2025-02-21)
 

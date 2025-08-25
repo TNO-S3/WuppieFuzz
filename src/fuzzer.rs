@@ -164,6 +164,30 @@ pub fn fuzz() -> Result<()> {
     let power = StdPowerMutationalStage::new(mutator_openapi);
     let mut stages = tuple_list!(calibration, power);
 
+    // APIs already create code coverage during boot. We check if the code coverage is non-zero. Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
+    if config.coverage_configuration != crate::configuration::CoverageConfiguration::Endpoint {
+        log::debug!("Gathering initial code coverage");
+
+        match code_coverage_client.max_coverage_ratio() {
+            (0, _) => {
+                log::error!(
+                    "No initial code coverage detected. \
+                This likely indicates an issue with instrumentation. \
+                You specified {} as coverage tooling. \
+                Please ensure your target was restarted and is properly instrumented.",
+                    config.coverage_configuration.type_str()
+                );
+                std::process::exit(1);
+            }
+            (hit, total) => {
+                log::info!(
+                    "Initial code coverage: {hit}/{total} ({}%)",
+                    (hit * 100 + total / 2) / total
+                );
+            }
+        }
+    }
+
     // Create the executor for an in-process function with just one observer
     let mut executor = SequenceExecutor::new(
         collective_observer,
