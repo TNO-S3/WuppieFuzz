@@ -22,9 +22,9 @@
 - Use a single file to store Jacoco exec data in
   [#114](https://github.com/TNO-S3/WuppieFuzz/pull/114).
 - Fix a bug in corpus generation when no examples were found for a
-  request body [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
+  request body in [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
 - Parameter matching for corpus generation now detects resource-id and
-  resourceId in addition to resource_id [#143](https://github.com/TNO-S3/WuppieFuzz/pull/143)
+  resourceId in addition to resource_id in [#143](https://github.com/TNO-S3/WuppieFuzz/pull/143)
 - Consider AnyOf and AllOf schemas for parameter backreferences if they
   have exactly one element in [#144](https://github.com/TNO-S3/WuppieFuzz/pull/144)
 - Improved corpus loading and fixed fallback when corpus loading fails in
