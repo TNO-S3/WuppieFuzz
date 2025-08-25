@@ -11,6 +11,7 @@
 - Generate example parameters for the OpenAPI `allOf` keyword with just a
   single schema in [#118](https://github.com/TNO-S3/WuppieFuzz/pull/118)
 - Support logging in the output-corpus subcommand in [#121](https://github.com/TNO-S3/WuppieFuzz/pull/121)
+- Corpus minimization added in [#146](https://github.com/TNO-S3/WuppieFuzz/pull/146)
 
 ## Fixes
 
