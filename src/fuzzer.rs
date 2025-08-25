@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use indexmap::{Equivalent, IndexMap};
+use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
@@ -165,10 +165,7 @@ pub fn fuzz() -> Result<()> {
     let mut stages = tuple_list!(calibration, power);
 
     // APIs already create code coverage during boot. We check if the code coverage is non-zero. Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
-    if !config
-        .coverage_configuration
-        .equivalent(&crate::configuration::CoverageConfiguration::Endpoint)
-    {
+    if config.coverage_configuration != crate::configuration::CoverageConfiguration::Endpoint {
         log::debug!("Gathering initial code coverage");
 
         match code_coverage_client.max_coverage_ratio() {
@@ -182,7 +179,7 @@ pub fn fuzz() -> Result<()> {
             }
             (hit, total) => {
                 log::info!(
-                    "Initial code coverage successful: {hit}/{total} ({}%)",
+                    "Initial code coverage: {hit}/{total} ({}%)",
                     (hit * 100 + total / 2) / total
                 );
             }
