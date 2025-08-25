@@ -22,7 +22,6 @@
 - Use a single file to store Jacoco exec data in
   [#114](https://github.com/TNO-S3/WuppieFuzz/pull/114).
 - Fix a bug in corpus generation when no examples were found for a
-
   request body in [#137](https://github.com/TNO-S3/WuppieFuzz/pull/137)
 - Consider AnyOf and AllOf schemas for parameter backreferences if they
   have exactly one element in [#144](https://github.com/TNO-S3/WuppieFuzz/pull/144)
