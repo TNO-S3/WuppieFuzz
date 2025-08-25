@@ -4,7 +4,7 @@ use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 use cargo_license::{GetDependenciesOpt, get_dependencies_from_cargo_lock};
 
-pub fn get_hash_version() -> String {
+fn get_hash_version() -> String {
     let git_output = Command::new("git").arg("rev-parse").arg("HEAD").output();
     match git_output {
         Ok(v) => {
