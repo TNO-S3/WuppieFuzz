@@ -1,8 +1,25 @@
 //! Creates a Software Bill of Materials to be include in every build.
 
-use std::{env, fs::File, io::Write, path::Path};
+use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 use cargo_license::{GetDependenciesOpt, get_dependencies_from_cargo_lock};
+
+pub fn get_hash_version() -> String {
+    let git_output = Command::new("git").arg("rev-parse").arg("HEAD").output();
+    match git_output {
+        Ok(v) => {
+            if v.stdout.is_empty() {
+                "".to_string()
+            } else {
+                "-".to_string().clone()
+                    + &String::from_utf8(v.stdout)
+                        .clone()
+                        .unwrap_or("Invalid UTF8 output".to_string())
+            }
+        }
+        Err(_) => "<could not get git hash>".to_string(),
+    }
+}
 
 fn main() {
     let dependencies = get_dependencies_from_cargo_lock(
@@ -51,12 +68,18 @@ fn main() {
 
     let sbom_path = Path::new(&env::var("OUT_DIR").unwrap()).join("SBOM.txt");
     let sbom_directory_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).join("SBOM.txt");
+    let version_hash_path =
+        Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).join("version.hash");
 
     // Create and write to the file
-    for file_path in [sbom_path, sbom_directory_path] {
+    for (file_path, content) in [
+        (sbom_path, &dep_string),
+        (sbom_directory_path, &dep_string),
+        (version_hash_path, &get_hash_version()),
+    ] {
         let mut file = File::create(file_path.clone())
             .unwrap_or_else(|_| panic!("Failed to create {:?}", &file_path.as_path()));
-        file.write_all(dep_string.as_bytes())
+        file.write_all(content.as_bytes())
             .unwrap_or_else(|_| panic!("Failed to write to {:?}", &file_path.as_path()));
     }
 
