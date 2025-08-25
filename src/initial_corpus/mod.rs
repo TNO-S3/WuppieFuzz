@@ -179,22 +179,16 @@ fn fill_corpus_from_file(
     corpus: &mut InMemoryOnDiskCorpus<OpenApiInput>,
     initial_corpus_path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    match load_starting_corpus(initial_corpus_path) {
-        Ok(inputs) => {
-            print_starting_corpus(initial_corpus_path);
-            for input in inputs {
-                let mut testcase = Testcase::new(input);
-                testcase.add_metadata(SchedulerTestcaseMetadata::new(0));
-                match corpus.add(testcase) {
-                    Ok(_) => (),
-                    Err(e) => log::warn!("Could not add testcase to corpus, omitting. {e:?}"),
-                }
-            }
+    let inputs = load_starting_corpus(initial_corpus_path)?;
+    print_starting_corpus(initial_corpus_path);
+    for input in inputs {
+        let mut testcase = Testcase::new(input);
+        testcase.add_metadata(SchedulerTestcaseMetadata::new(0));
+        match corpus.add(testcase) {
+            Ok(_) => (),
+            Err(e) => log::warn!("Could not add testcase to corpus, omitting. {e:?}"),
         }
-        Err(err) => {
-            return Err(err);
-        }
-    };
+    }
     Ok(())
 }
 
