@@ -157,8 +157,10 @@ pub fn fuzz() -> Result<()> {
     let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 
     // The order of the stages matter!
-    let power = StdPowerMutationalStage::new(mutator_openapi);
+    let power: StdPowerMutationalStage<_, _, OpenApiInput, _, _, _> = StdPowerMutationalStage::new(mutator_openapi);
+
     let mut stages = tuple_list!(calibration, power);
+
 
     // APIs already create code coverage during boot. We check if the code coverage is non-zero. Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
     if config.coverage_configuration != crate::configuration::CoverageConfiguration::Endpoint {
