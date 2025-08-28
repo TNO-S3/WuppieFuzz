@@ -64,17 +64,29 @@ pub fn fuzz() -> Result<()> {
     );
 
     let (
-        endpoint_coverage_client,
-        endpoint_coverage_observer,
+        mut endpoint_coverage_client,
         mut code_coverage_client,
-        code_coverage_observer,
-        time_observer,
         objective,
         mut state,
-        combined_map_observer,
+        collective_observer,
         collective_feedback,
         calibration,
     ) = fun_name(config, &report_path, &api, initial_corpus)?;
+
+    let combined_map_observer: CombinedMapObserver<'_> =
+        MultiMapObserver::new("all_maps", unsafe {
+            vec![
+                OwnedMutSlice::from_raw_parts_mut(
+                    endpoint_coverage_client.get_coverage_ptr(),
+                    endpoint_coverage_client.get_coverage_len(),
+                ),
+                OwnedMutSlice::from_raw_parts_mut(
+                    code_coverage_client.get_coverage_ptr(),
+                    code_coverage_client.get_coverage_len(),
+                ),
+            ]
+        })
+        .track_indices();
 
     let scheduler = construct_scheduler(config, &mut state, &combined_map_observer);
 
@@ -83,13 +95,6 @@ pub fn fuzz() -> Result<()> {
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
-
-    let collective_observer = tuple_list!(
-        code_coverage_observer,
-        endpoint_coverage_observer,
-        combined_map_observer,
-        time_observer
-    );
 
     // The order of the stages matter!
     let power: StdPowerMutationalStage<_, _, OpenApiInput, _, _, _> =
@@ -183,7 +188,7 @@ pub fn fuzz() -> Result<()> {
     Ok(())
 }
 
-type MyObservers = (
+type ObserversTupleType = (
     LineCovObserver<'static>,
     (
         EndpointObserver<'static>,
@@ -222,19 +227,16 @@ fn fun_name(
 ) -> Result<
     (
         Arc<Mutex<EndpointCoverageClient>>,
-        EndpointObserver<'static>,
         Box<dyn CoverageClient>,
-        LineCovObserver<'static>,
-        TimeObserver,
         libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
         OpenApiFuzzerStateType,
-        CombinedMapObserver<'static>,
+        ObserversTupleType,
         CombinedFeedbackType<'static>,
         CalibrationStage<
             LineCovObserver<'static>,
             OpenApiInput,
             StdMapObserver<'static, u8, false>,
-            MyObservers,
+            ObserversTupleType,
             OpenApiFuzzerStateType,
         >,
     ),
@@ -249,7 +251,7 @@ fn fun_name(
         code_coverage_feedback,
         combined_map_observer,
         time_observer,
-    ) = fun_name1(config, report_path, api)?;
+    ) = construct_observers(config, report_path, api)?;
     let calibration = CalibrationStage::new(&code_coverage_feedback);
     let (collective_feedback, objective, state) = construct_state(
         api,
@@ -258,21 +260,24 @@ fn fun_name(
         code_coverage_feedback,
         &time_observer,
     )?;
+    let collective_observer = tuple_list!(
+        code_coverage_observer,
+        endpoint_coverage_observer,
+        combined_map_observer,
+        time_observer
+    );
     Ok((
         endpoint_coverage_client,
-        endpoint_coverage_observer,
         code_coverage_client,
-        code_coverage_observer,
-        time_observer,
         objective,
         state,
-        combined_map_observer,
+        collective_observer,
         collective_feedback,
         calibration,
     ))
 }
 
-fn fun_name1(
+fn construct_observers(
     config: &&'static Configuration,
     report_path: &Option<PathBuf>,
     api: &OpenAPI,
@@ -337,7 +342,7 @@ fn construct_state(
     let mut collective_feedback = feedback_or!(
         endpoint_coverage_feedback,
         code_coverage_feedback,
-        TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
+        TimeFeedback::new(time_observer), // Time feedback, this one does not need a feedback state
     );
     let mut objective = CrashFeedback::new();
     let state: OpenApiFuzzerStateType = OpenApiFuzzerState::new(
@@ -359,12 +364,7 @@ fn construct_state(
 
 fn construct_scheduler(
     config: &&'static Configuration,
-    state: &mut OpenApiFuzzerState<
-        OpenApiInput,
-        libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-        libafl_bolts::prelude::RomuDuoJrRand,
-        OnDiskCorpus<OpenApiInput>,
-    >,
+    state: &mut OpenApiFuzzerStateType,
     combined_map_observer: &CombinedMapObserver<'static>,
 ) -> SchedulerType<'static> {
     IndexesLenTimeMinimizerScheduler::new(
