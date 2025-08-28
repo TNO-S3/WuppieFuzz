@@ -330,12 +330,7 @@ fn construct_state(
     (
         CombinedFeedbackType<'static>,
         libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
-        OpenApiFuzzerState<
-            OpenApiInput,
-            libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-            libafl_bolts::prelude::RomuDuoJrRand,
-            OnDiskCorpus<OpenApiInput>,
-        >,
+        OpenApiFuzzerStateType,
     ),
     anyhow::Error,
 > {
