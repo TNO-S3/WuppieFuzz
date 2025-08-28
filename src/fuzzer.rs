@@ -17,7 +17,9 @@ use libafl::{
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::ExitKind,
     feedback_or,
-    feedbacks::{CrashFeedback, Feedback, MaxMapFeedback, TimeFeedback},
+    feedbacks::{
+        CombinedFeedback, CrashFeedback, LogicEagerOr, MaxMapFeedback, TimeFeedback,
+    },
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
@@ -32,7 +34,7 @@ use libafl_bolts::{
     current_nanos, current_time,
     prelude::OwnedMutSlice,
     rands::StdRand,
-    tuples::{MatchName, tuple_list},
+    tuples::tuple_list,
 };
 use log::{error, info};
 use openapiv3::{OpenAPI, Server};
@@ -58,6 +60,8 @@ pub fn fuzz() -> Result<()> {
     let api = parse_api_spec(config)?;
     let mut mgr = construct_event_mgr();
 
+    let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
+
     // Initialize corpus normally.
     let initial_corpus = crate::initial_corpus::initialize_corpus(
         &api,
@@ -65,69 +69,19 @@ pub fn fuzz() -> Result<()> {
         &report_path.as_deref(),
     );
 
-    // Set up endpoint coverage
-    let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
-        setup_endpoint_coverage(api.clone())?;
-
-    let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
-        setup_line_coverage(config, &report_path)?;
-
-    // Create an observation channel to keep track of the execution time
-    let time_observer = TimeObserver::new("time");
-
-    let calibration = CalibrationStage::new(&code_coverage_feedback);
-
-    let mut collective_feedback = feedback_or!(
-        endpoint_coverage_feedback,
-        code_coverage_feedback,
-        TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
-    );
-
-    // A feedback to choose if an input is a solution or not
-    let mut objective = CrashFeedback::new();
-
-    // Create a State from scratch
-    let mut state = OpenApiFuzzerState::new(
-        // RNG
-        StdRand::with_seed(current_nanos()),
-        // Corpus that will be evolved, we keep it in memory for performance
-        initial_corpus,
-        // Corpus in which we store solutions (crashes in this example),
-        // on disk so the user can get them after stopping the fuzzer
-        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-        // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        &mut collective_feedback,
-        &mut objective,
-        api,
-    )?;
-
-    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
-    // this is only possible if it does not touch the map while the harness is running. We must
-    // assume they have designed their algorithms for this to work correctly.
-    let combined_map_observer = MultiMapObserver::new("all_maps", unsafe {
-        vec![
-            OwnedMutSlice::from_raw_parts_mut(
-                endpoint_coverage_client.get_coverage_ptr(),
-                endpoint_coverage_client.get_coverage_len(),
-            ),
-            OwnedMutSlice::from_raw_parts_mut(
-                code_coverage_client.get_coverage_ptr(),
-                code_coverage_client.get_coverage_len(),
-            ),
-        ]
-    })
-    .track_indices();
-
-    // A minimization+queue policy to get testcases from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(
-        &combined_map_observer,
-        PowerQueueScheduler::new(
-            &mut state,
-            &combined_map_observer,
-            PowerSchedule::new(config.power_schedule),
-        ),
-    );
+    let (
+        endpoint_coverage_client,
+        endpoint_coverage_observer,
+        mut code_coverage_client,
+        code_coverage_observer,
+        time_observer,
+        objective,
+        mut state,
+        combined_map_observer,
+        scheduler,
+        collective_feedback,
+        calibration,
+    ) = fun_name(config, &report_path, &api, initial_corpus)?;
 
     let minimizer: MapCorpusMinimizer<_, _, _, _, _, _, CorpusPowerTestcaseScore> =
         MapCorpusMinimizer::new(&combined_map_observer);
@@ -142,13 +96,12 @@ pub fn fuzz() -> Result<()> {
         time_observer
     );
 
-    let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 
     // The order of the stages matter!
-    let power: StdPowerMutationalStage<_, _, OpenApiInput, _, _, _> = StdPowerMutationalStage::new(mutator_openapi);
+    let power: StdPowerMutationalStage<_, _, OpenApiInput, _, _, _> =
+        StdPowerMutationalStage::new(mutator_openapi);
 
     let mut stages = tuple_list!(calibration, power);
-
 
     // APIs already create code coverage during boot. We check if the code coverage is non-zero. Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
     if config.coverage_configuration != crate::configuration::CoverageConfiguration::Endpoint {
@@ -236,6 +189,143 @@ pub fn fuzz() -> Result<()> {
     Ok(())
 }
 
+type MyObservers = (
+    LineCovObserver<'static>,
+    EndpointObserver<'static>,
+    CombinedMapObserver<'static>,
+    TimeObserver,
+);
+
+
+type MyFeedback<'a> = CombinedFeedback<
+    EndpointFeedback<'a>,
+    CombinedFeedback<LineCovFeedback<'a>, TimeFeedback, LogicEagerOr>,
+    LogicEagerOr,
+>;
+
+type OpenApiFuzzerStateType = OpenApiFuzzerState<
+                OpenApiInput,
+                libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+                libafl_bolts::prelude::RomuDuoJrRand,
+                OnDiskCorpus<OpenApiInput>,
+            >;
+type EventMgrType = SimpleEventManager<OpenApiInput, CoverageMonitor<Box<dyn FnMut(String)>>, OpenApiFuzzerState<OpenApiInput, libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>, libafl_bolts::prelude::RomuDuoJrRand, OnDiskCorpus<OpenApiInput>>>;
+
+type CombinedMapObserver<'a> = ExplicitTracking<MultiMapObserver<'a, u8, false>, true, false>;
+
+fn fun_name(
+    config: &&'static Configuration,
+    report_path: &Option<PathBuf>,
+    api: &OpenAPI,
+    initial_corpus: libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+) -> Result<
+    (
+        Arc<Mutex<EndpointCoverageClient>>,
+        EndpointObserver<'static>,
+        Box<dyn CoverageClient>,
+        LineCovObserver<'static>,
+        TimeObserver,
+        libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
+        OpenApiFuzzerStateType,
+        CombinedMapObserver<'static>,
+        libafl::schedulers::MinimizerScheduler<
+            PowerQueueScheduler<
+                CombinedMapObserver<'static>,
+                MultiMapObserver<'static, u8, false>,
+            >,
+            libafl::schedulers::LenTimeMulTestcaseScore,
+            OpenApiInput,
+            libafl::feedbacks::MapIndexesMetadata,
+            CombinedMapObserver<'static>
+        >,
+        MyFeedback<'static>,
+        CalibrationStage<
+            LineCovObserver<'static>,
+            OpenApiInput,
+            StdMapObserver<'static, u8, false>,
+            MyObservers,
+            OpenApiFuzzerStateType,
+        >,
+    ),
+    anyhow::Error,
+> {
+    let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
+        setup_endpoint_coverage::<'static, OpenApiFuzzerStateType, EventMgrType, OpenApiInput>(api.clone())?;
+    let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
+        setup_line_coverage(config, report_path)?;
+    let calibration: CalibrationStage<LineCovObserver<'_>, OpenApiInput, StdMapObserver<'_, u8, false>, MyObservers, OpenApiFuzzerStateType> = CalibrationStage::new(&code_coverage_feedback);
+    let time_observer = TimeObserver::new("time");
+    let mut collective_feedback = feedback_or!(
+        endpoint_coverage_feedback,
+        code_coverage_feedback,
+        TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
+    );
+    let mut objective = CrashFeedback::new();
+    let mut state: OpenApiFuzzerState<
+        OpenApiInput,
+        libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+        libafl_bolts::prelude::RomuDuoJrRand,
+        OnDiskCorpus<OpenApiInput>,
+    > = OpenApiFuzzerState::new(
+        // RNG
+        StdRand::with_seed(current_nanos()),
+        // Corpus that will be evolved, we keep it in memory for performance
+        initial_corpus,
+        // Corpus in which we store solutions (crashes in this example),
+        // on disk so the user can get them after stopping the fuzzer
+        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+        // States of the feedbacks.
+        // They are the data related to the feedbacks that you want to persist in the State.
+        &mut collective_feedback,
+        &mut objective,
+        api.clone(),
+    )?;
+    let combined_map_observer: CombinedMapObserver<'_> =
+        MultiMapObserver::new("all_maps", unsafe {
+            vec![
+                OwnedMutSlice::from_raw_parts_mut(
+                    endpoint_coverage_client.get_coverage_ptr(),
+                    endpoint_coverage_client.get_coverage_len(),
+                ),
+                OwnedMutSlice::from_raw_parts_mut(
+                    code_coverage_client.get_coverage_ptr(),
+                    code_coverage_client.get_coverage_len(),
+                ),
+            ]
+        })
+        .track_indices();
+    let scheduler: libafl::schedulers::MinimizerScheduler<
+        PowerQueueScheduler<
+            CombinedMapObserver<'_>,
+            MultiMapObserver<'_, u8, false>,
+        >,
+        libafl::schedulers::LenTimeMulTestcaseScore,
+        OpenApiInput,
+        libafl::feedbacks::MapIndexesMetadata,
+        CombinedMapObserver<'_>,
+    > = IndexesLenTimeMinimizerScheduler::new(
+        &combined_map_observer,
+        PowerQueueScheduler::new(
+            &mut state,
+            &combined_map_observer,
+            PowerSchedule::new(config.power_schedule),
+        ),
+    );
+    Ok((
+        endpoint_coverage_client,
+        endpoint_coverage_observer,
+        code_coverage_client,
+        code_coverage_observer,
+        time_observer,
+        objective,
+        state,
+        combined_map_observer,
+        scheduler,
+        collective_feedback,
+        calibration,
+    ))
+}
+
 fn parse_api_spec(config: &&'static Configuration) -> Result<OpenAPI, anyhow::Error> {
     let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
     if let Some(server_override) = &config.target {
@@ -262,6 +352,13 @@ where
     SimpleEventManager::new(mon)
 }
 
+type EndpointObserver<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>;
+
+type EndpointFeedback<'a> = MaxMapFeedback<
+    EndpointObserver<'a>,
+    StdMapObserver<'a, u8, false>,
+>;
+
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
@@ -270,14 +367,13 @@ fn setup_endpoint_coverage<
     S: HasNamedMetadata + HasExecutions,
     EM: EventFirer<I, S>,
     I,
-    OT: MatchName,
 >(
     api: OpenAPI,
-) -> Result<
+) -> core::result::Result<
     (
         Arc<Mutex<EndpointCoverageClient>>,
-        ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>,
-        impl Feedback<EM, I, OT, S>,
+        EndpointObserver<'a>,
+        EndpointFeedback<'a>,
     ),
     anyhow::Error,
 > {
@@ -306,13 +402,17 @@ fn setup_endpoint_coverage<
     ))
 }
 
+type LineCovObserver<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>;
+
+type LineCovFeedback<'a> = MaxMapFeedback<
+    LineCovObserver<'a>,
+    StdMapObserver<'a, u8, false>,
+>;
+
 type LineCovClientObserverFeedback<'a> = (
     Box<dyn CoverageClient>,
-    ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
-    MaxMapFeedback<
-        ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>,
-        StdMapObserver<'a, u8, false>,
-    >,
+    LineCovObserver<'a>,
+    LineCovFeedback<'a>,
 );
 
 /// Sets up the line coverage client according to the configuration, and initializes it
