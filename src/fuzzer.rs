@@ -127,7 +127,7 @@ pub fn fuzz() -> Result<()> {
         &api,
         config,
         code_coverage_client,
-        endpoint_coverage_client.clone(),
+        endpoint_coverage_client,
     )?;
 
     log::info!("Start corpus minimization");
@@ -232,12 +232,143 @@ fn fun_name(
     ),
     anyhow::Error,
 > {
+    let (
+        endpoint_coverage_client,
+        endpoint_coverage_observer,
+        endpoint_coverage_feedback,
+        code_coverage_client,
+        code_coverage_observer,
+        code_coverage_feedback,
+        combined_map_observer,
+        time_observer,
+    ) = fun_name1(config, report_path, api)?;
+    let calibration = CalibrationStage::new(&code_coverage_feedback);
+    let (collective_feedback, objective, state) = construct_state(
+        api,
+        initial_corpus,
+        endpoint_coverage_feedback,
+        code_coverage_feedback,
+        &time_observer,
+    )?;
+    Ok((
+        endpoint_coverage_client,
+        endpoint_coverage_observer,
+        code_coverage_client,
+        code_coverage_observer,
+        time_observer,
+        objective,
+        state,
+        combined_map_observer,
+        collective_feedback,
+        calibration,
+    ))
+}
+
+fn fun_name1(
+    config: &&'static Configuration,
+    report_path: &Option<PathBuf>,
+    api: &OpenAPI,
+) -> Result<
+    (
+        Arc<Mutex<EndpointCoverageClient>>,
+        ExplicitTracking<StdMapObserver<'static, u8, false>, false, true>,
+        libafl::feedbacks::simd::SimdMapFeedback<
+            ExplicitTracking<StdMapObserver<'static, u8, false>, false, true>,
+            StdMapObserver<'static, u8, false>,
+            libafl_bolts::simd::SimdMaxReducer,
+            libafl_bolts::simd::vector::u8x16,
+        >,
+        Box<dyn CoverageClient>,
+        ExplicitTracking<StdMapObserver<'static, u8, false>, true, true>,
+        libafl::feedbacks::simd::SimdMapFeedback<
+            ExplicitTracking<StdMapObserver<'static, u8, false>, true, true>,
+            StdMapObserver<'static, u8, false>,
+            libafl_bolts::simd::SimdMaxReducer,
+            libafl_bolts::simd::vector::u8x16,
+        >,
+        ExplicitTracking<MultiMapObserver<'static, u8, false>, true, false>,
+        TimeObserver,
+    ),
+    anyhow::Error,
+> {
     let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
         setup_endpoint_coverage(api.clone())?;
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, report_path)?;
-    let calibration = CalibrationStage::new(&code_coverage_feedback);
+    let combined_map_observer: CombinedMapObserver<'_> =
+        MultiMapObserver::new("all_maps", unsafe {
+            vec![
+                OwnedMutSlice::from_raw_parts_mut(
+                    endpoint_coverage_client.get_coverage_ptr(),
+                    endpoint_coverage_client.get_coverage_len(),
+                ),
+                OwnedMutSlice::from_raw_parts_mut(
+                    code_coverage_client.get_coverage_ptr(),
+                    code_coverage_client.get_coverage_len(),
+                ),
+            ]
+        })
+        .track_indices();
     let time_observer = TimeObserver::new("time");
+    Ok((
+        endpoint_coverage_client,
+        endpoint_coverage_observer,
+        endpoint_coverage_feedback,
+        code_coverage_client,
+        code_coverage_observer,
+        code_coverage_feedback,
+        combined_map_observer,
+        time_observer,
+    ))
+}
+
+fn construct_state(
+    api: &OpenAPI,
+    initial_corpus: libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+    endpoint_coverage_feedback: libafl::feedbacks::simd::SimdMapFeedback<
+        EndpointObserver<'static>,
+        StdMapObserver<'static, u8, false>,
+        libafl_bolts::simd::SimdMaxReducer,
+        libafl_bolts::simd::vector::u8x16,
+    >,
+    code_coverage_feedback: libafl::feedbacks::simd::SimdMapFeedback<
+        LineCovObserver<'static>,
+        StdMapObserver<'static, u8, false>,
+        libafl_bolts::simd::SimdMaxReducer,
+        libafl_bolts::simd::vector::u8x16,
+    >,
+    time_observer: &TimeObserver,
+) -> Result<
+    (
+        CombinedFeedback<
+            libafl::feedbacks::simd::SimdMapFeedback<
+                EndpointObserver<'static>,
+                StdMapObserver<'static, u8, false>,
+                libafl_bolts::simd::SimdMaxReducer,
+                libafl_bolts::simd::vector::u8x16,
+            >,
+            CombinedFeedback<
+                libafl::feedbacks::simd::SimdMapFeedback<
+                    LineCovObserver<'static>,
+                    StdMapObserver<'static, u8, false>,
+                    libafl_bolts::simd::SimdMaxReducer,
+                    libafl_bolts::simd::vector::u8x16,
+                >,
+                TimeFeedback,
+                LogicEagerOr,
+            >,
+            LogicEagerOr,
+        >,
+        libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
+        OpenApiFuzzerState<
+            OpenApiInput,
+            libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+            libafl_bolts::prelude::RomuDuoJrRand,
+            OnDiskCorpus<OpenApiInput>,
+        >,
+    ),
+    anyhow::Error,
+> {
     let mut collective_feedback = feedback_or!(
         endpoint_coverage_feedback,
         code_coverage_feedback,
@@ -263,32 +394,7 @@ fn fun_name(
         &mut objective,
         api.clone(),
     )?;
-    let combined_map_observer: CombinedMapObserver<'_> =
-        MultiMapObserver::new("all_maps", unsafe {
-            vec![
-                OwnedMutSlice::from_raw_parts_mut(
-                    endpoint_coverage_client.get_coverage_ptr(),
-                    endpoint_coverage_client.get_coverage_len(),
-                ),
-                OwnedMutSlice::from_raw_parts_mut(
-                    code_coverage_client.get_coverage_ptr(),
-                    code_coverage_client.get_coverage_len(),
-                ),
-            ]
-        })
-        .track_indices();
-    Ok((
-        endpoint_coverage_client,
-        endpoint_coverage_observer,
-        code_coverage_client,
-        code_coverage_observer,
-        time_observer,
-        objective,
-        state,
-        combined_map_observer,
-        collective_feedback,
-        calibration,
-    ))
+    Ok((collective_feedback, objective, state))
 }
 
 fn construct_scheduler(
@@ -301,10 +407,7 @@ fn construct_scheduler(
     >,
     combined_map_observer: &CombinedMapObserver<'static>,
 ) -> libafl::schedulers::MinimizerScheduler<
-    PowerQueueScheduler<
-        CombinedMapObserver<'static>,
-        MultiMapObserver<'static, u8, false>,
-    >,
+    PowerQueueScheduler<CombinedMapObserver<'static>, MultiMapObserver<'static, u8, false>>,
     libafl::schedulers::LenTimeMulTestcaseScore,
     OpenApiInput,
     libafl::feedbacks::MapIndexesMetadata,
@@ -378,7 +481,7 @@ fn setup_endpoint_coverage<'a>(
     }
     .track_novelties();
     let endpoint_coverage_feedback: MaxMapFeedback<
-        ExplicitTracking<StdMapObserver<'_, u8, false>, false, true>,
+        EndpointObserver,
         StdMapObserver<'_, u8, false>,
     > = MaxMapFeedback::new(&endpoint_coverage_observer);
     Ok((
