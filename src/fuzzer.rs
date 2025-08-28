@@ -55,18 +55,8 @@ pub fn fuzz() -> Result<()> {
     let config = &Configuration::get().map_err(anyhow::Error::msg)?;
     crate::setup_logging(config);
     let report_path = config.report.then(generate_report_path);
-
-    // Override the `servers` field in the OpenAPI specification if a server override
-    // was specified on the CLI.
-    let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
-    if let Some(server_override) = &config.target {
-        api.servers = vec![Server {
-            url: server_override.as_str().trim_end_matches('/').to_string(),
-            description: None,
-            variables: None,
-            extensions: IndexMap::new(),
-        }];
-    }
+    let api = parse_api_spec(config)?;
+    let mut mgr = construct_event_mgr();
 
     // Initialize corpus normally.
     let initial_corpus = crate::initial_corpus::initialize_corpus(
@@ -75,11 +65,9 @@ pub fn fuzz() -> Result<()> {
         &report_path.as_deref(),
     );
 
-    let mut mgr = construct_event_mgr();
-
     // Set up endpoint coverage
     let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
-        setup_endpoint_coverage(*api.clone())?;
+        setup_endpoint_coverage(api.clone())?;
 
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
@@ -111,7 +99,7 @@ pub fn fuzz() -> Result<()> {
         // They are the data related to the feedbacks that you want to persist in the State.
         &mut collective_feedback,
         &mut objective,
-        *api.clone(),
+        api,
     )?;
 
     // Safety: libafl wants to read the coverage map directly that we also update in the harness;
@@ -246,6 +234,19 @@ pub fn fuzz() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn parse_api_spec(config: &&'static Configuration) -> Result<OpenAPI, anyhow::Error> {
+    let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+    if let Some(server_override) = &config.target {
+        api.servers = vec![Server {
+            url: server_override.as_str().trim_end_matches('/').to_string(),
+            description: None,
+            variables: None,
+            extensions: IndexMap::new(),
+        }];
+    }
+    Ok(*api)
 }
 
 fn construct_event_mgr<I, S>() -> SimpleEventManager<I, CoverageMonitor<impl FnMut(String)>, S>
