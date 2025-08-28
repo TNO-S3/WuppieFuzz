@@ -191,7 +191,7 @@ type MyObservers = (
     ),
 );
 
-type MyFeedback<'a> = CombinedFeedback<
+type CombinedFeedbackType<'a> = CombinedFeedback<
     EndpointFeedback<'a>,
     CombinedFeedback<LineCovFeedback<'a>, TimeFeedback, LogicEagerOr>,
     LogicEagerOr,
@@ -205,6 +205,14 @@ type OpenApiFuzzerStateType = OpenApiFuzzerState<
 >;
 
 type CombinedMapObserver<'a> = ExplicitTracking<MultiMapObserver<'a, u8, false>, true, false>;
+
+type SchedulerType<'a> = libafl::schedulers::MinimizerScheduler<
+    PowerQueueScheduler<CombinedMapObserver<'a>, MultiMapObserver<'a, u8, false>>,
+    libafl::schedulers::LenTimeMulTestcaseScore,
+    OpenApiInput,
+    libafl::feedbacks::MapIndexesMetadata,
+    CombinedMapObserver<'a>,
+>;
 
 fn fun_name(
     config: &&'static Configuration,
@@ -221,7 +229,7 @@ fn fun_name(
         libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
         OpenApiFuzzerStateType,
         CombinedMapObserver<'static>,
-        MyFeedback<'static>,
+        CombinedFeedbackType<'static>,
         CalibrationStage<
             LineCovObserver<'static>,
             OpenApiInput,
@@ -271,21 +279,11 @@ fn fun_name1(
 ) -> Result<
     (
         Arc<Mutex<EndpointCoverageClient>>,
-        ExplicitTracking<StdMapObserver<'static, u8, false>, false, true>,
-        libafl::feedbacks::simd::SimdMapFeedback<
-            ExplicitTracking<StdMapObserver<'static, u8, false>, false, true>,
-            StdMapObserver<'static, u8, false>,
-            libafl_bolts::simd::SimdMaxReducer,
-            libafl_bolts::simd::vector::u8x16,
-        >,
+        EndpointObserver<'static>,
+        EndpointFeedback<'static>,
         Box<dyn CoverageClient>,
-        ExplicitTracking<StdMapObserver<'static, u8, false>, true, true>,
-        libafl::feedbacks::simd::SimdMapFeedback<
-            ExplicitTracking<StdMapObserver<'static, u8, false>, true, true>,
-            StdMapObserver<'static, u8, false>,
-            libafl_bolts::simd::SimdMaxReducer,
-            libafl_bolts::simd::vector::u8x16,
-        >,
+        LineCovObserver<'static>,
+        LineCovFeedback<'static>,
         ExplicitTracking<MultiMapObserver<'static, u8, false>, true, false>,
         TimeObserver,
     ),
@@ -325,40 +323,12 @@ fn fun_name1(
 fn construct_state(
     api: &OpenAPI,
     initial_corpus: libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-    endpoint_coverage_feedback: libafl::feedbacks::simd::SimdMapFeedback<
-        EndpointObserver<'static>,
-        StdMapObserver<'static, u8, false>,
-        libafl_bolts::simd::SimdMaxReducer,
-        libafl_bolts::simd::vector::u8x16,
-    >,
-    code_coverage_feedback: libafl::feedbacks::simd::SimdMapFeedback<
-        LineCovObserver<'static>,
-        StdMapObserver<'static, u8, false>,
-        libafl_bolts::simd::SimdMaxReducer,
-        libafl_bolts::simd::vector::u8x16,
-    >,
+    endpoint_coverage_feedback: EndpointFeedback<'static>,
+    code_coverage_feedback: LineCovFeedback<'static>,
     time_observer: &TimeObserver,
 ) -> Result<
     (
-        CombinedFeedback<
-            libafl::feedbacks::simd::SimdMapFeedback<
-                EndpointObserver<'static>,
-                StdMapObserver<'static, u8, false>,
-                libafl_bolts::simd::SimdMaxReducer,
-                libafl_bolts::simd::vector::u8x16,
-            >,
-            CombinedFeedback<
-                libafl::feedbacks::simd::SimdMapFeedback<
-                    LineCovObserver<'static>,
-                    StdMapObserver<'static, u8, false>,
-                    libafl_bolts::simd::SimdMaxReducer,
-                    libafl_bolts::simd::vector::u8x16,
-                >,
-                TimeFeedback,
-                LogicEagerOr,
-            >,
-            LogicEagerOr,
-        >,
+        CombinedFeedbackType<'static>,
         libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
         OpenApiFuzzerState<
             OpenApiInput,
@@ -406,13 +376,7 @@ fn construct_scheduler(
         OnDiskCorpus<OpenApiInput>,
     >,
     combined_map_observer: &CombinedMapObserver<'static>,
-) -> libafl::schedulers::MinimizerScheduler<
-    PowerQueueScheduler<CombinedMapObserver<'static>, MultiMapObserver<'static, u8, false>>,
-    libafl::schedulers::LenTimeMulTestcaseScore,
-    OpenApiInput,
-    libafl::feedbacks::MapIndexesMetadata,
-    CombinedMapObserver<'static>,
-> {
+) -> SchedulerType<'static> {
     IndexesLenTimeMinimizerScheduler::new(
         combined_map_observer,
         PowerQueueScheduler::new(
