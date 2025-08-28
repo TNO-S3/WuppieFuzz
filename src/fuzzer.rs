@@ -1,3 +1,4 @@
+use core::fmt::Debug;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{
@@ -25,7 +26,7 @@ use libafl::{
         testcase_score::CorpusPowerTestcaseScore,
     },
     stages::{CalibrationStage, StdPowerMutationalStage},
-    state::{HasCorpus, HasExecutions},
+    state::{HasCorpus, HasExecutions, Stoppable},
 };
 use libafl_bolts::{
     current_nanos, current_time,
@@ -67,12 +68,14 @@ pub fn fuzz() -> Result<()> {
         }];
     }
 
-    // The Monitor trait define how the fuzzer stats are reported to the user
-    let mon = CoverageMonitor::new(|s| info!("{s}"));
+    // Initialize corpus normally.
+    let initial_corpus = crate::initial_corpus::initialize_corpus(
+        &api,
+        config.initial_corpus.as_deref(),
+        &report_path.as_deref(),
+    );
 
-    // The event manager handle the various events generated during the fuzzing loop
-    // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(mon);
+    let mut mgr = construct_event_mgr();
 
     // Set up endpoint coverage
     let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
@@ -94,13 +97,6 @@ pub fn fuzz() -> Result<()> {
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
-
-    // Initialize corpus normally.
-    let initial_corpus = crate::initial_corpus::initialize_corpus(
-        &api,
-        config.initial_corpus.as_deref(),
-        &report_path.as_deref(),
-    );
 
     // Create a State from scratch
     let mut state = OpenApiFuzzerState::new(
@@ -248,6 +244,19 @@ pub fn fuzz() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn construct_event_mgr<I, S>() -> SimpleEventManager<I, CoverageMonitor<impl FnMut(String)>, S>
+where
+    I: Debug,
+    S: Stoppable,
+{
+    // The Monitor trait define how the fuzzer stats are reported to the user
+    let mon = CoverageMonitor::new(Box::new(|s| info!("{s}")) as Box<dyn FnMut(String)>);
+
+    // The event manager handle the various events generated during the fuzzing loop
+    // such as the notification of the addition of a new item to the corpus
+    SimpleEventManager::new(mon)
 }
 
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
