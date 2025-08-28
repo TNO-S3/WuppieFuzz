@@ -345,12 +345,7 @@ fn construct_state(
         TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
     );
     let mut objective = CrashFeedback::new();
-    let state: OpenApiFuzzerState<
-        OpenApiInput,
-        libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-        libafl_bolts::prelude::RomuDuoJrRand,
-        OnDiskCorpus<OpenApiInput>,
-    > = OpenApiFuzzerState::new(
+    let state: OpenApiFuzzerStateType = OpenApiFuzzerState::new(
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
