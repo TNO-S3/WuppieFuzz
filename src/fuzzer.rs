@@ -17,9 +17,7 @@ use libafl::{
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::ExitKind,
     feedback_or,
-    feedbacks::{
-        CombinedFeedback, CrashFeedback, LogicEagerOr, MaxMapFeedback, TimeFeedback,
-    },
+    feedbacks::{CombinedFeedback, CrashFeedback, LogicEagerOr, MaxMapFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
@@ -31,10 +29,7 @@ use libafl::{
     state::{HasCorpus, HasExecutions, Stoppable},
 };
 use libafl_bolts::{
-    current_nanos, current_time,
-    prelude::OwnedMutSlice,
-    rands::StdRand,
-    tuples::tuple_list,
+    current_nanos, current_time, prelude::OwnedMutSlice, rands::StdRand, tuples::tuple_list,
 };
 use log::{error, info};
 use openapiv3::{OpenAPI, Server};
@@ -95,7 +90,6 @@ pub fn fuzz() -> Result<()> {
         combined_map_observer,
         time_observer
     );
-
 
     // The order of the stages matter!
     let power: StdPowerMutationalStage<_, _, OpenApiInput, _, _, _> =
@@ -191,11 +185,11 @@ pub fn fuzz() -> Result<()> {
 
 type MyObservers = (
     LineCovObserver<'static>,
-    EndpointObserver<'static>,
-    CombinedMapObserver<'static>,
-    TimeObserver,
+    (
+        EndpointObserver<'static>,
+        (CombinedMapObserver<'static>, (TimeObserver, ())),
+    ),
 );
-
 
 type MyFeedback<'a> = CombinedFeedback<
     EndpointFeedback<'a>,
@@ -204,12 +198,21 @@ type MyFeedback<'a> = CombinedFeedback<
 >;
 
 type OpenApiFuzzerStateType = OpenApiFuzzerState<
-                OpenApiInput,
-                libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-                libafl_bolts::prelude::RomuDuoJrRand,
-                OnDiskCorpus<OpenApiInput>,
-            >;
-type EventMgrType = SimpleEventManager<OpenApiInput, CoverageMonitor<Box<dyn FnMut(String)>>, OpenApiFuzzerState<OpenApiInput, libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>, libafl_bolts::prelude::RomuDuoJrRand, OnDiskCorpus<OpenApiInput>>>;
+    OpenApiInput,
+    libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+    libafl_bolts::prelude::RomuDuoJrRand,
+    OnDiskCorpus<OpenApiInput>,
+>;
+type EventMgrType = SimpleEventManager<
+    OpenApiInput,
+    CoverageMonitor<Box<dyn FnMut(String)>>,
+    OpenApiFuzzerState<
+        OpenApiInput,
+        libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+        libafl_bolts::prelude::RomuDuoJrRand,
+        OnDiskCorpus<OpenApiInput>,
+    >,
+>;
 
 type CombinedMapObserver<'a> = ExplicitTracking<MultiMapObserver<'a, u8, false>, true, false>;
 
@@ -229,14 +232,11 @@ fn fun_name(
         OpenApiFuzzerStateType,
         CombinedMapObserver<'static>,
         libafl::schedulers::MinimizerScheduler<
-            PowerQueueScheduler<
-                CombinedMapObserver<'static>,
-                MultiMapObserver<'static, u8, false>,
-            >,
+            PowerQueueScheduler<CombinedMapObserver<'static>, MultiMapObserver<'static, u8, false>>,
             libafl::schedulers::LenTimeMulTestcaseScore,
             OpenApiInput,
             libafl::feedbacks::MapIndexesMetadata,
-            CombinedMapObserver<'static>
+            CombinedMapObserver<'static>,
         >,
         MyFeedback<'static>,
         CalibrationStage<
@@ -250,10 +250,12 @@ fn fun_name(
     anyhow::Error,
 > {
     let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
-        setup_endpoint_coverage::<'static, OpenApiFuzzerStateType, EventMgrType, OpenApiInput>(api.clone())?;
+        setup_endpoint_coverage::<'static, OpenApiFuzzerStateType, EventMgrType, OpenApiInput>(
+            api.clone(),
+        )?;
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, report_path)?;
-    let calibration: CalibrationStage<LineCovObserver<'_>, OpenApiInput, StdMapObserver<'_, u8, false>, MyObservers, OpenApiFuzzerStateType> = CalibrationStage::new(&code_coverage_feedback);
+    let calibration = CalibrationStage::new(&code_coverage_feedback);
     let time_observer = TimeObserver::new("time");
     let mut collective_feedback = feedback_or!(
         endpoint_coverage_feedback,
@@ -295,10 +297,7 @@ fn fun_name(
         })
         .track_indices();
     let scheduler: libafl::schedulers::MinimizerScheduler<
-        PowerQueueScheduler<
-            CombinedMapObserver<'_>,
-            MultiMapObserver<'_, u8, false>,
-        >,
+        PowerQueueScheduler<CombinedMapObserver<'_>, MultiMapObserver<'_, u8, false>>,
         libafl::schedulers::LenTimeMulTestcaseScore,
         OpenApiInput,
         libafl::feedbacks::MapIndexesMetadata,
@@ -354,20 +353,12 @@ where
 
 type EndpointObserver<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>;
 
-type EndpointFeedback<'a> = MaxMapFeedback<
-    EndpointObserver<'a>,
-    StdMapObserver<'a, u8, false>,
->;
+type EndpointFeedback<'a> = MaxMapFeedback<EndpointObserver<'a>, StdMapObserver<'a, u8, false>>;
 
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
-fn setup_endpoint_coverage<
-    'a,
-    S: HasNamedMetadata + HasExecutions,
-    EM: EventFirer<I, S>,
-    I,
->(
+fn setup_endpoint_coverage<'a, S: HasNamedMetadata + HasExecutions, EM: EventFirer<I, S>, I>(
     api: OpenAPI,
 ) -> core::result::Result<
     (
@@ -404,10 +395,7 @@ fn setup_endpoint_coverage<
 
 type LineCovObserver<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>;
 
-type LineCovFeedback<'a> = MaxMapFeedback<
-    LineCovObserver<'a>,
-    StdMapObserver<'a, u8, false>,
->;
+type LineCovFeedback<'a> = MaxMapFeedback<LineCovObserver<'a>, StdMapObserver<'a, u8, false>>;
 
 type LineCovClientObserverFeedback<'a> = (
     Box<dyn CoverageClient>,
