@@ -12,7 +12,6 @@ use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    HasNamedMetadata,
     corpus::{Corpus, OnDiskCorpus, minimizer::MapCorpusMinimizer},
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::ExitKind,
@@ -73,10 +72,11 @@ pub fn fuzz() -> Result<()> {
         objective,
         mut state,
         combined_map_observer,
-        scheduler,
         collective_feedback,
         calibration,
     ) = fun_name(config, &report_path, &api, initial_corpus)?;
+
+    let scheduler = construct_scheduler(config, &mut state, &combined_map_observer);
 
     let minimizer: MapCorpusMinimizer<_, _, _, _, _, _, CorpusPowerTestcaseScore> =
         MapCorpusMinimizer::new(&combined_map_observer);
@@ -203,16 +203,6 @@ type OpenApiFuzzerStateType = OpenApiFuzzerState<
     libafl_bolts::prelude::RomuDuoJrRand,
     OnDiskCorpus<OpenApiInput>,
 >;
-type EventMgrType = SimpleEventManager<
-    OpenApiInput,
-    CoverageMonitor<Box<dyn FnMut(String)>>,
-    OpenApiFuzzerState<
-        OpenApiInput,
-        libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-        libafl_bolts::prelude::RomuDuoJrRand,
-        OnDiskCorpus<OpenApiInput>,
-    >,
->;
 
 type CombinedMapObserver<'a> = ExplicitTracking<MultiMapObserver<'a, u8, false>, true, false>;
 
@@ -231,13 +221,6 @@ fn fun_name(
         libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
         OpenApiFuzzerStateType,
         CombinedMapObserver<'static>,
-        libafl::schedulers::MinimizerScheduler<
-            PowerQueueScheduler<CombinedMapObserver<'static>, MultiMapObserver<'static, u8, false>>,
-            libafl::schedulers::LenTimeMulTestcaseScore,
-            OpenApiInput,
-            libafl::feedbacks::MapIndexesMetadata,
-            CombinedMapObserver<'static>,
-        >,
         MyFeedback<'static>,
         CalibrationStage<
             LineCovObserver<'static>,
@@ -250,9 +233,7 @@ fn fun_name(
     anyhow::Error,
 > {
     let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
-        setup_endpoint_coverage::<'static, OpenApiFuzzerStateType, EventMgrType, OpenApiInput>(
-            api.clone(),
-        )?;
+        setup_endpoint_coverage(api.clone())?;
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, report_path)?;
     let calibration = CalibrationStage::new(&code_coverage_feedback);
@@ -263,7 +244,7 @@ fn fun_name(
         TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
     );
     let mut objective = CrashFeedback::new();
-    let mut state: OpenApiFuzzerState<
+    let state: OpenApiFuzzerState<
         OpenApiInput,
         libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
         libafl_bolts::prelude::RomuDuoJrRand,
@@ -296,20 +277,6 @@ fn fun_name(
             ]
         })
         .track_indices();
-    let scheduler: libafl::schedulers::MinimizerScheduler<
-        PowerQueueScheduler<CombinedMapObserver<'_>, MultiMapObserver<'_, u8, false>>,
-        libafl::schedulers::LenTimeMulTestcaseScore,
-        OpenApiInput,
-        libafl::feedbacks::MapIndexesMetadata,
-        CombinedMapObserver<'_>,
-    > = IndexesLenTimeMinimizerScheduler::new(
-        &combined_map_observer,
-        PowerQueueScheduler::new(
-            &mut state,
-            &combined_map_observer,
-            PowerSchedule::new(config.power_schedule),
-        ),
-    );
     Ok((
         endpoint_coverage_client,
         endpoint_coverage_observer,
@@ -319,10 +286,38 @@ fn fun_name(
         objective,
         state,
         combined_map_observer,
-        scheduler,
         collective_feedback,
         calibration,
     ))
+}
+
+fn construct_scheduler(
+    config: &&'static Configuration,
+    state: &mut OpenApiFuzzerState<
+        OpenApiInput,
+        libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+        libafl_bolts::prelude::RomuDuoJrRand,
+        OnDiskCorpus<OpenApiInput>,
+    >,
+    combined_map_observer: &CombinedMapObserver<'static>,
+) -> libafl::schedulers::MinimizerScheduler<
+    PowerQueueScheduler<
+        CombinedMapObserver<'static>,
+        MultiMapObserver<'static, u8, false>,
+    >,
+    libafl::schedulers::LenTimeMulTestcaseScore,
+    OpenApiInput,
+    libafl::feedbacks::MapIndexesMetadata,
+    CombinedMapObserver<'static>,
+> {
+    IndexesLenTimeMinimizerScheduler::new(
+        combined_map_observer,
+        PowerQueueScheduler::new(
+            state,
+            combined_map_observer,
+            PowerSchedule::new(config.power_schedule),
+        ),
+    )
 }
 
 fn parse_api_spec(config: &&'static Configuration) -> Result<OpenAPI, anyhow::Error> {
@@ -358,7 +353,7 @@ type EndpointFeedback<'a> = MaxMapFeedback<EndpointObserver<'a>, StdMapObserver<
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
-fn setup_endpoint_coverage<'a, S: HasNamedMetadata + HasExecutions, EM: EventFirer<I, S>, I>(
+fn setup_endpoint_coverage<'a>(
     api: OpenAPI,
 ) -> core::result::Result<
     (
