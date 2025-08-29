@@ -16,7 +16,7 @@ use libafl::{
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::ExitKind,
     feedback_or,
-    feedbacks::{CrashFeedback, CrashLogic, ExitKindFeedback, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, StateInitializer, TimeFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, MultiMapObserver, StdMapObserver, TimeObserver},
@@ -42,9 +42,8 @@ use crate::{
     openapi_mutator::havoc_mutations_openapi,
     state::OpenApiFuzzerState,
     types::{
-        CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
-        LineCovClientObserverFeedbackType, LineCovFeedbackType, LineCovObserverType,
-        ObserversTupleType, OpenApiFuzzerStateType, SchedulerType,
+        CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
+        LineCovClientObserverFeedbackType, LineCovFeedbackType, LineCovObserverType, OpenApiFuzzerStateType, SchedulerType,
     },
 };
 
@@ -58,7 +57,7 @@ pub fn fuzz() -> Result<()> {
     let report_path = config.report.then(generate_report_path);
     let api = parse_api_spec(config)?;
     let mut mgr = construct_event_mgr();
-
+    let mut objective = CrashFeedback::new();
     let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 
     // Initialize corpus normally.
@@ -70,13 +69,27 @@ pub fn fuzz() -> Result<()> {
 
     let (
         mut endpoint_coverage_client,
+        endpoint_coverage_observer,
+        endpoint_coverage_feedback,
         mut code_coverage_client,
-        objective,
-        mut state,
-        collective_observer,
-        collective_feedback,
-        calibration,
-    ) = construct_observers_state(config, &report_path, &api, initial_corpus)?;
+        code_coverage_observer,
+        code_coverage_feedback,
+        combined_map_observer,
+        time_observer,
+    ) = construct_observers(config, &report_path, &api)?;
+
+    let calibration = CalibrationStage::new(&code_coverage_feedback);
+    let mut collective_feedback = feedback_or!(
+        endpoint_coverage_feedback,
+        code_coverage_feedback,
+        TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
+    );
+    let collective_observer = tuple_list!(
+        code_coverage_observer,
+        endpoint_coverage_observer,
+        combined_map_observer,
+        time_observer
+    );
 
     let combined_map_observer: CombinedMapObserverType<'_> =
         MultiMapObserver::new("all_maps", unsafe {
@@ -93,10 +106,15 @@ pub fn fuzz() -> Result<()> {
         })
         .track_indices();
 
+    let mut state = construct_state(&api, initial_corpus)?;
+
     let scheduler = construct_scheduler(config, &mut state, &combined_map_observer);
 
     let minimizer: MapCorpusMinimizer<_, _, _, _, _, _, CorpusPowerTestcaseScore> =
         MapCorpusMinimizer::new(&combined_map_observer);
+
+    collective_feedback.init_state(&mut state)?;
+    objective.init_state(&mut state)?;
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
@@ -193,64 +211,6 @@ pub fn fuzz() -> Result<()> {
     Ok(())
 }
 
-fn construct_observers_state<'a>(
-    config: &&'static Configuration,
-    report_path: &Option<PathBuf>,
-    api: &OpenAPI,
-    initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
-) -> Result<
-    (
-        Arc<Mutex<EndpointCoverageClient>>,
-        Box<dyn CoverageClient>,
-        ExitKindFeedback<CrashLogic>,
-        OpenApiFuzzerStateType,
-        ObserversTupleType<'a>,
-        CombinedFeedbackType<'a>,
-        CalibrationStage<
-            LineCovObserverType<'a>,
-            OpenApiInput,
-            StdMapObserver<'a, u8, false>,
-            ObserversTupleType<'a>,
-            OpenApiFuzzerStateType,
-        >,
-    ),
-    anyhow::Error,
-> {
-    let (
-        endpoint_coverage_client,
-        endpoint_coverage_observer,
-        endpoint_coverage_feedback,
-        code_coverage_client,
-        code_coverage_observer,
-        code_coverage_feedback,
-        combined_map_observer,
-        time_observer,
-    ) = construct_observers(config, report_path, api)?;
-    let calibration = CalibrationStage::new(&code_coverage_feedback);
-    let (collective_feedback, objective, state) = construct_state(
-        api,
-        initial_corpus,
-        endpoint_coverage_feedback,
-        code_coverage_feedback,
-        &time_observer,
-    )?;
-    let collective_observer = tuple_list!(
-        code_coverage_observer,
-        endpoint_coverage_observer,
-        combined_map_observer,
-        time_observer
-    );
-    Ok((
-        endpoint_coverage_client,
-        code_coverage_client,
-        objective,
-        state,
-        collective_observer,
-        collective_feedback,
-        calibration,
-    ))
-}
-
 fn construct_observers<'a>(
     config: &&'static Configuration,
     report_path: &Option<PathBuf>,
@@ -297,27 +257,11 @@ fn construct_observers<'a>(
     ))
 }
 
-fn construct_state<'a>(
+fn construct_state(
     api: &OpenAPI,
     initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
-    endpoint_coverage_feedback: EndpointFeedbackType<'a>,
-    code_coverage_feedback: LineCovFeedbackType<'a>,
-    time_observer: &TimeObserver,
-) -> Result<
-    (
-        CombinedFeedbackType<'a>,
-        ExitKindFeedback<CrashLogic>,
-        OpenApiFuzzerStateType,
-    ),
-    anyhow::Error,
-> {
-    let mut collective_feedback = feedback_or!(
-        endpoint_coverage_feedback,
-        code_coverage_feedback,
-        TimeFeedback::new(time_observer), // Time feedback, this one does not need a feedback state
-    );
-    let mut objective = CrashFeedback::new();
-    let state: OpenApiFuzzerStateType = OpenApiFuzzerState::new(
+) -> Result<OpenApiFuzzerStateType, anyhow::Error> {
+    let state = OpenApiFuzzerState::new_uninit(
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
@@ -325,13 +269,9 @@ fn construct_state<'a>(
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-        // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        &mut collective_feedback,
-        &mut objective,
         api.clone(),
     )?;
-    Ok((collective_feedback, objective, state))
+    Ok(state)
 }
 
 fn construct_scheduler<'a>(

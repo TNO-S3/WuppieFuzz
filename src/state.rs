@@ -361,6 +361,34 @@ where
         objective.init_state(&mut state)?;
         Ok(state)
     }
+
+    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
+    pub fn new_uninit(rand: R, corpus: C, solutions: SC, api: OpenAPI) -> Result<Self, Error>
+    where
+        C: Serialize + DeserializeOwned,
+        SC: Serialize + DeserializeOwned,
+    {
+        let mut state = Self {
+            rand,
+            executions: 0,
+            stop_requested: false,
+            start_time: Duration::from_millis(0),
+            metadata: SerdeAnyMap::default(),
+            named_metadata: NamedSerdeAnyMap::default(),
+            corpus,
+            solutions,
+            max_size: libafl::state::DEFAULT_MAX_SIZE,
+            #[cfg(feature = "std")]
+            remaining_initial_files: None,
+            phantom: PhantomData,
+            api,
+            current_stage: None,
+            current_corpus_id: None,
+            last_found_time: Duration::default(),
+        };
+        state.add_metadata(SchedulerMetadata::new(None));
+        Ok(state)
+    }
 }
 
 // Necessary because of borrow checking conflicts
