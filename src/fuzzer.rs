@@ -286,7 +286,6 @@ fn construct_observers(
             ]
         })
         .track_indices();
-    let time_observer = TimeObserver::new("time");
     Ok((
         endpoint_coverage_client,
         endpoint_coverage_observer,
@@ -295,20 +294,20 @@ fn construct_observers(
         code_coverage_observer,
         code_coverage_feedback,
         combined_map_observer,
-        time_observer,
+        TimeObserver::new("time"),
     ))
 }
 
 fn construct_state(
     api: &OpenAPI,
-    initial_corpus: libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+    initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
     endpoint_coverage_feedback: EndpointFeedbackType<'static>,
     code_coverage_feedback: LineCovFeedbackType<'static>,
     time_observer: &TimeObserver,
 ) -> Result<
     (
         CombinedFeedbackType<'static>,
-        libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
+        ExitKindFeedback<CrashLogic>,
         OpenApiFuzzerStateType,
     ),
     anyhow::Error,
