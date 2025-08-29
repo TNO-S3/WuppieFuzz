@@ -30,8 +30,8 @@ use self::{
     toposort::{Cycle, toposort},
 };
 use crate::{
-    initial_corpus::dependency_graph::normalize::ReqResp,
-    input::{Method, OpenApiInput, ParameterContents, parameter::ParameterKind},
+    initial_corpus::dependency_graph::normalize::path_context_component,
+    input::{OpenApiInput, ParameterContents},
     openapi::{
         QualifiedOperation,
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
@@ -155,19 +155,6 @@ fn add_references_to_openapi_input(
             };
         }
     }
-}
-
-/// Find the context of a request from the path.
-///
-/// For a path like /albums/artist/{artist_id}, you get albums, so the answer is albums.
-/// For a path like /albums/{album_id}/songs, you get songs, so the answer is songs.
-/// This function chooses splits the path at {parameters}, and from the last section
-/// chooses the first component.
-fn path_context_component(path: &str) -> Option<String> {
-    path.rsplit('}')
-        .flat_map(|series| series.split('/'))
-        .map(|x| x.to_owned())
-        .find(|component| !component.is_empty() && !component.starts_with('{'))
 }
 
 type DepGraph<'a> = DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx>;
@@ -351,7 +338,7 @@ impl Display for DependencyGraph<'_> {
                 self.graph[edge.source()].method,
                 self.graph[edge.source()].path,
                 edge.weight().output_access,
-                edge.weight().normalized,
+                edge.weight().input_name_normalized,
                 edge.weight().input_access,
                 self.graph[edge.target()].method,
                 self.graph[edge.target()].path,
@@ -383,7 +370,7 @@ fn find_links<'a>(
                     .clone()
                     .unwrap_response(),
                 input_access: input.parameter_access.clone().unwrap_request(),
-                normalized: input.normalized.clone(),
+                input_name_normalized: input.normalized.clone(),
             })
         })
         .collect()
@@ -401,6 +388,7 @@ fn inout_params<'a>(
         .responses
         .responses
         .iter()
+        // TODO: decide whether to really remove the status_is_2xx (in that case also remove that function)
         // .filter(|(status_code, _)| status_is_2xx(status_code))
         .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
         .filter_map(|response| normalize_response(api, response, path_context_component(op.path)))
@@ -423,13 +411,20 @@ fn inout_params<'a>(
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
         .find_map(|body| normalize_request_body(api, body, path_context_component(op.path)))
         .unwrap_or_default();
+    // TODO: using an input parameter as an output causes problems for the new, stricter distinction
+    // between requests and responses in e.g. ParameterAccess. Might it be cleaner to simply set
+    // input parameters to the same value where appropriate? This "input-linking" would still need
+    // to be done separately then though. If the below is removed, remember to update the comment above.
+
     // if op.method == Method::Post {
     //     output_fields.extend(body_fields.clone());
     // }
-    input_fields.extend(body_fields.into_iter());
+    input_fields.extend(body_fields);
 
     (input_fields, output_fields)
 }
+
+// TODO: remove the status_is_2xx function if non-2xx responses are really going to be considered for backrefs.
 
 /// Checks if a StatusCode is 2XX
 fn status_is_2xx(status_code: &StatusCode) -> bool {

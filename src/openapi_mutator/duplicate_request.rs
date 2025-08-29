@@ -78,7 +78,7 @@ mod test {
 
     use super::DuplicateRequestMutator;
     use crate::{
-        input::{OpenApiInput, parameter::ParameterKind},
+        input::OpenApiInput,
         openapi_mutator::test_helpers::{linked_requests, simple_request},
         parameter_access::RequestParameterAccess,
         state::tests::TestOpenApiFuzzerState,

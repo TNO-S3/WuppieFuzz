@@ -11,8 +11,7 @@ use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
 use crate::parameter_access::{
-    ParameterAccess, ParameterAccessElement, ParameterAccessElements, RequestParameterAccess,
-    ResponseParameterAccess,
+    ParameterAccess, ParameterAccessElement, ParameterAccessElements, ResponseParameterAccess,
 };
 
 use super::utils::new_rand_input;
@@ -105,54 +104,6 @@ pub enum ParameterContents {
 }
 
 impl ParameterContents {
-    // pub fn get_mut_parameter(
-    //     &mut self,
-    //     parameter_access: RequestParameterAccess,
-    // ) -> Option<&mut ParameterContents> {
-    //     match parameter_access {
-    //         RequestParameterAccess::Body(parameter_access_elements) => {
-    //             if let Some((element, tail)) = parameter_access_elements.0.split_first() {
-    //                 match self {
-    //                     ParameterContents::Object(btree_map) => {
-    //                         if let ParameterAccessElement::Name(name) = element {
-    //                             let nested = btree_map.get_mut(name)?;
-    //                             if tail.len() > 0 {
-    //                                 nested.get_mut_parameter(RequestParameterAccess::Body(
-    //                                     tail.into(),
-    //                                 ))
-    //                             } else {
-    //                                 Some(nested)
-    //                             }
-    //                         } else {
-    //                             None
-    //                         }
-    //                     }
-    //                     ParameterContents::Array(items) => {
-    //                         if let ParameterAccessElement::Offset(index) = element {
-    //                             let nested = items.get_mut(*index)?;
-    //                             if tail.len() > 0 {
-    //                                 nested.get_mut_parameter(RequestParameterAccess::Body(
-    //                                     tail.into(),
-    //                                 ))
-    //                             } else {
-    //                                 Some(nested)
-    //                             }
-    //                         } else {
-    //                             None
-    //                         }
-    //                     }
-    //                     ParameterContents::LeafValue(_)
-    //                     | ParameterContents::Bytes(_)
-    //                     | ParameterContents::Reference { .. } => None,
-    //                 }
-    //             } else {
-    //                 Some(self)
-    //             }
-    //         }
-    //         _ => None,
-    //     }
-    // }
-
     /// Returns whether the `ParameterContents` is the `reference` variant.
     pub fn is_reference(&self) -> bool {
         matches!(self, ParameterContents::Reference { .. })
@@ -356,7 +307,7 @@ impl From<Value> for ParameterContents {
             Value::Object(content) => Self::Object(
                 content
                     .into_iter()
-                    .map(|(key, val)| (key.into(), ParameterContents::from(val)))
+                    .map(|(key, val)| (key, ParameterContents::from(val)))
                     .collect(),
             ),
         }

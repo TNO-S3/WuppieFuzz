@@ -12,10 +12,8 @@
 use openapiv3::{
     MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, Schema, SchemaKind,
 };
-use porter_stemmer::stem;
 
 use crate::{
-    initial_corpus::dependency_graph::path_context_component,
     openapi::JsonContent,
     parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
 };
@@ -51,16 +49,37 @@ impl ParameterNormalization {
     ///
     /// TODO: make clear decisions how about exact meaning of context and document this.
     pub fn new(name: String, context: Option<String>, parameter_access: ParameterAccess) -> Self {
-        // let normal_name = nested_access
-        //     .elements
-        //     .last()
-        //     .unwrap_or(&ParameterAccessElement::Name("".to_owned()))
-        //     .to_string();
-        Self {
-            normalized: stem(&name),
-            name,
-            context,
-            parameter_access,
+        match context {
+            Some(ref context) => {
+                // Catch the case where the context word is also included in the name,
+                // like `widget_id` for context `widgets`. Often, this same value is then
+                // called `id` in other context, such as when part of a `Widget` object
+                // in a body.
+                let last = name.len() - 1;
+                let no_context_name = if let Some(i) = name.find(['-', '_'])
+                    && (i != 0 && i != last && stem(context) == stem(&name[..i]))
+                {
+                    &name[i + 1..]
+                } else if ["id", "Id", "ID"].iter().any(|id| name.ends_with(id))
+                    && stem(context) == stem(&name[..name.len() - 2])
+                {
+                    "id"
+                } else {
+                    &name
+                };
+                Self {
+                    normalized: stem(context) + "|" + &stem(no_context_name),
+                    name,
+                    context: Some(context.to_string()),
+                    parameter_access,
+                }
+            }
+            None => Self {
+                normalized: stem(&name),
+                name,
+                context,
+                parameter_access,
+            },
         }
     }
 }
@@ -94,7 +113,7 @@ fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalizat
         // stem('resource') + "id"
         openapiv3::ParameterKind::Query { .. } => {
             return ParameterNormalization::new(
-                parameter.data.name.clone().into(),
+                parameter.data.name.clone(),
                 path_context_component(path),
                 ParameterAccess::request_query(parameter.data.name.clone()),
             );
@@ -108,7 +127,7 @@ fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalizat
         openapiv3::ParameterKind::Path { .. } => {
             if let Some(end) = path.find(&format!("/{{{}}}", parameter.data.name)) {
                 return ParameterNormalization::new(
-                    parameter.data.name.clone().into(),
+                    parameter.data.name.clone(),
                     path_context_component(&path[..end]),
                     ParameterAccess::request_path(parameter.data.name.clone()),
                 );
@@ -124,6 +143,7 @@ fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalizat
     // ParameterNormalization::new(parameter.data.name.clone().into(), None)
 
     // NEW: We are lost at this point, we NEED a ParameterAccess. Just panic for now.
+    // TODO: find a solution
     panic!("Could not normalize parameter {:?}", parameter.data.name)
 }
 
@@ -145,7 +165,7 @@ pub fn normalize_response<'a>(
         context.clone(),
         ReqResp::Resp,
     );
-    log::warn!("Context:\n{:?}\nNormalized:\n{:?}", context, result);
+    log::warn!("Context:\n{context:?}\nNormalized:\n{result:?}");
     result
 }
 
@@ -164,31 +184,12 @@ pub fn normalize_request_body<'a>(
     normalize_media_type(api, body.content.get_json_content()?, context, ReqResp::Req)
 }
 
-/// MediaType is the internal type used for objects, both input (POST) and
-/// output (GET). This function normalizes the field names.
-fn normalize_media_type<'a>(
-    api: &'a OpenAPI,
-    media_type: &'a MediaType,
-    context: Option<String>,
-    req_resp: ReqResp,
-) -> Option<Vec<ParameterNormalization>> {
-    let schema = media_type.schema.as_ref()?.resolve(api);
-    let access = match req_resp {
-        ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
-        ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
-    };
-    log::error!("ACCESS: {:?}", access);
-    normalize_schema(
-        api, schema, context, // req_resp,
-        access,
-    )
-}
-
+/// Schema describes contents of objects and arrays. This function normalizes field
+/// names in a schema if it contains an object or an array of objects.
 fn normalize_schema<'a>(
     api: &'a OpenAPI,
     schema: &'a Schema,
     context: Option<String>,
-    // req_resp: ReqResp,
     access: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
     match &schema.kind {
@@ -210,23 +211,18 @@ fn normalize_schema<'a>(
             // enclosing object/array is still included.
             Some(vec![])
         }
-        openapiv3::SchemaKind::AllOf { all_of } => {
+        openapiv3::SchemaKind::AllOf { all_of } if all_of.len() == 1 => {
             // If only a single property is in this AllOf, return an example from it.
-            if all_of.len() == 1 {
-                normalize_schema(api, all_of[0].resolve(api), context, access)
-            } else {
-                log::warn!(concat!(
-                    "Normalizing example parameters for the allOf keyword with more than one schema is not supported. ",
-                    "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
-                ));
-                None
-            }
+            normalize_schema(api, all_of[0].resolve(api), context, access)
         }
         openapiv3::SchemaKind::Any(_) => {
             log::warn!(
                 "Normalizing example parameters for this schema is not supported, it's too flexible."
             );
             None
+        }
+        SchemaKind::AnyOf { any_of } if any_of.len() == 1 => {
+            normalize_schema(api, any_of[0].resolve(api), context, access)
         }
         openapiv3::SchemaKind::Not { not: _ } => {
             log::warn!(concat!(
@@ -237,6 +233,22 @@ fn normalize_schema<'a>(
         }
         _ => None,
     }
+}
+
+/// MediaType is the internal type used for objects, both input (POST) and
+/// output (GET). This function normalizes the field names.
+fn normalize_media_type<'a>(
+    api: &'a OpenAPI,
+    media_type: &'a MediaType,
+    context: Option<String>,
+    req_resp: ReqResp,
+) -> Option<Vec<ParameterNormalization>> {
+    let schema = media_type.schema.as_ref()?.resolve(api);
+    let access = match req_resp {
+        ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
+        ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
+    };
+    normalize_schema(api, schema, context, access)
 }
 
 fn normalize_object_type<'a>(
@@ -270,6 +282,23 @@ fn normalize_object_type<'a>(
         .collect()
 }
 
+/// Find the context of a request from the path.
+///
+/// For a path like /albums/artist/{artist_id}, you get albums, so the answer is albums.
+/// For a path like /albums/{album_id}/songs, you get songs, so the answer is songs.
+/// This function chooses splits the path at {parameters}, and from the last section
+/// chooses the first component.
+pub(crate) fn path_context_component(path: &str) -> Option<String> {
+    path.rsplit('}')
+        .flat_map(|series| series.split('/'))
+        .map(|x| x.to_owned())
+        .find(|component| !component.is_empty() && !component.starts_with('{'))
+}
+
+fn stem(name: &str) -> String {
+    porter_stemmer::stem(name).to_lowercase()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,60 +308,80 @@ mod tests {
     // fn test_parameter_normalization_new() {
     //     assert_eq!(
     //         ParameterNormalization {
-    //             name: "widget".into(),
+    //             name: "widget",
     //             normalized: "widget".into(),
-    //             parameter_access: ParameterAccess::request_query("test".to_string()),
-    //             ..Default::default()
     //         },
-    //         ParameterNormalization::new("widget".into(), None)
+    //         ParameterNormalization::new("widget", None)
     //     );
     //     assert_eq!(
     //         ParameterNormalization {
-    //             name: "widgets".into(),
+    //             name: "widgets",
     //             normalized: "widget".into(),
-    //             ..Default::default()
     //         },
-    //         ParameterNormalization::new("widgets".into(), None)
+    //         ParameterNormalization::new("widgets", None)
     //     );
     //     assert_eq!(
     //         ParameterNormalization {
-    //             name: "widget".into(),
+    //             name: "widget",
     //             normalized: "aircraft|widget".into(),
-    //             ..Default::default()
     //         },
-    //         ParameterNormalization::new("widget".into(), Some("aircraft".to_owned()))
+    //         ParameterNormalization::new("widget", Some("aircraft"))
     //     );
     //     assert_eq!(
     //         ParameterNormalization {
-    //             name: "widget".into(),
+    //             name: "widget",
     //             normalized: "aircraft|widget".into(),
-    //             ..Default::default()
     //         },
-    //         ParameterNormalization::new("widget".into(), Some("aircrafts".to_owned()))
+    //         ParameterNormalization::new("widget", Some("aircrafts"))
     //     );
     //     assert_eq!(
     //         ParameterNormalization {
-    //             name: "country_id".into(),
+    //             name: "country_id",
     //             normalized: "countri|id".into(),
-    //             ..Default::default()
     //         },
-    //         ParameterNormalization::new("country_id".into(), Some("countries".to_owned()))
+    //         ParameterNormalization::new("country_id", Some("countries"))
     //     );
     //     assert_eq!(
     //         ParameterNormalization {
-    //             name: "id".into(),
+    //             name: "id",
     //             normalized: "countri|id".into(),
-    //             ..Default::default()
     //         },
-    //         ParameterNormalization::new("id".into(), Some("countries".to_owned()))
+    //         ParameterNormalization::new("id", Some("countries"))
     //     );
     //     assert_eq!(
     //         ParameterNormalization {
-    //             name: "widget_id".into(),
+    //             name: "widget_id",
     //             normalized: "countri|widget_id".into(),
-    //             ..Default::default()
     //         },
-    //         ParameterNormalization::new("widget_id".into(), Some("countries".to_owned()))
+    //         ParameterNormalization::new("widget_id", Some("countries"))
+    //     );
+    //     assert_eq!(
+    //         ParameterNormalization {
+    //             name: "pet-id",
+    //             normalized: "pet|id".into(),
+    //         },
+    //         ParameterNormalization::new("pet-id", Some("pets"))
+    //     );
+    //     assert_eq!(
+    //         ParameterNormalization {
+    //             name: "petId",
+    //             normalized: "pet|id".into(),
+    //         },
+    //         ParameterNormalization::new("petId", Some("pets"))
+    //     );
+    //     assert_eq!(
+    //         ParameterNormalization {
+    //             name: "petid",
+    //             normalized: "pet|id".into(),
+    //         },
+    //         ParameterNormalization::new("petid", Some("pet"))
+    //     );
+    //     assert_eq!(
+    //         ParameterNormalization {
+    //             name: "PetID",
+    //             normalized: "pet|id".into(),
+    //         },
+    //         ParameterNormalization::new("PetID", Some("pet"))
     //     );
     // }
 

@@ -29,12 +29,25 @@ pub fn load_starting_corpus(
 ) -> Result<Vec<OpenApiInput>, Box<dyn std::error::Error>> {
     let mut corpus_vec = vec![];
     for file in fs::read_dir(corpus_dir)? {
-        let file = file?.path();
-        match serde_yaml::from_reader(std::fs::File::open(file)?) {
-            Ok(input) => corpus_vec.push(input),
-            Err(err) => return Err(err.into()),
+        let file = file?;
+        let file_name = file.file_name();
+        let file_name_str = file_name
+            .to_str()
+            .expect("Invalid utf-8 encountered in filenames in the corpus directory");
+        match file_name_str.starts_with('.') {
+            true => log::debug!("File {file_name_str} is ignored as it starts with a '.'"),
+            false => {
+                let file = file.path();
+                match serde_yaml::from_reader(std::fs::File::open(&file)?) {
+                    Ok(input) => corpus_vec.push(input),
+                    Err(err) => log::warn!("File {file_name_str} could not be parsed: {err:?}"),
+                }
+            }
         }
     }
+    if corpus_vec.is_empty() {
+        return Err("Zero seeds loaded from corpus directory.".into());
+    };
     Ok(corpus_vec)
 }
 
@@ -94,13 +107,18 @@ pub fn initialize_corpus(
     match initial_corpus_path {
         Some(initial_corpus_path) => {
             log::info!("Filling corpus from file: {initial_corpus_path:?}");
-            fill_corpus_from_file(&mut corpus, initial_corpus_path)
+            match fill_corpus_from_file(&mut corpus, initial_corpus_path) {
+                Ok(_) => return corpus,
+                Err(err) => log::error!(
+                    "Error loading initial corpus, will generate random inputs instead: {err}"
+                ),
+            }
         }
         None => {
             log::info!("No corpus supplied, generating one based on the API");
-            fill_corpus_from_api(&mut corpus, api, report_path)
         }
     }
+    fill_corpus_from_api(&mut corpus, api, report_path);
     corpus
 }
 
@@ -162,23 +180,18 @@ fn write_corpus_report(input_vector: &[OpenApiInput], report_path: &Path) -> std
 fn fill_corpus_from_file(
     corpus: &mut InMemoryOnDiskCorpus<OpenApiInput>,
     initial_corpus_path: &Path,
-) {
-    match load_starting_corpus(initial_corpus_path) {
-        Ok(inputs) => {
-            print_starting_corpus(initial_corpus_path);
-            for input in inputs {
-                let mut testcase = Testcase::new(input);
-                testcase.add_metadata(SchedulerTestcaseMetadata::new(0));
-                match corpus.add(testcase) {
-                    Ok(_) => (),
-                    Err(e) => log::warn!("Could not add testcase to corpus, omitting. {e:?}"),
-                }
-            }
+) -> Result<(), Box<dyn std::error::Error>> {
+    let inputs = load_starting_corpus(initial_corpus_path)?;
+    print_starting_corpus(initial_corpus_path);
+    for input in inputs {
+        let mut testcase = Testcase::new(input);
+        testcase.add_metadata(SchedulerTestcaseMetadata::new(0));
+        match corpus.add(testcase) {
+            Ok(_) => (),
+            Err(e) => log::warn!("Could not add testcase to corpus, omitting. {e:?}"),
         }
-        Err(err) => {
-            log::warn!("Error loading initial corpus, will generate random inputs instead: {err}")
-        }
-    };
+    }
+    Ok(())
 }
 
 fn fill_corpus_from_api(

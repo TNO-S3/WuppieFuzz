@@ -62,7 +62,7 @@ fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<Paramet
                 .iter()
                 .filter_map(|(param, ref_or_schema)| {
                     Some((
-                        param.clone().into(),
+                        param.clone(),
                         ParameterContents::from(example_from_schema(
                             api,
                             ref_or_schema.resolve(api),
@@ -107,12 +107,11 @@ fn all_interesting_body_contents(
         .or_else(|| body.content.get_json_content())
         .or_else(|| body.content.get_www_form_content())?;
 
-    Some(
-        interesting_params_from_media_type(api, media_type)
-            .into_iter()
-            .map(ParameterContents::from)
-            .collect(),
-    )
+    let values = interesting_params_from_media_type(api, media_type);
+    if values.is_empty() {
+        return None;
+    }
+    Some(values.into_iter().map(ParameterContents::from).collect())
 }
 
 /// Create an example body from an operation. This function is meant for requests that do
@@ -162,7 +161,7 @@ fn example_parameters(
             example_parameter_value(api, par_data)
                 .map(|value| {
                     (
-                        (par_data.name.clone().into(), par_kind),
+                        (par_data.name.clone(), par_kind),
                         ParameterContents::from(value),
                     )
                 })
@@ -231,7 +230,7 @@ fn all_interesting_parameters(
                 .into_iter()
                 .map(ParameterContents::from)
                 .collect();
-            ((par_data.name.clone().into(), par_kind), possible_values)
+            ((par_data.name.clone(), par_kind), possible_values)
         })
         .collect();
 
@@ -895,6 +894,9 @@ pub fn openapi_inputs_from_ops<'a>(
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)
         })
         .collect();
+
+    assert_eq!(sorted_nodes.len(), concrete_requests.len());
+
     // deduplicate_same_reference_requests(&mut concrete_requests, &subgraph, &sorted_nodes);
     let total_combinations: usize = concrete_requests
         .iter()
@@ -934,6 +936,9 @@ pub fn openapi_inputs_from_ops<'a>(
             assert_eq!(chain.len(), chain_len);
         }
     }
+    for chain in &all_chains {
+        assert_eq!(chain.len(), sorted_nodes.len());
+    }
     Ok(all_chains.into_iter().map(OpenApiInput).collect())
 }
 
@@ -946,7 +951,7 @@ fn all_interesting_inputs_for_qualified_operation(
     // There may be multiple parameters, create an OpenApiRequest for each combination
     // of interesting values for these parameters.
     let combinations = all_interesting_parameters(operation.operation, api, single_valued);
-    if combinations.is_empty() {
+    let rv = if combinations.is_empty() {
         // There are no parameters, return the interesting bodies.
         match all_interesting_body_contents(api, operation.operation) {
             Some(bodies) => bodies
@@ -987,5 +992,7 @@ fn all_interesting_inputs_for_qualified_operation(
                 })
                 .collect(),
         }
-    }
+    };
+    assert_ne!(rv.len(), 0);
+    rv
 }

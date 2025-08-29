@@ -52,8 +52,8 @@ where
         // Build a list of (x, y),
         // x is the request index for which the response contains a parameter y
         // y is the parameter name
-        let request_index_and_parameter_name_pairs = input.return_values(api);
-        if request_index_and_parameter_name_pairs.is_empty() {
+        let request_index_and_parameter_access_pairs = input.return_values(api);
+        if request_index_and_parameter_access_pairs.is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
@@ -67,7 +67,7 @@ where
             // parameters
             .flat_map(|(current_request_index, request)| {
                 let request_index_and_parameter_name_pairs =
-                    &request_index_and_parameter_name_pairs; // allow the move|| later on
+                    &request_index_and_parameter_access_pairs; // allow the move|| later on
                 request
                     .parameters
                     .iter_mut()
@@ -103,8 +103,8 @@ where
 
         // Make the link
         *random_link.0 = ParameterContents::Reference {
-            request_index: request_index_and_parameter_name_pairs[random_link.1].0,
-            parameter_access: request_index_and_parameter_name_pairs[random_link.1]
+            request_index: request_index_and_parameter_access_pairs[random_link.1].0,
+            parameter_access: request_index_and_parameter_access_pairs[random_link.1]
                 .1
                 .to_owned(),
         };

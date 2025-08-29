@@ -122,11 +122,11 @@ impl ParameterFeedback {
                 field,
             ),
             Err(e) => {
-                log::trace!("Error parsing response: {:?}", e);
+                log::trace!("Error parsing response: {e:?}");
             }
         }
         // We also record the values of any Set-Cookie headers
-        // TODO: parse cookies in validate_response.rs to also treat them as non-String types
+        // TODO: try to parse cookies in validate_response.rs to also treat them as non-String types?
         for (name, value) in response.cookies() {
             self.add_response_parameter(
                 request_index,

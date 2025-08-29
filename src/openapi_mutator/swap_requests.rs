@@ -85,7 +85,7 @@ mod test {
 
     use super::SwapRequestsMutator;
     use crate::{
-        input::{Method, parameter::ParameterKind},
+        input::Method,
         openapi_mutator::test_helpers::{linked_requests, simple_request},
         parameter_access::RequestParameterAccess,
         state::tests::TestOpenApiFuzzerState,

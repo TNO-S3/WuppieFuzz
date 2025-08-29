@@ -70,9 +70,7 @@ use openapiv3::{OpenAPI, Operation};
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
 use crate::{
-    parameter_access::{
-        ParameterAccess, ParameterAccessElements, RequestParameterAccess, ResponseParameterAccess,
-    },
+    parameter_access::{ParameterAccessElements, RequestParameterAccess, ResponseParameterAccess},
     parameter_feedback::ParameterFeedback,
     state::HasRandAndOpenAPI,
 };
@@ -305,7 +303,7 @@ impl OpenApiRequest {
                 // For getting named parameters, we consider only first-level parameters in object values
                 // TODO: implement a way to address nested parameters and non-object parameters.
                 Body::ApplicationJson(parameters) | Body::XWwwFormUrlencoded(parameters) => {
-                    parameters.resolve_mut(&parameter_access)
+                    parameters.resolve_mut(parameter_access)
                 }
             },
             RequestParameterAccess::Query(name)
@@ -541,7 +539,7 @@ impl OpenApiInput {
                 // request no longer has the reference parameter accessible.
                 // We do not have the response available at this point, so we cannot check whether
                 // the reference will actually be resolvable when we get the response.
-                |(src_idx, src_parameter_access, target_idx, target_parameter_access)| match (
+                |(src_idx, src_parameter_access, target_idx, _target_parameter_access)| match (
                     self.0.clone().get_mut(*src_idx),
                     self.0.clone().get(*target_idx),
                 ) {
@@ -565,9 +563,9 @@ impl OpenApiInput {
                         }
                         Body::ApplicationJson(contents) | Body::XWwwFormUrlencoded(contents) => {
                             match contents {
-                                ParameterContents::Object(obj_param) => {
+                                ParameterContents::Object(_obj_param) => {
                                     let resolved =
-                                        contents.resolve_mut(&parameter_access_elements).unwrap();
+                                        contents.resolve_mut(parameter_access_elements).unwrap();
                                     resolved.break_reference_if_target(rand, |_| true);
                                 }
                                 // Note that a Reference parameter is not by itself named, but must be the value in an Object parameter.
@@ -712,7 +710,7 @@ where
         // Keep only concrete values and valid references
         .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
         // Convert to (parameter_name, parameter_kind) tuples
-        .map(|param| (param.data.name.clone().into(), param.into()))
+        .map(|param| (param.data.name.clone(), param.into()))
         .map(|(name, kind)| {
             let key = (name, kind);
             // Remove *AND RETURN*, meaning we *keep* the parameter for this key

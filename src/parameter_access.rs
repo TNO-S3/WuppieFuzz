@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
 };
 
-use openapiv3::{Response, Schema};
+use openapiv3::Schema;
 use serde::{Deserialize, Serialize};
 
 use crate::input::parameter::ParameterKind;
@@ -65,8 +65,7 @@ impl ParameterAccessElements {
     }
 
     pub fn from_elements(elements: Vec<ParameterAccessElement>) -> Self {
-        let result = Self(elements.clone());
-        result
+        Self(elements.clone())
     }
 
     pub fn parameter_accesses_from_schema(
@@ -100,14 +99,6 @@ impl ParameterAccessElements {
         elements.push(new_element);
         Self::from_elements(elements)
     }
-
-    pub fn into_parameter_name(&self) -> &str {
-        if let ParameterAccessElement::Name(name) = &self.0[0] {
-            name
-        } else {
-            todo!("Need to decide on how to handle invalid conversion to parameter name")
-        }
-    }
 }
 
 impl Display for ParameterAccessElements {
@@ -139,12 +130,6 @@ pub enum ResponseParameterAccess {
 }
 
 impl ResponseParameterAccess {
-    fn simple_name(&self) -> &str {
-        match self {
-            Self::Body(_) => "",
-            Self::Cookie(name) => &name,
-        }
-    }
     pub fn get_body_access_elements(&self) -> Option<&ParameterAccessElements> {
         if let Self::Body(elements) = self {
             Some(elements)
@@ -159,7 +144,7 @@ impl Display for ResponseParameterAccess {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ResponseParameterAccess::Body(parameter_access) => parameter_access.fmt(f),
-            ResponseParameterAccess::Cookie(value) => write!(f, "{}", value),
+            ResponseParameterAccess::Cookie(value) => write!(f, "{value}"),
         }
     }
 }
@@ -177,7 +162,7 @@ impl RequestParameterAccess {
     pub fn simple_name(&self) -> &str {
         match self {
             Self::Body(_) => "",
-            Self::Query(name) | Self::Path(name) | Self::Header(name) | Self::Cookie(name) => &name,
+            Self::Query(name) | Self::Path(name) | Self::Header(name) | Self::Cookie(name) => name,
         }
     }
 
@@ -216,7 +201,7 @@ impl Display for RequestParameterAccess {
             RequestParameterAccess::Query(value)
             | RequestParameterAccess::Path(value)
             | RequestParameterAccess::Header(value)
-            | RequestParameterAccess::Cookie(value) => write!(f, "{}", value),
+            | RequestParameterAccess::Cookie(value) => write!(f, "{value}"),
         }
     }
 }
@@ -234,7 +219,7 @@ impl From<&RequestParameterAccess> for ParameterKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ParameterAccess {
+pub enum ParameterAccess {
     Request(RequestParameterAccess),
     Response(ResponseParameterAccess),
 }
@@ -298,12 +283,11 @@ impl ParameterAccess {
     }
 }
 
-/// A parameter name saved in two variants: the canonical name appearing as the
-/// output parameter in the spec, the canonical name appearing as the input parameter
-/// in the spec.
+/// A matching between an output- and input parameter that represents a link between these,
+/// indicating that the input parameter could contain a backreference to the output parameter.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParameterMatching {
     pub(crate) output_access: ResponseParameterAccess,
     pub(crate) input_access: RequestParameterAccess,
-    pub(crate) normalized: String,
+    pub(crate) input_name_normalized: String,
 }

@@ -43,10 +43,10 @@ backtrace 0.3.75
 base64 0.22.1
 	licensed under "Apache-2.0 OR MIT"
 	by Marshall Pierce <marshall@mpierce.org>
-bitflags 2.9.1
+bitflags 2.9.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-build_html 2.6.0
+build_html 2.7.0
 	licensed under "MIT"
 	by Joseph Skubal
 bumpalo 3.19.0
@@ -64,7 +64,7 @@ bytes 1.10.1
 cesu8 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Eric Kidd <git@randomhacks.net>
-cfg-if 1.0.1
+cfg-if 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
 chrono 0.4.41
@@ -98,6 +98,9 @@ cookie 0.18.1
 	licensed under "Apache-2.0 OR MIT"
 	by Sergio Benitez <sb@sergio.bz>|Alex Crichton <alex@alexcrichton.com>
 cookie_store 0.21.1
+	licensed under "Apache-2.0 OR MIT"
+	by Patrick Fernie <patrick.fernie@gmail.com>
+cookie_store 0.22.0
 	licensed under "Apache-2.0 OR MIT"
 	by Patrick Fernie <patrick.fernie@gmail.com>
 core-foundation 0.9.4
@@ -178,7 +181,7 @@ foreign-types 0.3.2
 foreign-types-shared 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
-form_urlencoded 1.2.1
+form_urlencoded 1.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
 fs2 0.4.3
@@ -238,7 +241,7 @@ http-body-util 0.1.3
 httparse 1.10.1
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-hyper 1.6.0
+hyper 1.7.0
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 hyper-rustls 0.27.7
@@ -277,19 +280,19 @@ icu_properties_data 2.0.1
 icu_provider 2.0.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-idna 1.0.3
+idna 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
 idna_adapter 1.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-indexmap 2.10.0
+indexmap 2.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 indicatif 0.18.0
 	licensed under "MIT"
 	by unspecified authors
-io-uring 0.7.9
+io-uring 0.7.10
 	licensed under "Apache-2.0 OR MIT"
 	by quininer <quininer@live.com>
 ipnet 2.11.0
@@ -436,7 +439,7 @@ parking_lot 0.12.4
 parking_lot_core 0.9.11
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-percent-encoding 2.3.1
+percent-encoding 2.3.2
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
 petgraph 0.8.2
@@ -493,19 +496,19 @@ rand_regex 0.18.1
 redox_syscall 0.5.17
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
-regex 1.11.1
+regex 1.11.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-automata 0.4.9
+regex-automata 0.4.10
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-syntax 0.8.5
+regex-syntax 0.8.6
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
 reqwest 0.12.23
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-reqwest_cookie_store 0.8.2
+reqwest_cookie_store 0.9.0
 	licensed under "Apache-2.0 OR MIT"
 	by Patrick Fernie <patrick.fernie@gmail.com>
 ring 0.17.14
@@ -538,7 +541,7 @@ safe_arch 0.7.4
 same-file 1.0.6
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-scc 2.3.4
+scc 2.4.0
 	licensed under "Apache-2.0"
 	by wvwwvwwv <wvwwvwwv@me.com>
 schannel 0.1.27
@@ -595,7 +598,7 @@ system-configuration 0.6.1
 system-configuration-sys 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
-tempfile 3.20.0
+tempfile 3.21.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
 thiserror-impl 1.0.69
@@ -649,16 +652,16 @@ try-lock 0.2.5
 tuple_list 0.1.3
 	licensed under "MIT"
 	by Valerii Lashmanov <vflashm@gmail.com>
-typed-builder 0.21.1
+typed-builder 0.21.2
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
-typed-builder-macro 0.21.1
+typed-builder-macro 0.21.2
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
 typeid 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-typewit 1.12.1
+typewit 1.13.0
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 uds 0.4.2
@@ -685,7 +688,7 @@ unsafe-libyaml 0.2.11
 untrusted 0.9.0
 	licensed under "ISC"
 	by Brian Smith <brian@briansmith.org>
-url 2.5.4
+url 2.5.7
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
 urlencoding 2.1.3
@@ -748,7 +751,7 @@ winapi 0.3.9
 winapi-i686-pc-windows-gnu 0.4.0
 	licensed under "Apache-2.0 OR MIT"
 	by Peter Atashian <retep998@gmail.com>
-winapi-util 0.1.9
+winapi-util 0.1.10
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
 winapi-x86_64-pc-windows-gnu 0.4.0
