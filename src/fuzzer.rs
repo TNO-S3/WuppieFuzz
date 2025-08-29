@@ -19,7 +19,7 @@ use libafl::{
     feedbacks::{CrashFeedback, CrashLogic, ExitKindFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
-    observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, MultiMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
         testcase_score::CorpusPowerTestcaseScore,
@@ -193,7 +193,7 @@ pub fn fuzz() -> Result<()> {
     Ok(())
 }
 
-fn construct_observers_state(
+fn construct_observers_state<'a>(
     config: &&'static Configuration,
     report_path: &Option<PathBuf>,
     api: &OpenAPI,
@@ -204,13 +204,13 @@ fn construct_observers_state(
         Box<dyn CoverageClient>,
         ExitKindFeedback<CrashLogic>,
         OpenApiFuzzerStateType,
-        ObserversTupleType<'static>,
-        CombinedFeedbackType<'static>,
+        ObserversTupleType<'a>,
+        CombinedFeedbackType<'a>,
         CalibrationStage<
-            LineCovObserverType<'static>,
+            LineCovObserverType<'a>,
             OpenApiInput,
-            StdMapObserver<'static, u8, false>,
-            ObserversTupleType<'static>,
+            StdMapObserver<'a, u8, false>,
+            ObserversTupleType<'a>,
             OpenApiFuzzerStateType,
         >,
     ),
@@ -251,19 +251,19 @@ fn construct_observers_state(
     ))
 }
 
-fn construct_observers(
+fn construct_observers<'a>(
     config: &&'static Configuration,
     report_path: &Option<PathBuf>,
     api: &OpenAPI,
 ) -> Result<
     (
         Arc<Mutex<EndpointCoverageClient>>,
-        EndpointObserverType<'static>,
-        EndpointFeedbackType<'static>,
+        EndpointObserverType<'a>,
+        EndpointFeedbackType<'a>,
         Box<dyn CoverageClient>,
-        LineCovObserverType<'static>,
-        LineCovFeedbackType<'static>,
-        ExplicitTracking<MultiMapObserver<'static, u8, false>, true, false>,
+        LineCovObserverType<'a>,
+        LineCovFeedbackType<'a>,
+        CombinedMapObserverType<'a>,
         TimeObserver,
     ),
     anyhow::Error,
@@ -272,20 +272,19 @@ fn construct_observers(
         setup_endpoint_coverage(api.clone())?;
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, report_path)?;
-    let combined_map_observer: CombinedMapObserverType<'_> =
-        MultiMapObserver::new("all_maps", unsafe {
-            vec![
-                OwnedMutSlice::from_raw_parts_mut(
-                    endpoint_coverage_client.get_coverage_ptr(),
-                    endpoint_coverage_client.get_coverage_len(),
-                ),
-                OwnedMutSlice::from_raw_parts_mut(
-                    code_coverage_client.get_coverage_ptr(),
-                    code_coverage_client.get_coverage_len(),
-                ),
-            ]
-        })
-        .track_indices();
+    let combined_map_observer = MultiMapObserver::new("all_maps", unsafe {
+        vec![
+            OwnedMutSlice::from_raw_parts_mut(
+                endpoint_coverage_client.get_coverage_ptr(),
+                endpoint_coverage_client.get_coverage_len(),
+            ),
+            OwnedMutSlice::from_raw_parts_mut(
+                code_coverage_client.get_coverage_ptr(),
+                code_coverage_client.get_coverage_len(),
+            ),
+        ]
+    })
+    .track_indices();
     Ok((
         endpoint_coverage_client,
         endpoint_coverage_observer,
@@ -298,15 +297,15 @@ fn construct_observers(
     ))
 }
 
-fn construct_state(
+fn construct_state<'a>(
     api: &OpenAPI,
     initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
-    endpoint_coverage_feedback: EndpointFeedbackType<'static>,
-    code_coverage_feedback: LineCovFeedbackType<'static>,
+    endpoint_coverage_feedback: EndpointFeedbackType<'a>,
+    code_coverage_feedback: LineCovFeedbackType<'a>,
     time_observer: &TimeObserver,
 ) -> Result<
     (
-        CombinedFeedbackType<'static>,
+        CombinedFeedbackType<'a>,
         ExitKindFeedback<CrashLogic>,
         OpenApiFuzzerStateType,
     ),
@@ -335,11 +334,11 @@ fn construct_state(
     Ok((collective_feedback, objective, state))
 }
 
-fn construct_scheduler(
+fn construct_scheduler<'a>(
     config: &&'static Configuration,
     state: &mut OpenApiFuzzerStateType,
-    combined_map_observer: &CombinedMapObserverType<'static>,
-) -> SchedulerType<'static> {
+    combined_map_observer: &CombinedMapObserverType<'a>,
+) -> SchedulerType<'a> {
     IndexesLenTimeMinimizerScheduler::new(
         combined_map_observer,
         PowerQueueScheduler::new(
