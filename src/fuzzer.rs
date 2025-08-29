@@ -1,54 +1,44 @@
-use core::hash::Hash;
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{
-    fs::create_dir_all,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
-use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus, minimizer::MapCorpusMinimizer},
-    events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
-    executors::ExitKind,
+    corpus::minimizer::MapCorpusMinimizer,
+    events::{Event, EventFirer, EventWithStats, ExecStats},
     feedback_or,
-    feedbacks::{
-        CrashFeedback, CrashLogic, ExitKindFeedback, MaxMapFeedback, StateInitializer, TimeFeedback,
-    },
+    feedbacks::{CrashFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
-    observers::{CanTrack, MapObserver, MultiMapObserver, StdMapObserver, TimeObserver},
+    observers::{CanTrack, MultiMapObserver, TimeObserver},
     schedulers::{
         IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
         testcase_score::CorpusPowerTestcaseScore,
     },
     stages::{CalibrationStage, StdPowerMutationalStage},
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
 };
-use libafl_bolts::{
-    AsIter, Named, current_nanos, current_time, prelude::OwnedMutSlice, rands::StdRand,
-    tuples::tuple_list,
-};
-use log::{error, info};
-use openapiv3::{OpenAPI, Server};
+use libafl_bolts::{current_time, prelude::OwnedMutSlice, tuples::tuple_list};
+use log::error;
 
 use crate::{
     configuration::Configuration,
-    coverage_clients::{CoverageClient, endpoint::EndpointCoverageClient},
-    executor::SequenceExecutor,
-    input::OpenApiInput,
-    monitors::CoverageMonitor,
-    openapi_mutator::havoc_mutations_openapi,
-    state::OpenApiFuzzerState,
-    types::{
-        CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
-        EventManagerType, ExecutorType, FuzzerType, LineCovClientObserverFeedbackType,
-        ObserversTupleType, OpenApiFuzzerStateType, SchedulerType,
+    coverage_clients::{
+        CoverageClient,
+        endpoint::{EndpointCoverageClient, setup_endpoint_coverage},
+        setup_line_coverage, validate_instrumentation,
     },
+    executor::SequenceExecutor,
+    initial_corpus::minimize_corpus,
+    input::OpenApiInput,
+    monitors::construct_event_mgr,
+    openapi::parse_api_spec,
+    openapi_mutator::havoc_mutations_openapi,
+    reporting::{generate_coverage_reports, generate_report_path},
+    state::{construct_state_uninit, init_state},
+    types::{CombinedMapObserverType, ObserversTupleType, OpenApiFuzzerStateType, SchedulerType},
 };
 
 /// Main fuzzer function.
@@ -161,111 +151,6 @@ pub fn fuzz() -> Result<()> {
     Ok(())
 }
 
-fn generate_coverage_reports(report_path: Option<PathBuf>, executor: ExecutorType) {
-    if let Some(report_path) = report_path {
-        executor.generate_coverage_report(&report_path);
-    }
-}
-
-fn minimize_corpus<'a, C, O, T>(
-    mgr: &mut EventManagerType,
-    minimizer: MapCorpusMinimizer<
-        C,
-        ExecutorType<'a>,
-        OpenApiInput,
-        O,
-        OpenApiFuzzerStateType,
-        T,
-        CorpusPowerTestcaseScore,
-    >,
-    state: &mut OpenApiFuzzerStateType,
-    fuzzer: &mut FuzzerType<'a>,
-    executor: &mut ExecutorType<'a>,
-) -> Result<(), anyhow::Error>
-where
-    C: Named + AsRef<O>,
-    for<'b> O: MapObserver<Entry = T> + AsIter<'b, Item = T>,
-    T: Copy + Hash + Eq,
-{
-    log::info!("Start corpus minimization");
-    log::info!("Size before {}", state.corpus().count());
-    minimizer.minimize(fuzzer, executor, mgr, state)?;
-    log::info!("Size after {}", state.corpus().count());
-    let corpus_size = state.corpus().count();
-    let _: () = if let Err(e) = mgr.fire(
-        state,
-        EventWithStats::new(
-            Event::NewTestcase {
-                input: OpenApiInput(vec![]),
-                observers_buf: None,
-                exit_kind: ExitKind::Ok,
-                corpus_size,
-                client_config: mgr.configuration(),
-                forward_id: None,
-            },
-            ExecStats::new(current_time(), 0),
-        ),
-    ) {
-        error!("Err: failed to fire event{e:?}")
-    };
-    Ok(())
-}
-
-fn validate_instrumentation(
-    config: &&'static Configuration,
-    code_coverage_client: &mut Box<dyn CoverageClient>,
-) {
-    // APIs already create code coverage during boot. We check if the code coverage is non-zero. Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
-    if config.coverage_configuration != crate::configuration::CoverageConfiguration::Endpoint {
-        log::debug!("Gathering initial code coverage");
-
-        match code_coverage_client.max_coverage_ratio() {
-            (0, _) => {
-                log::error!(
-                    "No initial code coverage detected. \
-                This likely indicates an issue with instrumentation. \
-                You specified {} as coverage tooling. \
-                Please ensure your target was restarted and is properly instrumented.",
-                    config.coverage_configuration.type_str()
-                );
-                std::process::exit(1);
-            }
-            (hit, total) => {
-                log::info!(
-                    "Initial code coverage: {hit}/{total} ({}%)",
-                    (hit * 100 + total / 2) / total
-                );
-            }
-        }
-    }
-}
-
-fn init_state<'a>(
-    objective: &mut ExitKindFeedback<CrashLogic>,
-    collective_feedback: &mut CombinedFeedbackType<'a>,
-    state: &'a mut OpenApiFuzzerStateType,
-) -> Result<&'a mut OpenApiFuzzerStateType, anyhow::Error> {
-    collective_feedback.init_state(state)?;
-    objective.init_state(state)?;
-    Ok(state)
-}
-
-fn construct_state_uninit(
-    api: &OpenAPI,
-    initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
-) -> Result<OpenApiFuzzerStateType, anyhow::Error> {
-    Ok(OpenApiFuzzerState::new_uninit(
-        // RNG
-        StdRand::with_seed(current_nanos()),
-        // Corpus that will be evolved, we keep it in memory for performance
-        initial_corpus,
-        // Corpus in which we store solutions (crashes in this example),
-        // on disk so the user can get them after stopping the fuzzer
-        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-        api.clone(),
-    )?)
-}
-
 fn construct_scheduler<'a>(
     config: &&'static Configuration,
     state: &mut OpenApiFuzzerStateType,
@@ -297,110 +182,8 @@ fn construct_scheduler<'a>(
     (scheduler, combined_map_observer)
 }
 
-fn parse_api_spec(config: &&'static Configuration) -> Result<OpenAPI, anyhow::Error> {
-    let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
-    if let Some(server_override) = &config.target {
-        api.servers = vec![Server {
-            url: server_override.as_str().trim_end_matches('/').to_string(),
-            description: None,
-            variables: None,
-            extensions: IndexMap::new(),
-        }];
-    }
-    Ok(*api)
-}
-
-fn construct_event_mgr() -> EventManagerType {
-    // The Monitor trait define how the fuzzer stats are reported to the user
-    let mon = CoverageMonitor::new(Box::new(|s| info!("{s}")) as Box<dyn FnMut(String)>);
-
-    // The event manager handle the various events generated during the fuzzing loop
-    // such as the notification of the addition of a new item to the corpus
-    SimpleEventManager::new(mon)
-}
-
-/// Sets up the endpoint coverage client according to the configuration, and initializes it
-/// and constructs a LibAFL observer and feedback
-#[allow(clippy::type_complexity)]
-fn setup_endpoint_coverage<'a>(
-    api: OpenAPI,
-) -> core::result::Result<
-    (
-        Arc<Mutex<EndpointCoverageClient>>,
-        EndpointObserverType<'a>,
-        EndpointFeedbackType<'a>,
-    ),
-    anyhow::Error,
-> {
-    let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
-    endpoint_coverage_client.fetch_coverage(true);
-    // no-op for this particular CoverageClient
-    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
-    // this is only possible if it does not touch the map while the harness is running. We must
-    // assume they have designed their algorithms for this to work correctly.
-    let endpoint_coverage_observer = unsafe {
-        StdMapObserver::from_mut_ptr(
-            "endpoint_coverage",
-            endpoint_coverage_client.get_coverage_ptr(),
-            endpoint_coverage_client.get_coverage_len(),
-        )
-    }
-    .track_novelties();
-    let endpoint_coverage_feedback: MaxMapFeedback<
-        EndpointObserverType,
-        StdMapObserver<'_, u8, false>,
-    > = MaxMapFeedback::new(&endpoint_coverage_observer);
-    Ok((
-        endpoint_coverage_client,
-        endpoint_coverage_observer,
-        endpoint_coverage_feedback,
-    ))
-}
-
 fn setup_time_feedback() -> (TimeObserver, TimeFeedback) {
     let observer = TimeObserver::new("time");
     let feedback = TimeFeedback::new(&observer);
     (observer, feedback)
-}
-
-/// Sets up the line coverage client according to the configuration, and initializes it
-/// and constructs a LibAFL observer and feedback
-fn setup_line_coverage<'a>(
-    config: &'static Configuration,
-    report_path: &Option<PathBuf>,
-) -> Result<LineCovClientObserverFeedbackType<'a>, anyhow::Error> {
-    let mut code_coverage_client: Box<dyn CoverageClient> =
-        crate::coverage_clients::get_coverage_client(config, report_path)?;
-    // This is very important, we want to fetch and reset the coverage before interacting with the target
-    code_coverage_client.fetch_coverage(true);
-    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
-    // this is only possible if it does not touch the map while the harness is running. We must
-    // assume they have designed their algorithms for this to work correctly.
-    let code_coverage_observer = unsafe {
-        StdMapObserver::from_mut_ptr(
-            "code_coverage",
-            code_coverage_client.get_coverage_ptr(),
-            code_coverage_client.get_coverage_len(),
-        )
-    }
-    .track_indices()
-    .track_novelties();
-    let code_coverage_feedback = MaxMapFeedback::new(&code_coverage_observer);
-    Ok((
-        code_coverage_client,
-        code_coverage_observer,
-        code_coverage_feedback,
-    ))
-}
-
-/// Creates and returns the report path for this run. It is typically of the form
-/// `reports/2023-06-13T105302.602Z`, the filename being an ISO 8601 timestamp.
-fn generate_report_path() -> PathBuf {
-    let timestamp = format!(
-        "{}",
-        chrono::offset::Utc::now().format("%Y-%m-%dT%H%M%S%.3fZ")
-    );
-    let report_path = PathBuf::from("reports").join(timestamp);
-    create_dir_all(&report_path).expect("unable to make reports directory");
-    report_path
 }

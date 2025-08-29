@@ -13,14 +13,23 @@ use std::{
 
 use libafl::{
     HasMetadata,
-    corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
+    corpus::{
+        Corpus, InMemoryOnDiskCorpus, MapCorpusMinimizer, SchedulerTestcaseMetadata, Testcase,
+    },
+    events::{Event, EventFirer, EventWithStats, ExecStats},
+    executors::ExitKind,
+    observers::MapObserver,
+    schedulers::testcase_score::CorpusPowerTestcaseScore,
+    state::HasCorpus,
 };
+use libafl_bolts::{AsIter, Named, current_time};
 use openapiv3::OpenAPI;
 
 use self::dependency_graph::DependencyGraph;
 use crate::{
     initial_corpus::dependency_graph::initial_corpus_from_api,
     input::{OpenApiInput, OpenApiRequest},
+    types::{EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType},
 };
 
 /// Loads an `OpenApiInput` from a yaml file.
@@ -49,6 +58,50 @@ pub fn load_starting_corpus(
         return Err("Zero seeds loaded from corpus directory.".into());
     };
     Ok(corpus_vec)
+}
+
+pub fn minimize_corpus<'a, C, O, T>(
+    mgr: &mut EventManagerType,
+    minimizer: MapCorpusMinimizer<
+        C,
+        ExecutorType<'a>,
+        OpenApiInput,
+        O,
+        OpenApiFuzzerStateType,
+        T,
+        CorpusPowerTestcaseScore,
+    >,
+    state: &mut OpenApiFuzzerStateType,
+    fuzzer: &mut FuzzerType<'a>,
+    executor: &mut ExecutorType<'a>,
+) -> Result<(), anyhow::Error>
+where
+    C: Named + AsRef<O>,
+    for<'b> O: MapObserver<Entry = T> + AsIter<'b, Item = T>,
+    T: Copy + Hash + Eq,
+{
+    log::info!("Start corpus minimization");
+    log::info!("Size before {}", state.corpus().count());
+    minimizer.minimize(fuzzer, executor, mgr, state)?;
+    log::info!("Size after {}", state.corpus().count());
+    let corpus_size = state.corpus().count();
+    let _: () = if let Err(e) = mgr.fire(
+        state,
+        EventWithStats::new(
+            Event::NewTestcase {
+                input: OpenApiInput(vec![]),
+                observers_buf: None,
+                exit_kind: ExitKind::Ok,
+                corpus_size,
+                client_config: mgr.configuration(),
+                forward_id: None,
+            },
+            ExecStats::new(current_time(), 0),
+        ),
+    ) {
+        log::error!("Err: failed to fire event{e:?}")
+    };
+    Ok(())
 }
 
 /// Generates a corpus and writes it to the path specified at `corpus_dir`.

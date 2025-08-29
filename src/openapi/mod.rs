@@ -2,9 +2,12 @@ use std::{convert::TryFrom, fmt::Debug, path::Path};
 
 use anyhow::{Context, Result};
 use indexmap::IndexMap;
-use openapiv3::{MediaType, OpenAPI, Operation, PathItem, VersionedOpenAPI};
+use openapiv3::{MediaType, OpenAPI, Operation, PathItem, Server, VersionedOpenAPI};
 
-use crate::input::{Method, method::InvalidMethodError};
+use crate::{
+    configuration::Configuration,
+    input::{Method, method::InvalidMethodError},
+};
 
 pub mod build_request;
 pub mod curl_request;
@@ -16,6 +19,19 @@ pub fn get_api_spec(path: &Path) -> Result<Box<OpenAPI>, anyhow::Error> {
     openapi_from_yaml_file(path)
         .map(Box::new)
         .with_context(|| format!("Error parsing OpenAPI-file at {}", path.to_string_lossy()))
+}
+
+pub fn parse_api_spec(config: &&'static Configuration) -> Result<OpenAPI, anyhow::Error> {
+    let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+    if let Some(server_override) = &config.target {
+        api.servers = vec![Server {
+            url: server_override.as_str().trim_end_matches('/').to_string(),
+            description: None,
+            variables: None,
+            extensions: IndexMap::new(),
+        }];
+    }
+    Ok(*api)
 }
 
 /// A QualifiedOperation is the (path, method, operation) tuple returned from

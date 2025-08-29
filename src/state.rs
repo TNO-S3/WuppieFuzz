@@ -7,8 +7,11 @@ use std::{
 
 use libafl::{
     Error, HasMetadata, HasNamedMetadata,
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    feedbacks::StateInitializer,
+    corpus::{
+        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryOnDiskCorpus, OnDiskCorpus,
+        Testcase,
+    },
+    feedbacks::{CrashLogic, ExitKindFeedback, StateInitializer},
     inputs::Input,
     schedulers::powersched::SchedulerMetadata,
     stages::StageId,
@@ -18,11 +21,43 @@ use libafl::{
     },
 };
 use libafl_bolts::{
-    rands::Rand,
+    current_nanos,
+    rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
 use openapiv3::OpenAPI;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+
+use crate::{
+    input::OpenApiInput,
+    types::{CombinedFeedbackType, OpenApiFuzzerStateType},
+};
+
+pub fn construct_state_uninit(
+    api: &OpenAPI,
+    initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
+) -> Result<OpenApiFuzzerStateType, anyhow::Error> {
+    Ok(OpenApiFuzzerState::new_uninit(
+        // RNG
+        StdRand::with_seed(current_nanos()),
+        // Corpus that will be evolved, we keep it in memory for performance
+        initial_corpus,
+        // Corpus in which we store solutions (crashes in this example),
+        // on disk so the user can get them after stopping the fuzzer
+        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+        api.clone(),
+    )?)
+}
+
+pub fn init_state<'a>(
+    objective: &mut ExitKindFeedback<CrashLogic>,
+    collective_feedback: &mut CombinedFeedbackType<'a>,
+    state: &'a mut OpenApiFuzzerStateType,
+) -> Result<&'a mut OpenApiFuzzerStateType, anyhow::Error> {
+    collective_feedback.init_state(state)?;
+    objective.init_state(state)?;
+    Ok(state)
+}
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///

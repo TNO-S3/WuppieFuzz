@@ -1,3 +1,5 @@
+use std::{fs::create_dir_all, path::PathBuf};
+
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     state::HasCorpus,
@@ -7,9 +9,28 @@ use crate::{
     input::{OpenApiInput, OpenApiRequest},
     openapi::{curl_request::CurlRequest, validate_response::Response},
     state::OpenApiFuzzerState,
+    types::ExecutorType,
 };
 
 pub mod sqlite;
+
+/// Creates and returns the report path for this run. It is typically of the form
+/// `reports/2023-06-13T105302.602Z`, the filename being an ISO 8601 timestamp.
+pub fn generate_report_path() -> PathBuf {
+    let timestamp = format!(
+        "{}",
+        chrono::offset::Utc::now().format("%Y-%m-%dT%H%M%S%.3fZ")
+    );
+    let report_path = PathBuf::from("reports").join(timestamp);
+    create_dir_all(&report_path).expect("unable to make reports directory");
+    report_path
+}
+
+pub fn generate_coverage_reports(report_path: Option<PathBuf>, executor: ExecutorType) {
+    if let Some(report_path) = report_path {
+        executor.generate_coverage_report(&report_path);
+    }
+}
 
 // The reporting trait allows reporting requests and responses for later analysis.
 // The type `T` is the type used by the underlying data store to refer to records,
