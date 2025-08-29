@@ -69,7 +69,11 @@ pub fn fuzz() -> Result<()> {
         setup_endpoint_coverage(api.clone())?;
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
-    let (time_observer, time_feedback) = setup_time_feedback();
+    let (time_observer, time_feedback) = {
+        let observer = TimeObserver::new("time");
+        let feedback = TimeFeedback::new(&observer);
+        (observer, feedback)
+    };
 
     // Stages
     let calibration = CalibrationStage::new(&code_coverage_feedback);
@@ -180,10 +184,4 @@ fn construct_scheduler<'a>(
         ),
     );
     (scheduler, combined_map_observer)
-}
-
-fn setup_time_feedback() -> (TimeObserver, TimeFeedback) {
-    let observer = TimeObserver::new("time");
-    let feedback = TimeFeedback::new(&observer);
-    (observer, feedback)
 }
