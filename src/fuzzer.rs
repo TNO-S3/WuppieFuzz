@@ -16,7 +16,9 @@ use libafl::{
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::ExitKind,
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, StateInitializer, TimeFeedback},
+    feedbacks::{
+        CrashFeedback, CrashLogic, ExitKindFeedback, MaxMapFeedback, StateInitializer, TimeFeedback,
+    },
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, MultiMapObserver, StdMapObserver, TimeObserver},
@@ -42,7 +44,7 @@ use crate::{
     openapi_mutator::havoc_mutations_openapi,
     state::OpenApiFuzzerState,
     types::{
-        CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
+        CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
         LineCovClientObserverFeedbackType, LineCovFeedbackType, LineCovObserverType,
         OpenApiFuzzerStateType, SchedulerType,
     },
@@ -85,11 +87,11 @@ pub fn fuzz() -> Result<()> {
         TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
     );
 
-    let mut state = construct_state(&api, initial_corpus)?;
+    let mut state_uninit = construct_state_uninit(&api, initial_corpus)?;
 
     let (scheduler, combined_map_observer) = construct_scheduler(
         config,
-        &mut state,
+        &mut state_uninit,
         &mut endpoint_coverage_client,
         &mut code_coverage_client,
     );
@@ -104,8 +106,7 @@ pub fn fuzz() -> Result<()> {
         time_observer
     );
 
-    collective_feedback.init_state(&mut state)?;
-    objective.init_state(&mut state)?;
+    let state = init_state(&mut objective, &mut collective_feedback, &mut state_uninit)?;
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
@@ -151,13 +152,13 @@ pub fn fuzz() -> Result<()> {
 
     log::info!("Start corpus minimization");
     log::info!("Size before {}", state.corpus().count());
-    minimizer.minimize(&mut fuzzer, &mut executor, &mut mgr, &mut state)?;
+    minimizer.minimize(&mut fuzzer, &mut executor, &mut mgr, state)?;
     log::info!("Size after {}", state.corpus().count());
 
     // Fire an event to print the initial corpus size
     let corpus_size = state.corpus().count();
     if let Err(e) = mgr.fire(
-        &mut state,
+        state,
         EventWithStats::new(
             Event::NewTestcase {
                 input: OpenApiInput(vec![]),
@@ -175,7 +176,7 @@ pub fn fuzz() -> Result<()> {
 
     log::debug!("Start fuzzing loop");
     loop {
-        match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
+        match fuzzer.fuzz_one(&mut stages, &mut executor, state, &mut mgr) {
             Ok(_) => (),
             Err(libafl_bolts::Error::ShuttingDown) => {
                 log::info!("[Fuzzing campaign ended] Thanks for using WuppieFuzz!");
@@ -188,7 +189,7 @@ pub fn fuzz() -> Result<()> {
         // send update of execution data to the monitor
         let executions = *state.executions();
         if let Err(e) = mgr.fire(
-            &mut state,
+            state,
             EventWithStats::new(Event::Heartbeat, ExecStats::new(current_time(), executions)),
         ) {
             error!("Err: failed to fire event{e:?}")
@@ -200,6 +201,16 @@ pub fn fuzz() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn init_state<'a>(
+    objective: &mut ExitKindFeedback<CrashLogic>,
+    collective_feedback: &mut CombinedFeedbackType<'a>,
+    state: &'a mut OpenApiFuzzerStateType,
+) -> Result<&'a mut OpenApiFuzzerStateType, anyhow::Error> {
+    collective_feedback.init_state(state)?;
+    objective.init_state(state)?;
+    Ok(state)
 }
 
 fn construct_observers<'a>(
@@ -233,7 +244,7 @@ fn construct_observers<'a>(
     ))
 }
 
-fn construct_state(
+fn construct_state_uninit(
     api: &OpenAPI,
     initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
 ) -> Result<OpenApiFuzzerStateType, anyhow::Error> {
