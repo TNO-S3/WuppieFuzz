@@ -8,26 +8,19 @@ use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     feedbacks::{
-        CombinedFeedback, CrashLogic, ExitKindFeedback, LogicEagerOr, MaxMapFeedback, TimeFeedback,
+        CombinedFeedback, CrashLogic, ExitKindFeedback, LogicEagerOr, MapIndexesMetadata,
+        MaxMapFeedback, TimeFeedback,
     },
     inputs::NopToTargetBytes,
     observers::{ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
-    schedulers::PowerQueueScheduler,
-    stages::CalibrationStage,
+    schedulers::{LenTimeMulTestcaseScore, MinimizerScheduler, PowerQueueScheduler},
 };
+use libafl_bolts::rands::RomuDuoJrRand;
 
 use crate::{
     coverage_clients::CoverageClient, executor::SequenceExecutor, input::OpenApiInput,
     monitors::CoverageMonitor, state::OpenApiFuzzerState,
 };
-
-pub type CalibrationStageType<'a> = CalibrationStage<
-    LineCovObserverType<'a>,
-    OpenApiInput,
-    StdMapObserver<'a, u8, false>,
-    ObserversTupleType<'a>,
-    OpenApiFuzzerStateType,
->;
 
 pub type FuzzerType<'a> = StdFuzzer<
     SchedulerType<'a>,
@@ -45,7 +38,7 @@ pub type EventManagerType = SimpleEventManager<
     OpenApiFuzzerState<
         OpenApiInput,
         InMemoryOnDiskCorpus<OpenApiInput>,
-        libafl_bolts::prelude::RomuDuoJrRand,
+        RomuDuoJrRand,
         OnDiskCorpus<OpenApiInput>,
     >,
 >;
@@ -66,19 +59,19 @@ pub type CombinedFeedbackType<'a> = CombinedFeedback<
 
 pub type OpenApiFuzzerStateType = OpenApiFuzzerState<
     OpenApiInput,
-    libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-    libafl_bolts::prelude::RomuDuoJrRand,
+    InMemoryOnDiskCorpus<OpenApiInput>,
+    RomuDuoJrRand,
     OnDiskCorpus<OpenApiInput>,
 >;
 
 pub type CombinedMapObserverType<'a> =
     ExplicitTracking<MultiMapObserver<'a, u8, false>, true, false>;
 
-pub type SchedulerType<'a> = libafl::schedulers::MinimizerScheduler<
+pub type SchedulerType<'a> = MinimizerScheduler<
     PowerQueueScheduler<CombinedMapObserverType<'a>, MultiMapObserver<'a, u8, false>>,
-    libafl::schedulers::LenTimeMulTestcaseScore,
+    LenTimeMulTestcaseScore,
     OpenApiInput,
-    libafl::feedbacks::MapIndexesMetadata,
+    MapIndexesMetadata,
     CombinedMapObserverType<'a>,
 >;
 

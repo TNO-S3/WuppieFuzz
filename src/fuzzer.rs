@@ -12,11 +12,22 @@ use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    corpus::{minimizer::MapCorpusMinimizer, Corpus, InMemoryOnDiskCorpus, OnDiskCorpus}, events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager}, executors::ExitKind, feedback_or, feedbacks::{
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus, minimizer::MapCorpusMinimizer},
+    events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
+    executors::ExitKind,
+    feedback_or,
+    feedbacks::{
         CrashFeedback, CrashLogic, ExitKindFeedback, MaxMapFeedback, StateInitializer, TimeFeedback,
-    }, fuzzer::StdFuzzer, inputs::Input, mutators::{HavocScheduledMutator, Mutator}, observers::{CanTrack, MapObserver, MultiMapObserver, StdMapObserver, TimeObserver}, schedulers::{
-        powersched::PowerSchedule, testcase_score::CorpusPowerTestcaseScore, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler
-    }, stages::{CalibrationStage, StdPowerMutationalStage}, state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasSolutions, MaybeHasClientPerfMonitor}
+    },
+    fuzzer::StdFuzzer,
+    mutators::HavocScheduledMutator,
+    observers::{CanTrack, MapObserver, MultiMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{
+        IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
+        testcase_score::CorpusPowerTestcaseScore,
+    },
+    stages::{CalibrationStage, StdPowerMutationalStage},
+    state::{HasCorpus, HasExecutions},
 };
 use libafl_bolts::{
     AsIter, Named, current_nanos, current_time, prelude::OwnedMutSlice, rands::StdRand,
@@ -34,10 +45,9 @@ use crate::{
     openapi_mutator::havoc_mutations_openapi,
     state::OpenApiFuzzerState,
     types::{
-        CalibrationStageType, CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType,
-        EndpointObserverType, EventManagerType, ExecutorType, FuzzerType,
-        LineCovClientObserverFeedbackType, ObserversTupleType, OpenApiFuzzerStateType,
-        SchedulerType,
+        CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
+        EventManagerType, ExecutorType, FuzzerType, LineCovClientObserverFeedbackType,
+        ObserversTupleType, OpenApiFuzzerStateType, SchedulerType,
     },
 };
 
@@ -301,8 +311,7 @@ fn parse_api_spec(config: &&'static Configuration) -> Result<OpenAPI, anyhow::Er
     Ok(*api)
 }
 
-fn construct_event_mgr() -> EventManagerType
-{
+fn construct_event_mgr() -> EventManagerType {
     // The Monitor trait define how the fuzzer stats are reported to the user
     let mon = CoverageMonitor::new(Box::new(|s| info!("{s}")) as Box<dyn FnMut(String)>);
 
