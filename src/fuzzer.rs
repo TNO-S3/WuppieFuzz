@@ -16,7 +16,7 @@ use libafl::{
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::ExitKind,
     feedback_or,
-    feedbacks::{CombinedFeedback, CrashFeedback, LogicEagerOr, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
@@ -41,6 +41,11 @@ use crate::{
     monitors::CoverageMonitor,
     openapi_mutator::havoc_mutations_openapi,
     state::OpenApiFuzzerState,
+    types::{
+        CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
+        LineCovClientObserverFeedbackType, LineCovFeedbackType, LineCovObserverType,
+        ObserversTupleType, OpenApiFuzzerStateType, SchedulerType,
+    },
 };
 
 /// Main fuzzer function.
@@ -73,7 +78,7 @@ pub fn fuzz() -> Result<()> {
         calibration,
     ) = fun_name(config, &report_path, &api, initial_corpus)?;
 
-    let combined_map_observer: CombinedMapObserver<'_> =
+    let combined_map_observer: CombinedMapObserverType<'_> =
         MultiMapObserver::new("all_maps", unsafe {
             vec![
                 OwnedMutSlice::from_raw_parts_mut(
@@ -188,37 +193,6 @@ pub fn fuzz() -> Result<()> {
     Ok(())
 }
 
-type ObserversTupleType = (
-    LineCovObserver<'static>,
-    (
-        EndpointObserver<'static>,
-        (CombinedMapObserver<'static>, (TimeObserver, ())),
-    ),
-);
-
-type CombinedFeedbackType<'a> = CombinedFeedback<
-    EndpointFeedback<'a>,
-    CombinedFeedback<LineCovFeedback<'a>, TimeFeedback, LogicEagerOr>,
-    LogicEagerOr,
->;
-
-type OpenApiFuzzerStateType = OpenApiFuzzerState<
-    OpenApiInput,
-    libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-    libafl_bolts::prelude::RomuDuoJrRand,
-    OnDiskCorpus<OpenApiInput>,
->;
-
-type CombinedMapObserver<'a> = ExplicitTracking<MultiMapObserver<'a, u8, false>, true, false>;
-
-type SchedulerType<'a> = libafl::schedulers::MinimizerScheduler<
-    PowerQueueScheduler<CombinedMapObserver<'a>, MultiMapObserver<'a, u8, false>>,
-    libafl::schedulers::LenTimeMulTestcaseScore,
-    OpenApiInput,
-    libafl::feedbacks::MapIndexesMetadata,
-    CombinedMapObserver<'a>,
->;
-
 fn fun_name(
     config: &&'static Configuration,
     report_path: &Option<PathBuf>,
@@ -230,13 +204,13 @@ fn fun_name(
         Box<dyn CoverageClient>,
         libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
         OpenApiFuzzerStateType,
-        ObserversTupleType,
+        ObserversTupleType<'static>,
         CombinedFeedbackType<'static>,
         CalibrationStage<
-            LineCovObserver<'static>,
+            LineCovObserverType<'static>,
             OpenApiInput,
             StdMapObserver<'static, u8, false>,
-            ObserversTupleType,
+            ObserversTupleType<'static>,
             OpenApiFuzzerStateType,
         >,
     ),
@@ -284,11 +258,11 @@ fn construct_observers(
 ) -> Result<
     (
         Arc<Mutex<EndpointCoverageClient>>,
-        EndpointObserver<'static>,
-        EndpointFeedback<'static>,
+        EndpointObserverType<'static>,
+        EndpointFeedbackType<'static>,
         Box<dyn CoverageClient>,
-        LineCovObserver<'static>,
-        LineCovFeedback<'static>,
+        LineCovObserverType<'static>,
+        LineCovFeedbackType<'static>,
         ExplicitTracking<MultiMapObserver<'static, u8, false>, true, false>,
         TimeObserver,
     ),
@@ -298,7 +272,7 @@ fn construct_observers(
         setup_endpoint_coverage(api.clone())?;
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, report_path)?;
-    let combined_map_observer: CombinedMapObserver<'_> =
+    let combined_map_observer: CombinedMapObserverType<'_> =
         MultiMapObserver::new("all_maps", unsafe {
             vec![
                 OwnedMutSlice::from_raw_parts_mut(
@@ -328,8 +302,8 @@ fn construct_observers(
 fn construct_state(
     api: &OpenAPI,
     initial_corpus: libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-    endpoint_coverage_feedback: EndpointFeedback<'static>,
-    code_coverage_feedback: LineCovFeedback<'static>,
+    endpoint_coverage_feedback: EndpointFeedbackType<'static>,
+    code_coverage_feedback: LineCovFeedbackType<'static>,
     time_observer: &TimeObserver,
 ) -> Result<
     (
@@ -365,7 +339,7 @@ fn construct_state(
 fn construct_scheduler(
     config: &&'static Configuration,
     state: &mut OpenApiFuzzerStateType,
-    combined_map_observer: &CombinedMapObserver<'static>,
+    combined_map_observer: &CombinedMapObserverType<'static>,
 ) -> SchedulerType<'static> {
     IndexesLenTimeMinimizerScheduler::new(
         combined_map_observer,
@@ -403,10 +377,6 @@ where
     SimpleEventManager::new(mon)
 }
 
-type EndpointObserver<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>;
-
-type EndpointFeedback<'a> = MaxMapFeedback<EndpointObserver<'a>, StdMapObserver<'a, u8, false>>;
-
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
@@ -415,8 +385,8 @@ fn setup_endpoint_coverage<'a>(
 ) -> core::result::Result<
     (
         Arc<Mutex<EndpointCoverageClient>>,
-        EndpointObserver<'a>,
-        EndpointFeedback<'a>,
+        EndpointObserverType<'a>,
+        EndpointFeedbackType<'a>,
     ),
     anyhow::Error,
 > {
@@ -435,7 +405,7 @@ fn setup_endpoint_coverage<'a>(
     }
     .track_novelties();
     let endpoint_coverage_feedback: MaxMapFeedback<
-        EndpointObserver,
+        EndpointObserverType,
         StdMapObserver<'_, u8, false>,
     > = MaxMapFeedback::new(&endpoint_coverage_observer);
     Ok((
@@ -445,22 +415,12 @@ fn setup_endpoint_coverage<'a>(
     ))
 }
 
-type LineCovObserver<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>;
-
-type LineCovFeedback<'a> = MaxMapFeedback<LineCovObserver<'a>, StdMapObserver<'a, u8, false>>;
-
-type LineCovClientObserverFeedback<'a> = (
-    Box<dyn CoverageClient>,
-    LineCovObserver<'a>,
-    LineCovFeedback<'a>,
-);
-
 /// Sets up the line coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 fn setup_line_coverage<'a>(
     config: &'static Configuration,
     report_path: &Option<PathBuf>,
-) -> Result<LineCovClientObserverFeedback<'a>, anyhow::Error> {
+) -> Result<LineCovClientObserverFeedbackType<'a>, anyhow::Error> {
     let mut code_coverage_client: Box<dyn CoverageClient> =
         crate::coverage_clients::get_coverage_client(config, report_path)?;
     // This is very important, we want to fetch and reset the coverage before interacting with the target
