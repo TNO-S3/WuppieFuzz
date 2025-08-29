@@ -45,8 +45,8 @@ use crate::{
     state::OpenApiFuzzerState,
     types::{
         CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
-        LineCovClientObserverFeedbackType, LineCovFeedbackType, LineCovObserverType,
-        OpenApiFuzzerStateType, SchedulerType,
+        LineCovClientObserverFeedbackType, ObserversTupleType, OpenApiFuzzerStateType,
+        SchedulerType,
     },
 };
 
@@ -70,15 +70,12 @@ pub fn fuzz() -> Result<()> {
         &report_path.as_deref(),
     );
 
-    let (
-        mut endpoint_coverage_client,
-        endpoint_coverage_observer,
-        endpoint_coverage_feedback,
-        mut code_coverage_client,
-        code_coverage_observer,
-        code_coverage_feedback,
-        time_observer,
-    ) = construct_observers(config, &report_path, &api)?;
+    // Observers
+    let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
+        setup_endpoint_coverage(api.clone())?;
+    let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
+        setup_line_coverage(config, &report_path)?;
+    let time_observer = TimeObserver::new("time");
 
     let calibration = CalibrationStage::new(&code_coverage_feedback);
     let mut collective_feedback = feedback_or!(
@@ -99,7 +96,7 @@ pub fn fuzz() -> Result<()> {
     let minimizer: MapCorpusMinimizer<_, _, _, _, _, _, CorpusPowerTestcaseScore> =
         MapCorpusMinimizer::new(&combined_map_observer);
 
-    let collective_observer = tuple_list!(
+    let collective_observer: ObserversTupleType = tuple_list!(
         code_coverage_observer,
         endpoint_coverage_observer,
         combined_map_observer,
@@ -211,37 +208,6 @@ fn init_state<'a>(
     collective_feedback.init_state(state)?;
     objective.init_state(state)?;
     Ok(state)
-}
-
-fn construct_observers<'a>(
-    config: &&'static Configuration,
-    report_path: &Option<PathBuf>,
-    api: &OpenAPI,
-) -> Result<
-    (
-        Arc<Mutex<EndpointCoverageClient>>,
-        EndpointObserverType<'a>,
-        EndpointFeedbackType<'a>,
-        Box<dyn CoverageClient>,
-        LineCovObserverType<'a>,
-        LineCovFeedbackType<'a>,
-        TimeObserver,
-    ),
-    anyhow::Error,
-> {
-    let (endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
-        setup_endpoint_coverage(api.clone())?;
-    let (code_coverage_client, code_coverage_observer, code_coverage_feedback) =
-        setup_line_coverage(config, report_path)?;
-    Ok((
-        endpoint_coverage_client,
-        endpoint_coverage_observer,
-        endpoint_coverage_feedback,
-        code_coverage_client,
-        code_coverage_observer,
-        code_coverage_feedback,
-        TimeObserver::new("time"),
-    ))
 }
 
 fn construct_state_uninit(
