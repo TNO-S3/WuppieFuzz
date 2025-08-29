@@ -55,37 +55,39 @@ use crate::{
 /// Sets up the various nuts and bolts required by LibAFL and runs the fuzzer until the configured
 /// timeout is reached, or until a (ctrl-c) interrupt is caught.
 pub fn fuzz() -> Result<()> {
+    // Preperatory stuff
     let config = &Configuration::get().map_err(anyhow::Error::msg)?;
     crate::setup_logging(config);
     let report_path = config.report.then(generate_report_path);
     let api = parse_api_spec(config)?;
-    let mut mgr = construct_event_mgr();
-    let mut objective = CrashFeedback::new();
-    let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 
-    // Initialize corpus normally.
     let initial_corpus = crate::initial_corpus::initialize_corpus(
         &api,
         config.initial_corpus.as_deref(),
         &report_path.as_deref(),
     );
+    let mut state_uninit = construct_state_uninit(&api, initial_corpus)?;
 
-    // Observers
+    let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
+
+    // Event manager
+    let mut mgr = construct_event_mgr();
+
+    // Observers & feedback initialization
     let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
         setup_endpoint_coverage(api.clone())?;
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
-    let time_observer = TimeObserver::new("time");
+    let (time_observer, time_feedback) = setup_time_feedback();
 
+    // Stages
     let calibration = CalibrationStage::new(&code_coverage_feedback);
-    let mut collective_feedback = feedback_or!(
-        endpoint_coverage_feedback,
-        code_coverage_feedback,
-        TimeFeedback::new(&time_observer), // Time feedback, this one does not need a feedback state
-    );
+    let power: StdPowerMutationalStage<_, _, OpenApiInput, _, _, _> =
+        StdPowerMutationalStage::new(mutator_openapi);
+    // The order of the stages matter!
+    let mut stages = tuple_list!(calibration, power);
 
-    let mut state_uninit = construct_state_uninit(&api, initial_corpus)?;
-
+    // Scheduler
     let (scheduler, combined_map_observer) = construct_scheduler(
         config,
         &mut state_uninit,
@@ -93,52 +95,32 @@ pub fn fuzz() -> Result<()> {
         &mut code_coverage_client,
     );
 
+    // Corpus minimizer
     let minimizer: MapCorpusMinimizer<_, _, _, _, _, _, CorpusPowerTestcaseScore> =
         MapCorpusMinimizer::new(&combined_map_observer);
 
+    // Initialize state
+    let mut objective = CrashFeedback::new();
+    let mut collective_feedback = feedback_or!(
+        endpoint_coverage_feedback,
+        code_coverage_feedback,
+        time_feedback, // Time feedback, this one does not need a feedback state
+    );
+    let state = init_state(&mut objective, &mut collective_feedback, &mut state_uninit)?;
+
+    // Fuzzer
+    let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
+
+    // Stop early in case something's wrong with the code instrumentation
+    validate_instrumentation(config, &mut code_coverage_client);
+
+    // Create the executor for an in-process function with just one observer
     let collective_observer: ObserversTupleType = tuple_list!(
         code_coverage_observer,
         endpoint_coverage_observer,
         combined_map_observer,
         time_observer
     );
-
-    let state = init_state(&mut objective, &mut collective_feedback, &mut state_uninit)?;
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
-
-    // The order of the stages matter!
-    let power: StdPowerMutationalStage<_, _, OpenApiInput, _, _, _> =
-        StdPowerMutationalStage::new(mutator_openapi);
-
-    let mut stages = tuple_list!(calibration, power);
-
-    // APIs already create code coverage during boot. We check if the code coverage is non-zero. Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
-    if config.coverage_configuration != crate::configuration::CoverageConfiguration::Endpoint {
-        log::debug!("Gathering initial code coverage");
-
-        match code_coverage_client.max_coverage_ratio() {
-            (0, _) => {
-                log::error!(
-                    "No initial code coverage detected. \
-                This likely indicates an issue with instrumentation. \
-                You specified {} as coverage tooling. \
-                Please ensure your target was restarted and is properly instrumented.",
-                    config.coverage_configuration.type_str()
-                );
-                std::process::exit(1);
-            }
-            (hit, total) => {
-                log::info!(
-                    "Initial code coverage: {hit}/{total} ({}%)",
-                    (hit * 100 + total / 2) / total
-                );
-            }
-        }
-    }
-
-    // Create the executor for an in-process function with just one observer
     let mut executor = SequenceExecutor::new(
         collective_observer,
         &api,
@@ -198,6 +180,35 @@ pub fn fuzz() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn validate_instrumentation(
+    config: &&'static Configuration,
+    code_coverage_client: &mut Box<dyn CoverageClient>,
+) {
+    // APIs already create code coverage during boot. We check if the code coverage is non-zero. Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
+    if config.coverage_configuration != crate::configuration::CoverageConfiguration::Endpoint {
+        log::debug!("Gathering initial code coverage");
+
+        match code_coverage_client.max_coverage_ratio() {
+            (0, _) => {
+                log::error!(
+                    "No initial code coverage detected. \
+                This likely indicates an issue with instrumentation. \
+                You specified {} as coverage tooling. \
+                Please ensure your target was restarted and is properly instrumented.",
+                    config.coverage_configuration.type_str()
+                );
+                std::process::exit(1);
+            }
+            (hit, total) => {
+                log::info!(
+                    "Initial code coverage: {hit}/{total} ({}%)",
+                    (hit * 100 + total / 2) / total
+                );
+            }
+        }
+    }
 }
 
 fn init_state<'a>(
@@ -320,6 +331,12 @@ fn setup_endpoint_coverage<'a>(
         endpoint_coverage_observer,
         endpoint_coverage_feedback,
     ))
+}
+
+fn setup_time_feedback() -> (TimeObserver, TimeFeedback) {
+    let observer = TimeObserver::new("time");
+    let feedback = TimeFeedback::new(&observer);
+    (observer, feedback)
 }
 
 /// Sets up the line coverage client according to the configuration, and initializes it
