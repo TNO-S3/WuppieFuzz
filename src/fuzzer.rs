@@ -254,7 +254,7 @@ fn construct_state_uninit(
     api: &OpenAPI,
     initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
 ) -> Result<OpenApiFuzzerStateType, anyhow::Error> {
-    let state = OpenApiFuzzerState::new_uninit(
+    Ok(OpenApiFuzzerState::new_uninit(
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
@@ -263,8 +263,7 @@ fn construct_state_uninit(
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         api.clone(),
-    )?;
-    Ok(state)
+    )?)
 }
 
 fn construct_scheduler<'a>(
