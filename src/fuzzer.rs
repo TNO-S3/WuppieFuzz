@@ -12,11 +12,11 @@ use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    corpus::{Corpus, OnDiskCorpus, minimizer::MapCorpusMinimizer},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus, minimizer::MapCorpusMinimizer},
     events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
     executors::ExitKind,
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, CrashLogic, ExitKindFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
@@ -76,7 +76,7 @@ pub fn fuzz() -> Result<()> {
         collective_observer,
         collective_feedback,
         calibration,
-    ) = fun_name(config, &report_path, &api, initial_corpus)?;
+    ) = construct_observers_state(config, &report_path, &api, initial_corpus)?;
 
     let combined_map_observer: CombinedMapObserverType<'_> =
         MultiMapObserver::new("all_maps", unsafe {
@@ -193,16 +193,16 @@ pub fn fuzz() -> Result<()> {
     Ok(())
 }
 
-fn fun_name(
+fn construct_observers_state(
     config: &&'static Configuration,
     report_path: &Option<PathBuf>,
     api: &OpenAPI,
-    initial_corpus: libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
+    initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
 ) -> Result<
     (
         Arc<Mutex<EndpointCoverageClient>>,
         Box<dyn CoverageClient>,
-        libafl::feedbacks::ExitKindFeedback<libafl::feedbacks::CrashLogic>,
+        ExitKindFeedback<CrashLogic>,
         OpenApiFuzzerStateType,
         ObserversTupleType<'static>,
         CombinedFeedbackType<'static>,

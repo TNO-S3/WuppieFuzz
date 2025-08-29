@@ -10,11 +10,7 @@ use libafl::{
     schedulers::PowerQueueScheduler,
 };
 
-use crate::{
-    coverage_clients::CoverageClient,
-    input::OpenApiInput,
-    state::OpenApiFuzzerState,
-};
+use crate::{coverage_clients::CoverageClient, input::OpenApiInput, state::OpenApiFuzzerState};
 
 pub type ObserversTupleType<'a> = (
     LineCovObserverType<'a>,
