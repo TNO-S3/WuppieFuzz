@@ -56,7 +56,7 @@ use crate::{
 /// Sets up the various nuts and bolts required by LibAFL and runs the fuzzer until the configured
 /// timeout is reached, or until a (ctrl-c) interrupt is caught.
 pub fn fuzz() -> Result<()> {
-    // Preperatory stuff
+    // Preparatory stuff
     let config = &Configuration::get().map_err(anyhow::Error::msg)?;
     crate::setup_logging(config);
     let report_path = config.report.then(generate_report_path);
