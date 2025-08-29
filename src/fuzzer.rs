@@ -1,4 +1,4 @@
-use core::fmt::Debug;
+use core::hash::Hash;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{
@@ -12,25 +12,15 @@ use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus, minimizer::MapCorpusMinimizer},
-    events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager},
-    executors::ExitKind,
-    feedback_or,
-    feedbacks::{
+    corpus::{minimizer::MapCorpusMinimizer, Corpus, InMemoryOnDiskCorpus, OnDiskCorpus}, events::{Event, EventFirer, EventWithStats, ExecStats, SimpleEventManager}, executors::ExitKind, feedback_or, feedbacks::{
         CrashFeedback, CrashLogic, ExitKindFeedback, MaxMapFeedback, StateInitializer, TimeFeedback,
-    },
-    fuzzer::StdFuzzer,
-    mutators::HavocScheduledMutator,
-    observers::{CanTrack, MultiMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{
-        IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
-        testcase_score::CorpusPowerTestcaseScore,
-    },
-    stages::{CalibrationStage, StdPowerMutationalStage},
-    state::{HasCorpus, HasExecutions, Stoppable},
+    }, fuzzer::StdFuzzer, inputs::Input, mutators::{HavocScheduledMutator, Mutator}, observers::{CanTrack, MapObserver, MultiMapObserver, StdMapObserver, TimeObserver}, schedulers::{
+        powersched::PowerSchedule, testcase_score::CorpusPowerTestcaseScore, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler
+    }, stages::{CalibrationStage, StdPowerMutationalStage}, state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasSolutions, MaybeHasClientPerfMonitor}
 };
 use libafl_bolts::{
-    current_nanos, current_time, prelude::OwnedMutSlice, rands::StdRand, tuples::tuple_list,
+    AsIter, Named, current_nanos, current_time, prelude::OwnedMutSlice, rands::StdRand,
+    tuples::tuple_list,
 };
 use log::{error, info};
 use openapiv3::{OpenAPI, Server};
@@ -44,7 +34,8 @@ use crate::{
     openapi_mutator::havoc_mutations_openapi,
     state::OpenApiFuzzerState,
     types::{
-        CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType, EndpointObserverType,
+        CalibrationStageType, CombinedFeedbackType, CombinedMapObserverType, EndpointFeedbackType,
+        EndpointObserverType, EventManagerType, ExecutorType, FuzzerType,
         LineCovClientObserverFeedbackType, ObserversTupleType, OpenApiFuzzerStateType,
         SchedulerType,
     },
@@ -129,29 +120,8 @@ pub fn fuzz() -> Result<()> {
         endpoint_coverage_client,
     )?;
 
-    log::info!("Start corpus minimization");
-    log::info!("Size before {}", state.corpus().count());
-    minimizer.minimize(&mut fuzzer, &mut executor, &mut mgr, state)?;
-    log::info!("Size after {}", state.corpus().count());
-
-    // Fire an event to print the initial corpus size
-    let corpus_size = state.corpus().count();
-    if let Err(e) = mgr.fire(
-        state,
-        EventWithStats::new(
-            Event::NewTestcase {
-                input: OpenApiInput(vec![]),
-                observers_buf: None,
-                exit_kind: ExitKind::Ok,
-                corpus_size,
-                client_config: mgr.configuration(),
-                forward_id: None,
-            },
-            ExecStats::new(current_time(), 0),
-        ),
-    ) {
-        error!("Err: failed to fire event{e:?}")
-    }
+    // Minimize corpus
+    minimize_corpus(&mut mgr, minimizer, state, &mut fuzzer, &mut executor)?;
 
     log::debug!("Start fuzzing loop");
     loop {
@@ -175,10 +145,59 @@ pub fn fuzz() -> Result<()> {
         }
     }
 
+    // Coverage reporting
+    generate_coverage_reports(report_path, executor);
+
+    Ok(())
+}
+
+fn generate_coverage_reports(report_path: Option<PathBuf>, executor: ExecutorType) {
     if let Some(report_path) = report_path {
         executor.generate_coverage_report(&report_path);
     }
+}
 
+fn minimize_corpus<'a, C, O, T>(
+    mgr: &mut EventManagerType,
+    minimizer: MapCorpusMinimizer<
+        C,
+        ExecutorType<'a>,
+        OpenApiInput,
+        O,
+        OpenApiFuzzerStateType,
+        T,
+        CorpusPowerTestcaseScore,
+    >,
+    state: &mut OpenApiFuzzerStateType,
+    fuzzer: &mut FuzzerType<'a>,
+    executor: &mut ExecutorType<'a>,
+) -> Result<(), anyhow::Error>
+where
+    C: Named + AsRef<O>,
+    for<'b> O: MapObserver<Entry = T> + AsIter<'b, Item = T>,
+    T: Copy + Hash + Eq,
+{
+    log::info!("Start corpus minimization");
+    log::info!("Size before {}", state.corpus().count());
+    minimizer.minimize(fuzzer, executor, mgr, state)?;
+    log::info!("Size after {}", state.corpus().count());
+    let corpus_size = state.corpus().count();
+    let _: () = if let Err(e) = mgr.fire(
+        state,
+        EventWithStats::new(
+            Event::NewTestcase {
+                input: OpenApiInput(vec![]),
+                observers_buf: None,
+                exit_kind: ExitKind::Ok,
+                corpus_size,
+                client_config: mgr.configuration(),
+                forward_id: None,
+            },
+            ExecStats::new(current_time(), 0),
+        ),
+    ) {
+        error!("Err: failed to fire event{e:?}")
+    };
     Ok(())
 }
 
@@ -282,10 +301,7 @@ fn parse_api_spec(config: &&'static Configuration) -> Result<OpenAPI, anyhow::Er
     Ok(*api)
 }
 
-fn construct_event_mgr<I, S>() -> SimpleEventManager<I, CoverageMonitor<impl FnMut(String)>, S>
-where
-    I: Debug,
-    S: Stoppable,
+fn construct_event_mgr() -> EventManagerType
 {
     // The Monitor trait define how the fuzzer stats are reported to the user
     let mon = CoverageMonitor::new(Box::new(|s| info!("{s}")) as Box<dyn FnMut(String)>);

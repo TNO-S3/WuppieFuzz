@@ -4,13 +4,51 @@ use std::ptr::write_volatile;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    corpus::OnDiskCorpus,
-    feedbacks::{CombinedFeedback, LogicEagerOr, MaxMapFeedback, TimeFeedback},
+    NopInputFilter, StdFuzzer,
+    corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
+    events::SimpleEventManager,
+    feedbacks::{
+        CombinedFeedback, CrashLogic, ExitKindFeedback, LogicEagerOr, MaxMapFeedback, TimeFeedback,
+    },
+    inputs::NopToTargetBytes,
     observers::{ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
     schedulers::PowerQueueScheduler,
+    stages::CalibrationStage,
 };
 
-use crate::{coverage_clients::CoverageClient, input::OpenApiInput, state::OpenApiFuzzerState};
+use crate::{
+    coverage_clients::CoverageClient, executor::SequenceExecutor, input::OpenApiInput,
+    monitors::CoverageMonitor, state::OpenApiFuzzerState,
+};
+
+pub type CalibrationStageType<'a> = CalibrationStage<
+    LineCovObserverType<'a>,
+    OpenApiInput,
+    StdMapObserver<'a, u8, false>,
+    ObserversTupleType<'a>,
+    OpenApiFuzzerStateType,
+>;
+
+pub type FuzzerType<'a> = StdFuzzer<
+    SchedulerType<'a>,
+    CombinedFeedbackType<'a>,
+    NopToTargetBytes,
+    NopInputFilter,
+    ExitKindFeedback<CrashLogic>,
+>;
+
+pub type ExecutorType<'a> = SequenceExecutor<'a, ObserversTupleType<'a>>;
+
+pub type EventManagerType = SimpleEventManager<
+    OpenApiInput,
+    CoverageMonitor<Box<dyn FnMut(String)>>,
+    OpenApiFuzzerState<
+        OpenApiInput,
+        InMemoryOnDiskCorpus<OpenApiInput>,
+        libafl_bolts::prelude::RomuDuoJrRand,
+        OnDiskCorpus<OpenApiInput>,
+    >,
+>;
 
 pub type ObserversTupleType<'a> = (
     LineCovObserverType<'a>,
