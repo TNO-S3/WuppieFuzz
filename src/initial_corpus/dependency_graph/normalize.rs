@@ -143,7 +143,7 @@ fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalizat
     // ParameterNormalization::new(parameter.data.name.clone().into(), None)
 
     // NEW: We are lost at this point, we NEED a ParameterAccess. Just panic for now.
-    // TODO: find a solution
+    // TODO: find a solution, probably handle the Cookie and Header cases.
     panic!("Could not normalize parameter {:?}", parameter.data.name)
 }
 

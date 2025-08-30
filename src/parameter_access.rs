@@ -231,17 +231,8 @@ impl ParameterAccess {
     pub(crate) fn request_path(name: String) -> Self {
         Self::Request(RequestParameterAccess::Path(name))
     }
-    pub(crate) fn request_cookie(name: String) -> Self {
-        Self::Request(RequestParameterAccess::Cookie(name))
-    }
-    pub(crate) fn request_header(name: String) -> Self {
-        Self::Request(RequestParameterAccess::Header(name))
-    }
     pub(crate) fn request_body(elements: ParameterAccessElements) -> Self {
         Self::Request(RequestParameterAccess::Body(elements))
-    }
-    pub(crate) fn response_cookie(name: String) -> Self {
-        Self::Response(ResponseParameterAccess::Cookie(name))
     }
     pub(crate) fn response_body(elements: ParameterAccessElements) -> Self {
         Self::Response(ResponseParameterAccess::Body(elements))
@@ -267,17 +258,18 @@ impl ParameterAccess {
                 RequestParameterAccess::Body(elements) => {
                     Self::request_body(elements.with_new_element(new_element))
                 }
-                RequestParameterAccess::Query(name) => Self::request_query(name.clone()),
-                RequestParameterAccess::Path(name) => Self::request_path(name.clone()),
-                RequestParameterAccess::Header(name) => Self::request_header(name.clone()),
-                RequestParameterAccess::Cookie(name) => Self::request_cookie(name.clone()),
+                _ => panic!(
+                    "Trying to add element to {self:?}, but with_new_element is only sensible for Body variants."
+                ),
             },
             ParameterAccess::Response(response_parameter_access) => match response_parameter_access
             {
                 ResponseParameterAccess::Body(elements) => {
                     Self::response_body(elements.with_new_element(new_element))
                 }
-                ResponseParameterAccess::Cookie(name) => Self::response_cookie(name.clone()),
+                _ => panic!(
+                    "Trying to add element to {self:?}, but with_new_element is only sensible for Body variants."
+                ),
             },
         }
     }
