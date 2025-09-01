@@ -48,7 +48,7 @@ build_html = "2.7.0"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
 chrono = "0.4.41"
-clap = { version = "4.5.45", features = ["cargo", "derive", "env"] }
+clap = { version = "4.5.46", features = ["cargo", "derive", "env"] }
 ctrlc = "3.4.7"
 env_logger = "0.11.8"
 indexmap = { version = "2.11.0", features = ["serde"] }
