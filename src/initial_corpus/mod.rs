@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Context;
 use libafl::{
     HasMetadata,
     corpus::{
@@ -74,7 +75,7 @@ pub fn minimize_corpus<'a, C, O, T>(
     state: &mut OpenApiFuzzerStateType,
     fuzzer: &mut FuzzerType<'a>,
     executor: &mut ExecutorType<'a>,
-) -> Result<(), anyhow::Error>
+) -> anyhow::Result<()>
 where
     C: Named + AsRef<O>,
     for<'b> O: MapObserver<Entry = T> + AsIter<'b, Item = T>,
@@ -85,7 +86,7 @@ where
     minimizer.minimize(fuzzer, executor, mgr, state)?;
     log::info!("Size after {}", state.corpus().count());
     let corpus_size = state.corpus().count();
-    let _: () = if let Err(e) = mgr.fire(
+    mgr.fire(
         state,
         EventWithStats::new(
             Event::NewTestcase {
@@ -98,9 +99,8 @@ where
             },
             ExecStats::new(current_time(), 0),
         ),
-    ) {
-        log::error!("Err: failed to fire event{e:?}")
-    };
+    )
+    .context("Firing event after corpus minimization")?;
     Ok(())
 }
 
