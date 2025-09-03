@@ -906,7 +906,7 @@ pub fn openapi_inputs_from_ops<'a>(
     let total_combinations: usize = concrete_requests
         .iter()
         .try_fold(1, |acc: usize, elem| acc.checked_mul(elem.len()))
-        .ok_or("Error")?;
+        .ok_or("Corpus generation would generate billions of inputs, fall back to simple examples.")?;
     if total_combinations > 10000 {
         return Err(format!(
             "Corpus generation would try to create {total_combinations} inputs, fall back to simple examples."
