@@ -57,7 +57,7 @@ pub fn fuzz() -> Result<()> {
         config.initial_corpus.as_deref(),
         &report_path.as_deref(),
     );
-    let mut state = OpenApiFuzzerState::new_uninit(initial_corpus, api.clone())?;
+    let mut state_uninit = OpenApiFuzzerState::new_uninit(initial_corpus, api.clone())?;
 
     let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 
@@ -82,7 +82,7 @@ pub fn fuzz() -> Result<()> {
     // Scheduler
     let (scheduler, combined_map_observer) = construct_scheduler(
         config,
-        &mut state,
+        &mut state_uninit,
         &mut endpoint_coverage_client,
         &mut code_coverage_client,
     );
@@ -98,7 +98,7 @@ pub fn fuzz() -> Result<()> {
         code_coverage_feedback,
         time_feedback, // Time feedback, this one does not need a feedback state
     );
-    state.initialize(&mut objective, &mut collective_feedback)?;
+    let mut state = state_uninit.initialize(&mut objective, &mut collective_feedback)?;
 
     // Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);

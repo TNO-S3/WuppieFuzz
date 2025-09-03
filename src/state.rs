@@ -369,13 +369,13 @@ where
     }
 
     pub fn initialize(
-        &mut self,
+        mut self,
         objective: &mut ExitKindFeedback<CrashLogic>,
         collective_feedback: &mut CombinedFeedbackType,
-    ) -> anyhow::Result<()> {
-        collective_feedback.init_state(self)?;
-        objective.init_state(self)?;
-        Ok(())
+    ) -> anyhow::Result<Self> {
+        collective_feedback.init_state(&mut self)?;
+        objective.init_state(&mut self)?;
+        Ok(self)
     }
 }
 
