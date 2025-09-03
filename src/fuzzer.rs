@@ -69,11 +69,8 @@ pub fn fuzz() -> Result<()> {
         setup_endpoint_coverage(api.clone())?;
     let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
-    let (time_observer, time_feedback) = {
-        let observer = TimeObserver::new("time");
-        let feedback = TimeFeedback::new(&observer);
-        (observer, feedback)
-    };
+    let time_observer = TimeObserver::new("time");
+    let time_feedback = TimeFeedback::new(&time_observer);
 
     // Stages
     let calibration = CalibrationStage::new(&code_coverage_feedback);
