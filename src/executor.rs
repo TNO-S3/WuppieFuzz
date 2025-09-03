@@ -41,12 +41,7 @@ use crate::{
 /// How often to print a new log line
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5;
 
-type FuzzerState = crate::state::OpenApiFuzzerState<
-    OpenApiInput,
-    libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-    libafl_bolts::rands::RomuDuoJrRand,
-    libafl::corpus::OnDiskCorpus<OpenApiInput>,
->;
+type FuzzerState = crate::state::OpenApiFuzzerState<OpenApiInput>;
 
 /// The Executor for sending Sequences of OpenAPI requests to the target.
 /// It is responsible for executing inputs chosen by the fuzzer, and tracking
@@ -324,6 +319,14 @@ where
     pub fn generate_coverage_report(&self, report_path: &std::path::Path) {
         self.endpoint_client.generate_coverage_report(report_path);
         self.coverage_client.generate_coverage_report(report_path);
+    }
+
+    /// Uses the embedded coverage clients to generate a coverage report
+    /// if a path is given (`report_path.is_some()`).
+    pub fn generate_coverage_report_if_path(&self, report_path: Option<&std::path::Path>) {
+        if let Some(path) = report_path {
+            self.generate_coverage_report(path);
+        }
     }
 }
 

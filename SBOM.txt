@@ -43,10 +43,10 @@ backtrace 0.3.75
 base64 0.22.1
 	licensed under "Apache-2.0 OR MIT"
 	by Marshall Pierce <marshall@mpierce.org>
-bitflags 2.9.2
+bitflags 2.9.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-build_html 2.6.0
+build_html 2.7.0
 	licensed under "MIT"
 	by Joseph Skubal
 bumpalo 3.19.0
@@ -64,16 +64,16 @@ bytes 1.10.1
 cesu8 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Eric Kidd <git@randomhacks.net>
-cfg-if 1.0.1
+cfg-if 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
 chrono 0.4.41
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.45
+clap 4.5.46
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.44
+clap_builder 4.5.46
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.5
@@ -118,7 +118,7 @@ ctor-proc-macro 0.0.6
 ctrlc 3.4.7
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
-deranged 0.4.0
+deranged 0.5.3
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
 document-features 0.2.11
@@ -163,7 +163,7 @@ fallible-iterator 0.3.0
 fallible-streaming-iterator 0.1.9
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
-fastbloom 0.11.0
+fastbloom 0.14.0
 	licensed under "Apache-2.0 OR MIT"
 	by tomtomwombat
 fixedbitset 0.5.7
@@ -181,7 +181,7 @@ foreign-types 0.3.2
 foreign-types-shared 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
-form_urlencoded 1.2.1
+form_urlencoded 1.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
 fs2 0.4.3
@@ -280,19 +280,19 @@ icu_properties_data 2.0.1
 icu_provider 2.0.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-idna 1.0.3
+idna 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
 idna_adapter 1.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-indexmap 2.10.0
+indexmap 2.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 indicatif 0.18.0
 	licensed under "MIT"
 	by unspecified authors
-io-uring 0.7.9
+io-uring 0.7.10
 	licensed under "Apache-2.0 OR MIT"
 	by quininer <quininer@live.com>
 ipnet 2.11.0
@@ -337,10 +337,10 @@ lazy_static 1.5.0
 lcov 0.8.1
 	licensed under "Apache-2.0 OR MIT"
 	by gifnksm <makoto.nksm+github@gmail.com>
-libafl 0.15.3
+libafl 0.15.4
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libafl_bolts 0.15.3
+libafl_bolts 0.15.4
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
 libafl_wide 0.7.33
@@ -364,7 +364,7 @@ lock_api 0.4.13
 log 0.4.27
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-mach2 0.4.3
+mach2 0.5.0
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
 memchr 2.7.5
@@ -388,9 +388,6 @@ mio 1.0.4
 native-tls 0.2.14
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
-nix 0.29.0
-	licensed under "MIT"
-	by The nix-rust Project Developers
 nix 0.30.1
 	licensed under "MIT"
 	by The nix-rust Project Developers
@@ -439,7 +436,7 @@ parking_lot 0.12.4
 parking_lot_core 0.9.11
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-percent-encoding 2.3.1
+percent-encoding 2.3.2
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
 petgraph 0.8.2
@@ -463,7 +460,7 @@ porter-stemmer 0.1.2
 postcard 1.1.3
 	licensed under "Apache-2.0 OR MIT"
 	by James Munns <james@onevariable.com>
-potential_utf 0.1.2
+potential_utf 0.1.3
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 powerfmt 0.2.0
@@ -496,13 +493,13 @@ rand_regex 0.18.1
 redox_syscall 0.5.17
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
-regex 1.11.1
+regex 1.11.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-automata 0.4.9
+regex-automata 0.4.10
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-syntax 0.8.5
+regex-syntax 0.8.6
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
 reqwest 0.12.23
@@ -598,7 +595,7 @@ system-configuration 0.6.1
 system-configuration-sys 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
-tempfile 3.20.0
+tempfile 3.21.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
 thiserror-impl 1.0.69
@@ -607,10 +604,10 @@ thiserror-impl 1.0.69
 thiserror-impl 2.0.14
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-time 0.3.41
+time 0.3.42
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
-time-macros 0.2.22
+time-macros 0.2.23
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
 tinystr 0.8.1
@@ -652,16 +649,16 @@ try-lock 0.2.5
 tuple_list 0.1.3
 	licensed under "MIT"
 	by Valerii Lashmanov <vflashm@gmail.com>
-typed-builder 0.21.1
+typed-builder 0.21.2
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
-typed-builder-macro 0.21.1
+typed-builder-macro 0.21.2
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
 typeid 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-typewit 1.12.1
+typewit 1.13.0
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 uds 0.4.2
@@ -688,7 +685,10 @@ unsafe-libyaml 0.2.11
 untrusted 0.9.0
 	licensed under "ISC"
 	by Brian Smith <brian@briansmith.org>
-url 2.5.4
+unty 0.0.4
+	licensed under "Apache-2.0 OR MIT"
+	by Victor Koenders <bincode@trang.ar>
+url 2.5.7
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
 urlencoding 2.1.3
@@ -742,16 +742,13 @@ web-sys 0.3.77
 web-time 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-wide 0.7.33
-	licensed under "Apache-2.0 OR MIT OR Zlib"
-	by Lokathor <zefria@gmail.com>
 winapi 0.3.9
 	licensed under "Apache-2.0 OR MIT"
 	by Peter Atashian <retep998@gmail.com>
 winapi-i686-pc-windows-gnu 0.4.0
 	licensed under "Apache-2.0 OR MIT"
 	by Peter Atashian <retep998@gmail.com>
-winapi-util 0.1.9
+winapi-util 0.1.10
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
 winapi-x86_64-pc-windows-gnu 0.4.0
@@ -868,6 +865,12 @@ yoke 0.8.0
 yoke-derive 0.8.0
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
+z3 0.12.1
+	licensed under "MIT"
+	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>
+z3-sys 0.8.1
+	licensed under "MIT"
+	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>
 zerocopy 0.8.26
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>

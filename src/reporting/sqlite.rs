@@ -2,16 +2,15 @@ use std::{fs::create_dir_all, path::Path};
 
 use anyhow::Context;
 use chrono::SecondsFormat;
-use libafl::corpus::{InMemoryOnDiskCorpus, OnDiskCorpus};
 use log::info;
 use rusqlite::{Connection, named_params};
 
 use crate::{
     configuration::Configuration,
-    input::{OpenApiInput, OpenApiRequest},
+    input::OpenApiRequest,
     openapi::{curl_request::CurlRequest, validate_response::Response},
     reporting::Reporting,
-    state::OpenApiFuzzerState,
+    types::OpenApiFuzzerStateType,
 };
 
 /// Instantiates a MySqLite reporter if desired by the configuration
@@ -103,19 +102,12 @@ impl MySqLite {
     }
 }
 
-type Oafs = OpenApiFuzzerState<
-    OpenApiInput,
-    InMemoryOnDiskCorpus<OpenApiInput>,
-    libafl_bolts::rands::RomuDuoJrRand,
-    OnDiskCorpus<OpenApiInput>,
->;
-
-impl Reporting<i64, Oafs> for MySqLite {
+impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
     fn report_request(
         &self,
         request: &OpenApiRequest,
         curl: &CurlRequest,
-        state: &Oafs,
+        state: &OpenApiFuzzerStateType,
         input_id: usize,
     ) -> i64 {
         let path = &request.path;
