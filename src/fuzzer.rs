@@ -37,7 +37,7 @@ use crate::{
     openapi::parse_api_spec,
     openapi_mutator::havoc_mutations_openapi,
     reporting::{generate_coverage_reports, generate_report_path},
-    state::{construct_state_uninit, init_state},
+    state::construct_state_uninit,
     types::{CombinedMapObserverType, ObserversTupleType, OpenApiFuzzerStateType, SchedulerType},
 };
 
@@ -57,7 +57,7 @@ pub fn fuzz() -> Result<()> {
         config.initial_corpus.as_deref(),
         &report_path.as_deref(),
     );
-    let mut state_uninit = construct_state_uninit(&api, initial_corpus)?;
+    let mut state = construct_state_uninit(&api, initial_corpus)?;
 
     let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 
@@ -85,7 +85,7 @@ pub fn fuzz() -> Result<()> {
     // Scheduler
     let (scheduler, combined_map_observer) = construct_scheduler(
         config,
-        &mut state_uninit,
+        &mut state,
         &mut endpoint_coverage_client,
         &mut code_coverage_client,
     );
@@ -101,7 +101,7 @@ pub fn fuzz() -> Result<()> {
         code_coverage_feedback,
         time_feedback, // Time feedback, this one does not need a feedback state
     );
-    let state = init_state(&mut objective, &mut collective_feedback, &mut state_uninit)?;
+    state.initialize(&mut objective, &mut collective_feedback)?;
 
     // Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, collective_feedback, objective);
@@ -125,11 +125,11 @@ pub fn fuzz() -> Result<()> {
     )?;
 
     // Minimize corpus
-    minimize_corpus(&mut mgr, minimizer, state, &mut fuzzer, &mut executor)?;
+    minimize_corpus(&mut mgr, minimizer, &mut state, &mut fuzzer, &mut executor)?;
 
     log::debug!("Start fuzzing loop");
     loop {
-        match fuzzer.fuzz_one(&mut stages, &mut executor, state, &mut mgr) {
+        match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) => (),
             Err(libafl_bolts::Error::ShuttingDown) => {
                 log::info!("[Fuzzing campaign ended] Thanks for using WuppieFuzz!");
@@ -142,7 +142,7 @@ pub fn fuzz() -> Result<()> {
         // send update of execution data to the monitor
         let executions = *state.executions();
         if let Err(e) = mgr.fire(
-            state,
+            &mut state,
             EventWithStats::new(Event::Heartbeat, ExecStats::new(current_time(), executions)),
         ) {
             error!("Err: failed to fire event{e:?}")

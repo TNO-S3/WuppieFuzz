@@ -49,16 +49,6 @@ pub fn construct_state_uninit(
     )?)
 }
 
-pub fn init_state<'a>(
-    objective: &mut ExitKindFeedback<CrashLogic>,
-    collective_feedback: &mut CombinedFeedbackType<'a>,
-    state: &'a mut OpenApiFuzzerStateType,
-) -> Result<&'a mut OpenApiFuzzerStateType, anyhow::Error> {
-    collective_feedback.init_state(state)?;
-    objective.init_state(state)?;
-    Ok(state)
-}
-
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///
 /// We have a bespoke one so we're able to pass the api spec to mutators,
@@ -423,6 +413,16 @@ where
         };
         state.add_metadata(SchedulerMetadata::new(None));
         Ok(state)
+    }
+
+    pub fn initialize(
+        &mut self,
+        objective: &mut ExitKindFeedback<CrashLogic>,
+        collective_feedback: &mut CombinedFeedbackType,
+    ) -> anyhow::Result<()> {
+        collective_feedback.init_state(self)?;
+        objective.init_state(self)?;
+        Ok(())
     }
 }
 
