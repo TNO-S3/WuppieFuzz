@@ -5,7 +5,7 @@ use libafl::{corpus::Corpus, state::HasCorpus};
 use crate::{
     input::OpenApiRequest,
     openapi::{curl_request::CurlRequest, validate_response::Response},
-    types::{ExecutorType, OpenApiFuzzerStateType},
+    types::OpenApiFuzzerStateType,
 };
 
 pub mod sqlite;
@@ -20,12 +20,6 @@ pub fn generate_report_path() -> PathBuf {
     let report_path = PathBuf::from("reports").join(timestamp);
     create_dir_all(&report_path).expect("unable to make reports directory");
     report_path
-}
-
-pub fn generate_coverage_reports(report_path: Option<PathBuf>, executor: ExecutorType) {
-    if let Some(report_path) = report_path {
-        executor.generate_coverage_report(&report_path);
-    }
 }
 
 // The reporting trait allows reporting requests and responses for later analysis.

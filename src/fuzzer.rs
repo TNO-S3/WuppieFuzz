@@ -36,7 +36,7 @@ use crate::{
     monitors::construct_event_mgr,
     openapi::parse_api_spec,
     openapi_mutator::havoc_mutations_openapi,
-    reporting::{generate_coverage_reports, generate_report_path},
+    reporting::generate_report_path,
     state::OpenApiFuzzerState,
     types::{CombinedMapObserverType, ObserversTupleType, OpenApiFuzzerStateType, SchedulerType},
 };
@@ -147,7 +147,7 @@ pub fn fuzz() -> Result<()> {
     }
 
     // Coverage reporting
-    generate_coverage_reports(report_path, executor);
+    executor.generate_coverage_report_if_path(report_path.as_deref());
 
     Ok(())
 }

@@ -320,6 +320,14 @@ where
         self.endpoint_client.generate_coverage_report(report_path);
         self.coverage_client.generate_coverage_report(report_path);
     }
+
+    /// Uses the embedded coverage clients to generate a coverage report
+    /// if a path is given (`report_path.is_some()`).
+    pub fn generate_coverage_report_if_path(&self, report_path: Option<&std::path::Path>) {
+        if let Some(path) = report_path {
+            self.generate_coverage_report(path);
+        }
+    }
 }
 
 impl<EM, FZ, OT> Executor<EM, OpenApiInput, FuzzerState, FZ> for SequenceExecutor<'_, OT>
