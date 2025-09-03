@@ -20,7 +20,6 @@ use libafl::{
     state::{HasExecutions, Stoppable},
 };
 use libafl_bolts::{current_time, prelude::RefIndexable};
-use log::{debug, error};
 use openapiv3::OpenAPI;
 use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
@@ -42,12 +41,7 @@ use crate::{
 /// How often to print a new log line
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5;
 
-type FuzzerState = crate::state::OpenApiFuzzerState<
-    OpenApiInput,
-    libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-    libafl_bolts::rands::RomuDuoJrRand,
-    libafl::corpus::OnDiskCorpus<OpenApiInput>,
->;
+type FuzzerState = crate::state::OpenApiFuzzerState<OpenApiInput>;
 
 /// The Executor for sending Sequences of OpenAPI requests to the target.
 /// It is responsible for executing inputs chosen by the fuzzer, and tracking
@@ -135,7 +129,7 @@ where
             let mut request = request.clone();
             log::trace!("OpenAPI request:\n{request:#?}");
             if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
-                debug!(
+                log::debug!(
                     "Cannot instantiate request: missing value for backreferenced parameter: {error}. Maybe the earlier request crashed?"
                 );
                 break 'chain;
@@ -148,7 +142,7 @@ where
                 &request,
             ) {
                 Err(err) => {
-                    error!("Error building request: {err}");
+                    log::error!("Error building request: {err}");
                     continue;
                 }
                 Ok(r) => r.timeout(Duration::from_millis(self.config.request_timeout)),
@@ -159,7 +153,7 @@ where
                 Err(err) => {
                     // We don't expect errors to occur in the reqwest builder. If one occurs,
                     // it's not the target's fault, so we don't set ExitKind::Crash or Timeout.
-                    error!("Error building request: {err}");
+                    log::error!("Error building request: {err}");
                     break;
                 }
             };
@@ -219,7 +213,7 @@ where
                 Err(transport_error) => {
                     self.reporter
                         .report_response_error(&transport_error.to_string(), reporter_request_id);
-                    error!("{transport_error}");
+                    log::error!("{transport_error}");
                     exit_kind = ExitKind::Timeout;
                     break;
                 }
@@ -315,7 +309,7 @@ where
                     ExecStats::new(current_time(), *state.executions()),
                 ),
             ) {
-                error!("Err: failed to fire event{e:?}");
+                log::error!("Err: failed to fire event{e:?}");
             }
             state.request_stop();
         }
@@ -325,6 +319,14 @@ where
     pub fn generate_coverage_report(&self, report_path: &std::path::Path) {
         self.endpoint_client.generate_coverage_report(report_path);
         self.coverage_client.generate_coverage_report(report_path);
+    }
+
+    /// Uses the embedded coverage clients to generate a coverage report
+    /// if a path is given (`report_path.is_some()`).
+    pub fn generate_coverage_report_if_path(&self, report_path: Option<&std::path::Path>) {
+        if let Some(path) = report_path {
+            self.generate_coverage_report(path);
+        }
     }
 }
 
@@ -391,7 +393,7 @@ fn update_stats<EM>(
             ExecStats::new(current_time(), *state.executions()),
         ),
     ) {
-        error!("Err: failed to fire event {name}: {e:?}")
+        log::error!("Err: failed to fire event {name}: {e:?}")
     }
 }
 

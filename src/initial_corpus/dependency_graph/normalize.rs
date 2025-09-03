@@ -12,7 +12,6 @@
 use openapiv3::{
     MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, Schema, SchemaKind,
 };
-use porter_stemmer::stem;
 
 use crate::{input::parameter::ParameterKind, openapi::JsonContent};
 
@@ -41,11 +40,16 @@ impl<'a> ParameterNormalization<'a> {
                 // called `id` in other context, such as when part of a `Widget` object
                 // in a body.
                 let last = name.len() - 1;
-                let no_context_name = match name.find('_') {
-                    Some(i) if (i != 0 && i != last && stem(context) == stem(&name[..i])) => {
-                        &name[i + 1..]
-                    }
-                    _ => name,
+                let no_context_name = if let Some(i) = name.find(['-', '_'])
+                    && (i != 0 && i != last && stem(context) == stem(&name[..i]))
+                {
+                    &name[i + 1..]
+                } else if ["id", "Id", "ID"].iter().any(|id| name.ends_with(id))
+                    && stem(context) == stem(&name[..name.len() - 2])
+                {
+                    "id"
+                } else {
+                    name
                 };
 
                 Self {
@@ -206,6 +210,10 @@ fn path_context_component(path: &str) -> Option<&str> {
         .find(|component| !component.is_empty() && !component.starts_with('{'))
 }
 
+fn stem(name: &str) -> String {
+    porter_stemmer::stem(name).to_lowercase()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,6 +268,34 @@ mod tests {
                 normalized: "countri|widget_id".into(),
             },
             ParameterNormalization::new("widget_id", Some("countries"))
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "pet-id",
+                normalized: "pet|id".into(),
+            },
+            ParameterNormalization::new("pet-id", Some("pets"))
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "petId",
+                normalized: "pet|id".into(),
+            },
+            ParameterNormalization::new("petId", Some("pets"))
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "petid",
+                normalized: "pet|id".into(),
+            },
+            ParameterNormalization::new("petid", Some("pet"))
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "PetID",
+                normalized: "pet|id".into(),
+            },
+            ParameterNormalization::new("PetID", Some("pet"))
         );
     }
 

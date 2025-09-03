@@ -564,6 +564,17 @@ pub enum CoverageConfiguration {
     Coverband { source_dir: Option<PathBuf> },
 }
 
+impl CoverageConfiguration {
+    pub fn type_str(&self) -> &'static str {
+        match self {
+            Self::Endpoint => "endpoint-only",
+            Self::Lcov { .. } => "LCOV",
+            Self::Jacoco { .. } => "JaCoCo",
+            Self::Coverband { .. } => "Coverband",
+        }
+    }
+}
+
 impl Configuration {
     /// Attempts to gather configuration from all sources. If certain required
     /// parameters are missing, the `Err` variant specifies what is missing.

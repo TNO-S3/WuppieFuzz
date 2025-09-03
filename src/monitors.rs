@@ -6,6 +6,7 @@ use std::{borrow::Cow, fmt};
 
 use libafl::{
     alloc::fmt::Debug,
+    events::SimpleEventManager,
     monitors::{
         Monitor,
         stats::{AggregatorOps, ClientStats, ClientStatsManager, UserStats, UserStatsValue},
@@ -14,7 +15,20 @@ use libafl::{
 use libafl_bolts::{ClientId, Error, current_time, format_duration};
 use serde_json::json;
 
-use crate::configuration::{Configuration, OutputFormat};
+use crate::{
+    configuration::{Configuration, OutputFormat},
+    types::EventManagerType,
+};
+
+/// Constructs an event manager
+pub fn construct_event_mgr() -> EventManagerType {
+    // The Monitor trait define how the fuzzer stats are reported to the user
+    let mon = CoverageMonitor::new(Box::new(|s| log::info!("{s}")) as Box<dyn FnMut(String)>);
+
+    // The event manager handle the various events generated during the fuzzing loop
+    // such as the notification of the addition of a new item to the corpus
+    SimpleEventManager::new(mon)
+}
 
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]
