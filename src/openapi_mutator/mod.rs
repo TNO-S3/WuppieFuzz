@@ -11,8 +11,7 @@ use std::borrow::Cow;
 pub use libafl::mutators::mutations::*;
 use libafl::{
     Error,
-    corpus::Corpus,
-    inputs::{BytesInput, HasMutatorBytes, Input},
+    inputs::{BytesInput, HasMutatorBytes},
     mutators::{MutationResult, Mutator},
     state::HasRand,
 };
@@ -24,7 +23,7 @@ use libafl_bolts::{
 
 use crate::{
     input::{OpenApiInput, ParameterContents, new_rand_input, parameter::SimpleValue},
-    state::OpenApiFuzzerState,
+    types::OpenApiFuzzerStateType,
 };
 
 pub mod add_request;
@@ -50,45 +49,39 @@ use string_interesting::StringInterestingMutator;
 pub mod test_helpers;
 
 /// Creates a tuple list containing all available mutators from this module.
-pub fn havoc_mutations_openapi<C, I, R, SC>() -> tuple_list_type!(
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-    OpenApiMutator<OpenApiFuzzerState<I, C, R, SC>>,
-)
-where
-    C: Corpus<I> + 'static,
-    I: Input + 'static,
-    R: Rand + 'static,
-    SC: Corpus<I> + 'static,
-{
+pub fn havoc_mutations_openapi() -> tuple_list_type!(
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
+) {
     tuple_list!(
         OpenApiMutator::from_bytes_mutator(Box::new(BitFlipMutator::new())),
         OpenApiMutator::from_bytes_mutator(Box::new(ByteAddMutator::new())),

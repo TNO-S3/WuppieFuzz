@@ -26,42 +26,18 @@ use libafl_bolts::{
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
 use openapiv3::OpenAPI;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    input::OpenApiInput,
-    types::{CombinedFeedbackType, OpenApiFuzzerStateType},
-};
-
-pub fn construct_state_uninit(
-    api: &OpenAPI,
-    initial_corpus: InMemoryOnDiskCorpus<OpenApiInput>,
-) -> Result<OpenApiFuzzerStateType, anyhow::Error> {
-    Ok(OpenApiFuzzerState::new_uninit(
-        // RNG
-        StdRand::with_seed(current_nanos()),
-        // Corpus that will be evolved, we keep it in memory for performance
-        initial_corpus,
-        // Corpus in which we store solutions (crashes in this example),
-        // on disk so the user can get them after stopping the fuzzer
-        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-        api.clone(),
-    )?)
-}
+use crate::types::CombinedFeedbackType;
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///
 /// We have a bespoke one so we're able to pass the api spec to mutators,
 /// which get a reference to the state object as argument to the mutate method.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "
-        C: serde::Serialize + for<'a> serde::Deserialize<'a>,
-        SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
-        R: serde::Serialize + for<'a> serde::Deserialize<'a>
-    ")]
-pub struct OpenApiFuzzerState<I, C, R, SC> {
+pub struct OpenApiFuzzerState<I> {
     /// RNG instance
-    rand: R,
+    rand: StdRand,
     /// How many times the executor ran the harness/target
     executions: u64,
     /// Request to stop
@@ -69,9 +45,9 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
     /// At what time the fuzzing started
     start_time: Duration,
     /// The corpus
-    corpus: C,
+    corpus: InMemoryOnDiskCorpus<I>,
     /// Solutions corpus
-    solutions: SC,
+    solutions: OnDiskCorpus<I>,
     /// The current stage
     current_stage: Option<StageId>,
     /// The current corpus Id
@@ -91,7 +67,7 @@ pub struct OpenApiFuzzerState<I, C, R, SC> {
     api: OpenAPI,
 }
 
-impl<I, C, R, SC> HasCurrentStageId for OpenApiFuzzerState<I, C, R, SC> {
+impl<I> HasCurrentStageId for OpenApiFuzzerState<I> {
     fn set_current_stage_id(&mut self, idx: StageId) -> Result<(), Error> {
         self.current_stage = Some(idx);
         Ok(())
@@ -107,7 +83,7 @@ impl<I, C, R, SC> HasCurrentStageId for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasCurrentCorpusId for OpenApiFuzzerState<I, C, R, SC> {
+impl<I> HasCurrentCorpusId for OpenApiFuzzerState<I> {
     fn set_corpus_id(&mut self, id: CorpusId) -> Result<(), Error> {
         self.current_corpus_id = Some(id);
         Ok(())
@@ -123,7 +99,7 @@ impl<I, C, R, SC> HasCurrentCorpusId for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> Stoppable for OpenApiFuzzerState<I, C, R, SC> {
+impl<I> Stoppable for OpenApiFuzzerState<I> {
     fn stop_requested(&self) -> bool {
         self.stop_requested
     }
@@ -137,11 +113,8 @@ impl<I, C, R, SC> Stoppable for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasRand for OpenApiFuzzerState<I, C, R, SC>
-where
-    R: Rand,
-{
-    type Rand = R;
+impl<I> HasRand for OpenApiFuzzerState<I> {
+    type Rand = StdRand;
 
     /// The rand instance
     #[inline]
@@ -156,9 +129,9 @@ where
     }
 }
 
-impl<I, C, R, SC> HasTestcase<I> for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasTestcase<I> for OpenApiFuzzerState<I>
 where
-    C: Corpus<I>,
+    I: Input,
 {
     /// To get the testcase
     fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error> {
@@ -171,7 +144,7 @@ where
     }
 }
 
-impl<I, C, R, SC> HasLastFoundTime for OpenApiFuzzerState<I, C, R, SC> {
+impl<I> HasLastFoundTime for OpenApiFuzzerState<I> {
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn last_found_time(&self) -> &Duration {
@@ -185,11 +158,11 @@ impl<I, C, R, SC> HasLastFoundTime for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasCorpus<I> for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasCorpus<I> for OpenApiFuzzerState<I>
 where
-    C: Corpus<I>,
+    I: Input,
 {
-    type Corpus = C;
+    type Corpus = InMemoryOnDiskCorpus<I>;
 
     /// Returns the corpus
     #[inline]
@@ -204,32 +177,28 @@ where
     }
 }
 
-impl<I, C, R, SC> HasSolutions<I> for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasSolutions<I> for OpenApiFuzzerState<I>
 where
     I: Input,
-    SC: Corpus<I>,
 {
-    type Solutions = SC;
+    type Solutions = OnDiskCorpus<I>;
 
     /// Returns the solutions corpus
     #[inline]
-    fn solutions(&self) -> &SC {
+    fn solutions(&self) -> &OnDiskCorpus<I> {
         &self.solutions
     }
 
     /// Returns the solutions corpus (mutable)
     #[inline]
-    fn solutions_mut(&mut self) -> &mut SC {
+    fn solutions_mut(&mut self) -> &mut OnDiskCorpus<I> {
         &mut self.solutions
     }
 }
 
-impl<I, C, R, SC> HasMetadata for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasMetadata for OpenApiFuzzerState<I>
 where
     I: Input,
-    C: Corpus<I>,
-    R: Rand,
-    SC: Corpus<I>,
 {
     /// Get all the metadata into a HashMap
     #[inline]
@@ -244,12 +213,9 @@ where
     }
 }
 
-impl<I, C, R, SC> HasExecutions for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasExecutions for OpenApiFuzzerState<I>
 where
     I: Input,
-    C: Corpus<I>,
-    R: Rand,
-    SC: Corpus<I>,
 {
     /// The executions counter
     #[inline]
@@ -264,12 +230,9 @@ where
     }
 }
 
-impl<C, I, R, SC> HasMaxSize for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasMaxSize for OpenApiFuzzerState<I>
 where
     I: Input,
-    C: Corpus<I>,
-    R: Rand,
-    SC: Corpus<I>,
 {
     fn max_size(&self) -> usize {
         self.max_size
@@ -280,12 +243,9 @@ where
     }
 }
 
-impl<C, I, R, SC> HasStartTime for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasStartTime for OpenApiFuzzerState<I>
 where
     I: Input,
-    C: Corpus<I>,
-    R: Rand,
-    SC: Corpus<I>,
 {
     /// The starting time
     #[inline]
@@ -300,7 +260,7 @@ where
     }
 }
 
-impl<I, C, R, SC> HasNamedMetadata for OpenApiFuzzerState<I, C, R, SC> {
+impl<I> HasNamedMetadata for OpenApiFuzzerState<I> {
     /// Get all the metadata into an HashMap
     #[inline]
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
@@ -314,12 +274,9 @@ impl<I, C, R, SC> HasNamedMetadata for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasLastReportTime for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasLastReportTime for OpenApiFuzzerState<I>
 where
     I: Input,
-    C: Corpus<I>,
-    R: Rand,
-    SC: Corpus<I>,
 {
     fn last_report_time(&self) -> &Option<Duration> {
         todo!()
@@ -330,7 +287,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasImported for OpenApiFuzzerState<I, C, R, SC> {
+impl<I> HasImported for OpenApiFuzzerState<I> {
     fn imported(&self) -> &usize {
         todo!()
     }
@@ -340,18 +297,15 @@ impl<C, I, R, SC> HasImported for OpenApiFuzzerState<I, C, R, SC> {
     }
 }
 
-impl<C, I, R, SC> OpenApiFuzzerState<I, C, R, SC>
+impl<I> OpenApiFuzzerState<I>
 where
     I: Input,
-    C: Corpus<I>,
-    R: Rand,
-    SC: Corpus<I>,
 {
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
     pub fn new<F, O>(
-        rand: R,
-        corpus: C,
-        solutions: SC,
+        rand: StdRand,
+        corpus: InMemoryOnDiskCorpus<I>,
+        solutions: OnDiskCorpus<I>,
         feedback: &mut F,
         objective: &mut O,
         api: OpenAPI,
@@ -359,8 +313,6 @@ where
     where
         F: StateInitializer<Self>,
         O: StateInitializer<Self>,
-        C: Serialize + DeserializeOwned,
-        SC: Serialize + DeserializeOwned,
     {
         let mut state = Self {
             rand,
@@ -387,21 +339,22 @@ where
         Ok(state)
     }
 
-    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    pub fn new_uninit(rand: R, corpus: C, solutions: SC, api: OpenAPI) -> Result<Self, Error>
-    where
-        C: Serialize + DeserializeOwned,
-        SC: Serialize + DeserializeOwned,
-    {
+    /// Creates a new partially initialized `State`, which needs to be `initialize`d later.
+    pub fn new_uninit(
+        initial_corpus: InMemoryOnDiskCorpus<I>,
+        api: OpenAPI,
+    ) -> Result<Self, Error> {
         let mut state = Self {
-            rand,
+            rand: StdRand::with_seed(current_nanos()),
             executions: 0,
             stop_requested: false,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
-            corpus,
-            solutions,
+            corpus: initial_corpus,
+            // Corpus in which we store solutions (crashes in this example),
+            // on disk so the user can get them after stopping the fuzzer
+            solutions: OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
             max_size: libafl::state::DEFAULT_MAX_SIZE,
             #[cfg(feature = "std")]
             remaining_initial_files: None,
@@ -432,12 +385,9 @@ pub trait HasRandAndOpenAPI {
     fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &OpenAPI);
 }
 
-impl<C, I, R, SC> HasRandAndOpenAPI for OpenApiFuzzerState<I, C, R, SC>
+impl<I> HasRandAndOpenAPI for OpenApiFuzzerState<I>
 where
     I: Input,
-    C: Corpus<I>,
-    R: Rand,
-    SC: Corpus<I>,
 {
     type Rand = <Self as HasRand>::Rand;
     fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &OpenAPI) {

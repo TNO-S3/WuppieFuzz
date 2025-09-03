@@ -1,11 +1,9 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
 
-#[allow(unused_imports)]
-use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
+// This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
     NopInputFilter, StdFuzzer,
-    corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     feedbacks::{
         CombinedFeedback, CrashLogic, ExitKindFeedback, LogicEagerOr, MapIndexesMetadata,
@@ -15,7 +13,6 @@ use libafl::{
     observers::{ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
     schedulers::{LenTimeMulTestcaseScore, MinimizerScheduler, PowerQueueScheduler},
 };
-use libafl_bolts::rands::RomuDuoJrRand;
 
 use crate::{
     coverage_clients::CoverageClient, executor::SequenceExecutor, input::OpenApiInput,
@@ -35,12 +32,7 @@ pub type ExecutorType<'a> = SequenceExecutor<'a, ObserversTupleType<'a>>;
 pub type EventManagerType = SimpleEventManager<
     OpenApiInput,
     CoverageMonitor<Box<dyn FnMut(String)>>,
-    OpenApiFuzzerState<
-        OpenApiInput,
-        InMemoryOnDiskCorpus<OpenApiInput>,
-        RomuDuoJrRand,
-        OnDiskCorpus<OpenApiInput>,
-    >,
+    OpenApiFuzzerState<OpenApiInput>,
 >;
 
 pub type ObserversTupleType<'a> = (
@@ -57,12 +49,7 @@ pub type CombinedFeedbackType<'a> = CombinedFeedback<
     LogicEagerOr,
 >;
 
-pub type OpenApiFuzzerStateType = OpenApiFuzzerState<
-    OpenApiInput,
-    InMemoryOnDiskCorpus<OpenApiInput>,
-    RomuDuoJrRand,
-    OnDiskCorpus<OpenApiInput>,
->;
+pub type OpenApiFuzzerStateType = OpenApiFuzzerState<OpenApiInput>;
 
 pub type CombinedMapObserverType<'a> =
     ExplicitTracking<MultiMapObserver<'a, u8, false>, true, false>;

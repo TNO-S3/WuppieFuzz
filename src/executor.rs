@@ -41,12 +41,7 @@ use crate::{
 /// How often to print a new log line
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5;
 
-type FuzzerState = crate::state::OpenApiFuzzerState<
-    OpenApiInput,
-    libafl::corpus::InMemoryOnDiskCorpus<OpenApiInput>,
-    libafl_bolts::rands::RomuDuoJrRand,
-    libafl::corpus::OnDiskCorpus<OpenApiInput>,
->;
+type FuzzerState = crate::state::OpenApiFuzzerState<OpenApiInput>;
 
 /// The Executor for sending Sequences of OpenAPI requests to the target.
 /// It is responsible for executing inputs chosen by the fuzzer, and tracking

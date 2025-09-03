@@ -37,7 +37,7 @@ use crate::{
     openapi::parse_api_spec,
     openapi_mutator::havoc_mutations_openapi,
     reporting::{generate_coverage_reports, generate_report_path},
-    state::construct_state_uninit,
+    state::OpenApiFuzzerState,
     types::{CombinedMapObserverType, ObserversTupleType, OpenApiFuzzerStateType, SchedulerType},
 };
 
@@ -57,7 +57,7 @@ pub fn fuzz() -> Result<()> {
         config.initial_corpus.as_deref(),
         &report_path.as_deref(),
     );
-    let mut state = construct_state_uninit(&api, initial_corpus)?;
+    let mut state = OpenApiFuzzerState::new_uninit(initial_corpus, api.clone())?;
 
     let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 

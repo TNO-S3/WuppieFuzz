@@ -1,15 +1,11 @@
 use std::{fs::create_dir_all, path::PathBuf};
 
-use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    state::HasCorpus,
-};
+use libafl::{corpus::Corpus, state::HasCorpus};
 
 use crate::{
-    input::{OpenApiInput, OpenApiRequest},
+    input::OpenApiRequest,
     openapi::{curl_request::CurlRequest, validate_response::Response},
-    state::OpenApiFuzzerState,
-    types::ExecutorType,
+    types::{ExecutorType, OpenApiFuzzerStateType},
 };
 
 pub mod sqlite;
@@ -109,14 +105,7 @@ where
     }
 }
 
-fn get_current_test_case_file_name(
-    state: &OpenApiFuzzerState<
-        OpenApiInput,
-        InMemoryOnDiskCorpus<OpenApiInput>,
-        libafl_bolts::rands::RomuDuoJrRand,
-        OnDiskCorpus<OpenApiInput>,
-    >,
-) -> Option<String> {
+fn get_current_test_case_file_name(state: &OpenApiFuzzerStateType) -> Option<String> {
     let corpus = state.corpus();
     corpus
         .current()
