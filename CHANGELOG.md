@@ -4,6 +4,16 @@
 
 ## Features
 
+## Fixes
+
+# v1.3.0 (2025-09-05)
+
+## Highlights
+
+In this release, we improved parsing of OpenAPI specs, minimization of corpora before starting the fuzzing campaign (performance gains), and added support for specifying the target server through the command line arguments.
+
+## Features
+
 - Added unit tests for mutators in
   [#100](https://github.com/TNO-S3/WuppieFuzz/pull/100)
 - Adds support for overriding the target server from the CLI in

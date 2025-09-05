@@ -69,9 +69,7 @@
   "paths": {
     "/account": {
       "get": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Get Account",
         "description": "Get currently logged in user data as JSON object.",
         "operationId": "accountGet",
@@ -104,10 +102,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -115,9 +110,7 @@
         }
       },
       "post": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Create Account",
         "description": "Use this endpoint to allow a new user to register a new account in your project. After the user registration completes successfully, you can use the [/account/verfication](/docs/client/account#accountCreateVerification) route to start verifying the user email address. To allow the new user to login to their new account, you need to create a new [account session](/docs/client/account#accountCreateSession).",
         "operationId": "accountCreate",
@@ -125,10 +118,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "email",
-                  "password"
-                ],
+                "required": ["email", "password"],
                 "type": "object",
                 "properties": {
                   "email": {
@@ -180,9 +170,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "public",
-          "platforms": [
-            "client"
-          ],
+          "platforms": ["client"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -191,9 +179,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Delete Account",
         "description": "Delete a currently logged in user account. Behind the scene, the user record is not deleted but permanently blocked from any access. This is done to avoid deleted accounts being overtaken by new users with the same email address. Any user-related resources like documents or storage files should be deleted separately.",
         "operationId": "accountDelete",
@@ -220,10 +206,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -233,9 +216,7 @@
     },
     "/account/email": {
       "patch": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Update Account Email",
         "description": "Update currently logged in user account email address. After changing user address, user confirmation status is being reset and a new confirmation mail is sent. For security measures, user password is required to complete this request.\nThis endpoint can also be used to convert an anonymous account to a normal one, by passing an email address and a new password.",
         "operationId": "accountUpdateEmail",
@@ -243,10 +224,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "email",
-                  "password"
-                ],
+                "required": ["email", "password"],
                 "type": "object",
                 "properties": {
                   "email": {
@@ -294,10 +272,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -308,9 +283,7 @@
     },
     "/account/jwt": {
       "post": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Create Account JWT",
         "description": "Use this endpoint to create a JSON Web Token. You can use the resulting JWT to authenticate on behalf of the current user when working with the Appwrite server-side API and SDKs. The JWT secret is valid for 15 minutes from its creation and will be invalid if the user will logout in that time frame.",
         "operationId": "accountCreateJWT",
@@ -342,9 +315,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},userId:{param-userId}",
           "scope": "account",
-          "platforms": [
-            "client"
-          ],
+          "platforms": ["client"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -354,9 +325,7 @@
     },
     "/account/logs": {
       "get": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Get Account Logs",
         "description": "Get currently logged in user list of latest security activity logs. Each log returns user IP address, location and date and time of log.",
         "operationId": "accountGetLogs",
@@ -389,10 +358,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -402,9 +368,7 @@
     },
     "/account/name": {
       "patch": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Update Account Name",
         "description": "Update currently logged in user account name.",
         "operationId": "accountUpdateName",
@@ -412,9 +376,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name"
-                ],
+                "required": ["name"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -457,10 +419,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -471,9 +430,7 @@
     },
     "/account/password": {
       "patch": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Update Account Password",
         "description": "Update currently logged in user password. For validation, user is required to pass in the new password, and the old password. For users created with OAuth and Team Invites, oldPassword is optional.",
         "operationId": "accountUpdatePassword",
@@ -481,9 +438,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "password"
-                ],
+                "required": ["password"],
                 "type": "object",
                 "properties": {
                   "password": {
@@ -531,10 +486,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -545,9 +497,7 @@
     },
     "/account/prefs": {
       "get": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Get Account Preferences",
         "description": "Get currently logged in user preferences as a key-value object.",
         "operationId": "accountGetPrefs",
@@ -580,10 +530,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -591,9 +538,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Update Account Preferences",
         "description": "Update currently logged in user account preferences. You can pass only the specific settings you wish to update.",
         "operationId": "accountUpdatePrefs",
@@ -601,9 +546,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "prefs"
-                ],
+                "required": ["prefs"],
                 "type": "object",
                 "properties": {
                   "prefs": {
@@ -646,10 +589,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -660,9 +600,7 @@
     },
     "/account/recovery": {
       "put": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Complete Password Recovery",
         "description": "Use this endpoint to complete the user account password reset. Both the **userId** and **secret** arguments will be passed as query parameters to the redirect URL you have provided when sending your request to the [POST /account/recovery](/docs/client/account#accountCreateRecovery) endpoint.\n\nPlease note that in order to avoid a [Redirect Attack](https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.md) the only valid redirect URLs are the ones from domains you have set when adding your platforms in the console interface.",
         "operationId": "accountUpdateRecovery",
@@ -670,12 +608,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "password",
-                  "passwordAgain",
-                  "secret",
-                  "userId"
-                ],
+                "required": ["password", "passwordAgain", "secret", "userId"],
                 "type": "object",
                 "properties": {
                   "userId": {
@@ -733,10 +666,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},userId:{param-userId}",
           "scope": "public",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -745,9 +675,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "post": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Create Password Recovery",
         "description": "Sends the user an email with a temporary secret key for password reset. When the user clicks the confirmation link he is redirected back to your app password reset URL with the secret key and email address values attached to the URL query string. Use the query string params to submit a request to the [PUT /account/recovery](/docs/client/account#accountUpdateRecovery) endpoint to complete the process. The verification link sent to the user's email address is valid for 1 hour.",
         "operationId": "accountCreateRecovery",
@@ -755,10 +683,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "email",
-                  "url"
-                ],
+                "required": ["email", "url"],
                 "type": "object",
                 "properties": {
                   "email": {
@@ -806,10 +731,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},email:{param-email}",
           "scope": "public",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -820,9 +742,7 @@
     },
     "/account/sessions": {
       "get": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Get Account Sessions",
         "description": "Get currently logged in user list of active sessions across different devices.",
         "operationId": "accountGetSessions",
@@ -855,10 +775,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -866,9 +783,7 @@
         }
       },
       "post": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Create Account Session",
         "description": "Allow the user to login into their account by providing a valid email and password combination. This route will create a new session for the user.",
         "operationId": "accountCreateSession",
@@ -876,10 +791,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "email",
-                  "password"
-                ],
+                "required": ["email", "password"],
                 "type": "object",
                 "properties": {
                   "email": {
@@ -926,9 +838,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},email:{param-email}",
           "scope": "public",
-          "platforms": [
-            "client"
-          ],
+          "platforms": ["client"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -937,9 +847,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Delete All Account Sessions",
         "description": "Delete all sessions from the user account and remove any sessions cookies from the end client.",
         "operationId": "accountDeleteSessions",
@@ -966,10 +874,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -979,9 +884,7 @@
     },
     "/account/sessions/anonymous": {
       "post": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Create Anonymous Session",
         "description": "Use this endpoint to allow a new user to register an anonymous account in your project. This route will also create a new session for the user. To allow the new user to convert an anonymous account to a normal account, you need to update its [email and password](/docs/client/account#accountUpdateEmail) or create an [OAuth2 session](/docs/client/account#accountCreateOAuth2Session).",
         "operationId": "accountCreateAnonymousSession",
@@ -1013,9 +916,7 @@
           "rate-time": 3600,
           "rate-key": "ip:{ip}",
           "scope": "public",
-          "platforms": [
-            "client"
-          ],
+          "platforms": ["client"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1025,9 +926,7 @@
     },
     "/account/sessions/oauth2/{provider}": {
       "get": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Create Account Session with OAuth2",
         "description": "Allow the user to login to their account using the OAuth2 provider of their choice. Each OAuth2 provider should be enabled from the Appwrite console first. Use the success and failure arguments to provide a redirect URL's back to your app when login is completed.",
         "operationId": "accountCreateOAuth2Session",
@@ -1101,9 +1000,7 @@
           "rate-time": 3600,
           "rate-key": "ip:{ip}",
           "scope": "public",
-          "platforms": [
-            "client"
-          ],
+          "platforms": ["client"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1113,9 +1010,7 @@
     },
     "/account/sessions/{sessionId}": {
       "get": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Get Session By ID",
         "description": "Use this endpoint to get a logged in user's session using a Session ID. Inputting 'current' will return the current session being used.",
         "operationId": "accountGetSession",
@@ -1160,10 +1055,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1171,9 +1063,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Delete Account Session",
         "description": "Use this endpoint to log out the currently logged in user from all their account sessions across all of their different devices. When using the option id argument, only the session unique ID provider will be deleted.",
         "operationId": "accountDeleteSession",
@@ -1212,10 +1102,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1225,9 +1112,7 @@
     },
     "/account/verification": {
       "put": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Complete Email Verification",
         "description": "Use this endpoint to complete the user email verification process. Use both the **userId** and **secret** parameters that were attached to your app URL to verify the user email ownership. If confirmed this route will return a 200 status code.",
         "operationId": "accountUpdateVerification",
@@ -1235,10 +1120,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "secret",
-                  "userId"
-                ],
+                "required": ["secret", "userId"],
                 "type": "object",
                 "properties": {
                   "userId": {
@@ -1286,10 +1168,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},userId:{param-userId}",
           "scope": "public",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1298,9 +1177,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "post": {
-        "tags": [
-          "account"
-        ],
+        "tags": ["account"],
         "summary": "Create Email Verification",
         "description": "Use this endpoint to send a verification message to your user email address to confirm they are the valid owners of that address. Both the **userId** and **secret** arguments will be passed as query parameters to the URL you have provided to be attached to the verification email. The provided URL should redirect the user back to your app and allow you to complete the verification process by verifying both the **userId** and **secret** parameters. Learn more about how to [complete the verification process](/docs/client/account#accountUpdateVerification). The verification link sent to the user's email address is valid for 7 days.\n\nPlease note that in order to avoid a [Redirect Attack](https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.md), the only valid redirect URLs are the ones from domains you have set when adding your platforms in the console interface.\n",
         "operationId": "accountCreateVerification",
@@ -1308,9 +1185,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "url"
-                ],
+                "required": ["url"],
                 "type": "object",
                 "properties": {
                   "url": {
@@ -1353,10 +1228,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},email:{param-email}",
           "scope": "account",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1367,9 +1239,7 @@
     },
     "/avatars/browsers/{code}": {
       "get": {
-        "tags": [
-          "avatars"
-        ],
+        "tags": ["avatars"],
         "summary": "Get Browser Icon",
         "description": "You can use this endpoint to show different browser icons to your users. The code argument receives the browser code as it appears in your user /account/sessions endpoint. Use width, height and quality arguments to change the output settings.",
         "operationId": "avatarsGetBrowser",
@@ -1449,11 +1319,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "avatars.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1463,9 +1329,7 @@
     },
     "/avatars/credit-cards/{code}": {
       "get": {
-        "tags": [
-          "avatars"
-        ],
+        "tags": ["avatars"],
         "summary": "Get Credit Card Icon",
         "description": "The credit card endpoint will return you the icon of the credit card provider you need. Use width, height and quality arguments to change the output settings.",
         "operationId": "avatarsGetCreditCard",
@@ -1545,11 +1409,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "avatars.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1559,9 +1419,7 @@
     },
     "/avatars/favicon": {
       "get": {
-        "tags": [
-          "avatars"
-        ],
+        "tags": ["avatars"],
         "summary": "Get Favicon",
         "description": "Use this endpoint to fetch the favorite icon (AKA favicon) of any remote website URL.\n",
         "operationId": "avatarsGetFavicon",
@@ -1609,11 +1467,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "avatars.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1623,9 +1477,7 @@
     },
     "/avatars/flags/{code}": {
       "get": {
-        "tags": [
-          "avatars"
-        ],
+        "tags": ["avatars"],
         "summary": "Get Country Flag",
         "description": "You can use this endpoint to show different country flags icons to your users. The code argument receives the 2 letter country code. Use width, height and quality arguments to change the output settings.",
         "operationId": "avatarsGetFlag",
@@ -1705,11 +1557,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "avatars.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1719,9 +1567,7 @@
     },
     "/avatars/image": {
       "get": {
-        "tags": [
-          "avatars"
-        ],
+        "tags": ["avatars"],
         "summary": "Get Image from URL",
         "description": "Use this endpoint to fetch a remote image URL and crop it to any image size you want. This endpoint is very useful if you need to crop and display remote images in your app or in case you want to make sure a 3rd party image is properly served using a TLS protocol.",
         "operationId": "avatarsGetImage",
@@ -1791,11 +1637,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "avatars.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1805,9 +1647,7 @@
     },
     "/avatars/initials": {
       "get": {
-        "tags": [
-          "avatars"
-        ],
+        "tags": ["avatars"],
         "summary": "Get User Initials",
         "description": "Use this endpoint to show your user initials avatar icon on your website or app. By default, this route will try to print your logged-in user name or email initials. You can also overwrite the user name if you pass the 'name' parameter. If no name is given and no user is logged, an empty avatar will be returned.\n\nYou can use the color and background params to change the avatar colors. By default, a random theme will be selected. The random theme will persist for the user's initials when reloading the same theme will always return for the same initials.",
         "operationId": "avatarsGetInitials",
@@ -1891,11 +1731,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "avatars.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -1905,9 +1741,7 @@
     },
     "/avatars/qr": {
       "get": {
-        "tags": [
-          "avatars"
-        ],
+        "tags": ["avatars"],
         "summary": "Get QR Code",
         "description": "Converts a given plain text to a QR code image. You can use the query parameters to change the size and style of the resulting image.",
         "operationId": "avatarsGetQR",
@@ -1986,11 +1820,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "avatars.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2000,9 +1830,7 @@
     },
     "/database/collections": {
       "get": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "List Collections",
         "description": "Get a list of all the user collections. You can use the query params to filter your results. On admin mode, this endpoint will return a list of all of the project's collections. [Learn more about different API modes](/docs/admin).",
         "operationId": "databaseListCollections",
@@ -2078,9 +1906,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "collections.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2088,9 +1914,7 @@
         }
       },
       "post": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "Create Collection",
         "description": "Create a new Collection.",
         "operationId": "databaseCreateCollection",
@@ -2098,12 +1922,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name",
-                  "read",
-                  "rules",
-                  "write"
-                ],
+                "required": ["name", "read", "rules", "write"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -2167,9 +1986,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "collections.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2180,9 +1997,7 @@
     },
     "/database/collections/{collectionId}": {
       "get": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "Get Collection",
         "description": "Get a collection by its unique ID. This endpoint response returns a JSON object with the collection metadata.",
         "operationId": "databaseGetCollection",
@@ -2227,9 +2042,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "collections.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2237,9 +2050,7 @@
         }
       },
       "put": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "Update Collection",
         "description": "Update a collection by its unique ID.",
         "operationId": "databaseUpdateCollection",
@@ -2259,9 +2070,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name"
-                ],
+                "required": ["name"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -2325,9 +2134,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "collections.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2336,9 +2143,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "Delete Collection",
         "description": "Delete a collection by its unique ID. Only users with write permissions have access to delete this resource.",
         "operationId": "databaseDeleteCollection",
@@ -2377,9 +2182,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "collections.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2389,9 +2192,7 @@
     },
     "/database/collections/{collectionId}/documents": {
       "get": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "List Documents",
         "description": "Get a list of all the user documents. You can use the query params to filter your results. On admin mode, this endpoint will return a list of all of the project's documents. [Learn more about different API modes](/docs/admin).",
         "operationId": "databaseListDocuments",
@@ -2511,11 +2312,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "documents.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2523,9 +2320,7 @@
         }
       },
       "post": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "Create Document",
         "description": "Create a new Document. Before using this route, you should create a new collection resource using either a [server integration](/docs/server/database#databaseCreateCollection) API or directly from your database console.",
         "operationId": "databaseCreateDocument",
@@ -2545,9 +2340,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "data"
-                ],
+                "required": ["data"],
                 "type": "object",
                 "properties": {
                   "data": {
@@ -2620,11 +2413,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "documents.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2635,9 +2424,7 @@
     },
     "/database/collections/{collectionId}/documents/{documentId}": {
       "get": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "Get Document",
         "description": "Get a document by its unique ID. This endpoint response returns a JSON object with the document data.",
         "operationId": "databaseGetDocument",
@@ -2693,11 +2480,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "documents.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2705,9 +2488,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "Delete Document",
         "description": "Delete a document by its unique ID. This endpoint deletes only the parent documents, its attributes and relations to other documents. Child documents **will not** be deleted.",
         "operationId": "databaseDeleteDocument",
@@ -2757,11 +2538,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "documents.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2769,9 +2546,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "database"
-        ],
+        "tags": ["database"],
         "summary": "Update Document",
         "description": "Update a document by its unique ID. Using the patch method you can pass only specific fields that will get updated.",
         "operationId": "databaseUpdateDocument",
@@ -2801,9 +2576,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "data"
-                ],
+                "required": ["data"],
                 "type": "object",
                 "properties": {
                   "data": {
@@ -2861,11 +2634,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "documents.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2876,9 +2645,7 @@
     },
     "/functions": {
       "get": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "List Functions",
         "description": "Get a list of all the project's functions. You can use the query params to filter your results.",
         "operationId": "functionsList",
@@ -2954,9 +2721,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -2964,9 +2729,7 @@
         }
       },
       "post": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Create Function",
         "description": "Create a new function. You can pass a list of [permissions](/docs/permissions) to allow different project users or team with access to execute the function using the client API.",
         "operationId": "functionsCreate",
@@ -2974,11 +2737,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "execute",
-                  "name",
-                  "runtime"
-                ],
+                "required": ["execute", "name", "runtime"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -3054,9 +2813,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3067,9 +2824,7 @@
     },
     "/functions/{functionId}": {
       "get": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Get Function",
         "description": "Get a function by its unique ID.",
         "operationId": "functionsGet",
@@ -3114,9 +2869,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3124,9 +2877,7 @@
         }
       },
       "put": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Update Function",
         "description": "Update function by its unique ID.",
         "operationId": "functionsUpdate",
@@ -3146,10 +2897,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "execute",
-                  "name"
-                ],
+                "required": ["execute", "name"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -3220,9 +2968,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3231,9 +2977,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Delete Function",
         "description": "Delete a function by its unique ID.",
         "operationId": "functionsDelete",
@@ -3272,9 +3016,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3284,9 +3026,7 @@
     },
     "/functions/{functionId}/executions": {
       "get": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "List Executions",
         "description": "Get a list of all the current user function execution logs. You can use the query params to filter your results. On admin mode, this endpoint will return a list of all of the project's executions. [Learn more about different API modes](/docs/admin).",
         "operationId": "functionsListExecutions",
@@ -3373,11 +3113,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "execution.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3385,9 +3121,7 @@
         }
       },
       "post": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Create Execution",
         "description": "Trigger a function execution. The returned object will return you the current execution status. You can ping the `Get Execution` endpoint to get updates on the current execution status. Once this endpoint is called, your function execution process will start asynchronously.",
         "operationId": "functionsCreateExecution",
@@ -3450,11 +3184,7 @@
           "rate-time": 60,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "execution.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3465,9 +3195,7 @@
     },
     "/functions/{functionId}/executions/{executionId}": {
       "get": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Get Execution",
         "description": "Get a function execution log by its unique ID.",
         "operationId": "functionsGetExecution",
@@ -3523,11 +3251,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "execution.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3537,9 +3261,7 @@
     },
     "/functions/{functionId}/tag": {
       "patch": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Update Function Tag",
         "description": "Update the function code tag ID using the unique function ID. Use this endpoint to switch the code tag that should be executed by the execution endpoint.",
         "operationId": "functionsUpdateTag",
@@ -3559,9 +3281,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "tag"
-                ],
+                "required": ["tag"],
                 "type": "object",
                 "properties": {
                   "tag": {
@@ -3604,9 +3324,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3617,9 +3335,7 @@
     },
     "/functions/{functionId}/tags": {
       "get": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "List Tags",
         "description": "Get a list of all the project's code tags. You can use the query params to filter your results.",
         "operationId": "functionsListTags",
@@ -3705,9 +3421,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3715,9 +3429,7 @@
         }
       },
       "post": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Create Tag",
         "description": "Create a new function code tag. Use this endpoint to upload a new version of your code function. To execute your newly uploaded code, you'll need to update the function's tag to use your new tag UID.\n\nThis endpoint accepts a tar.gz file compressed with your code. Make sure to include any dependencies your code has within the compressed file. You can learn more about code packaging in the [Appwrite Cloud Functions tutorial](/docs/functions).\n\nUse the \"command\" param to set the entry point used to execute your code.",
         "operationId": "functionsCreateTag",
@@ -3737,10 +3449,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "required": [
-                  "code",
-                  "command"
-                ],
+                "required": ["code", "command"],
                 "type": "object",
                 "properties": {
                   "command": {
@@ -3788,9 +3497,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": true,
           "auth": {
             "Project": []
@@ -3800,9 +3507,7 @@
     },
     "/functions/{functionId}/tags/{tagId}": {
       "get": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Get Tag",
         "description": "Get a code tag by its unique ID.",
         "operationId": "functionsGetTag",
@@ -3857,9 +3562,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3867,9 +3570,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Delete Tag",
         "description": "Delete a code tag by its unique ID.",
         "operationId": "functionsDeleteTag",
@@ -3918,9 +3619,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3930,9 +3629,7 @@
     },
     "/functions/{functionId}/usage": {
       "get": {
-        "tags": [
-          "functions"
-        ],
+        "tags": ["functions"],
         "summary": "Get Function Usage",
         "operationId": "functionsGetUsage",
         "parameters": [
@@ -3986,9 +3683,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "functions.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -3998,9 +3693,7 @@
     },
     "/health": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get HTTP",
         "description": "Check the Appwrite HTTP server is up and responsive.",
         "operationId": "healthGet",
@@ -4034,9 +3727,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4046,9 +3737,7 @@
     },
     "/health/anti-virus": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Anti virus",
         "description": "Check the Appwrite Anti Virus server is up and connection is successful.",
         "operationId": "healthGetAntiVirus",
@@ -4082,9 +3771,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4094,9 +3781,7 @@
     },
     "/health/cache": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Cache",
         "description": "Check the Appwrite in-memory cache server is up and connection is successful.",
         "operationId": "healthGetCache",
@@ -4130,9 +3815,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4142,9 +3825,7 @@
     },
     "/health/db": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get DB",
         "description": "Check the Appwrite database server is up and connection is successful.",
         "operationId": "healthGetDB",
@@ -4178,9 +3859,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4190,9 +3869,7 @@
     },
     "/health/queue/certificates": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Certificate Queue",
         "description": "Get the number of certificates that are waiting to be issued against [Letsencrypt](https://letsencrypt.org/) in the Appwrite internal queue server.",
         "operationId": "healthGetQueueCertificates",
@@ -4226,9 +3903,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4238,9 +3913,7 @@
     },
     "/health/queue/functions": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Functions Queue",
         "operationId": "healthGetQueueFunctions",
         "responses": {
@@ -4273,9 +3946,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4285,9 +3956,7 @@
     },
     "/health/queue/logs": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Logs Queue",
         "description": "Get the number of logs that are waiting to be processed in the Appwrite internal queue server.",
         "operationId": "healthGetQueueLogs",
@@ -4321,9 +3990,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4333,9 +4000,7 @@
     },
     "/health/queue/tasks": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Tasks Queue",
         "description": "Get the number of tasks that are waiting to be processed in the Appwrite internal queue server.",
         "operationId": "healthGetQueueTasks",
@@ -4369,9 +4034,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4381,9 +4044,7 @@
     },
     "/health/queue/usage": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Usage Queue",
         "description": "Get the number of usage stats that are waiting to be processed in the Appwrite internal queue server.",
         "operationId": "healthGetQueueUsage",
@@ -4417,9 +4078,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4429,9 +4088,7 @@
     },
     "/health/queue/webhooks": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Webhooks Queue",
         "description": "Get the number of webhooks that are waiting to be processed in the Appwrite internal queue server.",
         "operationId": "healthGetQueueWebhooks",
@@ -4465,9 +4122,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4477,9 +4132,7 @@
     },
     "/health/storage/local": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Local Storage",
         "description": "Check the Appwrite local storage device is up and connection is successful.",
         "operationId": "healthGetStorageLocal",
@@ -4513,9 +4166,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4525,9 +4176,7 @@
     },
     "/health/time": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Get Time",
         "description": "Check the Appwrite server time is synced with Google remote NTP server. We use this technology to smoothly handle leap seconds with no disruptive events. The [Network Time Protocol](https://en.wikipedia.org/wiki/Network_Time_Protocol) (NTP) is used by hundreds of millions of computers and devices to synchronize their clocks over the Internet. If your computer sets its own clock, it likely uses NTP.",
         "operationId": "healthGetTime",
@@ -4561,9 +4210,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "health.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4573,9 +4220,7 @@
     },
     "/locale": {
       "get": {
-        "tags": [
-          "locale"
-        ],
+        "tags": ["locale"],
         "summary": "Get User Locale",
         "description": "Get the current user location based on IP. Returns an object with user country code, country name, continent name, continent code, ip address and suggested currency. You can use the locale header to get the data in a supported language.\n\n([IP Geolocation by DB-IP](https://db-ip.com))",
         "operationId": "localeGet",
@@ -4609,11 +4254,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "locale.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4623,9 +4264,7 @@
     },
     "/locale/continents": {
       "get": {
-        "tags": [
-          "locale"
-        ],
+        "tags": ["locale"],
         "summary": "List Continents",
         "description": "List of all continents. You can use the locale header to get the data in a supported language.",
         "operationId": "localeGetContinents",
@@ -4659,11 +4298,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "locale.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4673,9 +4308,7 @@
     },
     "/locale/countries": {
       "get": {
-        "tags": [
-          "locale"
-        ],
+        "tags": ["locale"],
         "summary": "List Countries",
         "description": "List of all countries. You can use the locale header to get the data in a supported language.",
         "operationId": "localeGetCountries",
@@ -4709,11 +4342,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "locale.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4723,9 +4352,7 @@
     },
     "/locale/countries/eu": {
       "get": {
-        "tags": [
-          "locale"
-        ],
+        "tags": ["locale"],
         "summary": "List EU Countries",
         "description": "List of all countries that are currently members of the EU. You can use the locale header to get the data in a supported language.",
         "operationId": "localeGetCountriesEU",
@@ -4759,11 +4386,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "locale.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4773,9 +4396,7 @@
     },
     "/locale/countries/phones": {
       "get": {
-        "tags": [
-          "locale"
-        ],
+        "tags": ["locale"],
         "summary": "List Countries Phone Codes",
         "description": "List of all countries phone codes. You can use the locale header to get the data in a supported language.",
         "operationId": "localeGetCountriesPhones",
@@ -4809,11 +4430,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "locale.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4823,9 +4440,7 @@
     },
     "/locale/currencies": {
       "get": {
-        "tags": [
-          "locale"
-        ],
+        "tags": ["locale"],
         "summary": "List Currencies",
         "description": "List of all currencies, including currency symbol, name, plural, and decimal digits for all major and minor currencies. You can use the locale header to get the data in a supported language.",
         "operationId": "localeGetCurrencies",
@@ -4859,11 +4474,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "locale.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4873,9 +4484,7 @@
     },
     "/locale/languages": {
       "get": {
-        "tags": [
-          "locale"
-        ],
+        "tags": ["locale"],
         "summary": "List Languages",
         "description": "List of all languages classified by ISO 639-1 including 2-letter code, name in English, and name in the respective language.",
         "operationId": "localeGetLanguages",
@@ -4909,11 +4518,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "locale.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -4923,9 +4528,7 @@
     },
     "/projects": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "List Projects",
         "operationId": "projectsList",
         "parameters": [
@@ -4999,9 +4602,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5009,19 +4610,14 @@
         }
       },
       "post": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Create Project",
         "operationId": "projectsCreate",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name",
-                  "teamId"
-                ],
+                "required": ["name", "teamId"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -5113,9 +4709,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5126,9 +4720,7 @@
     },
     "/projects/{projectId}": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Get Project",
         "operationId": "projectsGet",
         "parameters": [
@@ -5171,9 +4763,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5181,9 +4771,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Delete Project",
         "operationId": "projectsDelete",
         "parameters": [
@@ -5202,9 +4790,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "password"
-                ],
+                "required": ["password"],
                 "type": "object",
                 "properties": {
                   "password": {
@@ -5240,9 +4826,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5251,9 +4835,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "patch": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Project",
         "operationId": "projectsUpdate",
         "parameters": [
@@ -5272,9 +4854,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name"
-                ],
+                "required": ["name"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -5361,9 +4941,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5374,9 +4952,7 @@
     },
     "/projects/{projectId}/auth/limit": {
       "patch": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Project users limit",
         "operationId": "projectsUpdateAuthLimit",
         "parameters": [
@@ -5395,9 +4971,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "limit"
-                ],
+                "required": ["limit"],
                 "type": "object",
                 "properties": {
                   "limit": {
@@ -5438,9 +5012,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5451,9 +5023,7 @@
     },
     "/projects/{projectId}/auth/{method}": {
       "patch": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Project auth method status. Use this endpoint to enable or disable a given auth method for this project.",
         "operationId": "projectsUpdateAuthStatus",
         "parameters": [
@@ -5482,9 +5052,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "status"
-                ],
+                "required": ["status"],
                 "type": "object",
                 "properties": {
                   "status": {
@@ -5526,9 +5094,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5539,9 +5105,7 @@
     },
     "/projects/{projectId}/domains": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "List Domains",
         "operationId": "projectsListDomains",
         "parameters": [
@@ -5584,9 +5148,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5594,9 +5156,7 @@
         }
       },
       "post": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Create Domain",
         "operationId": "projectsCreateDomain",
         "parameters": [
@@ -5615,9 +5175,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "domain"
-                ],
+                "required": ["domain"],
                 "type": "object",
                 "properties": {
                   "domain": {
@@ -5659,9 +5217,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5672,9 +5228,7 @@
     },
     "/projects/{projectId}/domains/{domainId}": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Get Domain",
         "operationId": "projectsGetDomain",
         "parameters": [
@@ -5727,9 +5281,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5737,9 +5289,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Delete Domain",
         "operationId": "projectsDeleteDomain",
         "parameters": [
@@ -5786,9 +5336,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5798,9 +5346,7 @@
     },
     "/projects/{projectId}/domains/{domainId}/verification": {
       "patch": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Domain Verification Status",
         "operationId": "projectsUpdateDomainVerification",
         "parameters": [
@@ -5853,9 +5399,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5865,9 +5409,7 @@
     },
     "/projects/{projectId}/keys": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "List Keys",
         "operationId": "projectsListKeys",
         "parameters": [
@@ -5910,9 +5452,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -5920,9 +5460,7 @@
         }
       },
       "post": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Create Key",
         "operationId": "projectsCreateKey",
         "parameters": [
@@ -5941,10 +5479,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name",
-                  "scopes"
-                ],
+                "required": ["name", "scopes"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -5993,9 +5528,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6006,9 +5539,7 @@
     },
     "/projects/{projectId}/keys/{keyId}": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Get Key",
         "operationId": "projectsGetKey",
         "parameters": [
@@ -6061,9 +5592,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6071,9 +5600,7 @@
         }
       },
       "put": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Key",
         "operationId": "projectsUpdateKey",
         "parameters": [
@@ -6102,10 +5629,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name",
-                  "scopes"
-                ],
+                "required": ["name", "scopes"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -6154,9 +5678,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6165,9 +5687,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Delete Key",
         "operationId": "projectsDeleteKey",
         "parameters": [
@@ -6214,9 +5734,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6226,9 +5744,7 @@
     },
     "/projects/{projectId}/oauth2": {
       "patch": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Project OAuth2",
         "operationId": "projectsUpdateOAuth2",
         "parameters": [
@@ -6247,9 +5763,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "provider"
-                ],
+                "required": ["provider"],
                 "type": "object",
                 "properties": {
                   "provider": {
@@ -6301,9 +5815,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6314,9 +5826,7 @@
     },
     "/projects/{projectId}/platforms": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "List Platforms",
         "operationId": "projectsListPlatforms",
         "parameters": [
@@ -6359,9 +5869,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6369,9 +5877,7 @@
         }
       },
       "post": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Create Platform",
         "operationId": "projectsCreatePlatform",
         "parameters": [
@@ -6390,10 +5896,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name",
-                  "type"
-                ],
+                "required": ["name", "type"],
                 "type": "object",
                 "properties": {
                   "type": {
@@ -6455,9 +5958,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6468,9 +5969,7 @@
     },
     "/projects/{projectId}/platforms/{platformId}": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Get Platform",
         "operationId": "projectsGetPlatform",
         "parameters": [
@@ -6523,9 +6022,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6533,9 +6030,7 @@
         }
       },
       "put": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Platform",
         "operationId": "projectsUpdatePlatform",
         "parameters": [
@@ -6564,9 +6059,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name"
-                ],
+                "required": ["name"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -6623,9 +6116,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6634,9 +6125,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Delete Platform",
         "operationId": "projectsDeletePlatform",
         "parameters": [
@@ -6683,9 +6172,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6695,9 +6182,7 @@
     },
     "/projects/{projectId}/tasks": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "List Tasks",
         "operationId": "projectsListTasks",
         "parameters": [
@@ -6740,9 +6225,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6750,9 +6233,7 @@
         }
       },
       "post": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Create Task",
         "operationId": "projectsCreateTask",
         "parameters": [
@@ -6862,9 +6343,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6875,9 +6354,7 @@
     },
     "/projects/{projectId}/tasks/{taskId}": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Get Task",
         "operationId": "projectsGetTask",
         "parameters": [
@@ -6930,9 +6407,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -6940,9 +6415,7 @@
         }
       },
       "put": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Task",
         "operationId": "projectsUpdateTask",
         "parameters": [
@@ -7062,9 +6535,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7073,9 +6544,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Delete Task",
         "operationId": "projectsDeleteTask",
         "parameters": [
@@ -7122,9 +6591,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7134,9 +6601,7 @@
     },
     "/projects/{projectId}/usage": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Get Project",
         "operationId": "projectsGetUsage",
         "parameters": [
@@ -7190,9 +6655,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7202,9 +6665,7 @@
     },
     "/projects/{projectId}/webhooks": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "List Webhooks",
         "operationId": "projectsListWebhooks",
         "parameters": [
@@ -7247,9 +6708,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7257,9 +6716,7 @@
         }
       },
       "post": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Create Webhook",
         "operationId": "projectsCreateWebhook",
         "parameters": [
@@ -7278,12 +6735,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "events",
-                  "name",
-                  "security",
-                  "url"
-                ],
+                "required": ["events", "name", "security", "url"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -7352,9 +6804,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7365,9 +6815,7 @@
     },
     "/projects/{projectId}/webhooks/{webhookId}": {
       "get": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Get Webhook",
         "operationId": "projectsGetWebhook",
         "parameters": [
@@ -7420,9 +6868,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.read",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7430,9 +6876,7 @@
         }
       },
       "put": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Update Webhook",
         "operationId": "projectsUpdateWebhook",
         "parameters": [
@@ -7461,12 +6905,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "events",
-                  "name",
-                  "security",
-                  "url"
-                ],
+                "required": ["events", "name", "security", "url"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -7535,9 +6974,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7546,9 +6983,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "projects"
-        ],
+        "tags": ["projects"],
         "summary": "Delete Webhook",
         "operationId": "projectsDeleteWebhook",
         "parameters": [
@@ -7595,9 +7030,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "projects.write",
-          "platforms": [
-            "console"
-          ],
+          "platforms": ["console"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7607,9 +7040,7 @@
     },
     "/storage/files": {
       "get": {
-        "tags": [
-          "storage"
-        ],
+        "tags": ["storage"],
         "summary": "List Files",
         "description": "Get a list of all the user files. You can use the query params to filter your results. On admin mode, this endpoint will return a list of all of the project's files. [Learn more about different API modes](/docs/admin).",
         "operationId": "storageListFiles",
@@ -7686,11 +7117,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "files.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7698,9 +7125,7 @@
         }
       },
       "post": {
-        "tags": [
-          "storage"
-        ],
+        "tags": ["storage"],
         "summary": "Create File",
         "description": "Create a new file. The user who creates the file will automatically be assigned to read and write access unless he has passed custom values for read and write arguments.",
         "operationId": "storageCreateFile",
@@ -7708,9 +7133,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "required": [
-                  "file"
-                ],
+                "required": ["file"],
                 "type": "object",
                 "properties": {
                   "file": {
@@ -7768,11 +7191,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "files.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7782,9 +7201,7 @@
     },
     "/storage/files/{fileId}": {
       "get": {
-        "tags": [
-          "storage"
-        ],
+        "tags": ["storage"],
         "summary": "Get File",
         "description": "Get a file by its unique ID. This endpoint response returns a JSON object with the file metadata.",
         "operationId": "storageGetFile",
@@ -7830,11 +7247,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "files.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7842,9 +7255,7 @@
         }
       },
       "put": {
-        "tags": [
-          "storage"
-        ],
+        "tags": ["storage"],
         "summary": "Update File",
         "description": "Update a file by its unique ID. Only users with write permissions have access to update this resource.",
         "operationId": "storageUpdateFile",
@@ -7864,10 +7275,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "read",
-                  "write"
-                ],
+                "required": ["read", "write"],
                 "type": "object",
                 "properties": {
                   "read": {
@@ -7920,11 +7328,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "files.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7933,9 +7337,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "storage"
-        ],
+        "tags": ["storage"],
         "summary": "Delete File",
         "description": "Delete a file by its unique ID. Only users with write permissions have access to delete this resource.",
         "operationId": "storageDeleteFile",
@@ -7975,11 +7377,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "files.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -7989,9 +7387,7 @@
     },
     "/storage/files/{fileId}/download": {
       "get": {
-        "tags": [
-          "storage"
-        ],
+        "tags": ["storage"],
         "summary": "Get File for Download",
         "description": "Get a file content by its unique ID. The endpoint response return with a 'Content-Disposition: attachment' header that tells the browser to start downloading the file to user downloads directory.",
         "operationId": "storageGetFileDownload",
@@ -8038,11 +7434,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "files.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8052,9 +7444,7 @@
     },
     "/storage/files/{fileId}/preview": {
       "get": {
-        "tags": [
-          "storage"
-        ],
+        "tags": ["storage"],
         "summary": "Get File Preview",
         "description": "Get a file preview image. Currently, this method supports preview for image files (jpg, png, and gif), other supported formats, like pdf, docs, slides, and spreadsheets, will return the file icon image. You can also pass query string arguments for cutting and resizing your preview image.",
         "operationId": "storageGetFilePreview",
@@ -8213,11 +7603,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "files.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8227,9 +7613,7 @@
     },
     "/storage/files/{fileId}/view": {
       "get": {
-        "tags": [
-          "storage"
-        ],
+        "tags": ["storage"],
         "summary": "Get File for View",
         "description": "Get a file content by its unique ID. This endpoint is similar to the download method but returns with no  'Content-Disposition: attachment' header.",
         "operationId": "storageGetFileView",
@@ -8276,11 +7660,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "files.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8290,9 +7670,7 @@
     },
     "/teams": {
       "get": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "List Teams",
         "description": "Get a list of all the current user teams. You can use the query params to filter your results. On admin mode, this endpoint will return a list of all of the project's teams. [Learn more about different API modes](/docs/admin).",
         "operationId": "teamsList",
@@ -8369,11 +7747,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8381,9 +7755,7 @@
         }
       },
       "post": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Create Team",
         "description": "Create a new team. The user who creates the team will automatically be assigned as the owner of the team. The team owner can invite new members, who will be able add new owners and update or delete the team from your project.",
         "operationId": "teamsCreate",
@@ -8391,9 +7763,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name"
-                ],
+                "required": ["name"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -8444,11 +7814,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8459,9 +7825,7 @@
     },
     "/teams/{teamId}": {
       "get": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Get Team",
         "description": "Get a team by its unique ID. All team members have read access for this resource.",
         "operationId": "teamsGet",
@@ -8507,11 +7871,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8519,9 +7879,7 @@
         }
       },
       "put": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Update Team",
         "description": "Update a team by its unique ID. Only team owners have write access for this resource.",
         "operationId": "teamsUpdate",
@@ -8541,9 +7899,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "name"
-                ],
+                "required": ["name"],
                 "type": "object",
                 "properties": {
                   "name": {
@@ -8587,11 +7943,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8600,9 +7952,7 @@
         "x-codegen-request-body-name": "payload"
       },
       "delete": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Delete Team",
         "description": "Delete a team by its unique ID. Only team owners have write access for this resource.",
         "operationId": "teamsDelete",
@@ -8642,11 +7992,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8656,9 +8002,7 @@
     },
     "/teams/{teamId}/memberships": {
       "get": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Get Team Memberships",
         "description": "Get a team members by the team unique ID. All team members have read access for this list of resources.",
         "operationId": "teamsGetMemberships",
@@ -8745,11 +8089,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.read",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8757,9 +8097,7 @@
         }
       },
       "post": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Create Team Membership",
         "description": "Use this endpoint to invite a new member to join your team. An email with a link to join the team will be sent to the new member email address if the member doesn't exist in the project it will be created automatically.\n\nUse the 'URL' parameter to redirect the user from the invitation email back to your app. When the user is redirected, use the [Update Team Membership Status](/docs/client/teams#teamsUpdateMembershipStatus) endpoint to allow the user to accept the invitation to the team.\n\nPlease note that in order to avoid a [Redirect Attacks](https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.md) the only valid redirect URL's are the once from domains you have set when added your platforms in the console interface.",
         "operationId": "teamsCreateMembership",
@@ -8779,11 +8117,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "email",
-                  "roles",
-                  "url"
-                ],
+                "required": ["email", "roles", "url"],
                 "type": "object",
                 "properties": {
                   "email": {
@@ -8844,11 +8178,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8859,9 +8189,7 @@
     },
     "/teams/{teamId}/memberships/{membershipId}": {
       "delete": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Delete Team Membership",
         "description": "This endpoint allows a user to leave a team or for a team owner to delete the membership of any other team member. You can also use this endpoint to delete a user membership even if it is not accepted.",
         "operationId": "teamsDeleteMembership",
@@ -8911,11 +8239,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -8923,9 +8247,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Update Membership Roles",
         "operationId": "teamsUpdateMembershipRoles",
         "parameters": [
@@ -8954,9 +8276,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "roles"
-                ],
+                "required": ["roles"],
                 "type": "object",
                 "properties": {
                   "roles": {
@@ -9002,11 +8322,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "teams.write",
-          "platforms": [
-            "client",
-            "server",
-            "server"
-          ],
+          "platforms": ["client", "server", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9017,9 +8333,7 @@
     },
     "/teams/{teamId}/memberships/{membershipId}/status": {
       "patch": {
-        "tags": [
-          "teams"
-        ],
+        "tags": ["teams"],
         "summary": "Update Team Membership Status",
         "description": "Use this endpoint to allow a user to accept an invitation to join a team after being redirected back to your app from the invitation email recieved by the user.",
         "operationId": "teamsUpdateMembershipStatus",
@@ -9049,10 +8363,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "secret",
-                  "userId"
-                ],
+                "required": ["secret", "userId"],
                 "type": "object",
                 "properties": {
                   "userId": {
@@ -9100,10 +8411,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "public",
-          "platforms": [
-            "client",
-            "server"
-          ],
+          "platforms": ["client", "server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9114,9 +8422,7 @@
     },
     "/users": {
       "get": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "List Users",
         "description": "Get a list of all the project's users. You can use the query params to filter your results.",
         "operationId": "usersList",
@@ -9192,9 +8498,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9202,9 +8506,7 @@
         }
       },
       "post": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Create User",
         "description": "Create a new user.",
         "operationId": "usersCreate",
@@ -9212,10 +8514,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "email",
-                  "password"
-                ],
+                "required": ["email", "password"],
                 "type": "object",
                 "properties": {
                   "email": {
@@ -9268,9 +8567,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9281,9 +8578,7 @@
     },
     "/users/{userId}": {
       "get": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Get User",
         "description": "Get a user by its unique ID.",
         "operationId": "usersGet",
@@ -9328,9 +8623,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9338,9 +8631,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Delete User",
         "description": "Delete a user by its unique ID.",
         "operationId": "usersDelete",
@@ -9379,9 +8670,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9391,9 +8680,7 @@
     },
     "/users/{userId}/logs": {
       "get": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Get User Logs",
         "description": "Get a user activity logs list by its unique ID.",
         "operationId": "usersGetLogs",
@@ -9438,9 +8725,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9450,9 +8735,7 @@
     },
     "/users/{userId}/prefs": {
       "get": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Get User Preferences",
         "description": "Get the user preferences by its unique ID.",
         "operationId": "usersGetPrefs",
@@ -9497,9 +8780,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9507,9 +8788,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Update User Preferences",
         "description": "Update the user preferences by its unique ID. You can pass only the specific settings you wish to update.",
         "operationId": "usersUpdatePrefs",
@@ -9529,9 +8808,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "prefs"
-                ],
+                "required": ["prefs"],
                 "type": "object",
                 "properties": {
                   "prefs": {
@@ -9574,9 +8851,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9587,9 +8862,7 @@
     },
     "/users/{userId}/sessions": {
       "get": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Get User Sessions",
         "description": "Get the user sessions list by its unique ID.",
         "operationId": "usersGetSessions",
@@ -9634,9 +8907,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.read",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9644,9 +8915,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Delete User Sessions",
         "description": "Delete all user's sessions by using the user's unique ID.",
         "operationId": "usersDeleteSessions",
@@ -9685,9 +8954,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9697,9 +8964,7 @@
     },
     "/users/{userId}/sessions/{sessionId}": {
       "delete": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Delete User Session",
         "description": "Delete a user sessions by its unique ID.",
         "operationId": "usersDeleteSession",
@@ -9748,9 +9013,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9760,9 +9023,7 @@
     },
     "/users/{userId}/status": {
       "patch": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Update User Status",
         "description": "Update the user status by its unique ID.",
         "operationId": "usersUpdateStatus",
@@ -9782,9 +9043,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "status"
-                ],
+                "required": ["status"],
                 "type": "object",
                 "properties": {
                   "status": {
@@ -9826,9 +9085,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9839,9 +9096,7 @@
     },
     "/users/{userId}/verification": {
       "patch": {
-        "tags": [
-          "users"
-        ],
+        "tags": ["users"],
         "summary": "Update Email Verification",
         "description": "Update the user email verification status by its unique ID.",
         "operationId": "usersUpdateVerification",
@@ -9861,9 +9116,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "required": [
-                  "emailVerification"
-                ],
+                "required": ["emailVerification"],
                 "type": "object",
                 "properties": {
                   "emailVerification": {
@@ -9906,9 +9159,7 @@
           "rate-time": 3600,
           "rate-key": "url:{url},ip:{ip}",
           "scope": "users.write",
-          "platforms": [
-            "server"
-          ],
+          "platforms": ["server"],
           "packaging": false,
           "auth": {
             "Project": []
@@ -9921,10 +9172,7 @@
   "components": {
     "schemas": {
       "collectionList": {
-        "required": [
-          "collections",
-          "sum"
-        ],
+        "required": ["collections", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -9943,10 +9191,7 @@
         "description": "Collections List"
       },
       "documentList": {
-        "required": [
-          "documents",
-          "sum"
-        ],
+        "required": ["documents", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -9965,10 +9210,7 @@
         "description": "Documents List"
       },
       "userList": {
-        "required": [
-          "sum",
-          "users"
-        ],
+        "required": ["sum", "users"],
         "type": "object",
         "properties": {
           "sum": {
@@ -9987,10 +9229,7 @@
         "description": "Users List"
       },
       "sessionList": {
-        "required": [
-          "sessions",
-          "sum"
-        ],
+        "required": ["sessions", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10009,9 +9248,7 @@
         "description": "Sessions List"
       },
       "logList": {
-        "required": [
-          "logs"
-        ],
+        "required": ["logs"],
         "type": "object",
         "properties": {
           "logs": {
@@ -10025,10 +9262,7 @@
         "description": "Logs List"
       },
       "fileList": {
-        "required": [
-          "files",
-          "sum"
-        ],
+        "required": ["files", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10047,10 +9281,7 @@
         "description": "Files List"
       },
       "teamList": {
-        "required": [
-          "sum",
-          "teams"
-        ],
+        "required": ["sum", "teams"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10069,10 +9300,7 @@
         "description": "Teams List"
       },
       "membershipList": {
-        "required": [
-          "memberships",
-          "sum"
-        ],
+        "required": ["memberships", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10091,10 +9319,7 @@
         "description": "Memberships List"
       },
       "functionList": {
-        "required": [
-          "functions",
-          "sum"
-        ],
+        "required": ["functions", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10113,10 +9338,7 @@
         "description": "Functions List"
       },
       "tagList": {
-        "required": [
-          "sum",
-          "tags"
-        ],
+        "required": ["sum", "tags"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10135,10 +9357,7 @@
         "description": "Tags List"
       },
       "executionList": {
-        "required": [
-          "executions",
-          "sum"
-        ],
+        "required": ["executions", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10157,10 +9376,7 @@
         "description": "Executions List"
       },
       "projectList": {
-        "required": [
-          "projects",
-          "sum"
-        ],
+        "required": ["projects", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10179,10 +9395,7 @@
         "description": "Projects List"
       },
       "webhookList": {
-        "required": [
-          "sum",
-          "webhooks"
-        ],
+        "required": ["sum", "webhooks"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10201,10 +9414,7 @@
         "description": "Webhooks List"
       },
       "keyList": {
-        "required": [
-          "keys",
-          "sum"
-        ],
+        "required": ["keys", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10223,10 +9433,7 @@
         "description": "API Keys List"
       },
       "taskList": {
-        "required": [
-          "sum",
-          "tasks"
-        ],
+        "required": ["sum", "tasks"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10245,10 +9452,7 @@
         "description": "Tasks List"
       },
       "platformList": {
-        "required": [
-          "platforms",
-          "sum"
-        ],
+        "required": ["platforms", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10267,10 +9471,7 @@
         "description": "Platforms List"
       },
       "domainList": {
-        "required": [
-          "domains",
-          "sum"
-        ],
+        "required": ["domains", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10289,10 +9490,7 @@
         "description": "Domains List"
       },
       "countryList": {
-        "required": [
-          "countries",
-          "sum"
-        ],
+        "required": ["countries", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10311,10 +9509,7 @@
         "description": "Countries List"
       },
       "continentList": {
-        "required": [
-          "continents",
-          "sum"
-        ],
+        "required": ["continents", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10333,10 +9528,7 @@
         "description": "Continents List"
       },
       "languageList": {
-        "required": [
-          "languages",
-          "sum"
-        ],
+        "required": ["languages", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10355,10 +9547,7 @@
         "description": "Languages List"
       },
       "currencyList": {
-        "required": [
-          "currencies",
-          "sum"
-        ],
+        "required": ["currencies", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10377,10 +9566,7 @@
         "description": "Currencies List"
       },
       "phoneList": {
-        "required": [
-          "phones",
-          "sum"
-        ],
+        "required": ["phones", "sum"],
         "type": "object",
         "properties": {
           "sum": {
@@ -10399,10 +9585,7 @@
         "description": "Phones List"
       },
       "permissions": {
-        "required": [
-          "read",
-          "write"
-        ],
+        "required": ["read", "write"],
         "type": "object",
         "properties": {
           "read": {
@@ -10467,11 +9650,7 @@
         "description": "Collection"
       },
       "document": {
-        "required": [
-          "$collection",
-          "$id",
-          "$permissions"
-        ],
+        "required": ["$collection", "$id", "$permissions"],
         "type": "object",
         "properties": {
           "$id": {
@@ -10818,12 +9997,7 @@
         "description": "Session"
       },
       "token": {
-        "required": [
-          "$id",
-          "expire",
-          "secret",
-          "userId"
-        ],
+        "required": ["$id", "expire", "secret", "userId"],
         "type": "object",
         "properties": {
           "$id": {
@@ -10847,9 +10021,7 @@
         "description": "Token"
       },
       "jwt": {
-        "required": [
-          "jwt"
-        ],
+        "required": ["jwt"],
         "type": "object",
         "properties": {
           "jwt": {
@@ -10949,12 +10121,7 @@
         "description": "File"
       },
       "team": {
-        "required": [
-          "$id",
-          "dateCreated",
-          "name",
-          "sum"
-        ],
+        "required": ["$id", "dateCreated", "name", "sum"],
         "type": "object",
         "properties": {
           "$id": {
@@ -11124,13 +10291,7 @@
         "description": "Function"
       },
       "tag": {
-        "required": [
-          "$id",
-          "command",
-          "dateCreated",
-          "functionId",
-          "size"
-        ],
+        "required": ["$id", "command", "dateCreated", "functionId", "size"],
         "type": "object",
         "properties": {
           "$id": {
@@ -11659,12 +10820,7 @@
         "description": "Webhook"
       },
       "key": {
-        "required": [
-          "$id",
-          "name",
-          "scopes",
-          "secret"
-        ],
+        "required": ["$id", "name", "scopes", "secret"],
         "type": "object",
         "properties": {
           "$id": {
@@ -11873,10 +11029,7 @@
         "description": "Platform"
       },
       "country": {
-        "required": [
-          "code",
-          "name"
-        ],
+        "required": ["code", "name"],
         "type": "object",
         "properties": {
           "name": {
@@ -11891,10 +11044,7 @@
         "description": "Country"
       },
       "continent": {
-        "required": [
-          "code",
-          "name"
-        ],
+        "required": ["code", "name"],
         "type": "object",
         "properties": {
           "name": {
@@ -11909,11 +11059,7 @@
         "description": "Continent"
       },
       "language": {
-        "required": [
-          "code",
-          "name",
-          "nativeName"
-        ],
+        "required": ["code", "name", "nativeName"],
         "type": "object",
         "properties": {
           "name": {
@@ -11977,11 +11123,7 @@
         "description": "Currency"
       },
       "phone": {
-        "required": [
-          "code",
-          "countryCode",
-          "countryName"
-        ],
+        "required": ["code", "countryCode", "countryName"],
         "type": "object",
         "properties": {
           "code": {
