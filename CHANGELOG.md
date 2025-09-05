@@ -30,6 +30,7 @@
 - Improved corpus loading and fixed fallback when corpus loading fails in
   [#147](https://github.com/TNO-S3/WuppieFuzz/pull/147)
 - Multiply overflow in corpus generation fixed in [#108](https://github.com/TNO-S3/WuppieFuzz/pull/108)
+- Decrease logging verbosity in [#148](https://github.com/TNO-S3/WuppieFuzz/pull/148)
 
 # v1.2.0 (2025-02-21)
 
