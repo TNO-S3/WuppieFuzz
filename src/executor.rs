@@ -23,6 +23,7 @@ use libafl_bolts::{current_time, prelude::RefIndexable};
 use openapiv3::OpenAPI;
 use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
+use strum::IntoDiscriminant;
 
 use crate::{
     authentication::{Authentication, build_http_client},
@@ -195,9 +196,12 @@ where
                         );
                         break 'chain;
                     } else {
-                        if self.config.crash_criterion == CrashCriterion::AllErrors
-                            && let Err(validation_err) =
-                                validate_response(self.api, &request, &response)
+                        if let Err(validation_err) =
+                            validate_response(self.api, &request, &response)
+                            && self
+                                .config
+                                .crash_criteria
+                                .contains(&validation_err.discriminant())
                         {
                             log::debug!(
                                 "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
