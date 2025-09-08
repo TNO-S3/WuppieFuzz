@@ -27,7 +27,7 @@ use strum::IntoDiscriminant;
 
 use crate::{
     authentication::{Authentication, build_http_client},
-    configuration::{Configuration, CrashCriterion},
+    configuration::Configuration,
     coverage_clients::{CoverageClient, endpoint::EndpointCoverageClient},
     input::OpenApiInput,
     openapi::{

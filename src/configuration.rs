@@ -518,14 +518,6 @@ pub enum MethodMutationStrategy {
     Common7,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
-pub enum CrashCriterion {
-    #[serde(alias = "all-errors", alias = "all_errors", alias = "allerrors")]
-    AllErrors,
-    #[serde(alias = "only-5xx", alias = "only_5xx", alias = "only5xx")]
-    Only5xx,
-}
-
 /// The main configuration object.
 #[derive(PartialEq, Eq)]
 pub struct Configuration {
