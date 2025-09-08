@@ -3,7 +3,9 @@ use std::{error::Error, str::Utf8Error};
 use anyhow::Result;
 use openapiv3::{OpenAPI, ReferenceOr, Schema, Type};
 use reqwest::StatusCode;
+use serde::Deserialize;
 use serde_json::Value;
+use strum::{EnumDiscriminants, EnumString, VariantArray};
 
 use super::JsonContent;
 use crate::input::{Method, OpenApiRequest};
@@ -60,7 +62,8 @@ impl From<reqwest::blocking::Response> for Response {
 
 /// ValidationError is returned by `validate_response` if a given response should
 /// not have been given by the API under test.
-#[derive(Debug)]
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumString, VariantArray, Deserialize))]
 pub enum ValidationError {
     /// The operation does not exist in the spec, which incidentally means it should
     /// not have been executed by the fuzzer to begin with.
