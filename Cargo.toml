@@ -48,8 +48,8 @@ build_html = "2.7.0"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
 chrono = "0.4.41"
-clap = { version = "4.5.46", features = ["cargo", "derive", "env"] }
-ctrlc = "3.4.7"
+clap = { version = "4.5.47", features = ["cargo", "derive", "env"] }
+ctrlc = "3.5.0"
 env_logger = "0.11.8"
 indexmap = { version = "2.11.0", features = ["serde"] }
 indicatif = "0.18.0"
@@ -60,7 +60,7 @@ lazy_static = "1.5.0"
 lcov = "0.8"
 libafl = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "4a8d49e6239d1f60721fb72bb18a0dcc376e1795", features = ["clap", "cmin"] }
 libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "4a8d49e6239d1f60721fb72bb18a0dcc376e1795", features = ["prelude"] }
-log = { version = "0.4.27", features = ["serde"] }
+log = { version = "0.4.28", features = ["serde"] }
 num = { version = "0.4.3", default-features = false }
 num-derive = "0.4.2"
 num-traits = { version = "0.2", default-features = false }
