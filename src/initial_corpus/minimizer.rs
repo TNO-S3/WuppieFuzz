@@ -1,16 +1,17 @@
-#[cfg(unix)]
+#[cfg(all(unix, not(target_env = "musl")))]
 use libafl::observers::MapObserver;
+#[cfg(all(unix, not(target_env = "musl")))]
 use libafl::schedulers::testcase_score::CorpusPowerTestcaseScore;
-#[cfg(unix)]
+#[cfg(all(unix, not(target_env = "musl")))]
 use libafl_bolts::{AsIter, Named};
 
 use crate::types::{
     CombinedMapObserverType, EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType,
 };
-#[cfg(unix)]
+#[cfg(all(unix, not(target_env = "musl")))]
 use crate::{initial_corpus::Hash, input::OpenApiInput};
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_env = "musl")))]
 pub fn get_minimizer<'a, O, T>(
     combined_map_observer: &CombinedMapObserverType<'a>,
 ) -> libafl::corpus::MapCorpusMinimizer<
@@ -25,7 +26,7 @@ pub fn get_minimizer<'a, O, T>(
     libafl::corpus::MapCorpusMinimizer::new(combined_map_observer)
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_env = "musl")))]
 pub fn minimize_corpus<'a, C, O, T>(
     mgr: &mut EventManagerType,
     minimizer: libafl::corpus::MapCorpusMinimizer<
@@ -78,10 +79,10 @@ where
     Ok(())
 }
 
-#[cfg(not(unix))]
+#[cfg(not(all(unix, not(target_env = "musl"))))]
 pub fn get_minimizer<'a>(_combined_map_observer: &CombinedMapObserverType<'a>) {}
 
-#[cfg(not(unix))]
+#[cfg(not(all(unix, not(target_env = "musl"))))]
 pub fn minimize_corpus<'a>(
     _mgr: &mut EventManagerType,
     _minimizer: (),
