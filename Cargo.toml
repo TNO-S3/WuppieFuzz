@@ -110,4 +110,5 @@ install-updater = true
 pr-run-mode = "upload"
 
 [workspace.metadata.dist.dependencies.apt]
-gcc-musl-x86-64 = { version="*", targets = ["x86_64-unknown-linux-musl"] }
+musl-dev = { version="*", targets = ["x86_64-unknown-linux-musl"] }
+gcc = { version="*", targets = ["x86_64-unknown-linux-musl"] }
