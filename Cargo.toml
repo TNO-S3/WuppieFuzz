@@ -88,6 +88,7 @@ url = { version = "2.5.7", features = ["serde"] }
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
 z3 = { version = "^0.12.1", features = ["static-link-z3"] }
+z3-sys = { version = "^0.8.1", features = ["static-link-z3"] }
 
 # Config for 'dist'
 [workspace.metadata.dist]
