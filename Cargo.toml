@@ -108,3 +108,6 @@ install-path = "CARGO_HOME"
 install-updater = true
 # Which actions to run on pull requests
 pr-run-mode = "upload"
+
+[workspace.metadata.dist.dependencies.apt]
+gcc-musl-x86-64 = { version="*", targets = ["x86_64-unknown-linux-musl"] }
