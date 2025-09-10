@@ -1,20 +1,29 @@
-#[cfg(enable_minimizer)]
-use libafl::observers::MapObserver;
-#[cfg(enable_minimizer)]
-use libafl::schedulers::testcase_score::CorpusPowerTestcaseScore;
-#[cfg(enable_minimizer)]
-use libafl_bolts::{AsIter, Named};
+//! Functionality for corpus minimization based on code coverage.
 
-use crate::types::{
-    CombinedMapObserverType, EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType,
+use anyhow::Context;
+use libafl::{
+    corpus::{Corpus, MapCorpusMinimizer},
+    events::{Event, EventFirer, EventWithStats, ExecStats},
+    executors::ExitKind,
+    observers::MapObserver,
+    schedulers::testcase_score::CorpusPowerTestcaseScore,
+    state::HasCorpus,
 };
-#[cfg(enable_minimizer)]
-use crate::{initial_corpus::Hash, input::OpenApiInput};
+use libafl_bolts::{AsIter, Named, current_time};
 
-#[cfg(enable_minimizer)]
+use crate::{
+    initial_corpus::Hash,
+    input::OpenApiInput,
+    types::{
+        CombinedMapObserverType, EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType,
+    },
+};
+
+/// Yields a corpus minimizer which uses the given observer to
+/// minimize a corpus based on observed code coverage.
 pub fn get_minimizer<'a, O, T>(
     combined_map_observer: &CombinedMapObserverType<'a>,
-) -> libafl::corpus::MapCorpusMinimizer<
+) -> MapCorpusMinimizer<
     CombinedMapObserverType<'a>,
     ExecutorType<'a>,
     OpenApiInput,
@@ -23,13 +32,13 @@ pub fn get_minimizer<'a, O, T>(
     T,
     CorpusPowerTestcaseScore,
 > {
-    libafl::corpus::MapCorpusMinimizer::new(combined_map_observer)
+    MapCorpusMinimizer::new(combined_map_observer)
 }
 
-#[cfg(enable_minimizer)]
+/// Uses the given minimizer to minimize the given state's corpus.
 pub fn minimize_corpus<'a, C, O, T>(
     mgr: &mut EventManagerType,
-    minimizer: libafl::corpus::MapCorpusMinimizer<
+    minimizer: MapCorpusMinimizer<
         C,
         ExecutorType<'a>,
         OpenApiInput,
@@ -47,15 +56,6 @@ where
     for<'b> O: MapObserver<Entry = T> + AsIter<'b, Item = T>,
     T: Copy + Hash + Eq,
 {
-    use anyhow::Context;
-    use libafl::{
-        corpus::Corpus,
-        events::{Event, EventFirer, EventWithStats, ExecStats},
-        executors::ExitKind,
-        state::HasCorpus,
-    };
-    use libafl_bolts::current_time;
-
     log::info!("Start corpus minimization");
     log::info!("Size before {}", state.corpus().count());
     minimizer.minimize(fuzzer, executor, mgr, state)?;
@@ -76,19 +76,5 @@ where
         ),
     )
     .context("Firing event after corpus minimization")?;
-    Ok(())
-}
-
-#[cfg(not(enable_minimizer))]
-pub fn get_minimizer<'a>(_combined_map_observer: &CombinedMapObserverType<'a>) {}
-
-#[cfg(not(enable_minimizer))]
-pub fn minimize_corpus<'a>(
-    _mgr: &mut EventManagerType,
-    _minimizer: (),
-    _state: &mut OpenApiFuzzerStateType,
-    _fuzzer: &mut FuzzerType<'a>,
-    _executor: &mut ExecutorType<'a>,
-) -> anyhow::Result<()> {
     Ok(())
 }

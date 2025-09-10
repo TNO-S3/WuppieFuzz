@@ -1,7 +1,11 @@
 //! Helper functions for loading a corpus from disk. See module documentation of
 //! the `input` submodule for information on serialization.
 pub mod dependency_graph;
-pub mod minimizer;
+
+#[cfg(enable_minimizer)]
+mod minimizer;
+#[cfg(not(enable_minimizer))]
+mod minimizer_nop;
 
 use std::{
     collections::hash_map::DefaultHasher,
@@ -19,6 +23,10 @@ use libafl::{
 use openapiv3::OpenAPI;
 
 use self::dependency_graph::DependencyGraph;
+#[cfg(enable_minimizer)]
+pub use self::minimizer::*;
+#[cfg(not(enable_minimizer))]
+pub use self::minimizer_nop::*;
 use crate::{
     initial_corpus::dependency_graph::initial_corpus_from_api,
     input::{OpenApiInput, OpenApiRequest},

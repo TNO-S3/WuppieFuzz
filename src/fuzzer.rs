@@ -29,7 +29,7 @@ use crate::{
         setup_line_coverage, validate_instrumentation,
     },
     executor::SequenceExecutor,
-    initial_corpus::minimizer::{get_minimizer, minimize_corpus},
+    initial_corpus::{get_minimizer, minimize_corpus},
     input::OpenApiInput,
     monitors::construct_event_mgr,
     openapi::parse_api_spec,
