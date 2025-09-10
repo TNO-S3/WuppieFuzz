@@ -88,7 +88,7 @@ url = { version = "2.5.7", features = ["serde"] }
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
 
-[target.'cfg(all(unix, not(target_env = "musl")))'.dependencies]
+[target.'cfg(any(target_vendor = "apple", all(target_arch = "x86_64", target_env = "gnu")))'.dependencies]
 z3 = { version = "^0.12.1", features = ["static-link-z3"] }
 z3-sys = { version = "^0.8.1", features = ["static-link-z3"] }
 
