@@ -107,9 +107,10 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
                     if let Ok(text) = response.text() {
                         info!("Response contents printed below: \n{text}")
                     }
-                    if response.status().is_success() {
-                        parameter_feedback.process_response(request_index, response);
-                    }
+                    // TODO: deduplicate from code in executor.rs
+                    // if response.status().is_success() {
+                    parameter_feedback.process_response(request_index, response);
+                    // }
                 }
             }
             Err(e) => {
@@ -117,7 +118,6 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
                 break;
             }
         }
-        parameter_feedback.process_post_request(request_index, request);
     }
     Ok(())
 }
