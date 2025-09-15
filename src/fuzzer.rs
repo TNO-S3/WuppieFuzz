@@ -6,7 +6,6 @@ use anyhow::{Context, Result};
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
-    corpus::minimizer::MapCorpusMinimizer,
     events::{Event, EventFirer, EventWithStats, ExecStats},
     feedback_or,
     feedbacks::{CrashFeedback, TimeFeedback},
@@ -15,7 +14,6 @@ use libafl::{
     observers::{CanTrack, MultiMapObserver, TimeObserver},
     schedulers::{
         IndexesLenTimeMinimizerScheduler, PowerQueueScheduler, powersched::PowerSchedule,
-        testcase_score::CorpusPowerTestcaseScore,
     },
     stages::{CalibrationStage, StdPowerMutationalStage},
     state::HasExecutions,
@@ -31,7 +29,7 @@ use crate::{
         setup_line_coverage, validate_instrumentation,
     },
     executor::SequenceExecutor,
-    initial_corpus::minimize_corpus,
+    initial_corpus::{get_minimizer, minimize_corpus},
     input::OpenApiInput,
     monitors::construct_event_mgr,
     openapi::parse_api_spec,
@@ -88,8 +86,7 @@ pub fn fuzz() -> Result<()> {
     );
 
     // Corpus minimizer
-    let minimizer: MapCorpusMinimizer<_, _, _, _, _, _, CorpusPowerTestcaseScore> =
-        MapCorpusMinimizer::new(&combined_map_observer);
+    let minimizer = get_minimizer(&combined_map_observer);
 
     // Initialize state
     let mut objective = CrashFeedback::new();

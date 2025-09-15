@@ -2,6 +2,11 @@
 //! the `input` submodule for information on serialization.
 pub mod dependency_graph;
 
+#[cfg(enable_minimizer)]
+mod minimizer;
+#[cfg(not(enable_minimizer))]
+mod minimizer_nop;
+
 use std::{
     collections::hash_map::DefaultHasher,
     convert::TryInto,
@@ -11,26 +16,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Context;
 use libafl::{
     HasMetadata,
-    corpus::{
-        Corpus, InMemoryOnDiskCorpus, MapCorpusMinimizer, SchedulerTestcaseMetadata, Testcase,
-    },
-    events::{Event, EventFirer, EventWithStats, ExecStats},
-    executors::ExitKind,
-    observers::MapObserver,
-    schedulers::testcase_score::CorpusPowerTestcaseScore,
-    state::HasCorpus,
+    corpus::{Corpus, InMemoryOnDiskCorpus, SchedulerTestcaseMetadata, Testcase},
 };
-use libafl_bolts::{AsIter, Named, current_time};
 use openapiv3::OpenAPI;
 
 use self::dependency_graph::DependencyGraph;
+#[cfg(enable_minimizer)]
+pub use self::minimizer::*;
+#[cfg(not(enable_minimizer))]
+pub use self::minimizer_nop::*;
 use crate::{
     initial_corpus::dependency_graph::initial_corpus_from_api,
     input::{OpenApiInput, OpenApiRequest},
-    types::{EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType},
 };
 
 /// Loads an `OpenApiInput` from a yaml file.
@@ -59,49 +58,6 @@ pub fn load_starting_corpus(
         return Err("Zero seeds loaded from corpus directory.".into());
     };
     Ok(corpus_vec)
-}
-
-pub fn minimize_corpus<'a, C, O, T>(
-    mgr: &mut EventManagerType,
-    minimizer: MapCorpusMinimizer<
-        C,
-        ExecutorType<'a>,
-        OpenApiInput,
-        O,
-        OpenApiFuzzerStateType,
-        T,
-        CorpusPowerTestcaseScore,
-    >,
-    state: &mut OpenApiFuzzerStateType,
-    fuzzer: &mut FuzzerType<'a>,
-    executor: &mut ExecutorType<'a>,
-) -> anyhow::Result<()>
-where
-    C: Named + AsRef<O>,
-    for<'b> O: MapObserver<Entry = T> + AsIter<'b, Item = T>,
-    T: Copy + Hash + Eq,
-{
-    log::info!("Start corpus minimization");
-    log::info!("Size before {}", state.corpus().count());
-    minimizer.minimize(fuzzer, executor, mgr, state)?;
-    log::info!("Size after {}", state.corpus().count());
-    let corpus_size = state.corpus().count();
-    mgr.fire(
-        state,
-        EventWithStats::new(
-            Event::NewTestcase {
-                input: OpenApiInput(vec![]),
-                observers_buf: None,
-                exit_kind: ExitKind::Ok,
-                corpus_size,
-                client_config: mgr.configuration(),
-                forward_id: None,
-            },
-            ExecStats::new(current_time(), 0),
-        ),
-    )
-    .context("Firing event after corpus minimization")?;
-    Ok(())
 }
 
 /// Generates a corpus and writes it to the path specified at `corpus_dir`.

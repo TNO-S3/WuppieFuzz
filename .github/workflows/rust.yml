@@ -71,6 +71,12 @@ jobs:
 
           # Exit with the captured Clippy exit code
           exit $CLIPPY_EXIT_CODE
+      
+      # The Z3 solver (used for coverage minimization) leaves a trace file
+      # when the fuzzer is compiled in debug mode. It can be safely ignored.
+      - name: Delete Z3 trace file
+        run: |
+          rm .z3-trace || true
 
       # Check for uncommitted changes
       - name: Check for uncommitted changes

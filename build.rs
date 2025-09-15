@@ -83,6 +83,14 @@ fn main() {
             .unwrap_or_else(|_| panic!("Failed to write to {:?}", &file_path.as_path()));
     }
 
+    // Corpus minimization depends on Z3, which does not compile on all targets.
+    // Use a custom flag to enable corpus minimization on supported targets.
+    println!("cargo::rustc-check-cfg=cfg(enable_minimizer)");
+    let target = std::env::var("TARGET").unwrap();
+    if target.contains("apple") || target == "x86_64-unknown-linux-gnu" {
+        println!("cargo:rustc-cfg=enable_minimizer");
+    }
+
     // Tell Cargo to re-run this build script if `build.rs` of `Cargo.lock` is changed
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=Cargo.lock");
