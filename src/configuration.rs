@@ -173,9 +173,9 @@ pub enum Commands {
 
         /// Which errors the fuzzer considers a bug. By default, all behaviour that does not match
         /// the specification is considered a bug.
-        /// 
+        ///
         /// The possible errors are:
-        /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally 
+        /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally
         ///   means it should not have been executed by the fuzzer to begin with.
         /// - "StatusNotSpecified": The HTTP status code returned from the API is not one of the status codes
         ///   mentioned for this path in the specification.
@@ -194,7 +194,7 @@ pub enum Commands {
         ///   model is given.
         /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type)
         ///   We cannot validate schemas that are this flexible.
-        /// 
+        ///
         /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors,
         /// you can configure what behaviour is considered a bug by the fuzzer.
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
@@ -405,9 +405,9 @@ struct PartialConfiguration {
 
     /// Which errors the fuzzer considers a bug. By default, all behaviour that does not match
     /// the specification is considered a bug.
-    /// 
+    ///
     /// The possible errors are:
-    /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally 
+    /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally
     ///   means it should not have been executed by the fuzzer to begin with.
     /// - "StatusNotSpecified": The HTTP status code returned from the API is not one of the status codes
     ///   mentioned for this path in the specification.
@@ -426,7 +426,7 @@ struct PartialConfiguration {
     ///   model is given.
     /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type)
     ///   We cannot validate schemas that are this flexible.
-    /// 
+    ///
     /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors,
     /// you can configure what behaviour is considered a bug by the fuzzer.
     #[clap(value_parser, long, value_enum, required = false, ignore_case = true)]
@@ -553,9 +553,9 @@ pub struct Configuration {
 
     /// Which errors the fuzzer considers a bug. By default, all behaviour that does not match
     /// the specification is considered a bug.
-    /// 
+    ///
     /// The possible errors are:
-    /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally 
+    /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally
     ///   means it should not have been executed by the fuzzer to begin with.
     /// - "StatusNotSpecified": The HTTP status code returned from the API is not one of the status codes
     ///   mentioned for this path in the specification.
@@ -574,7 +574,7 @@ pub struct Configuration {
     ///   model is given.
     /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type)
     ///   We cannot validate schemas that are this flexible.
-    /// 
+    ///
     /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors,
     /// you can configure what behaviour is considered a bug by the fuzzer.
     pub crash_criteria: Vec<ValidationErrorDiscriminants>,
@@ -694,7 +694,9 @@ impl TryFrom<PartialConfiguration> for Configuration {
             timeout: value.timeout,
             request_timeout: value.request_timeout.unwrap_or(DEFAULT_REQUEST_TIMEOUT),
             power_schedule: value.power_schedule.unwrap_or(BaseSchedule::FAST),
-            crash_criteria: value.crash_criteria.unwrap_or_else(|| ValidationErrorDiscriminants::VARIANTS.to_vec()),
+            crash_criteria: value
+                .crash_criteria
+                .unwrap_or_else(|| ValidationErrorDiscriminants::VARIANTS.to_vec()),
             report: value.report.unwrap_or(false),
             method_mutation_strategy: value
                 .method_mutation_strategy
