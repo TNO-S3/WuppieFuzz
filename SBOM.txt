@@ -223,6 +223,9 @@ hashbrown 0.14.5
 hashbrown 0.15.5
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
+hashbrown 0.16.0
+	licensed under "Apache-2.0 OR MIT"
+	by Amanieu d'Antras <amanieu@gmail.com>
 hashlink 0.10.0
 	licensed under "Apache-2.0 OR MIT"
 	by kyren <kerriganw@gmail.com>
@@ -322,7 +325,7 @@ jiff 0.2.15
 jiff-static 0.2.15
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-js-sys 0.3.77
+js-sys 0.3.80
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 json_env_logger2 0.2.1
@@ -601,13 +604,13 @@ system-configuration 0.6.1
 system-configuration-sys 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
-tempfile 3.22.0
+tempfile 3.23.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
 thiserror-impl 1.0.69
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-thiserror-impl 2.0.14
+thiserror-impl 2.0.16
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 time 0.3.44
@@ -724,25 +727,28 @@ want 0.3.1
 wasi 0.11.1+wasi-snapshot-preview1
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by The Cranelift Project Developers
-wasi 0.14.2+wasi-0.2.4
+wasi 0.14.7+wasi-0.2.4
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
-	by The Cranelift Project Developers
-wasm-bindgen 0.2.100
+	by unspecified authors
+wasip2 1.0.1+wasi-0.2.4
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by unspecified authors
+wasm-bindgen 0.2.103
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-backend 0.2.100
+wasm-bindgen-backend 0.2.103
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-futures 0.4.50
+wasm-bindgen-futures 0.4.53
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-macro 0.2.100
+wasm-bindgen-macro 0.2.103
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-shared 0.2.100
+wasm-bindgen-shared 0.2.103
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-web-sys 0.3.77
+web-sys 0.3.80
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 web-time 1.1.0
@@ -766,7 +772,13 @@ windows 0.59.0
 windows-core 0.59.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
+windows-core 0.62.0
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
 windows-implement 0.59.0
+	licensed under "Apache-2.0 OR MIT"
+	by Microsoft
+windows-implement 0.60.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows-interface 0.59.1
@@ -784,12 +796,18 @@ windows-registry 0.5.3
 windows-result 0.3.4
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
+windows-result 0.4.0
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
 windows-strings 0.3.1
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows-strings 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
+windows-strings 0.5.0
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
 windows-sys 0.52.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
@@ -856,9 +874,9 @@ windows_x86_64_msvc 0.52.6
 windows_x86_64_msvc 0.53.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-wit-bindgen-rt 0.39.0
+wit-bindgen 0.46.0
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
-	by unspecified authors
+	by Alex Crichton <alex@alexcrichton.com>
 writeable 0.6.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
