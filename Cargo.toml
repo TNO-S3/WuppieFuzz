@@ -115,4 +115,4 @@ z3 = '*'
 z3 = '*'
 
 [workspace.metadata.dist.github-custom-runners]
-aarch64-apple-darwin = "macos-26"
+aarch64-apple-darwin = "macos-14"
