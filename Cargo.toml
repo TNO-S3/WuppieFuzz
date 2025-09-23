@@ -105,5 +105,10 @@ install-path = "CARGO_HOME"
 install-updater = true
 
 [workspace.metadata.dist.dependencies.homebrew]
-cmake = { targets = ["x86_64-apple-darwin"] }
+z3 = '*'
+
+[workspace.metadata.dist.dependencies.chocolatey]
+z3 = '*'
+
+[workspace.metadata.dist.dependencies.apt]
 z3 = '*'
