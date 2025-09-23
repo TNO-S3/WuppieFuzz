@@ -407,6 +407,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 
 [[package]]
+name = "cmake"
+version = "0.1.54"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "cobs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1381,7 +1390,7 @@ dependencies = [
 [[package]]
 name = "libafl"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=ffb833009993eb6e4b490f54fc6116c7dfa18e9e#ffb833009993eb6e4b490f54fc6116c7dfa18e9e"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=1688145b9b95159fc43e22a27664801545fbb956#1688145b9b95159fc43e22a27664801545fbb956"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1420,7 +1429,7 @@ dependencies = [
 [[package]]
 name = "libafl_bolts"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=ffb833009993eb6e4b490f54fc6116c7dfa18e9e#ffb833009993eb6e4b490f54fc6116c7dfa18e9e"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=1688145b9b95159fc43e22a27664801545fbb956#1688145b9b95159fc43e22a27664801545fbb956"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1456,7 +1465,7 @@ dependencies = [
 [[package]]
 name = "libafl_derive"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=ffb833009993eb6e4b490f54fc6116c7dfa18e9e#ffb833009993eb6e4b490f54fc6116c7dfa18e9e"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=1688145b9b95159fc43e22a27664801545fbb956#1688145b9b95159fc43e22a27664801545fbb956"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3592,6 +3601,7 @@ dependencies = [
  "url",
  "urlencoding",
  "walkdir",
+ "z3",
 ]
 
 [[package]]
@@ -3627,8 +3637,7 @@ dependencies = [
 [[package]]
 name = "z3"
 version = "0.18.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e6abe40eee88a065f2bde2f663e0e6aa95552d9124edc96ab291376db19f9a2"
+source = "git+https://github.com/prove-rs/z3.rs#44618aeeda0538789f57ce5d7271e7abeca368be"
 dependencies = [
  "log",
  "num",
@@ -3638,10 +3647,10 @@ dependencies = [
 [[package]]
 name = "z3-sys"
 version = "0.9.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cd1b38ffd95fae0fcc40026fb1a822074e2a923ad4e011e90df878cbed721e0"
+source = "git+https://github.com/prove-rs/z3.rs#44618aeeda0538789f57ce5d7271e7abeca368be"
 dependencies = [
  "bindgen",
+ "cmake",
  "pkg-config",
 ]
 

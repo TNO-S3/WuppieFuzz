@@ -58,8 +58,8 @@ itertools = "0.14.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.5.0"
 lcov = "0.8"
-libafl = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "3fe30270af1eea9f11b785d32701c7d3110d8270", features = ["clap", "cmin"] }
-libafl_bolts = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "3fe30270af1eea9f11b785d32701c7d3110d8270", features = ["prelude"] }
+libafl = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "1688145b9b95159fc43e22a27664801545fbb956", features = ["clap", "cmin"] }
+libafl_bolts = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "1688145b9b95159fc43e22a27664801545fbb956", features = ["prelude"] }
 log = { version = "0.4.27", features = ["serde"] }
 num = { version = "0.4.3", default-features = false }
 num-derive = "0.4.2"
@@ -87,6 +87,7 @@ unicode-truncate = "2.0.0"
 url = { version = "2.5.7", features = ["serde"] }
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
+z3 = { git = "https://github.com/prove-rs/z3.rs", features = ["bundled"] }
 
 # Config for 'dist'
 [workspace.metadata.dist]
