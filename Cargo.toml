@@ -58,8 +58,8 @@ itertools = "0.14.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.5.0"
 lcov = "0.8"
-libafl = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "d6daf1c55ab081f7f6b039b4146a2302d807c85a", features = ["clap", "cmin"] }
-libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "d6daf1c55ab081f7f6b039b4146a2302d807c85a", features = ["prelude"] }
+libafl = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "4f4d02b2999bade91bd4139f3d3634614ae75d6b", features = ["clap", "cmin"] }
+libafl_bolts = { git = "https://github.com/ThomasTNO/LibAFL.git", rev = "4f4d02b2999bade91bd4139f3d3634614ae75d6b", features = ["prelude"] }
 log = { version = "0.4.27", features = ["serde"] }
 num = { version = "0.4.3", default-features = false }
 num-derive = "0.4.2"
@@ -90,6 +90,7 @@ walkdir = "2.5.0"
 
 # Config for 'dist'
 [workspace.metadata.dist]
+pr-run-mode = "upload"
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.29.0"
 # CI backends to support
