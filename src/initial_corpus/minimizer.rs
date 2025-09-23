@@ -6,7 +6,7 @@ use libafl::{
     events::{Event, EventFirer, EventWithStats, ExecStats},
     executors::ExitKind,
     observers::MapObserver,
-    schedulers::testcase_score::CorpusPowerTestcaseScore,
+    schedulers::testcase_score::LenTimeMulTestcasePenalty,
     state::HasCorpus,
 };
 use libafl_bolts::{AsIter, Named, current_time};
@@ -30,7 +30,7 @@ pub fn get_minimizer<'a, O, T>(
     O,
     OpenApiFuzzerStateType,
     T,
-    CorpusPowerTestcaseScore,
+    LenTimeMulTestcasePenalty,
 > {
     MapCorpusMinimizer::new(combined_map_observer)
 }
@@ -45,7 +45,7 @@ pub fn minimize_corpus<'a, C, O, T>(
         O,
         OpenApiFuzzerStateType,
         T,
-        CorpusPowerTestcaseScore,
+        LenTimeMulTestcasePenalty,
     >,
     state: &mut OpenApiFuzzerStateType,
     fuzzer: &mut FuzzerType<'a>,
