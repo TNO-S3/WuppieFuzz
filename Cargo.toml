@@ -114,5 +114,5 @@ z3 = '*'
 [workspace.metadata.dist.dependencies.apt]
 z3 = '*'
 
-[dist.github-custom-runners]
+[workspace.metadata.dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"
