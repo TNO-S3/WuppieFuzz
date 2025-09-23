@@ -109,7 +109,7 @@ core-foundation 0.9.4
 core-foundation-sys 0.8.7
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
-ctor 0.4.3
+ctor 0.5.0
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
 ctor-proc-macro 0.0.6
@@ -124,10 +124,10 @@ deranged 0.5.3
 document-features 0.2.11
 	licensed under "Apache-2.0 OR MIT"
 	by Slint Developers <info@slint.dev>
-dtor 0.0.6
+dtor 0.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
-dtor-proc-macro 0.0.5
+dtor-proc-macro 0.0.6
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
 either 1.15.0
@@ -391,6 +391,9 @@ native-tls 0.2.14
 nix 0.30.1
 	licensed under "MIT"
 	by The nix-rust Project Developers
+num-bigint 0.4.6
+	licensed under "Apache-2.0 OR MIT"
+	by The Rust Project Developers
 num-complex 0.4.6
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
@@ -865,10 +868,10 @@ yoke 0.8.0
 yoke-derive 0.8.0
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-z3 0.12.1
+z3 0.18.2
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>
-z3-sys 0.8.1
+z3-sys 0.9.10
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>
 zerocopy 0.8.26

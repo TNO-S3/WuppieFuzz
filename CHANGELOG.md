@@ -6,7 +6,7 @@
 
 ## Fixes
 
-# v1.3.0 (2025-09-05)
+# v1.3.0 (2025-09-23)
 
 ## Highlights
 
@@ -20,7 +20,6 @@ In this release, we improved parsing of OpenAPI specs, minimization of corpora b
 - Support logging in the output-corpus subcommand in [#121](https://github.com/TNO-S3/WuppieFuzz/pull/121)
 - Corpus minimization added in [#146](https://github.com/TNO-S3/WuppieFuzz/pull/146)
 - Exit and notify user when instrumentation is not working in [#145](https://github.com/TNO-S3/WuppieFuzz/pull/145)
-- Enable LibAFL corpus minimization on supported platforms in [#146](https://github.com/TNO-S3/WuppieFuzz/pull/146)
 
 ## Fixes
 

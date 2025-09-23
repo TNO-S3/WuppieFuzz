@@ -58,8 +58,8 @@ itertools = "0.14.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.5.0"
 lcov = "0.8"
-libafl = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "4a8d49e6239d1f60721fb72bb18a0dcc376e1795", features = ["clap"] }
-libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "4a8d49e6239d1f60721fb72bb18a0dcc376e1795", features = ["prelude"] }
+libafl = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "d6daf1c55ab081f7f6b039b4146a2302d807c85a", features = ["clap", "cmin"] }
+libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "d6daf1c55ab081f7f6b039b4146a2302d807c85a", features = ["prelude"] }
 log = { version = "0.4.27", features = ["serde"] }
 num = { version = "0.4.3", default-features = false }
 num-derive = "0.4.2"
@@ -88,11 +88,6 @@ url = { version = "2.5.7", features = ["serde"] }
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
 
-[target.'cfg(any(target_vendor = "apple", all(target_arch = "x86_64", target_env = "gnu")))'.dependencies]
-libafl = { git = "https://github.com/AFLplusplus/LibAFL.git", rev = "4a8d49e6239d1f60721fb72bb18a0dcc376e1795", features = ["clap", "cmin"] }
-z3 = { version = "^0.12.1", features = ["static-link-z3"] }
-z3-sys = { version = "^0.8.1", features = ["static-link-z3"] }
-
 # Config for 'dist'
 [workspace.metadata.dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
@@ -102,8 +97,20 @@ ci = "github"
 # The installers to generate for each app
 installers = ["shell", "powershell", "msi"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Whether to install an updater program
 install-updater = true
+
+[workspace.metadata.dist.dependencies.homebrew]
+z3 = '*'
+
+[workspace.metadata.dist.dependencies.chocolatey]
+z3 = '*'
+
+[workspace.metadata.dist.dependencies.apt]
+z3 = '*'
+
+[workspace.metadata.dist.github-custom-runners]
+aarch64-apple-darwin = "macos-14"

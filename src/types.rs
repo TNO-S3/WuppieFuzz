@@ -11,7 +11,7 @@ use libafl::{
     },
     inputs::NopToTargetBytes,
     observers::{ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{LenTimeMulTestcaseScore, MinimizerScheduler, PowerQueueScheduler},
+    schedulers::{LenTimeMulTestcasePenalty, MinimizerScheduler, PowerQueueScheduler},
 };
 
 use crate::{
@@ -56,7 +56,7 @@ pub type CombinedMapObserverType<'a> =
 
 pub type SchedulerType<'a> = MinimizerScheduler<
     PowerQueueScheduler<CombinedMapObserverType<'a>, MultiMapObserver<'a, u8, false>>,
-    LenTimeMulTestcaseScore,
+    LenTimeMulTestcasePenalty,
     OpenApiInput,
     MapIndexesMetadata,
     CombinedMapObserverType<'a>,
