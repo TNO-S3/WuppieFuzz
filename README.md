@@ -20,7 +20,7 @@ WuppieFuzz was featured in
 ## Quick install
 
 For quick installation of WuppieFuzz for popular operating systems (MacOS,
-Windows, Linux) see [releases](https://github.com/TNO-S3/WuppieFuzz/releases/)
+Windows, Linux) see [releases](https://github.com/TNO-S3/WuppieFuzz/releases/) or use [`brew install wuppiefuzz`](https://formulae.brew.sh/wuppiefuzz)
 
 ### Short how-to
 
