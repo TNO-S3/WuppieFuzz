@@ -104,14 +104,5 @@ install-path = "CARGO_HOME"
 # Whether to install an updater program
 install-updater = true
 
-[workspace.metadata.dist.dependencies.homebrew]
-z3 = '*'
-
-[workspace.metadata.dist.dependencies.chocolatey]
-z3 = '*'
-
-[workspace.metadata.dist.dependencies.apt]
-z3 = '*'
-
 [workspace.metadata.dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"
