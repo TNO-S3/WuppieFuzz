@@ -1390,7 +1390,7 @@ dependencies = [
 [[package]]
 name = "libafl"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=1688145b9b95159fc43e22a27664801545fbb956#1688145b9b95159fc43e22a27664801545fbb956"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b#57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1429,7 +1429,7 @@ dependencies = [
 [[package]]
 name = "libafl_bolts"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=1688145b9b95159fc43e22a27664801545fbb956#1688145b9b95159fc43e22a27664801545fbb956"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b#57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1465,7 +1465,7 @@ dependencies = [
 [[package]]
 name = "libafl_derive"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=1688145b9b95159fc43e22a27664801545fbb956#1688145b9b95159fc43e22a27664801545fbb956"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b#57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3637,7 +3637,7 @@ dependencies = [
 [[package]]
 name = "z3"
 version = "0.18.2"
-source = "git+https://github.com/prove-rs/z3.rs#44618aeeda0538789f57ce5d7271e7abeca368be"
+source = "git+https://github.com/prove-rs/z3.rs?rev=3d9325a463ea8c8af1f1c19a947e0fc163d66f46#3d9325a463ea8c8af1f1c19a947e0fc163d66f46"
 dependencies = [
  "log",
  "num",
@@ -3647,7 +3647,7 @@ dependencies = [
 [[package]]
 name = "z3-sys"
 version = "0.9.10"
-source = "git+https://github.com/prove-rs/z3.rs#44618aeeda0538789f57ce5d7271e7abeca368be"
+source = "git+https://github.com/prove-rs/z3.rs?rev=3d9325a463ea8c8af1f1c19a947e0fc163d66f46#3d9325a463ea8c8af1f1c19a947e0fc163d66f46"
 dependencies = [
  "bindgen",
  "cmake",
