@@ -1390,7 +1390,7 @@ dependencies = [
 [[package]]
 name = "libafl"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b#57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=4157cb0c6aa6cd05fe288592fefec0cd7d9c8e4a#4157cb0c6aa6cd05fe288592fefec0cd7d9c8e4a"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1429,7 +1429,7 @@ dependencies = [
 [[package]]
 name = "libafl_bolts"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b#57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=4157cb0c6aa6cd05fe288592fefec0cd7d9c8e4a#4157cb0c6aa6cd05fe288592fefec0cd7d9c8e4a"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1465,7 +1465,7 @@ dependencies = [
 [[package]]
 name = "libafl_derive"
 version = "0.15.4"
-source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b#57d729cbe49a2e8d6cd62f9c8f96f0d1aa92962b"
+source = "git+https://github.com/ThomasTNO/LibAFL.git?rev=4157cb0c6aa6cd05fe288592fefec0cd7d9c8e4a#4157cb0c6aa6cd05fe288592fefec0cd7d9c8e4a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3601,7 +3601,6 @@ dependencies = [
  "url",
  "urlencoding",
  "walkdir",
- "z3",
 ]
 
 [[package]]

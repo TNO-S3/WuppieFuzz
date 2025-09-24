@@ -22,7 +22,6 @@ fn get_hash_version() -> String {
 }
 
 fn main() {
-    println!("cargo:rustc-link-lib=msvcrt");
     let dependencies = get_dependencies_from_cargo_lock(
         &Default::default(),
         &GetDependenciesOpt {
