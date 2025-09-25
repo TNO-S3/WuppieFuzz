@@ -176,6 +176,9 @@ The converted OpenAPI specification with the updated server url used for this
 tutorial has been added to the tutorial folder [here](openapi.json) and renamed
 to `openapi.json`.
 
+> [|NOTE]  
+> The target server can also be specified using the `--target` flag.
+
 ## Preparing for a fuzzing campaign
 
 ### Generate an initial corpus

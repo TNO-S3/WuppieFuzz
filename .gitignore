@@ -9,9 +9,13 @@ target/
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
+# Z3 compilation artifact
+.z3-trace
+
 # Fuzzer specific
 crashes/
 queue/
 reports/
 jacoco_report.exec
 endpointcoverage/
+version.hash

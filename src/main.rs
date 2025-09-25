@@ -58,6 +58,7 @@ mod parameter_feedback;
 mod reporting;
 mod reproducer;
 mod state;
+mod types;
 mod wuppie_version;
 
 use crate::{configuration::Configuration, openapi::get_api_spec};

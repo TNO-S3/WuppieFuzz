@@ -1,22 +1,8 @@
-use std::{env, process::Command};
+use std::env;
 
 pub fn get_wuppie_version() -> String {
-    let git_output = Command::new("git").arg("rev-parse").arg("HEAD").output();
-    let git_hash = match git_output {
-        Ok(v) => {
-            if v.stdout.is_empty() {
-                "".to_string()
-            } else {
-                "-".to_string().clone()
-                    + &String::from_utf8(v.stdout)
-                        .clone()
-                        .unwrap_or("Invalid UTF8 output".to_string())
-            }
-        }
-        Err(_) => "<could not get git hash>".to_string(),
-    };
-
-    clap::crate_version!().to_string() + &git_hash
+    clap::crate_version!().to_string()
+        + include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/version.hash"))
 }
 
 pub fn print_version() {
