@@ -9,6 +9,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions: {}
+
 jobs:
   build-and-test:
     name: Build, Test, and Coverage
@@ -16,10 +18,14 @@ jobs:
     strategy:
       matrix:
         rust: [stable, nightly]
+    permissions:
+      contents: read
     steps:
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       # Install Rust toolchain
       - name: Install Rust ${{ matrix.rust }}
@@ -85,10 +91,14 @@ jobs:
   coverage:
     name: Code Coverage (Tarpaulin)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
       # Install Rust nightly toolchain with required components for Tarpaulin or llvm-tools-preview
       - name: Install nightly toolchain with llvm-tools-preview
