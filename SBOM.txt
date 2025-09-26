@@ -115,7 +115,7 @@ ctor-proc-macro 0.0.6
 ctrlc 3.5.0
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
-deranged 0.5.3
+deranged 0.5.4
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
 dispatch 0.2.0
@@ -370,7 +370,7 @@ log 0.4.28
 mach2 0.5.0
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
-memchr 2.7.5
+memchr 2.7.6
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>|bluss
 meminterval 0.4.2
@@ -499,10 +499,10 @@ rand_regex 0.18.1
 redox_syscall 0.5.17
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
-regex 1.11.2
+regex 1.11.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-automata 0.4.10
+regex-automata 0.4.11
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
 regex-syntax 0.8.6
