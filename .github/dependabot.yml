@@ -18,3 +18,13 @@ updates:
     labels:
       - "dependencies"
       - "rust"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      # Check for updates to GitHub Actions every week
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "actions"

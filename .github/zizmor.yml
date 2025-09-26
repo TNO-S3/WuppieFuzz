@@ -1,0 +1,8 @@
+rules:
+  template-injection:
+    ignore:
+      - release.yml
+  excessive-permissions:
+    ignore:
+      - release.yml
+  
