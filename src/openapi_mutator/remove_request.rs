@@ -81,9 +81,7 @@ mod test {
     use crate::{
         input::{ParameterContents, parameter::ParameterKind},
         openapi_mutator::test_helpers::{linked_requests, simple_request},
-        parameter_access::{
-            ParameterAccessElements, RequestParameterAccess, ResponseParameterAccess,
-        },
+        parameter_access::{ParameterAccess, ParameterAccessElements},
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -131,7 +129,7 @@ mod test {
                 ("id".into(), ParameterKind::Query),
                 ParameterContents::Reference {
                     request_index: 1,
-                    parameter_access: ResponseParameterAccess::Body(
+                    parameter_access: ParameterAccess::Body(
                         ParameterAccessElements::from_elements(&vec!["id".to_string().into()]),
                     ),
                 },
@@ -145,7 +143,7 @@ mod test {
                 // If the first simple request was removed, we would expect a reference_index of 0.
                 // But if the second simple request was removed, we would expect the parameter to have been changed to ParameterContents::Bytes.
                 let parameter = input.0[1]
-                    .get_mut_parameter(&RequestParameterAccess::Query("id".to_string()))
+                    .get_mut_parameter(&ParameterAccess::Query("id".to_string()))
                     .expect("Could not find parameter after request removal");
                 assert!(parameter.reference_index().is_none_or(|&mut idx| idx == 0));
             }

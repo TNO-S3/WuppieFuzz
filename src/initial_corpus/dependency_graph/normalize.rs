@@ -165,7 +165,6 @@ pub fn normalize_response<'a>(
         context.clone(),
         ReqResp::Resp,
     );
-    log::warn!("Context:\n{context:?}\nNormalized:\n{result:?}");
     result
 }
 

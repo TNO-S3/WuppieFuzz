@@ -70,7 +70,7 @@ use openapiv3::{OpenAPI, Operation};
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
 use crate::{
-    parameter_access::{ParameterAccessElements, RequestParameterAccess, ResponseParameterAccess},
+    parameter_access::{ParameterAccess, ParameterAccessElements},
     parameter_feedback::ParameterFeedback,
     state::HasRandAndOpenAPI,
 };
@@ -291,13 +291,13 @@ impl OpenApiRequest {
     /// Returns a mutable reference to a parameter identified a RequestParameterAccess.
     pub fn get_mut_parameter<'a>(
         &'a mut self,
-        req_parameter_access: &RequestParameterAccess,
+        req_parameter_access: &ParameterAccess,
     ) -> Option<&'a mut ParameterContents> {
         // Can't use or_else with a closure because you'd have to move self
         // which is not possible
         #[allow(clippy::or_fun_call)]
         match &req_parameter_access {
-            RequestParameterAccess::Body(parameter_access) => match &mut self.body {
+            ParameterAccess::Body(parameter_access) => match &mut self.body {
                 Body::Empty => None,
                 Body::TextPlain(text) => Some(text),
                 // For getting named parameters, we consider only first-level parameters in object values
@@ -306,10 +306,10 @@ impl OpenApiRequest {
                     parameters.resolve_mut(parameter_access)
                 }
             },
-            RequestParameterAccess::Query(name)
-            | RequestParameterAccess::Path(name)
-            | RequestParameterAccess::Header(name)
-            | RequestParameterAccess::Cookie(name) => self
+            ParameterAccess::Query(name)
+            | ParameterAccess::Path(name)
+            | ParameterAccess::Header(name)
+            | ParameterAccess::Cookie(name) => self
                 .parameters
                 .get_mut(&(name.clone(), req_parameter_access.into())),
         }
@@ -427,14 +427,7 @@ impl OpenApiInput {
     /// (request idx, request parameter access, target request idx, target parameter access)
     pub fn reference_parameters(
         &self,
-    ) -> impl Iterator<
-        Item = (
-            usize,
-            RequestParameterAccess,
-            usize,
-            ResponseParameterAccess,
-        ),
-    > + '_ {
+    ) -> impl Iterator<Item = (usize, ParameterAccess, usize, ParameterAccess)> + '_ {
         self.0
             .iter()
             .enumerate()
@@ -443,6 +436,7 @@ impl OpenApiInput {
                 openapi_request
                     .parameters
                     .iter()
+                    // .map(|((n, k), v)| (Cow::Borrowed(n), *k, v))
                     .map(|((n, k), v)| (Cow::Borrowed(n), *k, v))
                     //.. then add any fields from the body as well ..
                     .chain(
@@ -463,6 +457,7 @@ impl OpenApiInput {
                         }
                         .map(|(n, v)| (n, ParameterKind::Body, v)),
                     )
+                    // Only preserve references
                     .filter_map(|(n, k, v)| match v {
                         ParameterContents::Reference {
                             request_index,
@@ -470,10 +465,12 @@ impl OpenApiInput {
                         } => Some(((n, k), (request_index, parameter_access))),
                         _ => None,
                     })
+                    // Turn parameter name (here still a String) into ParameterAccess
+                    // and return the request_idx, request_parameter_access, target_idx, target_parameter_access tuple
                     .map(move |((n, k), (ti, tn))| {
                         (
                             request_idx,
-                            RequestParameterAccess::create_of_kind(
+                            ParameterAccess::create_of_kind(
                                 k,
                                 Some(n.clone().into_owned()),
                                 Some(ParameterAccessElements::from_elements(&vec![
@@ -489,7 +486,7 @@ impl OpenApiInput {
 
     /// Returns an iterator that yields all (named) return value names from all
     /// requests, along with the index of the request they appear in.
-    pub fn return_values(&self, api: &OpenAPI) -> Vec<(usize, ResponseParameterAccess)> {
+    pub fn return_values(&self, api: &OpenAPI) -> Vec<(usize, ParameterAccess)> {
         self.0
             .iter()
             .enumerate()
@@ -521,7 +518,7 @@ impl OpenApiInput {
                             api,
                         )
                     })
-                    .map(move |resps| (i, ResponseParameterAccess::Body(resps)))
+                    .map(move |resps| (i, ParameterAccess::Body(resps)))
             })
             .collect()
     }
@@ -554,7 +551,7 @@ impl OpenApiInput {
 
         for (idx, parameter_access) in to_replace {
             match &parameter_access {
-                RequestParameterAccess::Body(parameter_access_elements) => {
+                ParameterAccess::Body(parameter_access_elements) => {
                     match &mut self.0[idx].body {
                         Body::Empty | Body::TextPlain(_) => {
                             log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,

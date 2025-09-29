@@ -126,7 +126,7 @@ mod test {
     use crate::{
         input::{Method, ParameterContents, parameter::ParameterKind},
         openapi_mutator::test_helpers::linked_requests,
-        parameter_access::RequestParameterAccess,
+        parameter_access::ParameterAccess,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -147,7 +147,7 @@ mod test {
 
             assert_eq!(result, MutationResult::Mutated);
             let parameter = input.0[1]
-                .get_mut_parameter(&RequestParameterAccess::Query("id".to_string()))
+                .get_mut_parameter(&ParameterAccess::Query("id".to_string()))
                 .expect("Request got the wrong parameter");
             assert!(parameter.is_reference());
             assert_eq!(parameter.reference_index().copied(), Some(0));

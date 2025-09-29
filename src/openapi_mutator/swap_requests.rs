@@ -87,7 +87,7 @@ mod test {
     use crate::{
         input::Method,
         openapi_mutator::test_helpers::{linked_requests, simple_request},
-        parameter_access::RequestParameterAccess,
+        parameter_access::ParameterAccess,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -123,7 +123,7 @@ mod test {
             assert_eq!(result, MutationResult::Mutated);
             assert!(
                 input.0[0]
-                    .get_mut_parameter(&RequestParameterAccess::Query("id".to_string()))
+                    .get_mut_parameter(&ParameterAccess::Query("id".to_string()))
                     .expect("Could not find parameter after request removal")
                     .bytes()
                     .is_some()

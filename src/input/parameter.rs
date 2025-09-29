@@ -11,9 +11,7 @@ use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
 use super::utils::new_rand_input;
-use crate::parameter_access::{
-    ParameterAccess, ParameterAccessElement, ParameterAccessElements, ResponseParameterAccess,
-};
+use crate::parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements};
 
 /// Structs that help describe parameters to HTTP requests in a way that the fuzzer can still
 /// mutate and reason about. The ParameterKind enum describes the places a parameter can occur
@@ -98,7 +96,7 @@ pub enum ParameterContents {
         #[serde(rename = "request")]
         request_index: usize,
         #[serde(rename = "parameter_name")]
-        parameter_access: ResponseParameterAccess,
+        parameter_access: ParameterAccess,
     },
 }
 
@@ -229,13 +227,12 @@ impl ParameterContents {
         Some(result)
     }
 
-    pub fn resolve(&self, path: &ParameterAccess) -> Option<&Self> {
+    /// Returns a nested field of this ParameterContents, as addressed by the parameter_access.
+    /// If the addressing does not identify a field (by having bad field names, out-of-bound indexes,
+    /// or too many elements), None is returned.
+    pub fn resolve(&self, parameter_access: &ParameterAccess) -> Option<&Self> {
         let mut result = self;
-        let elements = match path {
-            ParameterAccess::Request(access) => access.get_body_access_elements(),
-            ParameterAccess::Response(access) => access.get_body_access_elements(),
-        }
-        .unwrap();
+        let elements = parameter_access.get_body_access_elements().unwrap();
         for path_element in &elements.0 {
             match (result, path_element) {
                 (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {

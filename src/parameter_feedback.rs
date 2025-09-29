@@ -4,17 +4,17 @@ use serde_json::Value;
 
 use crate::{
     openapi::validate_response::Response,
-    parameter_access::{ParameterAccessElements, ResponseParameterAccess},
+    parameter_access::{ParameterAccess, ParameterAccessElements},
 };
 
 /// ParameterFeedbackMetadata collects parameter values from requests as they
 /// are made. This allows the harness to insert the values in subsequent requests
 /// if a parameter contains a backreference to an earlier request.
 #[derive(Debug, Clone)]
-pub struct ParameterFeedback(Vec<HashMap<ResponseParameterAccess, Value>>);
+pub struct ParameterFeedback(Vec<HashMap<ParameterAccess, Value>>);
 
-impl From<&Vec<HashMap<ResponseParameterAccess, Value>>> for ParameterFeedback {
-    fn from(collection: &Vec<HashMap<ResponseParameterAccess, Value>>) -> Self {
+impl From<&Vec<HashMap<ParameterAccess, Value>>> for ParameterFeedback {
+    fn from(collection: &Vec<HashMap<ParameterAccess, Value>>) -> Self {
         Self(collection.clone())
     }
 }
@@ -44,12 +44,12 @@ impl ParameterFeedback {
     }
 
     /// Returns the value saved for the given request
-    pub fn get(&self, request_index: usize, param: &ResponseParameterAccess) -> Option<&Value> {
+    pub fn get(&self, request_index: usize, param: &ParameterAccess) -> Option<&Value> {
         // Tuple indexing leads to clones... Better to implement as double hashmap?
         self.0.get(request_index)?.get(param)
     }
 
-    pub fn contains(&self, request_index: usize, param: &ResponseParameterAccess) -> bool {
+    pub fn contains(&self, request_index: usize, param: &ParameterAccess) -> bool {
         self.0
             .get(request_index)
             .map(|m| m.contains_key(param))
@@ -58,12 +58,7 @@ impl ParameterFeedback {
 
     /// Adds the given parameter/value combination to memory. Returns whether successful
     /// (if the request index is out of bounds, false is returned).
-    pub fn set(
-        &mut self,
-        request_index: usize,
-        param: ResponseParameterAccess,
-        value: Value,
-    ) -> bool {
+    pub fn set(&mut self, request_index: usize, param: ParameterAccess, value: Value) -> bool {
         self.0
             .get_mut(request_index)
             .map(|m| m.insert(param, value))
@@ -73,20 +68,20 @@ impl ParameterFeedback {
     fn add_response_parameter(
         &mut self,
         request_index: usize,
-        parent_access: ResponseParameterAccess,
+        parent_access: ParameterAccess,
         field: serde_json::Value,
     ) {
         self.set(request_index, parent_access.clone(), field.clone());
         // Only a Body response can contain nested values which we treat below.
         // Response cookies were already set with the line above.
-        if let ResponseParameterAccess::Body(parameter_access) = parent_access {
+        if let ParameterAccess::Body(parameter_access) = parent_access {
             match field {
                 Value::Array(values) => {
                     for (offset, value) in values.into_iter().enumerate() {
                         let access = parameter_access.with_new_element(offset.into());
                         self.add_response_parameter(
                             request_index,
-                            ResponseParameterAccess::Body(access),
+                            ParameterAccess::Body(access),
                             value,
                         );
                     }
@@ -96,7 +91,7 @@ impl ParameterFeedback {
                         let access = parameter_access.with_new_element(param.into());
                         self.add_response_parameter(
                             request_index,
-                            ResponseParameterAccess::Body(access),
+                            ParameterAccess::Body(access),
                             value,
                         );
                     }
@@ -118,7 +113,7 @@ impl ParameterFeedback {
             // Objects in responses: save all field/value combinations
             Ok(field) => self.add_response_parameter(
                 request_index,
-                ResponseParameterAccess::Body(ParameterAccessElements::new()),
+                ParameterAccess::Body(ParameterAccessElements::new()),
                 field,
             ),
             Err(e) => {
@@ -130,7 +125,7 @@ impl ParameterFeedback {
         for (name, value) in response.cookies() {
             self.add_response_parameter(
                 request_index,
-                ResponseParameterAccess::Cookie(name),
+                ParameterAccess::Cookie(name),
                 serde_json::Value::String(value),
             );
         }

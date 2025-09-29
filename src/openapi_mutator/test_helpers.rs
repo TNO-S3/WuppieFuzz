@@ -6,7 +6,7 @@ use crate::{
     input::{
         Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
     },
-    parameter_access::{ParameterAccessElements, ResponseParameterAccess},
+    parameter_access::{ParameterAccess, ParameterAccessElements},
 };
 
 /// Returns an input consisting of one request to the simple endpoint
@@ -27,9 +27,9 @@ pub fn linked_requests() -> OpenApiInput {
         ("id".into(), ParameterKind::Query),
         ParameterContents::Reference {
             request_index: 0,
-            parameter_access: ResponseParameterAccess::Body(
-                ParameterAccessElements::from_elements(&vec!["id".to_string().into()]),
-            ),
+            parameter_access: ParameterAccess::Body(ParameterAccessElements::from_elements(&vec![
+                "id".to_string().into(),
+            ])),
         },
     );
     let has_param = OpenApiRequest {

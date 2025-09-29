@@ -15,7 +15,8 @@ use std::{
     path::Path,
 };
 
-use openapiv3::{OpenAPI, StatusCode};
+use libafl::inputs;
+use openapiv3::OpenAPI;
 use petgraph::{
     prelude::{DiGraph, NodeIndex},
     stable_graph::DefaultIx,
@@ -364,17 +365,16 @@ fn find_links<'a>(
                         output.normalized == input.normalized || output.name == input.name
                     })?
                     .parameter_access
-                    .clone()
-                    .unwrap_response(),
-                input_access: input.parameter_access.clone().unwrap_request(),
+                    .clone(),
+                input_access: input.parameter_access.clone(),
                 input_name_normalized: input.normalized.clone(),
             })
         })
         .collect()
 }
 
-/// Collects all names of parameters and fields used as input and output to this
-/// operation.
+/// Collects all names of parameters and fields used as input (requests) and output (responses)
+/// of this operation.
 fn inout_params<'a>(
     api: &'a OpenAPI,
     op: &QualifiedOperation<'a>,
@@ -407,11 +407,13 @@ fn inout_params<'a>(
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
         .find_map(|body| normalize_request_body(api, body, path_context_component(op.path)))
         .unwrap_or_default();
-    // TODO: using an input parameter as an output causes problems for the new, stricter distinction
-    // between requests and responses in e.g. ParameterAccess. Might it be cleaner to simply set
-    // input parameters to the same value where appropriate? This "input-linking" would still need
-    // to be done separately then though. If the below is removed, remember to update the comment above.
-
+    // TODO: We want to use parameters in POST requests as inputs, this would address a common use case
+    // where requests need to reuse the same value that the client had to pick.
+    // However, using a request parameter as an output would need an extra mechanism to specify in a reference
+    // whether the request or response is referenced (both could have a field in the Body with the same ParameterAccess).
+    // It is probably cleaner to simply set input parameters to the same static value if they are "linked", and avoid references for this.
+    // This "input-linking" would still need to be done separately of course.
+    // TODO: If the below is removed, remember to update the comment above.
     if op.method == Method::Post {
         output_fields.extend(body_fields.clone());
     }
