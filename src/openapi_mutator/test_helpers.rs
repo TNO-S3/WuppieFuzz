@@ -2,8 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use crate::input::{
-    Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
+use crate::{
+    input::{
+        Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
+    },
+    parameter_access::{ParameterAccess, ParameterAccessElements},
 };
 
 /// Returns an input consisting of one request to the simple endpoint
@@ -21,10 +24,12 @@ pub fn simple_request() -> OpenApiInput {
 pub fn linked_requests() -> OpenApiInput {
     let mut parameters = BTreeMap::new();
     parameters.insert(
-        ("id".to_string(), ParameterKind::Query),
+        ("id".into(), ParameterKind::Query),
         ParameterContents::Reference {
             request_index: 0,
-            parameter_name: "id".to_string(),
+            parameter_access: ParameterAccess::Body(ParameterAccessElements::from_elements(&vec![
+                "id".to_string().into(),
+            ])),
         },
     );
     let has_param = OpenApiRequest {

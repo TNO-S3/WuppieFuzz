@@ -300,7 +300,8 @@ fn mutate_parameter_contents<S: HasRand>(
     state: &mut S,
     contents_mutator: &mut dyn Mutator<BytesInput, S>,
 ) -> Result<MutationResult, Error> {
-    // Used if we pick an element from an array or object to mutate
+    // random_element is used if we pick an element from an array or object to mutate,
+    // other ParameterContents return early with a mutated result.
     let random_element;
     match param_contents {
         ParameterContents::Object(obj_properties) => {
@@ -347,9 +348,7 @@ fn mutate_parameter_contents<S: HasRand>(
         ),
     }
     if let ParameterContents::Reference { .. } = random_element {
-        log::warn!(
-            "Tried to mutate nested reference. If this happens a lot some solution should be implemented here. Skipping for now."
-        );
+        // References do not currently get mutated.
         Ok(MutationResult::Skipped)
     } else {
         // This was nested in an array or object, recursively mutate
