@@ -2,12 +2,6 @@ name: Rust CI
 
 on:
   push:
-    branches:
-      - 'main'
-      - 'dependabot/cargo/**'
-  pull_request:
-    branches-ignore:
-      - 'dependabot/cargo/**'
   workflow_dispatch:
     inputs:
       branch:
