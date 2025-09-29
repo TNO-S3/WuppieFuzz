@@ -205,10 +205,7 @@ where
                             exit_kind = ExitKind::Crash;
                             break 'chain;
                         }
-                        // TODO: does everyone agree that non-2xx results should also be stored for backrefs?
-                        // if response.status().is_success() {
                         parameter_feedback.process_response(request_index, response);
-                        // }
                     }
                 }
                 Err(transport_error) => {

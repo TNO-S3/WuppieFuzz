@@ -31,7 +31,7 @@ use self::{
 };
 use crate::{
     initial_corpus::dependency_graph::normalize::path_context_component,
-    input::{OpenApiInput, ParameterContents},
+    input::{Method, OpenApiInput, ParameterContents},
     openapi::{
         QualifiedOperation,
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
@@ -50,8 +50,8 @@ pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
         .connected_components()
         .iter()
         .map(|nodes| dependency_graph.subgraph(nodes))
-        .map(|subgraph| match ops_from_subgraph(&subgraph) {
-            Ok((ops, idxs)) => {
+        .map(|subgraph| {
+            ops_from_subgraph(&subgraph).map(|(ops, idxs)| {
                 // TODO: pass subgraph into openapi_inputs_from_ops to prevent generation of parameter values
                 // that will be replaced by references below anyway. The current implementation often
                 // massively overgenerates all the different combinations, most of which then get
@@ -66,9 +66,8 @@ pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
                 inputs.iter_mut().for_each(|input| {
                     add_references_to_openapi_input(&subgraph, &idxs, input);
                 });
-                Ok(inputs)
-            }
-            Err(e) => Err(e),
+                inputs
+            })
         })
         .filter_map(|result| result.ok())
         .flatten()
@@ -85,7 +84,6 @@ fn ops_from_subgraph<'a>(
         Ok(nodes) => nodes,
         Err(cycle) => {
             let operation = &subgraph[cycle.node_id()];
-            // TODO: early-exit with this error, or support cycles
             log::error!(
                 "While building initial corpus from the API specification, found operation with a (self-)cycle {} {}",
                 operation.method,
@@ -145,7 +143,6 @@ fn add_references_to_openapi_input(
         // Turn the parameter of the edge's target (which at this point got a concrete
         // placeholder Value based on e.g. an example or its type) into a Reference to
         // the parameter of the same name and kind in the source.
-        log::debug!("{:#?}", openapi_input.0[target_index]);
         if let Some(x) =
             openapi_input.0[target_index].get_mut_parameter(&edge.weight().input_access.clone())
         {
@@ -383,16 +380,15 @@ fn inout_params<'a>(
     op: &QualifiedOperation<'a>,
 ) -> (Vec<ParameterNormalization>, Vec<ParameterNormalization>) {
     // Outputs from a request are all field names from the response body. Collect them.
-    let output_fields: Vec<_> = op
+    let mut output_fields: Vec<_> = op
         .operation
         .responses
         .responses
         .iter()
-        // TODO: decide whether to really remove the status_is_2xx (in that case also remove that function)
-        // .filter(|(status_code, _)| status_is_2xx(status_code))
         .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
         .filter_map(|response| normalize_response(api, response, path_context_component(op.path)))
-        .flatten() // Combine all 2XX responses, if multiple
+        // Flatten normalizations into one big collection (not grouped per Response)
+        .flatten()
         .collect();
 
     // Inputs to a request are all parameters. Collect those.
@@ -416,24 +412,10 @@ fn inout_params<'a>(
     // input parameters to the same value where appropriate? This "input-linking" would still need
     // to be done separately then though. If the below is removed, remember to update the comment above.
 
-    // if op.method == Method::Post {
-    //     output_fields.extend(body_fields.clone());
-    // }
+    if op.method == Method::Post {
+        output_fields.extend(body_fields.clone());
+    }
     input_fields.extend(body_fields);
 
     (input_fields, output_fields)
-}
-
-// TODO: remove the status_is_2xx function if non-2xx responses are really going to be considered for backrefs.
-
-/// Checks if a StatusCode is 2XX
-fn status_is_2xx(status_code: &StatusCode) -> bool {
-    // The implementation is currently (1.0.1) that the Code variant is just the
-    // status code, and a Range variant is nXX. This is not documented, but I
-    // derived this from the Display implementation...
-    // https://docs.rs/openapiv3/latest/src/openapiv3/status_code.rs.html#10
-    match status_code {
-        StatusCode::Code(n) => *n >= 200 && *n < 300,
-        StatusCode::Range(n) => *n == 2,
-    }
 }

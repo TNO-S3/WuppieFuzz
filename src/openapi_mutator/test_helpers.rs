@@ -28,7 +28,7 @@ pub fn linked_requests() -> OpenApiInput {
         ParameterContents::Reference {
             request_index: 0,
             parameter_access: ResponseParameterAccess::Body(
-                ParameterAccessElements::from_elements(vec!["id".to_string().into()]),
+                ParameterAccessElements::from_elements(&vec!["id".to_string().into()]),
             ),
         },
     );

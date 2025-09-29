@@ -476,7 +476,7 @@ impl OpenApiInput {
                             RequestParameterAccess::create_of_kind(
                                 k,
                                 Some(n.clone().into_owned()),
-                                Some(ParameterAccessElements::from_elements(vec![
+                                Some(ParameterAccessElements::from_elements(&vec![
                                     n.into_owned().into(),
                                 ])),
                             ),

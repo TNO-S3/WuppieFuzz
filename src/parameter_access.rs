@@ -1,3 +1,17 @@
+//! ParameterAccess identifies a field in a request or response, in a header, body, path, cookie, etc.
+//! This is used for two (related) purposes:
+//!
+//! 1. Store references to values in responses to earlier requests, e.g. to reuse an ID returned by
+//!    the server in a later request.
+//! 2. To create normalized versions of parameters in both requests and responses. These normalizations
+//!    are then used to link some request parameters to earlier response parameters, so in this case it
+//!    is useful to have a way to identify a request parameter so it can be replaced with a reference.
+//!
+//! For non-body fields, the identifier is simply a string with the name of the variable.
+//! For body fields parameters can be nested in objects and lists, in which case we use
+//! [a list](ParameterAccessElements) with elements of type [`ParameterAccessElement`](ParameterAccessElement)
+//! which are used to "descend" into body structures to identify a field.
+
 use std::{
     fmt::{Display, Formatter},
     hash::Hash,
@@ -12,20 +26,18 @@ use crate::input::parameter::ParameterKind;
     Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
 )]
 pub enum ParameterAccessElement {
+    /// Identifies a field in an object
     Name(String),
+    /// Identifies an item in a list
     Offset(usize),
 }
 
 impl Display for ParameterAccessElement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ParameterAccessElement::Name(name) => name.clone(),
-                ParameterAccessElement::Offset(offset) => offset.to_string(),
-            }
-        )
+        match self {
+            ParameterAccessElement::Name(name) => write!(f, "{}", name),
+            ParameterAccessElement::Offset(offset) => write!(f, "{}", offset),
+        }
     }
 }
 
@@ -64,8 +76,8 @@ impl ParameterAccessElements {
         Self(vec![])
     }
 
-    pub fn from_elements(elements: Vec<ParameterAccessElement>) -> Self {
-        Self(elements.clone())
+    pub fn from_elements(elements: &[ParameterAccessElement]) -> Self {
+        Self(elements.to_vec())
     }
 
     pub fn parameter_accesses_from_schema(
@@ -97,7 +109,7 @@ impl ParameterAccessElements {
     pub fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {
         let mut elements = self.0.clone();
         elements.push(new_element);
-        Self::from_elements(elements)
+        Self::from_elements(&elements)
     }
 }
 
@@ -119,7 +131,7 @@ impl Display for ParameterAccessElements {
 
 impl From<&[ParameterAccessElement]> for ParameterAccessElements {
     fn from(value: &[ParameterAccessElement]) -> Self {
-        Self::from_elements(value.to_vec())
+        Self::from_elements(&value.to_vec())
     }
 }
 
@@ -218,6 +230,7 @@ impl From<&RequestParameterAccess> for ParameterKind {
     }
 }
 
+/// See [module level documentation](crate::parameter_access).
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterAccess {
     Request(RequestParameterAccess),
@@ -237,7 +250,6 @@ impl ParameterAccess {
     pub(crate) fn response_body(elements: ParameterAccessElements) -> Self {
         Self::Response(ResponseParameterAccess::Body(elements))
     }
-    // TODO: add more helper construction methods
     pub(crate) fn unwrap_request(self) -> RequestParameterAccess {
         if let Self::Request(val) = self {
             val
