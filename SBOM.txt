@@ -1,4 +1,4 @@
-addr2line 0.24.2
+addr2line 0.25.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 adler2 2.0.1
@@ -34,7 +34,7 @@ anyhow 1.0.100
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
-backtrace 0.3.75
+backtrace 0.3.76
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 base64 0.22.1
@@ -211,7 +211,7 @@ getrandom 0.2.16
 getrandom 0.3.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
-gimli 0.31.1
+gimli 0.32.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 h2 0.4.12
@@ -415,7 +415,7 @@ num-rational 0.4.2
 num_enum 0.7.4
 	licensed under "Apache-2.0 OR BSD-3-Clause OR MIT"
 	by Daniel Wagner-Hall <dawagner@gmail.com>|Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>|Vincent Esche <regexident@gmail.com>
-object 0.36.7
+object 0.37.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 once_cell_polyfill 1.70.1
@@ -562,7 +562,7 @@ security-framework 2.11.1
 security-framework-sys 2.15.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>
-serde_core 1.0.226
+serde_core 1.0.228
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
 serde_urlencoded 0.7.1
@@ -628,7 +628,7 @@ tokio 1.47.1
 tokio-native-tls 0.3.1
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
-tokio-rustls 0.26.3
+tokio-rustls 0.26.4
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 tokio-util 0.7.16
@@ -781,9 +781,9 @@ windows-implement 0.59.0
 windows-implement 0.60.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-interface 0.59.1
+windows-interface 0.59.2
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
 windows-link 0.1.3
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
