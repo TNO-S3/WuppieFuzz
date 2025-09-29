@@ -35,7 +35,7 @@ jobs:
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust }}
+          channel: ${{ matrix.rust }}
           components: rustfmt, clippy
 
       # Cache dependencies to speed up builds
@@ -108,7 +108,7 @@ jobs:
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
           profile: minimal
-          toolchain: nightly
+          channel: nightly
           components: llvm-tools-preview
 
       # Install Tarpaulin for coverage generation (requires nightly)
