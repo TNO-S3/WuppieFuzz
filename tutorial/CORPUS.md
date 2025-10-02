@@ -1,6 +1,6 @@
 # WuppieFuzz Corpus YAML Format Documentation
 
-This document describes the structure and semantics of the YAML corpus files used by WuppieFuzz. Each file represents one "input", and contains a sequence of HTTP requests, including methods, paths, parameters, and bodies. The format enables the fuzzer to reconstruct requests and parameters, including references to earlier responses.
+This document describes the structure and semantics of the YAML corpus (and crash) files used by WuppieFuzz. Each file represents one "input", and contains a sequence of HTTP requests, including methods, paths, parameters, and bodies. The format enables the fuzzer to reconstruct requests and parameters, including references to earlier responses.
 
 ## Top-Level Structure
 
@@ -28,7 +28,8 @@ The second item in the key list specifies the parameter location, and is one of 
 
 The value is a dictionary with:
 - `DataType`: One of:
-  - `PrimitiveValue`: A direct value, annotated by its type e.g. `!Number`, `!String`.
+  - `PrimitiveValue`: A direct value, annotated by its type e.g. `!Number`, `!String`. Strings can be quoted if any special characters need to be escaped.
+  - `RawBytes`: a base64 encoded value that is sent as the parameter value without interpretation
   - `ReferenceToEarlierResponse`: A reference to a value from a previous request
 - `Contents`: The actual value or reference details
 
@@ -65,6 +66,20 @@ parameters:
     Contents:
       request: 0
       parameter_name: id
+```
+
+### Example: More complex parameter values
+
+```yaml
+parameters:
+? - api_key
+  - Header
+: DataType: PrimitiveValue
+  Contents: !String "?\x1FO'Sitz"
+? - petId
+  - Path
+: DataType: RawBytes
+  Contents: IxEIRCIRSJw=
 ```
 
 ## Request Body
