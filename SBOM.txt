@@ -10,13 +10,10 @@ ahash 0.8.12
 aho-corasick 1.1.3
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-allocator-api2 0.2.21
-	licensed under "Apache-2.0 OR MIT"
-	by Zakarum <zaq.dev@icloud.com>
 android_system_properties 0.1.5
 	licensed under "Apache-2.0 OR MIT"
 	by Nicolas Silva <nical@fastmail.com>
-anstream 0.6.20
+anstream 0.6.21
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 anstyle-parse 0.2.7
@@ -49,7 +46,7 @@ build_html 2.7.0
 bumpalo 3.19.0
 	licensed under "Apache-2.0 OR MIT"
 	by Nick Fitzgerald <fitzgen@gmail.com>
-bytemuck 1.23.2
+bytemuck 1.24.0
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Lokathor <zefria@gmail.com>
 byteorder 1.5.0
@@ -85,7 +82,7 @@ colorchoice 1.0.4
 console 0.16.1
 	licensed under "MIT"
 	by unspecified authors
-const_format 0.2.34
+const_format 0.2.35
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 const_panic 0.2.15
@@ -361,7 +358,7 @@ linux-raw-sys 0.11.0
 litemap 0.8.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-lock_api 0.4.13
+lock_api 0.4.14
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
 log 0.4.28
@@ -436,16 +433,16 @@ openssl-probe 0.1.6
 openssl-sys 0.9.109
 	licensed under "MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Steven Fackler <sfackler@gmail.com>
-parking_lot 0.12.4
+parking_lot 0.12.5
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-parking_lot_core 0.9.11
+parking_lot_core 0.9.12
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
 percent-encoding 2.3.2
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-petgraph 0.8.2
+petgraph 0.8.3
 	licensed under "Apache-2.0 OR MIT"
 	by bluss|mitchmindtree
 pin-project-lite 0.2.16
@@ -496,7 +493,7 @@ rand_core 0.9.3
 rand_regex 0.18.1
 	licensed under "MIT"
 	by kennytm <kennytm@gmail.com>
-redox_syscall 0.5.17
+redox_syscall 0.5.18
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
 regex 1.11.3
@@ -532,7 +529,7 @@ rustls 0.23.32
 rustls-pki-types 1.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-webpki 0.103.6
+rustls-webpki 0.103.7
 	licensed under "ISC"
 	by unspecified authors
 ryu 1.0.20
@@ -907,7 +904,7 @@ zerofrom 0.1.6
 zerofrom-derive 0.1.6
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-zeroize 1.8.1
+zeroize 1.8.2
 	licensed under "Apache-2.0 OR MIT"
 	by The RustCrypto Project Developers
 zerotrie 0.2.2
