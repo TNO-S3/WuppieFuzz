@@ -1,4 +1,4 @@
-# WuppieFuzz v1.2.0
+# WuppieFuzz v1.3.0
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/WuppieFuzz-dark.svg">
@@ -20,7 +20,7 @@ WuppieFuzz was featured in
 ## Quick install
 
 For quick installation of WuppieFuzz for popular operating systems (MacOS,
-Windows, Linux) see [releases](https://github.com/TNO-S3/WuppieFuzz/releases/)
+Windows, Linux) see [releases](https://github.com/TNO-S3/WuppieFuzz/releases/) or use [`brew install wuppiefuzz`](https://formulae.brew.sh/formula/wuppiefuzz)
 
 ### Short how-to
 
