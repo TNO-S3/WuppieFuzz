@@ -35,8 +35,8 @@ pub enum ParameterAccessElement {
 impl Display for ParameterAccessElement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParameterAccessElement::Name(name) => write!(f, "{}", name),
-            ParameterAccessElement::Offset(offset) => write!(f, "{}", offset),
+            ParameterAccessElement::Name(name) => write!(f, "{name}"),
+            ParameterAccessElement::Offset(offset) => write!(f, "{offset}"),
         }
     }
 }
@@ -131,7 +131,7 @@ impl Display for ParameterAccessElements {
 
 impl From<&[ParameterAccessElement]> for ParameterAccessElements {
     fn from(value: &[ParameterAccessElement]) -> Self {
-        Self::from_elements(&value.to_vec())
+        Self::from_elements(value)
     }
 }
 

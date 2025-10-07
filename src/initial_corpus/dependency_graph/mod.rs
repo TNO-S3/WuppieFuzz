@@ -15,7 +15,6 @@ use std::{
     path::Path,
 };
 
-use libafl::inputs;
 use openapiv3::OpenAPI;
 use petgraph::{
     prelude::{DiGraph, NodeIndex},

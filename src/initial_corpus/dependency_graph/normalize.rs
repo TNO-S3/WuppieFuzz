@@ -159,13 +159,13 @@ pub fn normalize_response<'a>(
     response: &'a Response,
     context: Option<String>,
 ) -> Option<Vec<ParameterNormalization>> {
-    let result = normalize_media_type(
+    
+    normalize_media_type(
         api,
         response.content.get_json_content()?,
         context.clone(),
         ReqResp::Resp,
-    );
-    result
+    )
 }
 
 /// Normalizes request body parameters.
