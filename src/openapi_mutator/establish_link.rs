@@ -80,14 +80,16 @@ where
                         request_index_and_parameter_name_pairs
                             .iter()
                             // Find the first request index that had the desired parameter name in a response
-                            .position(|(request_index, rv_parameter_access)| {
-                                let rv_name = rv_parameter_access
+                            .position(|target_addressing| {
+                                let target_name = target_addressing
+                                    .access
                                     .get_body_access_elements()
                                     .unwrap()
                                     .0
                                     .last();
-                                if let Some(ParameterAccessElement::Name(rv_name)) = rv_name {
-                                    *request_index < current_request_index && name == rv_name
+                                if let Some(ParameterAccessElement::Name(rv_name)) = target_name {
+                                    target_addressing.request_index < current_request_index
+                                        && name == rv_name
                                 } else {
                                     false
                                 }
@@ -102,10 +104,10 @@ where
         };
 
         // Make the link
-        *random_link.0 = ParameterContents::Reference {
-            request_index: request_index_and_parameter_access_pairs[random_link.1].0,
+        *random_link.0 = ParameterContents::OReference {
+            request_index: request_index_and_parameter_access_pairs[random_link.1].request_index,
             parameter_access: request_index_and_parameter_access_pairs[random_link.1]
-                .1
+                .access
                 .to_owned(),
         };
 
@@ -126,7 +128,7 @@ mod test {
     use crate::{
         input::{Method, ParameterContents, parameter::ParameterKind},
         openapi_mutator::test_helpers::linked_requests,
-        parameter_access::ParameterAccess,
+        parameter_access::RequestParameterAccess,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -147,7 +149,7 @@ mod test {
 
             assert_eq!(result, MutationResult::Mutated);
             let parameter = input.0[1]
-                .get_mut_parameter(&ParameterAccess::Query("id".to_string()))
+                .get_mut_parameter(&RequestParameterAccess::Query("id".to_string()))
                 .expect("Request got the wrong parameter");
             assert!(parameter.is_reference());
             assert_eq!(parameter.reference_index().copied(), Some(0));

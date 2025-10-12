@@ -115,7 +115,6 @@ impl ParameterAccessElements {
 
 impl Display for ParameterAccessElements {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        log::warn!("{:?}", self.0);
         write!(
             f,
             "{}",
@@ -135,23 +134,20 @@ impl From<&[ParameterAccessElement]> for ParameterAccessElements {
     }
 }
 
-impl From<&ParameterAccess> for ParameterKind {
-    fn from(value: &ParameterAccess) -> Self {
-        match value {
-            ParameterAccess::Body(_) => Self::Body,
-            ParameterAccess::Query(_) => Self::Query,
-            ParameterAccess::Path(_) => Self::Path,
-            ParameterAccess::Header(_) => Self::Header,
-            ParameterAccess::Cookie(_) => Self::Cookie,
-        }
-    }
-}
+// impl From<&ParameterAccess> for ParameterKind {
+//     fn from(value: &ParameterAccess) -> Self {
+//         match value {
+//             ParameterAccess::Body(_) => Self::Body,
+//             ParameterAccess::Query(_) => Self::Query,
+//             ParameterAccess::Path(_) => Self::Path,
+//             ParameterAccess::Header(_) => Self::Header,
+//             ParameterAccess::Cookie(_) => Self::Cookie,
+//         }
+//     }
+// }
 
-/// See [module level documentation](crate::parameter_access).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ParameterAccess {
-    // Request(RequestParameterAccess),
-    // Response(ResponseParameterAccess),
+pub enum RequestParameterAccess {
     Body(ParameterAccessElements),
     Query(String),
     Path(String),
@@ -159,44 +155,120 @@ pub enum ParameterAccess {
     Cookie(String),
 }
 
+impl Display for RequestParameterAccess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Body(parameter_access) => parameter_access.fmt(f),
+            Self::Query(value) | Self::Path(value) | Self::Header(value) | Self::Cookie(value) => {
+                write!(f, "{value}")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ResponseParameterAccess {
+    Body(ParameterAccessElements),
+    Header(String),
+    Cookie(String),
+}
+
+impl Display for ResponseParameterAccess {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Body(parameter_access) => parameter_access.fmt(f),
+            Self::Header(value) | Self::Cookie(value) => {
+                write!(f, "{value}")
+            }
+        }
+    }
+}
+
+/// See [module level documentation](crate::parameter_access).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ParameterAccess {
+    #[serde(with = "serde_yaml::with::singleton_map")]
+    Request(RequestParameterAccess),
+    #[serde(with = "serde_yaml::with::singleton_map")]
+    Response(ResponseParameterAccess),
+    // Body(ParameterAccessElements),
+    // Query(String),
+    // Path(String),
+    // Header(String),
+    // Cookie(String),
+}
+
 impl ParameterAccess {
     pub fn simple_name(&self) -> &str {
         match self {
-            Self::Body(_) => "",
-            Self::Query(name) | Self::Path(name) | Self::Header(name) | Self::Cookie(name) => name,
+            ParameterAccess::Request(request_parameter_access) => match request_parameter_access {
+                RequestParameterAccess::Body(_) => "",
+                RequestParameterAccess::Query(name)
+                | RequestParameterAccess::Path(name)
+                | RequestParameterAccess::Header(name)
+                | RequestParameterAccess::Cookie(name) => name,
+            },
+            ParameterAccess::Response(response_parameter_access) => {
+                match response_parameter_access {
+                    ResponseParameterAccess::Body(_) => "",
+                    ResponseParameterAccess::Header(name)
+                    | ResponseParameterAccess::Cookie(name) => name,
+                }
+            }
+        }
+    }
+    pub fn unwrap_request_variant(&self) -> &RequestParameterAccess {
+        if let Self::Request(request_variant) = self {
+            request_variant
+        } else {
+            panic!(
+                "Tried to unwrap a ParamterAccess as a Request variant, but it contains a Response variant!"
+            )
         }
     }
     pub(crate) fn request_query(name: String) -> Self {
-        Self::Query(name)
+        Self::Request(RequestParameterAccess::Query(name))
     }
     pub(crate) fn request_path(name: String) -> Self {
-        Self::Path(name)
+        Self::Request(RequestParameterAccess::Path(name))
+    }
+    pub(crate) fn request_header(name: String) -> Self {
+        Self::Request(RequestParameterAccess::Header(name))
+    }
+    pub(crate) fn request_cookie(name: String) -> Self {
+        Self::Request(RequestParameterAccess::Cookie(name))
     }
     pub(crate) fn request_body(elements: ParameterAccessElements) -> Self {
-        Self::Body(elements)
+        Self::Request(RequestParameterAccess::Body(elements))
     }
     pub(crate) fn response_body(elements: ParameterAccessElements) -> Self {
-        Self::Body(elements)
+        Self::Response(ResponseParameterAccess::Body(elements))
     }
-    pub fn create_of_kind(
-        kind: ParameterKind,
-        string_contents: Option<String>,
-        access_contents: Option<ParameterAccessElements>,
-    ) -> Self {
-        match kind {
-            ParameterKind::Path => Self::Path(string_contents.unwrap()),
-            ParameterKind::Query => Self::Query(string_contents.unwrap()),
-            ParameterKind::Header => Self::Header(string_contents.unwrap()),
-            ParameterKind::Cookie => Self::Cookie(string_contents.unwrap()),
-            ParameterKind::Body => Self::Body(access_contents.unwrap()),
-        }
+    pub(crate) fn response_cookie(name: String) -> Self {
+        Self::Response(ResponseParameterAccess::Cookie(name))
     }
     pub fn get_body_access_elements(&self) -> Option<&ParameterAccessElements> {
-        if let Self::Body(elements) = self {
-            Some(elements)
-        } else {
-            log::warn!("Trying to get access elements from non-body RequestParameterAccess");
-            None
+        let warn_text = "Trying to get access elements from non-body RequestParameterAccess";
+        match self {
+            ParameterAccess::Request(request_parameter_access) => match request_parameter_access {
+                RequestParameterAccess::Body(parameter_access_elements) => {
+                    Some(parameter_access_elements)
+                }
+                _ => {
+                    log::warn!("{}", warn_text);
+                    None
+                }
+            },
+            ParameterAccess::Response(response_parameter_access) => match response_parameter_access
+            {
+                ResponseParameterAccess::Body(parameter_access_elements) => {
+                    Some(parameter_access_elements)
+                }
+                _ => {
+                    log::warn!("{}", warn_text);
+                    None
+                }
+            },
         }
     }
     pub fn matches(&self, param: &openapiv3::Parameter) -> bool {
@@ -204,12 +276,24 @@ impl ParameterAccess {
     }
     pub(crate) fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {
         match self {
-            ParameterAccess::Body(access_elements) => {
-                Self::request_body(access_elements.with_new_element(new_element))
+            ParameterAccess::Request(request_parameter_access) => {
+                if let RequestParameterAccess::Body(access_elements) = request_parameter_access {
+                    Self::request_body(access_elements.with_new_element(new_element))
+                } else {
+                    panic!(
+                        "Trying to add element to Request {self:?}, but with_new_element is only sensible for Body variants."
+                    )
+                }
             }
-            _ => panic!(
-                "Trying to add element to {self:?}, but with_new_element is only sensible for Body variants."
-            ),
+            ParameterAccess::Response(response_parameter_access) => {
+                if let ResponseParameterAccess::Body(access_elements) = response_parameter_access {
+                    Self::request_body(access_elements.with_new_element(new_element))
+                } else {
+                    panic!(
+                        "Trying to add element to Response {self:?}, but with_new_element is only sensible for Body variants."
+                    )
+                }
+            }
         }
     }
 }
@@ -217,20 +301,84 @@ impl ParameterAccess {
 impl Display for ParameterAccess {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParameterAccess::Body(parameter_access) => parameter_access.fmt(f),
-            ParameterAccess::Query(value)
-            | ParameterAccess::Path(value)
-            | ParameterAccess::Header(value)
-            | ParameterAccess::Cookie(value) => write!(f, "{value}"),
+            ParameterAccess::Request(request_parameter_access) => request_parameter_access.fmt(f),
+            ParameterAccess::Response(response_parameter_access) => {
+                response_parameter_access.fmt(f)
+            }
         }
     }
 }
 
-/// A matching between an output- and input parameter that represents a link between these,
-/// indicating that the input parameter could contain a backreference to the output parameter.
+/// A matching between two parameters from different requests that represents a link between these.
+/// There are two types of ParameterMatching:
+///
+/// 1. Request: matches two request parameters so they contain the same value (e.g. a client-provided id).
+///             this could be resolved at corpus-generation time into a static value, but keeping it as
+///             a reference ensures that the link is kept when mutating the input value.  
+/// 2. Response: indicates that the input parameter could contain a backreference to the output parameter
+///              for which a value was returned by the server. Necessarily resolved at runtime.
+///
 #[derive(Debug, Clone, PartialEq)]
-pub struct ParameterMatching {
-    pub(crate) output_access: ParameterAccess,
-    pub(crate) input_access: ParameterAccess,
-    pub(crate) input_name_normalized: String,
+pub enum ParameterMatching {
+    Request {
+        output_access: ParameterAccess,
+        input_access: ParameterAccess,
+        input_name_normalized: String,
+    },
+    Response {
+        output_access: ParameterAccess,
+        input_access: ParameterAccess,
+        input_name_normalized: String,
+    },
+}
+
+impl ParameterMatching {
+    pub(crate) fn input_access(&self) -> &ParameterAccess {
+        match self {
+            ParameterMatching::Request { input_access, .. } => input_access,
+            ParameterMatching::Response { input_access, .. } => input_access,
+        }
+    }
+    pub(crate) fn output_access(&self) -> &ParameterAccess {
+        match self {
+            ParameterMatching::Request { output_access, .. } => output_access,
+            ParameterMatching::Response { output_access, .. } => output_access,
+        }
+    }
+    pub(crate) fn input_name_normalized(&self) -> &str {
+        match self {
+            ParameterMatching::Request {
+                input_name_normalized,
+                ..
+            } => input_name_normalized,
+            ParameterMatching::Response {
+                input_name_normalized,
+                ..
+            } => input_name_normalized,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub(crate) struct ParameterAddressing {
+    pub(crate) request_index: usize,
+    pub(crate) access: ParameterAccess,
+}
+
+impl ParameterAddressing {
+    pub fn new(request_index: usize, access: ParameterAccess) -> Self {
+        Self {
+            request_index,
+            access,
+        }
+    }
+}
+
+impl From<(usize, ParameterAccess)> for ParameterAddressing {
+    fn from(value: (usize, ParameterAccess)) -> Self {
+        Self {
+            request_index: value.0,
+            access: value.1,
+        }
+    }
 }

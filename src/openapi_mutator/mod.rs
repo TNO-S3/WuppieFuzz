@@ -343,11 +343,14 @@ fn mutate_parameter_contents<S: HasRand>(
             }
             return mutation_result;
         }
-        ParameterContents::Reference { .. } => unreachable!(
-            "Non-nested reference parameters should have been filtered out of concrete_parameters"
+        ParameterContents::OReference { .. } => unreachable!(
+            "Non-nested output-reference parameters should have been filtered out of concrete_parameters"
+        ),
+        ParameterContents::IReference { .. } => unreachable!(
+            "Non-nested input-reference parameters should have been filtered out of concrete_parameters"
         ),
     }
-    if let ParameterContents::Reference { .. } = random_element {
+    if let ParameterContents::OReference { .. } = random_element {
         // References do not currently get mutated.
         Ok(MutationResult::Skipped)
     } else {

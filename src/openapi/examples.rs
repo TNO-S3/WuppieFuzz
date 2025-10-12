@@ -867,7 +867,7 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
 /// of all these parameter choices, i.e. for a single-request OpenApiInput with parameters A: bool and B: usize
 /// it may for example return (true, 0), (true, 1), (false, 0) and (false, 1).
 ///
-/// This allows the fuzzer to start with all the inputs that we might a priori consider promising, and then
+/// This allows the fuzzer to start with all the inputs that we might a priori consider useful, and then
 /// continue with random mutations (picking seeds based on coverage feedback).
 pub fn openapi_inputs_from_ops<'a>(
     api: &OpenAPI,
@@ -888,7 +888,7 @@ pub fn openapi_inputs_from_ops<'a>(
                         .parameters
                         .iter()
                         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-                        .filter(move |parameter| edge.weight().input_access.matches(parameter))
+                        .filter(move |parameter| edge.weight().input_access().matches(parameter))
                 })
                 .collect();
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)

@@ -28,7 +28,7 @@ use crate::{
     authentication::{Authentication, build_http_client},
     configuration::{Configuration, CrashCriterion},
     coverage_clients::{CoverageClient, endpoint::EndpointCoverageClient},
-    input::OpenApiInput,
+    input::{OpenApiInput, OpenApiRequest},
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
@@ -73,6 +73,39 @@ where
     last_window_time: Instant,
     last_covered: u64,
     last_endpoint_covered: u64,
+}
+
+pub(crate) fn process_response(
+    request_idx: usize,
+    request: &OpenApiRequest,
+    response: Response,
+    api: &OpenAPI,
+    crash_criterion: &CrashCriterion,
+    exit_kind: &mut ExitKind,
+    parameter_feedback: &mut ParameterFeedback,
+) {
+    if response.status() == 429 {
+        log::warn!("HTTP status 429 'Too Many Requests' encountered!");
+        log::warn!("Rate limiting is likely active on the program under test.");
+        log::warn!("This hinders fuzz testing. Consider disabling it.");
+    }
+
+    if response.status().is_server_error() {
+        *exit_kind = ExitKind::Crash;
+        log::debug!(
+            "OpenAPI-input resulted in server error response, ignoring rest of request chain."
+        );
+    } else {
+        if *crash_criterion == CrashCriterion::AllErrors
+            && let Err(validation_err) = validate_response(api, &request, &response)
+        {
+            log::debug!(
+                "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
+            );
+            *exit_kind = ExitKind::Crash;
+        }
+    }
+    parameter_feedback.process_response(request_idx, response);
 }
 
 impl<'h, OT> SequenceExecutor<'h, OT>
@@ -163,7 +196,6 @@ where
                 self.reporter
                     .report_request(&request, &curl_request, state, self.inputs_tested);
             let curl_request = curl_request.to_string();
-
             match self.http_client.execute(request_built) {
                 Ok(response) => {
                     performed_requests += 1;
@@ -181,31 +213,17 @@ where
                     self.reporter
                         .report_response(&response, reporter_request_id);
                     log::trace!("Got response {}", response.status());
-
-                    if response.status() == 429 {
-                        log::warn!("HTTP status 429 'Too Many Requests' encountered!");
-                        log::warn!("Rate limiting is likely active on the program under test.");
-                        log::warn!("This hinders fuzz testing. Consider disabling it.");
-                    }
-
-                    if response.status().is_server_error() {
-                        exit_kind = ExitKind::Crash;
-                        log::debug!(
-                            "OpenAPI-input resulted in server error response, ignoring rest of request chain."
-                        );
+                    process_response(
+                        request_index,
+                        &request,
+                        response,
+                        &self.api,
+                        &self.config.crash_criterion,
+                        &mut exit_kind,
+                        &mut parameter_feedback,
+                    );
+                    if exit_kind == ExitKind::Crash {
                         break 'chain;
-                    } else {
-                        if self.config.crash_criterion == CrashCriterion::AllErrors
-                            && let Err(validation_err) =
-                                validate_response(self.api, &request, &response)
-                        {
-                            log::debug!(
-                                "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
-                            );
-                            exit_kind = ExitKind::Crash;
-                            break 'chain;
-                        }
-                        parameter_feedback.process_response(request_index, response);
                     }
                 }
                 Err(transport_error) => {

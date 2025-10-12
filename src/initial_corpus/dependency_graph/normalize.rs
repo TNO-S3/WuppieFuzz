@@ -18,6 +18,7 @@ use crate::{
     parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
 };
 
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ReqResp {
     Req,
     Resp,
@@ -30,6 +31,7 @@ pub struct ParameterNormalization {
     pub name: String,
     pub normalized: String,
     pub context: Option<String>,
+    pub(crate) req_or_resp: ReqResp,
     pub(crate) parameter_access: ParameterAccess,
 }
 
@@ -48,7 +50,12 @@ impl ParameterNormalization {
     /// to identify a parameter (like in ParameterAccess).
     ///
     /// TODO: make clear decisions how about exact meaning of context and document this.
-    pub fn new(name: String, context: Option<String>, parameter_access: ParameterAccess) -> Self {
+    pub fn new(
+        name: String,
+        context: Option<String>,
+        req_or_resp: ReqResp,
+        parameter_access: ParameterAccess,
+    ) -> Self {
         match context {
             Some(ref context) => {
                 // Catch the case where the context word is also included in the name,
@@ -71,6 +78,7 @@ impl ParameterNormalization {
                     normalized: stem(context) + "|" + &stem(no_context_name),
                     name,
                     context: Some(context.to_string()),
+                    req_or_resp,
                     parameter_access,
                 }
             }
@@ -78,13 +86,14 @@ impl ParameterNormalization {
                 normalized: stem(&name),
                 name,
                 context,
+                req_or_resp,
                 parameter_access,
             },
         }
     }
 }
 
-/// Finds all parameters used in an operation and returns their normalized name.
+/// Finds all request parameters used in an operation and returns their normalized name.
 /// See `normalize_parameter` for treatment of parameters named 'id'.
 pub fn normalize_parameters<'a>(
     api: &'a OpenAPI,
@@ -107,44 +116,35 @@ pub fn normalize_parameters<'a>(
 /// its stem is prepended to the stemmed parameter name.
 fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalization {
     // extract a context word if possible
-    match parameter.kind {
-        // For a query parameter /resource?id=18, we want to extract
-        // the 'resource' part as the context word, and return as the name
-        // stem('resource') + "id"
-        openapiv3::ParameterKind::Query { .. } => {
-            return ParameterNormalization::new(
-                parameter.data.name.clone(),
-                path_context_component(path),
-                ParameterAccess::request_query(parameter.data.name.clone()),
-            );
-        }
-        // For a path parameter /resource/{id}/..., we want to extract
-        // the 'resource' part as the context word, and return as the name
-        // stem('resource') + "id".
-        // Some APIs use urls like `/resource/name/{name}`, in which case we
-        // should detect that the final path component is not useful and take the
-        // one before.
+    let parameter_name = parameter.data.name.clone();
+    let path_context = match parameter.kind {
         openapiv3::ParameterKind::Path { .. } => {
             if let Some(end) = path.find(&format!("/{{{}}}", parameter.data.name)) {
-                return ParameterNormalization::new(
-                    parameter.data.name.clone(),
-                    path_context_component(&path[..end]),
-                    ParameterAccess::request_path(parameter.data.name.clone()),
-                );
+                path_context_component(&path[..end]).unwrap_or(path.to_string())
+            } else {
+                path.to_string()
             }
         }
-        _ => (),
+        _ => path.to_string(),
     };
 
-    // If we reach this point, either the spec didn't contain the data we
-    // expect based on the OpenAPI specification, or it's a parameter kind
-    // we can't find context for. Just return the "id" string.
-
-    // ParameterNormalization::new(parameter.data.name.clone().into(), None)
-
-    // NEW: We are lost at this point, we NEED a ParameterAccess. Just panic for now.
-    // TODO: find a solution, probably handle the Cookie and Header cases.
-    panic!("Could not normalize parameter {:?}", parameter.data.name)
+    let access = match &parameter.kind {
+        openapiv3::ParameterKind::Query { .. } => {
+            ParameterAccess::request_query(parameter_name.clone())
+        }
+        openapiv3::ParameterKind::Header { .. } => {
+            ParameterAccess::request_header(parameter_name.clone())
+        }
+        openapiv3::ParameterKind::Path { .. } => {
+            ParameterAccess::request_path(parameter_name.clone())
+        }
+        openapiv3::ParameterKind::Cookie { .. } => {
+            ParameterAccess::request_cookie(parameter_name.clone())
+        }
+    };
+    // TODO: make path_context just a String, not an Option?
+    // Or should an empty context/root path be considered a None here?
+    return ParameterNormalization::new(parameter_name, Some(path_context), ReqResp::Req, access);
 }
 
 /// Normalizes response parameters.
@@ -159,7 +159,6 @@ pub fn normalize_response<'a>(
     response: &'a Response,
     context: Option<String>,
 ) -> Option<Vec<ParameterNormalization>> {
-    
     normalize_media_type(
         api,
         response.content.get_json_content()?,
@@ -189,17 +188,18 @@ fn normalize_schema<'a>(
     api: &'a OpenAPI,
     schema: &'a Schema,
     context: Option<String>,
+    req_or_resp: ReqResp,
     access: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
     match &schema.kind {
         SchemaKind::Type(openapiv3::Type::Object(o)) => {
-            Some(normalize_object_type(api, o, context, access))
+            Some(normalize_object_type(api, o, context, req_or_resp, access))
         }
         SchemaKind::Type(openapiv3::Type::Array(a)) => {
             let inner_schema = a.items.as_ref()?.resolve(api);
             match inner_schema.kind {
                 SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-                    Some(normalize_object_type(api, o, context, access))
+                    Some(normalize_object_type(api, o, context, req_or_resp, access))
                 }
                 // No support for nested arrays - semantic meaning not obvious
                 _ => None,
@@ -212,7 +212,7 @@ fn normalize_schema<'a>(
         }
         openapiv3::SchemaKind::AllOf { all_of } if all_of.len() == 1 => {
             // If only a single property is in this AllOf, return an example from it.
-            normalize_schema(api, all_of[0].resolve(api), context, access)
+            normalize_schema(api, all_of[0].resolve(api), context, req_or_resp, access)
         }
         openapiv3::SchemaKind::Any(_) => {
             log::warn!(
@@ -221,7 +221,7 @@ fn normalize_schema<'a>(
             None
         }
         SchemaKind::AnyOf { any_of } if any_of.len() == 1 => {
-            normalize_schema(api, any_of[0].resolve(api), context, access)
+            normalize_schema(api, any_of[0].resolve(api), context, req_or_resp, access)
         }
         openapiv3::SchemaKind::Not { not: _ } => {
             log::warn!(concat!(
@@ -240,20 +240,22 @@ fn normalize_media_type<'a>(
     api: &'a OpenAPI,
     media_type: &'a MediaType,
     context: Option<String>,
-    req_resp: ReqResp,
+    req_or_resp: ReqResp,
 ) -> Option<Vec<ParameterNormalization>> {
     let schema = media_type.schema.as_ref()?.resolve(api);
-    let access = match req_resp {
+    let access = match req_or_resp {
         ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
         ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
     };
-    normalize_schema(api, schema, context, access)
+    normalize_schema(api, schema, context, req_or_resp, access)
 }
 
+/// Returns ParameterNormalizations for all fields in the object.
 fn normalize_object_type<'a>(
     api: &'a OpenAPI,
     object_type: &'a ObjectType,
     context: Option<String>,
+    req_or_resp: ReqResp,
     parameter_access: ParameterAccess,
 ) -> Vec<ParameterNormalization> {
     object_type
@@ -265,6 +267,7 @@ fn normalize_object_type<'a>(
             let mut normalized_params = vec![ParameterNormalization::new(
                 key.to_owned(),
                 context.clone(),
+                req_or_resp.clone(),
                 new_parameter_access.clone(),
             )];
             let nested_schema = object_type.properties[key].resolve(api);
@@ -272,6 +275,7 @@ fn normalize_object_type<'a>(
                 api,
                 nested_schema,
                 Some(key.to_owned()),
+                req_or_resp.clone(),
                 new_parameter_access.clone(),
             )
             .unwrap_or_default();

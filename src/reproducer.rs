@@ -4,18 +4,18 @@ use anyhow::Result;
 use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
-use libafl::inputs::Input;
+use libafl::{executors::ExitKind, inputs::Input};
 use log::{error, info, warn};
 use openapiv3::Server;
 
 use crate::{
     authentication::build_http_client,
     configuration::Configuration,
+    executor::process_response,
     input::OpenApiInput,
     openapi::{
-        build_request::build_request_from_input,
-        curl_request::CurlRequest,
-        validate_response::{Response, validate_response},
+        build_request::build_request_from_input, curl_request::CurlRequest,
+        validate_response::Response,
     },
     parameter_feedback::ParameterFeedback,
 };
@@ -92,25 +92,23 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
         match client.execute(request_built) {
             Ok(response) => {
                 let response: Response = response.into();
-                if response.status().is_server_error() {
-                    warn!("Crash reported by server: {}", response.status());
+                let mut exit_kind = ExitKind::Ok;
+                process_response(
+                    request_index,
+                    &request,
+                    response.clone(),
+                    &api,
+                    &config.crash_criterion,
+                    &mut exit_kind,
+                    &mut parameter_feedback,
+                );
+                if exit_kind == ExitKind::Crash {
                     if let Ok(text) = response.text() {
                         info!("Response contents printed below: \n{text}")
                     }
                     break;
                 } else {
                     info!("Request successful ({})", response.status());
-                    match validate_response(&api, &request, &response) {
-                        Ok(()) => info!("Response matches specification"),
-                        Err(e) => warn!("Validation error: {e}"),
-                    }
-                    if let Ok(text) = response.text() {
-                        info!("Response contents printed below: \n{text}")
-                    }
-                    // TODO: deduplicate from code in executor.rs
-                    // if response.status().is_success() {
-                    parameter_feedback.process_response(request_index, response);
-                    // }
                 }
             }
             Err(e) => {

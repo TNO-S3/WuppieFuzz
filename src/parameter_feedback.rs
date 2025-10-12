@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use crate::{
     openapi::validate_response::Response,
-    parameter_access::{ParameterAccess, ParameterAccessElements},
+    parameter_access::{ParameterAccess, ParameterAccessElements, ParameterAddressing},
 };
 
 /// ParameterFeedbackMetadata collects parameter values from requests as they
@@ -58,47 +58,19 @@ impl ParameterFeedback {
 
     /// Adds the given parameter/value combination to memory. Returns whether successful
     /// (if the request index is out of bounds, false is returned).
-    pub fn set(&mut self, request_index: usize, param: ParameterAccess, value: Value) -> bool {
+    pub(crate) fn set(&mut self, addressing: ParameterAddressing, value: Value) -> bool {
         self.0
-            .get_mut(request_index)
-            .map(|m| m.insert(param, value))
+            .get_mut(addressing.request_index)
+            .map(|m| m.insert(addressing.access, value))
             .is_some()
     }
 
     fn add_response_parameter(
         &mut self,
-        request_index: usize,
-        parent_access: ParameterAccess,
+        addressing: ParameterAddressing,
         field: serde_json::Value,
     ) {
-        self.set(request_index, parent_access.clone(), field.clone());
-        // Only a Body response can contain nested values which we treat below.
-        // Response cookies were already set with the line above.
-        if let ParameterAccess::Body(parameter_access) = parent_access {
-            match field {
-                Value::Array(values) => {
-                    for (offset, value) in values.into_iter().enumerate() {
-                        let access = parameter_access.with_new_element(offset.into());
-                        self.add_response_parameter(
-                            request_index,
-                            ParameterAccess::Body(access),
-                            value,
-                        );
-                    }
-                }
-                Value::Object(map) => {
-                    for (param, value) in map.into_iter() {
-                        let access = parameter_access.with_new_element(param.into());
-                        self.add_response_parameter(
-                            request_index,
-                            ParameterAccess::Body(access),
-                            value,
-                        );
-                    }
-                }
-                _ => (), // Non-composite value was already added above this match.
-            }
-        }
+        self.set(addressing, field.clone());
     }
 
     /// Processes the values returned in a Response.
@@ -112,8 +84,10 @@ impl ParameterFeedback {
         match response.json::<serde_json::Value>() {
             // Objects in responses: save all field/value combinations
             Ok(field) => self.add_response_parameter(
-                request_index,
-                ParameterAccess::Body(ParameterAccessElements::new()),
+                ParameterAddressing::new(
+                    request_index,
+                    ParameterAccess::response_body(ParameterAccessElements::new()),
+                ),
                 field,
             ),
             Err(e) => {
@@ -124,8 +98,7 @@ impl ParameterFeedback {
         // TODO: try to parse cookies in validate_response.rs to also treat them as non-String types?
         for (name, value) in response.cookies() {
             self.add_response_parameter(
-                request_index,
-                ParameterAccess::Cookie(name),
+                ParameterAddressing::new(request_index, ParameterAccess::response_cookie(name)),
                 serde_json::Value::String(value),
             );
         }

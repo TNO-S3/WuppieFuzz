@@ -25,11 +25,11 @@ pub fn linked_requests() -> OpenApiInput {
     let mut parameters = BTreeMap::new();
     parameters.insert(
         ("id".into(), ParameterKind::Query),
-        ParameterContents::Reference {
+        ParameterContents::OReference {
             request_index: 0,
-            parameter_access: ParameterAccess::Body(ParameterAccessElements::from_elements(&vec![
-                "id".to_string().into(),
-            ])),
+            parameter_access: ParameterAccess::request_body(
+                ParameterAccessElements::from_elements(&vec!["id".to_string().into()]),
+            ),
         },
     );
     let has_param = OpenApiRequest {

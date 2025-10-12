@@ -36,7 +36,7 @@ use crate::{
         QualifiedOperation,
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
     },
-    parameter_access::ParameterMatching,
+    parameter_access::{ParameterAddressing, ParameterMatching},
 };
 
 /// Returns OpenApiInputs generated from a dependency graph derived from the OpenAPI
@@ -57,16 +57,16 @@ pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
                 // massively overgenerates all the different combinations, most of which then get
                 // mapped back to the same OpenApiInput since all concrete parameter values get
                 // overwritten with references to the same parameter in an earlier response.
-                let mut inputs =
+                let inputs =
                     openapi_inputs_from_ops(api, ops.clone().into_iter(), &subgraph, &idxs)
                         .inspect_err(|err| {
                             log::warn!("{err} - falling back to single example generation.");
                         })
                         .unwrap_or(vec![openapi_example_input_from_ops(api, ops.into_iter())]);
-                inputs.iter_mut().for_each(|input| {
-                    add_references_to_openapi_input(&subgraph, &idxs, input);
+                let inputs_with_references = inputs.into_iter().flat_map(move |input| {
+                    add_references_to_openapi_input(&subgraph, &idxs, &input)
                 });
-                inputs
+                inputs_with_references
             })
         })
         .filter_map(|result| result.ok())
@@ -117,41 +117,97 @@ fn openapi_example_input_from_ops<'a>(
 /// The parameter Values for which this is done are defined by the edges in the subgraph,
 /// where the source and target of each edge index into sorted_nodes to get the position
 /// of the request in the openapi_input.
+///
+/// Note that each Value may reference one of multiple Values in previous responses.
+/// For this reason we create multiple OpenApiInputs; one for each choice of reference.
+/// To avoid a combinatorial explosion, we do not take the cartesian product of these
+/// reference choices but combine them more simply.
+///
+/// For ParameterMatching::Request variants the edges are (likely) transitive (they refer to
+/// other Values that may *also* be replaced with References based on names or
+/// normalized names being equal). Therefore we only add a single Reference, to the
+/// earliest suitable request in the chain.
 fn add_references_to_openapi_input(
     subgraph: &DiGraph<QualifiedOperation, ParameterMatching, DefaultIx>,
     sorted_nodes: &[NodeIndex],
-    openapi_input: &mut OpenApiInput,
-) {
-    for edge in subgraph.edge_references() {
-        assert_eq!(sorted_nodes.len(), openapi_input.0.len());
-        let source_index = sorted_nodes
-            .iter()
-            .position(|n| *n == edge.source())
-            .expect("source node of an edge not found in the graph");
-        let target_index = sorted_nodes
-            .iter()
-            .position(|n| *n == edge.target())
-            .expect("target node of an edge not found in the graph");
-
-        // It is possible (if the API graph contains cycles) for a request
-        // to refer to a future request (usually two ways to GET the same
-        // kind of resource). We can of course only use backwards edges.
-        if source_index >= target_index {
-            continue;
-        }
-
-        // Turn the parameter of the edge's target (which at this point got a concrete
-        // placeholder Value based on e.g. an example or its type) into a Reference to
-        // the parameter of the same name and kind in the source.
-        if let Some(x) =
-            openapi_input.0[target_index].get_mut_parameter(&edge.weight().input_access.clone())
-        {
-            *x = ParameterContents::Reference {
-                request_index: source_index,
-                parameter_access: edge.weight().output_access.clone(),
-            };
+    openapi_input: &OpenApiInput,
+) -> Vec<OpenApiInput> {
+    assert_eq!(sorted_nodes.len(), openapi_input.0.len());
+    // Naming: we use source and target here as the edges are defined in the graph, i.e.
+    // we are replacing Values that are targets with References to sources.
+    let mut target_to_sources: HashMap<ParameterAddressing, Vec<ParameterAddressing>> =
+        HashMap::new();
+    for (target_index, _request) in openapi_input.0.iter().enumerate() {
+        let target_node_index = sorted_nodes[target_index];
+        // let edges = subgraph.edges_directed(target_node_index, petgraph::Direction::Incoming);
+        let mut request_reference_added = false;
+        // Consider the requests that come before the target to possibly add a reference to
+        for source_index in 0..target_index {
+            let source_node_index = sorted_nodes[source_index];
+            for edge in subgraph.edges_directed(target_node_index, petgraph::Direction::Incoming) {
+                if source_node_index == edge.source() && target_node_index == edge.target() {
+                    match edge.weight() {
+                        ParameterMatching::Request {
+                            output_access,
+                            input_access,
+                            ..
+                        } => {
+                            if !request_reference_added {
+                                request_reference_added = true;
+                                target_to_sources
+                                    .entry((target_index, input_access.clone()).into())
+                                    .or_insert(vec![])
+                                    .push((source_index, output_access.clone()).into());
+                            }
+                        }
+                        ParameterMatching::Response {
+                            output_access,
+                            input_access,
+                            ..
+                        } => {
+                            target_to_sources
+                                .entry((target_index, input_access.clone()).into())
+                                .or_insert(vec![])
+                                .push((source_index, output_access.clone()).into());
+                        }
+                    }
+                }
+            }
         }
     }
+    let mut backref_combinations: Vec<Vec<(ParameterAddressing, ParameterAddressing)>> =
+        vec![Vec::new()];
+    // Construct all combinations of references
+    for (target_access, source_accesses) in target_to_sources.iter() {
+        let mut new_results = Vec::new();
+        for partial in &backref_combinations {
+            for source_access in source_accesses {
+                let mut new_partial = partial.clone();
+                new_partial.push((target_access.clone(), source_access.clone()));
+                new_results.push(new_partial);
+            }
+        }
+        backref_combinations = new_results;
+    }
+    // For each combination, construct an OpenApiInput
+    let mut inputs_with_references = vec![];
+    for backref_combination in backref_combinations.iter() {
+        let mut requests_with_references = openapi_input.0.clone();
+        for target_and_source in backref_combination {
+            let target = &target_and_source.0;
+            let source = &target_and_source.1;
+            if let Some(x) = requests_with_references[target.request_index]
+                .get_mut_parameter(target.access.unwrap_request_variant())
+            {
+                *x = ParameterContents::OReference {
+                    request_index: source.request_index,
+                    parameter_access: source.access.clone(),
+                };
+            }
+        }
+        inputs_with_references.push(OpenApiInput(requests_with_references));
+    }
+    inputs_with_references
 }
 
 type DepGraph<'a> = DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx>;
@@ -181,14 +237,13 @@ impl<'a> DependencyGraph<'a> {
             }
         }
 
-        // Find all input and output parameters for all operations, cache them
-        // to efficiently find edges
+        // Find all input, response_output and request_output parameters for all operations,
+        // cache them to efficiently find edges
         // (We save them by node index, node indices are a compact interval)
         let inout_params: Vec<_> = (0..graph.node_count())
             .map(NodeIndex::new)
             .map(|n| inout_params(api, &graph[n]))
             .collect();
-
         // Find edges (parameters in common) between all nodes (operations)
         for op_left in graph.node_indices() {
             for op_right in graph.node_indices() {
@@ -201,8 +256,9 @@ impl<'a> DependencyGraph<'a> {
                     continue;
                 }
                 for link in find_links(
-                    &inout_params[op_left.index()].1,
                     &inout_params[op_right.index()].0,
+                    &inout_params[op_left.index()].1,
+                    &inout_params[op_left.index()].2,
                 ) {
                     graph.add_edge(op_left, op_right, link);
                 }
@@ -270,12 +326,17 @@ impl<'a> DependencyGraph<'a> {
             let mut hasher_target = DefaultHasher::new();
             edge.source().hash(&mut hasher_source);
             edge.target().hash(&mut hasher_target);
+            let arrow = match edge.weight() {
+                ParameterMatching::Request { .. } => "< I >",
+                ParameterMatching::Response { .. } => "< O >",
+            };
             writeln!(
                 &mut file,
-                "  {} -->|{} <-> {}| {};",
+                "  {} -->|{} {} {}| {};",
                 hasher_source.finish(),
-                edge.weight().output_access,
-                edge.weight().input_access,
+                edge.weight().output_access(),
+                arrow,
+                edge.weight().input_access(),
                 hasher_target.finish(),
             )?;
         }
@@ -334,9 +395,9 @@ impl Display for DependencyGraph<'_> {
                 "{} {} -- ({} {} {}) -> {} {}",
                 self.graph[edge.source()].method,
                 self.graph[edge.source()].path,
-                edge.weight().output_access,
-                edge.weight().input_name_normalized,
-                edge.weight().input_access,
+                edge.weight().output_access(),
+                edge.weight().input_name_normalized(),
+                edge.weight().input_access(),
                 self.graph[edge.target()].method,
                 self.graph[edge.target()].path,
             )?;
@@ -347,18 +408,20 @@ impl Display for DependencyGraph<'_> {
 }
 
 /// Checks if two operations are linked: an output parameter of operation 1 occurs
-/// as an input parameter of operation 2. If they are linked, returns the parameter
-/// name in normalized form.
+/// as an input parameter of operation 2. If they are linked, return the link in the
+/// form of a ParameterMatching. Note that a parameter can be linked to another operation
+/// twice: once to a parameter in the request and once to a parameter in the response.
 fn find_links<'a>(
-    outputs_from_1: &'a [ParameterNormalization],
     inputs_to_2: &'a [ParameterNormalization],
+    response_outputs_from_1: &'a [ParameterNormalization],
+    request_outputs_from_1: &'a [ParameterNormalization],
 ) -> Vec<ParameterMatching> {
-    // Return the first input to 2 that is returned from 1
+    // Finds links with responses
     inputs_to_2
         .iter()
         .filter_map(|input| {
-            Some(ParameterMatching {
-                output_access: outputs_from_1
+            Some(ParameterMatching::Response {
+                output_access: response_outputs_from_1
                     .iter()
                     .find(|output| {
                         output.normalized == input.normalized || output.name == input.name
@@ -369,17 +432,42 @@ fn find_links<'a>(
                 input_name_normalized: input.normalized.clone(),
             })
         })
+        // Adds links with requests
+        .chain(inputs_to_2.iter().filter_map(|input| {
+            Some(ParameterMatching::Request {
+                output_access: request_outputs_from_1
+                    .iter()
+                    .find(|output| {
+                        output.normalized == input.normalized || output.name == input.name
+                    })?
+                    .parameter_access
+                    .clone(),
+                input_access: input.parameter_access.clone(),
+                input_name_normalized: input.normalized.clone(),
+            })
+        }))
         .collect()
 }
 
-/// Collects all names of parameters and fields used as input (requests) and output (responses)
-/// of this operation.
+/// Collects all ParameterNormalizations used as inputs and outputs for the QualifiedOperation.
+/// "Inputs" are variables to be passed into a request.
+/// "Outputs" come in two flavors:
+///   1. "Response Outputs": variables to be returned by the server at runtime,
+///                          which can be reused as inputs.
+///   2. "Request Outputs": variables in POST requests, which should possibly be reused in
+///                         other requests (e.g. two requests that should use the same user ID).
+///
+/// The order of the return value is: (inputs, response_outputs, request_outputs).
 fn inout_params<'a>(
     api: &'a OpenAPI,
     op: &QualifiedOperation<'a>,
-) -> (Vec<ParameterNormalization>, Vec<ParameterNormalization>) {
-    // Outputs from a request are all field names from the response body. Collect them.
-    let mut output_fields: Vec<_> = op
+) -> (
+    Vec<ParameterNormalization>,
+    Vec<ParameterNormalization>,
+    Vec<ParameterNormalization>,
+) {
+    // All field names from the response body are outputs to potentially refer back to. Collect them.
+    let response_output_fields: Vec<_> = op
         .operation
         .responses
         .responses
@@ -390,33 +478,24 @@ fn inout_params<'a>(
         .flatten()
         .collect();
 
-    // Inputs to a request are all parameters. Collect those.
+    // All parameters are inputs for the request. Collect those.
     let mut input_fields = normalize_parameters(api, op.path, op.operation);
+    // If two operations have the same parameters, they can be input-linked, so also consider these "request outputs".
+    let mut request_output_fields = input_fields.clone();
 
-    // For POST requests, also consider input parameters as output parameters!
+    // For POST requests, also consider body fields as "request output" parameters.
     // (Choose your own name or ID and still be able to use it in later GET requests etc)
-    // In addition, for *non*-POST requests, body return parameters count as inputs.
-    // (We only count non-body parameters for POST requests as input, on the assumption
-    // that a proper REST api will have 'parent' type parameters, such as 'artist' for
-    // an album, in the path and not in the request body.)
-    let body_fields = op
+    let request_body_fields = op
         .operation
         .request_body
         .iter()
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
         .find_map(|body| normalize_request_body(api, body, path_context_component(op.path)))
         .unwrap_or_default();
-    // TODO: We want to use parameters in POST requests as inputs, this would address a common use case
-    // where requests need to reuse the same value that the client had to pick.
-    // However, using a request parameter as an output would need an extra mechanism to specify in a reference
-    // whether the request or response is referenced (both could have a field in the Body with the same ParameterAccess).
-    // It is probably cleaner to simply set input parameters to the same static value if they are "linked", and avoid references for this.
-    // This "input-linking" would still need to be done separately of course.
-    // TODO: If the below is removed, remember to update the comment above.
     if op.method == Method::Post {
-        output_fields.extend(body_fields.clone());
+        request_output_fields.extend_from_slice(&request_body_fields);
     }
-    input_fields.extend(body_fields);
+    input_fields.extend(request_body_fields);
 
-    (input_fields, output_fields)
+    (input_fields, response_output_fields, request_output_fields)
 }
