@@ -130,7 +130,7 @@ mod test {
                 ParameterContents::OReference {
                     request_index: 1,
                     parameter_access: ParameterAccess::request_body(
-                        ParameterAccessElements::from_elements(&vec!["id".to_string().into()]),
+                        ParameterAccessElements::from_elements(&["id".to_string().into()]),
                     ),
                 },
             );

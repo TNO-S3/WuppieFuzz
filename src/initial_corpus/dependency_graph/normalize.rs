@@ -136,7 +136,7 @@ fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalizat
     };
     // TODO: make path_context just a String, not an Option?
     // Or should an empty context/root path be considered a None here?
-    return ParameterNormalization::new(parameter_name, Some(path_context), access);
+    ParameterNormalization::new(parameter_name, Some(path_context), access)
 }
 
 /// Normalizes response parameters.

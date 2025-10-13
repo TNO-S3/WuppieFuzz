@@ -238,7 +238,7 @@ impl ParameterAccess {
                     Some(parameter_access_elements)
                 }
                 _ => {
-                    log::warn!("{}", warn_text);
+                    log::warn!("{warn_text}");
                     None
                 }
             },
@@ -248,7 +248,7 @@ impl ParameterAccess {
                     Some(parameter_access_elements)
                 }
                 _ => {
-                    log::warn!("{}", warn_text);
+                    log::warn!("{warn_text}");
                     None
                 }
             },
@@ -296,10 +296,10 @@ impl Display for ParameterAccess {
 /// There are two types of ParameterMatching:
 ///
 /// 1. Request: matches two request parameters so they contain the same value (e.g. a client-provided id).
-///             this could be resolved at corpus-generation time into a static value, but keeping it as
-///             a reference ensures that the link is kept when mutating the input value.  
+///    this could be resolved at corpus-generation time into a static value, but keeping it as
+///    a reference ensures that the link is kept when mutating the input value.  
 /// 2. Response: indicates that the input parameter could contain a backreference to the output parameter
-///              for which a value was returned by the server. Necessarily resolved at runtime.
+///    for which a value was returned by the server. Necessarily resolved at runtime.
 ///
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterMatching {

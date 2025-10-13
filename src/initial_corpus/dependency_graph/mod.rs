@@ -63,10 +63,10 @@ pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
                             log::warn!("{err} - falling back to single example generation.");
                         })
                         .unwrap_or(vec![openapi_example_input_from_ops(api, ops.into_iter())]);
-                let inputs_with_references = inputs.into_iter().flat_map(move |input| {
+
+                inputs.into_iter().flat_map(move |input| {
                     add_references_to_openapi_input(&subgraph, &idxs, &input)
-                });
-                inputs_with_references
+                })
             })
         })
         .filter_map(|result| result.ok())
@@ -152,10 +152,10 @@ fn add_references_to_openapi_input(
         // let edges = subgraph.edges_directed(target_node_index, petgraph::Direction::Incoming);
         let mut request_reference_added = false;
         // Consider the requests that come before the target to possibly add a reference to
-        for source_index in 0..target_index {
-            let source_node_index = sorted_nodes[source_index];
+        for (source_index, source_node_index) in sorted_nodes.iter().enumerate().take(target_index)
+        {
             for edge in subgraph.edges_directed(target_node_index, petgraph::Direction::Incoming) {
-                if source_node_index == edge.source() && target_node_index == edge.target() {
+                if *source_node_index == edge.source() && target_node_index == edge.target() {
                     match edge.weight() {
                         ParameterMatching::Request {
                             output_access,
@@ -166,7 +166,7 @@ fn add_references_to_openapi_input(
                                 request_reference_added = true;
                                 target_to_sources
                                     .entry((target_index, input_access.clone()).into())
-                                    .or_insert(vec![])
+                                    .or_default()
                                     .push((source_index, output_access.clone()).into());
                             }
                         }
@@ -177,7 +177,7 @@ fn add_references_to_openapi_input(
                         } => {
                             target_to_sources
                                 .entry((target_index, input_access.clone()).into())
-                                .or_insert(vec![])
+                                .or_default()
                                 .push((source_index, output_access.clone()).into());
                         }
                     }
@@ -188,8 +188,8 @@ fn add_references_to_openapi_input(
     // Determine how many combinations we will create, this is the length of the longest list of
     // sources (we will add each target-source combination in only one request)
     let max_len = target_to_sources
-        .iter()
-        .map(|(_, v)| v.len())
+        .values()
+        .map(|v| v.len())
         .max()
         .unwrap_or(0);
     let mut backref_combinations: Vec<Vec<(ParameterAddressing, ParameterAddressing)>> =
@@ -470,9 +470,9 @@ fn find_links<'a>(
 /// "Inputs" are variables to be passed into a request.
 /// "Outputs" come in two flavors:
 ///   1. "Response Outputs": variables to be returned by the server at runtime,
-///                          which can be reused as inputs.
+///      which can be reused as inputs.
 ///   2. "Request Outputs": variables in POST requests, which should possibly be reused in
-///                         other requests (e.g. two requests that should use the same user ID).
+///      other requests (e.g. two requests that should use the same user ID).
 ///
 /// The order of the return value is: (inputs, response_outputs, request_outputs).
 fn inout_params<'a>(

@@ -95,15 +95,13 @@ pub(crate) fn process_response(
         log::debug!(
             "OpenAPI-input resulted in server error response, ignoring rest of request chain."
         );
-    } else {
-        if *crash_criterion == CrashCriterion::AllErrors
-            && let Err(validation_err) = validate_response(api, &request, &response)
-        {
-            log::debug!(
-                "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
-            );
-            *exit_kind = ExitKind::Crash;
-        }
+    } else if *crash_criterion == CrashCriterion::AllErrors
+        && let Err(validation_err) = validate_response(api, request, &response)
+    {
+        log::debug!(
+            "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
+        );
+        *exit_kind = ExitKind::Crash;
     }
     parameter_feedback.process_response(request_idx, response);
 }
@@ -217,7 +215,7 @@ where
                         request_index,
                         &request,
                         response,
-                        &self.api,
+                        self.api,
                         &self.config.crash_criterion,
                         &mut exit_kind,
                         &mut parameter_feedback,
