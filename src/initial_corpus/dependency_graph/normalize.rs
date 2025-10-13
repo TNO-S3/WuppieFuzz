@@ -31,7 +31,6 @@ pub struct ParameterNormalization {
     pub name: String,
     pub normalized: String,
     pub context: Option<String>,
-    pub(crate) req_or_resp: ReqResp,
     pub(crate) parameter_access: ParameterAccess,
 }
 
@@ -50,12 +49,7 @@ impl ParameterNormalization {
     /// to identify a parameter (like in ParameterAccess).
     ///
     /// TODO: make clear decisions how about exact meaning of context and document this.
-    pub fn new(
-        name: String,
-        context: Option<String>,
-        req_or_resp: ReqResp,
-        parameter_access: ParameterAccess,
-    ) -> Self {
+    pub fn new(name: String, context: Option<String>, parameter_access: ParameterAccess) -> Self {
         match context {
             Some(ref context) => {
                 // Catch the case where the context word is also included in the name,
@@ -78,7 +72,6 @@ impl ParameterNormalization {
                     normalized: stem(context) + "|" + &stem(no_context_name),
                     name,
                     context: Some(context.to_string()),
-                    req_or_resp,
                     parameter_access,
                 }
             }
@@ -86,7 +79,6 @@ impl ParameterNormalization {
                 normalized: stem(&name),
                 name,
                 context,
-                req_or_resp,
                 parameter_access,
             },
         }
@@ -144,7 +136,7 @@ fn normalize_parameter(path: &str, parameter: &Parameter) -> ParameterNormalizat
     };
     // TODO: make path_context just a String, not an Option?
     // Or should an empty context/root path be considered a None here?
-    return ParameterNormalization::new(parameter_name, Some(path_context), ReqResp::Req, access);
+    return ParameterNormalization::new(parameter_name, Some(path_context), access);
 }
 
 /// Normalizes response parameters.
@@ -188,18 +180,17 @@ fn normalize_schema<'a>(
     api: &'a OpenAPI,
     schema: &'a Schema,
     context: Option<String>,
-    req_or_resp: ReqResp,
     access: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
     match &schema.kind {
         SchemaKind::Type(openapiv3::Type::Object(o)) => {
-            Some(normalize_object_type(api, o, context, req_or_resp, access))
+            Some(normalize_object_type(api, o, context, access))
         }
         SchemaKind::Type(openapiv3::Type::Array(a)) => {
             let inner_schema = a.items.as_ref()?.resolve(api);
             match inner_schema.kind {
                 SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-                    Some(normalize_object_type(api, o, context, req_or_resp, access))
+                    Some(normalize_object_type(api, o, context, access))
                 }
                 // No support for nested arrays - semantic meaning not obvious
                 _ => None,
@@ -212,7 +203,7 @@ fn normalize_schema<'a>(
         }
         openapiv3::SchemaKind::AllOf { all_of } if all_of.len() == 1 => {
             // If only a single property is in this AllOf, return an example from it.
-            normalize_schema(api, all_of[0].resolve(api), context, req_or_resp, access)
+            normalize_schema(api, all_of[0].resolve(api), context, access)
         }
         openapiv3::SchemaKind::Any(_) => {
             log::warn!(
@@ -221,7 +212,7 @@ fn normalize_schema<'a>(
             None
         }
         SchemaKind::AnyOf { any_of } if any_of.len() == 1 => {
-            normalize_schema(api, any_of[0].resolve(api), context, req_or_resp, access)
+            normalize_schema(api, any_of[0].resolve(api), context, access)
         }
         openapiv3::SchemaKind::Not { not: _ } => {
             log::warn!(concat!(
@@ -247,7 +238,7 @@ fn normalize_media_type<'a>(
         ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
         ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
     };
-    normalize_schema(api, schema, context, req_or_resp, access)
+    normalize_schema(api, schema, context, access)
 }
 
 /// Returns ParameterNormalizations for all fields in the object.
@@ -255,7 +246,6 @@ fn normalize_object_type<'a>(
     api: &'a OpenAPI,
     object_type: &'a ObjectType,
     context: Option<String>,
-    req_or_resp: ReqResp,
     parameter_access: ParameterAccess,
 ) -> Vec<ParameterNormalization> {
     object_type
@@ -267,7 +257,6 @@ fn normalize_object_type<'a>(
             let mut normalized_params = vec![ParameterNormalization::new(
                 key.to_owned(),
                 context.clone(),
-                req_or_resp.clone(),
                 new_parameter_access.clone(),
             )];
             let nested_schema = object_type.properties[key].resolve(api);
@@ -275,7 +264,6 @@ fn normalize_object_type<'a>(
                 api,
                 nested_schema,
                 Some(key.to_owned()),
-                req_or_resp.clone(),
                 new_parameter_access.clone(),
             )
             .unwrap_or_default();
@@ -306,87 +294,124 @@ fn stem(name: &str) -> String {
 mod tests {
     use super::*;
 
-    // TODO: Reenable tests
-    // #[test]
-    // fn test_parameter_normalization_new() {
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "widget",
-    //             normalized: "widget".into(),
-    //         },
-    //         ParameterNormalization::new("widget", None)
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "widgets",
-    //             normalized: "widget".into(),
-    //         },
-    //         ParameterNormalization::new("widgets", None)
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "widget",
-    //             normalized: "aircraft|widget".into(),
-    //         },
-    //         ParameterNormalization::new("widget", Some("aircraft"))
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "widget",
-    //             normalized: "aircraft|widget".into(),
-    //         },
-    //         ParameterNormalization::new("widget", Some("aircrafts"))
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "country_id",
-    //             normalized: "countri|id".into(),
-    //         },
-    //         ParameterNormalization::new("country_id", Some("countries"))
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "id",
-    //             normalized: "countri|id".into(),
-    //         },
-    //         ParameterNormalization::new("id", Some("countries"))
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "widget_id",
-    //             normalized: "countri|widget_id".into(),
-    //         },
-    //         ParameterNormalization::new("widget_id", Some("countries"))
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "pet-id",
-    //             normalized: "pet|id".into(),
-    //         },
-    //         ParameterNormalization::new("pet-id", Some("pets"))
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "petId",
-    //             normalized: "pet|id".into(),
-    //         },
-    //         ParameterNormalization::new("petId", Some("pets"))
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "petid",
-    //             normalized: "pet|id".into(),
-    //         },
-    //         ParameterNormalization::new("petid", Some("pet"))
-    //     );
-    //     assert_eq!(
-    //         ParameterNormalization {
-    //             name: "PetID",
-    //             normalized: "pet|id".into(),
-    //         },
-    //         ParameterNormalization::new("PetID", Some("pet"))
-    //     );
-    // }
+    #[test]
+    fn test_parameter_normalization_new() {
+        let context = None;
+        let parameter_access =
+            ParameterAccess::request_query("for_now_unused_parameter_access".into());
+        assert_eq!(
+            ParameterNormalization {
+                name: "widget".into(),
+                normalized: "widget".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("widget".into(), context.clone(), parameter_access.clone())
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "widgets".into(),
+                normalized: "widget".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new(
+                "widgets".into(),
+                context.clone(),
+                parameter_access.clone()
+            )
+        );
+        let context = Some("aircraft".into());
+        assert_eq!(
+            ParameterNormalization {
+                name: "widget".into(),
+                normalized: "aircraft|widget".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("widget".into(), context, parameter_access.clone())
+        );
+        let context = Some("aircrafts".into());
+        assert_eq!(
+            ParameterNormalization {
+                name: "widget".into(),
+                normalized: "aircraft|widget".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("widget".into(), context, parameter_access.clone())
+        );
+        let context = Some("countries".into());
+        assert_eq!(
+            ParameterNormalization {
+                name: "country_id".into(),
+                normalized: "countri|id".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new(
+                "country_id".into(),
+                context.clone(),
+                parameter_access.clone()
+            )
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "id".into(),
+                normalized: "countri|id".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("id".into(), context.clone(), parameter_access.clone())
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "widget_id".into(),
+                normalized: "countri|widget_id".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("widget_id".into(), context, parameter_access.clone())
+        );
+        let context = Some("pets".into());
+        assert_eq!(
+            ParameterNormalization {
+                name: "pet-id".into(),
+                normalized: "pet|id".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("pet-id".into(), context.clone(), parameter_access.clone())
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "petId".into(),
+                normalized: "pet|id".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("petId".into(), context, parameter_access.clone())
+        );
+        let context = Some("pet".into());
+        assert_eq!(
+            ParameterNormalization {
+                name: "petid".into(),
+                normalized: "pet|id".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("petid".into(), context.clone(), parameter_access.clone())
+        );
+        assert_eq!(
+            ParameterNormalization {
+                name: "PetID".into(),
+                normalized: "pet|id".into(),
+                context: context.clone(),
+                parameter_access: parameter_access.clone()
+            },
+            ParameterNormalization::new("PetID".into(), context, parameter_access.clone())
+        );
+    }
 
     #[test]
     fn test_path_last_component() {

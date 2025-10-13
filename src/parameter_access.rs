@@ -134,18 +134,6 @@ impl From<&[ParameterAccessElement]> for ParameterAccessElements {
     }
 }
 
-// impl From<&ParameterAccess> for ParameterKind {
-//     fn from(value: &ParameterAccess) -> Self {
-//         match value {
-//             ParameterAccess::Body(_) => Self::Body,
-//             ParameterAccess::Query(_) => Self::Query,
-//             ParameterAccess::Path(_) => Self::Path,
-//             ParameterAccess::Header(_) => Self::Header,
-//             ParameterAccess::Cookie(_) => Self::Cookie,
-//         }
-//     }
-// }
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RequestParameterAccess {
     Body(ParameterAccessElements),
@@ -191,11 +179,6 @@ pub enum ParameterAccess {
     Request(RequestParameterAccess),
     #[serde(with = "serde_yaml::with::singleton_map")]
     Response(ResponseParameterAccess),
-    // Body(ParameterAccessElements),
-    // Query(String),
-    // Path(String),
-    // Header(String),
-    // Cookie(String),
 }
 
 impl ParameterAccess {

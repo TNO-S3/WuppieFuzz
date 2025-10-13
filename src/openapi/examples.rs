@@ -913,9 +913,10 @@ pub fn openapi_inputs_from_ops<'a>(
         log::warn!("Trying to create OpenApiInputs from QualifiedOperations gave empty result.");
         return Ok(vec![]);
     }
-    // Now take the cartesian product
+    // Now calculate combinations of requests:
     // Initialize "chains" of only the first request, then combine all chains built so far
     // with each of the OpenApiRequests in the next request (iteratively).
+    // TODO: improve this, see #36
     let mut all_chains: Vec<Vec<OpenApiRequest>> = concrete_requests
         .pop_front()
         .unwrap()

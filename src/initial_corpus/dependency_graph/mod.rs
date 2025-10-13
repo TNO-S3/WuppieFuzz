@@ -121,12 +121,22 @@ fn openapi_example_input_from_ops<'a>(
 /// Note that each Value may reference one of multiple Values in previous responses.
 /// For this reason we create multiple OpenApiInputs; one for each choice of reference.
 /// To avoid a combinatorial explosion, we do not take the cartesian product of these
-/// reference choices but combine them more simply.
+/// reference choices but combine them more simply: say we have these target parameters
+/// with their source parameters:
+///
+/// A -> A1, A2
+/// B -> B1, B2, B3
+///
+/// In that case we will only create these combinations of references:
+///
+/// 1. A -> A1, B -> B1
+/// 2. A -> A2, B -> B2
+/// 3. B -> B3
 ///
 /// For ParameterMatching::Request variants the edges are (likely) transitive (they refer to
-/// other Values that may *also* be replaced with References based on names or
+/// earlier Values that may *also* be replaced with References based on names or
 /// normalized names being equal). Therefore we only add a single Reference, to the
-/// earliest suitable request in the chain.
+/// earliest matching request in the chain.
 fn add_references_to_openapi_input(
     subgraph: &DiGraph<QualifiedOperation, ParameterMatching, DefaultIx>,
     sorted_nodes: &[NodeIndex],
@@ -175,20 +185,27 @@ fn add_references_to_openapi_input(
             }
         }
     }
+    // Determine how many combinations we will create, this is the length of the longest list of
+    // sources (we will add each target-source combination in only one request)
+    let max_len = target_to_sources
+        .iter()
+        .map(|(_, v)| v.len())
+        .max()
+        .unwrap_or(0);
     let mut backref_combinations: Vec<Vec<(ParameterAddressing, ParameterAddressing)>> =
         vec![Vec::new()];
-    // Construct all combinations of references
-    for (target_access, source_accesses) in target_to_sources.iter() {
-        let mut new_results = Vec::new();
-        for partial in &backref_combinations {
-            for source_access in source_accesses {
-                let mut new_partial = partial.clone();
-                new_partial.push((target_access.clone(), source_access.clone()));
-                new_results.push(new_partial);
+    for i in 0..max_len {
+        let mut new_combination = Vec::new();
+        for (key, values) in &target_to_sources {
+            if let Some(value) = values.get(i) {
+                new_combination.push(((*key).clone(), value.clone()));
             }
         }
-        backref_combinations = new_results;
+        if !new_combination.is_empty() {
+            backref_combinations.push(new_combination);
+        }
     }
+
     // For each combination, construct an OpenApiInput
     let mut inputs_with_references = vec![];
     for backref_combination in backref_combinations.iter() {
