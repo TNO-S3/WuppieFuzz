@@ -30,7 +30,6 @@ use self::{
     toposort::{Cycle, toposort},
 };
 use crate::{
-    initial_corpus::dependency_graph::normalize::path_context_component,
     input::{Method, OpenApiInput, ParameterContents},
     openapi::{
         QualifiedOperation,
@@ -349,7 +348,7 @@ impl<'a> DependencyGraph<'a> {
             };
             writeln!(
                 &mut file,
-                "  {} -->|{} {} {}| {};",
+                "  {} -->|\"{} {} {}\"| {};",
                 hasher_source.finish(),
                 edge.weight().output_access(),
                 arrow,
@@ -441,7 +440,7 @@ fn find_links<'a>(
                 output_access: response_outputs_from_1
                     .iter()
                     .find(|output| {
-                        output.normalized == input.normalized || output.name == input.name
+                        output.normalized == input.normalized // || output.name == input.name
                     })?
                     .parameter_access
                     .clone(),
@@ -490,7 +489,13 @@ fn inout_params<'a>(
         .responses
         .iter()
         .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
-        .filter_map(|response| normalize_response(api, response, path_context_component(op.path)))
+        .filter_map(|response| {
+            normalize_response(
+                api,
+                response,
+                op.path.split('/').map(String::from).collect(),
+            )
+        })
         // Flatten normalizations into one big collection (not grouped per Response)
         .flatten()
         .collect();
@@ -507,7 +512,9 @@ fn inout_params<'a>(
         .request_body
         .iter()
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
-        .find_map(|body| normalize_request_body(api, body, path_context_component(op.path)))
+        .find_map(|body| {
+            normalize_request_body(api, body, op.path.split('/').map(String::from).collect())
+        })
         .unwrap_or_default();
     if op.method == Method::Post {
         request_output_fields.extend_from_slice(&request_body_fields);

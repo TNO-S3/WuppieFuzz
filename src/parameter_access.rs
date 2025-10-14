@@ -230,28 +230,41 @@ impl ParameterAccess {
     pub(crate) fn response_cookie(name: String) -> Self {
         Self::Response(ResponseParameterAccess::Cookie(name))
     }
-    pub fn get_body_access_elements(&self) -> Option<&ParameterAccessElements> {
-        let warn_text = "Trying to get access elements from non-body RequestParameterAccess";
+    pub fn get_body_access_elements(&self) -> Result<&ParameterAccessElements, &str> {
+        let error_text = "Trying to get access elements from non-body ParameterAccess";
         match self {
             ParameterAccess::Request(request_parameter_access) => match request_parameter_access {
                 RequestParameterAccess::Body(parameter_access_elements) => {
-                    Some(parameter_access_elements)
+                    Ok(parameter_access_elements)
                 }
-                _ => {
-                    log::warn!("{warn_text}");
-                    None
-                }
+                _ => Err(error_text),
             },
             ParameterAccess::Response(response_parameter_access) => match response_parameter_access
             {
                 ResponseParameterAccess::Body(parameter_access_elements) => {
-                    Some(parameter_access_elements)
+                    Ok(parameter_access_elements)
                 }
-                _ => {
-                    log::warn!("{warn_text}");
-                    None
-                }
+                _ => Err(error_text),
             },
+        }
+    }
+    pub fn get_non_body_access_element(&self) -> Result<String, &str> {
+        let error_text = "Trying to get simple parameter name from body ParameterAccess";
+        match self {
+            ParameterAccess::Request(request_parameter_access) => match request_parameter_access {
+                RequestParameterAccess::Body(_) => Err(error_text),
+                RequestParameterAccess::Query(name)
+                | RequestParameterAccess::Path(name)
+                | RequestParameterAccess::Header(name)
+                | RequestParameterAccess::Cookie(name) => Ok(name.clone()),
+            },
+            ParameterAccess::Response(response_parameter_access) => {
+                match response_parameter_access {
+                    ResponseParameterAccess::Body(_) => Err(error_text),
+                    ResponseParameterAccess::Header(name)
+                    | ResponseParameterAccess::Cookie(name) => Ok(name.clone()),
+                }
+            }
         }
     }
     pub fn matches(&self, param: &openapiv3::Parameter) -> bool {
