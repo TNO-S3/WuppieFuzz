@@ -348,11 +348,12 @@ impl<'a> DependencyGraph<'a> {
             };
             writeln!(
                 &mut file,
-                "  {} -->|\"{} {} {}\"| {};",
+                "  {} -->|\"{} {} {} ({})\"| {};",
                 hasher_source.finish(),
                 edge.weight().output_access(),
                 arrow,
                 edge.weight().input_access(),
+                edge.weight().input_name_normalized(),
                 hasher_target.finish(),
             )?;
         }
@@ -453,9 +454,7 @@ fn find_links<'a>(
             Some(ParameterMatching::Request {
                 output_access: request_outputs_from_1
                     .iter()
-                    .find(|output| {
-                        output.normalized == input.normalized || output.name == input.name
-                    })?
+                    .find(|output| output.normalized == input.normalized)?
                     .parameter_access
                     .clone(),
                 input_access: input.parameter_access.clone(),

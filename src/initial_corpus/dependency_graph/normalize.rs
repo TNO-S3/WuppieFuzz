@@ -150,7 +150,10 @@ impl ParameterNormalization {
             // Name from body, context from path
             1 => match path.len() {
                 0 => (named_access_elements[0].clone(), None),
-                _ => (named_access_elements[0].clone(), Some(path[0].clone())),
+                _ => (
+                    named_access_elements[0].clone(),
+                    Some(path[path.len() - 1].clone()),
+                ),
             },
             // Name and context both from body
             _ => (
