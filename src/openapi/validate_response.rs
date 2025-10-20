@@ -71,11 +71,23 @@ pub enum ValidationError {
     /// If this variant is returned, it suggests a bug in the fuzzer.
     OperationNotInSpec { path: String, method: Method },
 
-    /// The HTTP status code returned from the API is not one of the status codes
+    /// The 5xx HTTP status code returned from the API is not one of the status codes
     /// mentioned for this path in the specification.
     ///
-    /// If this variant is returned, the API does not behave as specified.
-    StatusNotSpecified { got: StatusCode },
+    /// If this variant is returned, the API does not behave as specified. This error is
+    /// only captures 5xx status codes; for other status codes, see `ValidationError::StatusNon5xxNotSpecified`.
+    /// This distinction can be helpful because a 5xx status code often indicates a more
+    /// severe or 'real' crash.
+    Status5xxNotSpecified { got: StatusCode },
+
+    /// The HTTP status code (1xx - 4xx) returned from the API is not one of the status codes
+    /// mentioned for this path in the specification.
+    ///
+    /// If this variant is returned, the API does not behave as specified. This error is
+    /// only captures status codes from 1xx to 4xx; for 5xx codes, see `ValidationError::Status5xxNotSpecified`.
+    /// This distinction can be helpful because a 5xx status code often indicates a more
+    /// severe or 'real' crash.
+    OtherStatusNotSpecified { got: StatusCode },
 
     /// The specification calls for an object to be returned, and refers to the
     /// correct structure of this object using a reference (`#/example/reference`).
@@ -155,7 +167,8 @@ impl std::fmt::Display for ValidationError {
                 fmt,
                 "Operation {method} {path} does not occur in specification"
             ),
-            ValidationError::StatusNotSpecified { got } => {
+            ValidationError::Status5xxNotSpecified { got }
+            | ValidationError::OtherStatusNotSpecified { got } => {
                 write!(fmt, "Returned HTTP status {got} not allowed for this path")
             }
             ValidationError::ResponseReferenceBroken {
@@ -208,8 +221,16 @@ pub fn validate_response(
         .responses
         .responses
         .get(&openapiv3::StatusCode::Code(response.status().as_u16()))
-        .ok_or_else(|| ValidationError::StatusNotSpecified {
-            got: response.status(),
+        .ok_or_else(|| {
+            if response.status().is_server_error() {
+                ValidationError::Status5xxNotSpecified {
+                    got: response.status(),
+                }
+            } else {
+                ValidationError::OtherStatusNotSpecified {
+                    got: response.status(),
+                }
+            }
         })?;
     let response_options =
         desired_response
