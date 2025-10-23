@@ -1,4 +1,4 @@
-FROM rust:latest AS wuppiefuzz
+FROM rust:latest AS builder
 
 WORKDIR /app
 
@@ -9,18 +9,19 @@ COPY ./build.rs .
 RUN useradd -ms /bin/bash fuzzer
 RUN chown fuzzer:fuzzer /app
 
-USER fuzzer
+RUN apt-get update \
+    && apt-get install -qy cmake clang \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir src && \
-    echo 'fn main() {}' > src/main.rs && \
-    cargo build --release && \
-    rm -Rvf src
+USER fuzzer
 
 COPY . .
 
 RUN cargo build --release
 
-ENTRYPOINT ["cargo", "run", "--release", "--manifest-path", "/app/Cargo.toml", "--"]
+FROM debian:bookworm-slim AS wuppiefuzz
+WORKDIR /app
+COPY --from=builder /app/target/release/wuppiefuzz /app/wuppiefuzz
 
-CMD ["--help"] # Shows usage, must be overridden by user to target specific API
-
+ENTRYPOINT ["/app/wuppiefuzz"]
+CMD ["--help"]
