@@ -71,8 +71,7 @@ mod test {
 
     use super::BreakLinkMutator;
     use crate::{
-        openapi_mutator::test_helpers::linked_requests,
-        parameter_access::RequestParameterAccess,
+        openapi_mutator::test_helpers::linked_requests, parameter_access::RequestParameterAccess,
         state::tests::TestOpenApiFuzzerState,
     };
 

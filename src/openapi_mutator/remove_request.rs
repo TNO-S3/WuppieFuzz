@@ -79,7 +79,10 @@ mod test {
 
     use super::RemoveRequestMutator;
     use crate::{
-        input::{ParameterContents, parameter::ParameterKind},
+        input::{
+            ParameterContents,
+            parameter::{OReference, ParameterKind},
+        },
         openapi_mutator::test_helpers::{linked_requests, simple_request},
         parameter_access::{ParameterAccess, ParameterAccessElements, RequestParameterAccess},
         state::tests::TestOpenApiFuzzerState,
@@ -127,12 +130,12 @@ mod test {
             input.0.insert(0, input.0[0].clone());
             input.0[2].parameters.insert(
                 ("id".into(), ParameterKind::Query),
-                ParameterContents::OReference {
+                ParameterContents::OReference(OReference {
                     request_index: 1,
                     parameter_access: ParameterAccess::request_body(
                         ParameterAccessElements::from_elements(&["id".to_string().into()]),
                     ),
-                },
+                }),
             );
 
             let mut mutator = RemoveRequestMutator;

@@ -296,14 +296,14 @@ fn mutate_string<S: HasRand>(
 #[allow(clippy::needless_late_init)]
 /// Mutate parameter contents in-place
 fn mutate_parameter_contents<S: HasRand>(
-    param_contents: &mut ParameterContents,
+    non_reference_param_contents: &mut ParameterContents,
     state: &mut S,
     contents_mutator: &mut dyn Mutator<BytesInput, S>,
 ) -> Result<MutationResult, Error> {
     // random_element is used if we pick an element from an array or object to mutate,
     // other ParameterContents return early with a mutated result.
     let random_element;
-    match param_contents {
+    match non_reference_param_contents {
         ParameterContents::Object(obj_properties) => {
             random_element = match state.rand_mut().choose(obj_properties.values_mut()) {
                 None => {
@@ -339,7 +339,8 @@ fn mutate_parameter_contents<S: HasRand>(
                 if contents == new_value.mutator_bytes() {
                     return Ok(MutationResult::Skipped);
                 }
-                *param_contents = ParameterContents::Bytes(new_value.mutator_bytes().to_owned())
+                *non_reference_param_contents =
+                    ParameterContents::Bytes(new_value.mutator_bytes().to_owned())
             }
             return mutation_result;
         }

@@ -30,7 +30,10 @@ use self::{
     toposort::{Cycle, toposort},
 };
 use crate::{
-    input::{Method, OpenApiInput, ParameterContents},
+    input::{
+        Method, OpenApiInput, ParameterContents,
+        parameter::{IReference, OReference},
+    },
     openapi::{
         QualifiedOperation,
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
@@ -215,10 +218,20 @@ fn add_references_to_openapi_input(
             if let Some(x) = requests_with_references[target.request_index]
                 .get_mut_parameter(target.access.unwrap_request_variant())
             {
-                *x = ParameterContents::OReference {
-                    request_index: source.request_index,
-                    parameter_access: source.access.clone(),
-                };
+                match source.access {
+                    crate::parameter_access::ParameterAccess::Request(_) => {
+                        *x = ParameterContents::IReference(IReference {
+                            request_index: source.request_index,
+                            parameter_access: source.access.clone(),
+                        });
+                    }
+                    crate::parameter_access::ParameterAccess::Response(_) => {
+                        *x = ParameterContents::OReference(OReference {
+                            request_index: source.request_index,
+                            parameter_access: source.access.clone(),
+                        });
+                    }
+                }
             }
         }
         inputs_with_references.push(OpenApiInput(requests_with_references));

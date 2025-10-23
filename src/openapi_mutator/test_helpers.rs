@@ -4,7 +4,8 @@ use std::collections::BTreeMap;
 
 use crate::{
     input::{
-        Body, Method, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind,
+        Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
+        parameter::{OReference, ParameterKind},
     },
     parameter_access::{ParameterAccess, ParameterAccessElements},
 };
@@ -25,12 +26,12 @@ pub fn linked_requests() -> OpenApiInput {
     let mut parameters = BTreeMap::new();
     parameters.insert(
         ("id".into(), ParameterKind::Query),
-        ParameterContents::OReference {
+        ParameterContents::OReference(OReference {
             request_index: 0,
             parameter_access: ParameterAccess::request_body(
                 ParameterAccessElements::from_elements(&["id".to_string().into()]),
             ),
-        },
+        }),
     );
     let has_param = OpenApiRequest {
         method: Method::Get,

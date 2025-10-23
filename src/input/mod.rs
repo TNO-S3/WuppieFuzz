@@ -70,6 +70,7 @@ use openapiv3::{OpenAPI, Operation};
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
 use crate::{
+    input::parameter::{IReference, OReference},
     parameter_access::{
         ParameterAccess, ParameterAccessElements, ParameterAddressing, RequestParameterAccess,
     },
@@ -165,10 +166,10 @@ impl OpenApiRequest {
             parameter_values: &ParameterFeedback,
         ) -> Result<(), libafl::Error> {
             match parameter {
-                ParameterContents::OReference {
+                ParameterContents::OReference(OReference {
                     request_index,
                     parameter_access,
-                } => {
+                }) => {
                     let resolved_backref = parameter_values
                         .get(*request_index, parameter_access)
                         .ok_or_else(|| {
@@ -176,12 +177,12 @@ impl OpenApiRequest {
                             "invalid response-backreference to {request_index}:{parameter_access}"
                         ))
                     })?;
-                    *parameter = ParameterContents::from(resolved_backref.clone());
+                    *parameter = resolved_backref.clone();
                 }
-                ParameterContents::IReference {
+                ParameterContents::IReference(IReference {
                     request_index,
                     parameter_access,
-                } => {
+                }) => {
                     let resolved_backref = parameter_values
                         .get(*request_index, parameter_access)
                         .ok_or_else(|| {
@@ -189,7 +190,7 @@ impl OpenApiRequest {
                             "invalid request-backreference to {request_index}:{parameter_access}"
                         ))
                     })?;
-                    *parameter = ParameterContents::from(resolved_backref.clone());
+                    *parameter = resolved_backref.clone();
                 }
                 ParameterContents::Object(obj_contents) => {
                     for nested_parameter in obj_contents.values_mut() {
@@ -439,8 +440,7 @@ impl OpenApiInput {
             })
     }
 
-    /// This returns all reference parameters as follows:
-    /// (request idx, request parameter access, target request idx, target parameter access)
+    /// This returns all reference parameters as (source, target) addressings.
     pub(crate) fn reference_parameters(
         &self,
     ) -> impl Iterator<Item = (ParameterAddressing, ParameterAddressing)> + '_ {
@@ -465,7 +465,10 @@ impl OpenApiInput {
                                 ParameterContents::Object(obj_params) => {
                                     IterWrapper::WithIter(obj_params.iter())
                                 }
-                                ParameterContents::OReference { .. } => {
+                                ParameterContents::OReference(..) => {
+                                    IterWrapper::WithOption(Some(contents))
+                                }
+                                ParameterContents::IReference(..) => {
                                     IterWrapper::WithOption(Some(contents))
                                 }
                                 _ => IterWrapper::WithOption(None),
@@ -475,10 +478,15 @@ impl OpenApiInput {
                     )
                     // Only preserve references
                     .filter_map(|(n, k, v)| match v {
-                        ParameterContents::OReference {
+                        ParameterContents::OReference(OReference {
                             request_index,
                             parameter_access,
-                        } => Some(((n, k), (request_index, parameter_access))),
+                        })
+                        | ParameterContents::IReference(IReference {
+                            request_index,
+                            parameter_access,
+                        }) => Some(((n, k), (request_index, parameter_access))),
+
                         _ => None,
                     })
                     // Turn parameter name (here still a String) into ParameterAccess
@@ -606,20 +614,20 @@ impl OpenApiInput {
                                         contents.resolve_mut(parameter_access_elements).unwrap();
                                     resolved.break_reference_if_target(rand, |_| true);
                                 }
-                                ParameterContents::OReference {
+                                ParameterContents::OReference(OReference {
                                     request_index,
                                     parameter_access,
-                                } => {
+                                }) => {
                                     log::warn!("Marked body parameter in response {idx} with name {parameter_access} for replacement.
                                     The body's immediate contents are however an (unnamed) reference, pointing to a parameter
                                     with name {parameter_access} in response {request_index}.");
                                     continue;
                                 }
 
-                                ParameterContents::IReference {
+                                ParameterContents::IReference(IReference {
                                     request_index,
                                     parameter_access,
-                                } => {
+                                }) => {
                                     log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement.
                                     The body's immediate contents are however an (unnamed) reference, pointing to a parameter
                                     with name {parameter_access} in request {request_index}.");

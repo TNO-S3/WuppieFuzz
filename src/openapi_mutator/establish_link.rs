@@ -12,7 +12,7 @@ use libafl::{
 use libafl_bolts::Named;
 
 use crate::{
-    input::{OpenApiInput, ParameterContents},
+    input::{OpenApiInput, ParameterContents, parameter::OReference},
     parameter_access::ParameterAccessElement,
     state::HasRandAndOpenAPI,
 };
@@ -71,7 +71,7 @@ where
                 request
                     .parameters
                     .iter_mut()
-                    // only consider non-reference parameters for replacement with
+                    // only consider non-OReference parameters for replacement with
                     // a reference
                     .filter(|(_, v)| !v.is_reference())
                     // filter: this variable occurs in an earlier request's return value
@@ -104,12 +104,12 @@ where
         };
 
         // Make the link
-        *random_link.0 = ParameterContents::OReference {
+        *random_link.0 = ParameterContents::OReference(OReference {
             request_index: request_index_and_parameter_access_pairs[random_link.1].request_index,
             parameter_access: request_index_and_parameter_access_pairs[random_link.1]
                 .access
                 .to_owned(),
-        };
+        });
 
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
