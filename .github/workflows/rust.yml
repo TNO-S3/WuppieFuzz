@@ -35,6 +35,7 @@ jobs:
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
           profile: minimal
+          cache-base: main
           channel: ${{ matrix.rust }}
           components: rustfmt, clippy
 
@@ -108,6 +109,7 @@ jobs:
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
           profile: minimal
+          cache-base: main
           channel: nightly
           components: llvm-tools-preview
 
