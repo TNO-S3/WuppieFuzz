@@ -8,8 +8,9 @@ use std::collections::BTreeMap;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as base64};
 use serde::{
-    de::{Deserialize, Deserializer, Error},
-    ser::{Serialize, Serializer},
+    Deserialize, Serialize,
+    de::{Deserializer, Error},
+    ser::Serializer,
 };
 use serde_yaml::{
     Value,
