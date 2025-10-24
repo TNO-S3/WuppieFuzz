@@ -1,20 +1,32 @@
 use std::collections::HashMap;
 
-use serde_json::Value;
-
 use crate::{
-    input::{Body, Method, OpenApiRequest, ParameterContents::Object},
+    input::ParameterContents,
     openapi::validate_response::Response,
+    parameter_access::{
+        ParameterAccess, ParameterAccessElements, ParameterAddressing, RequestParameterAccess,
+        ResponseParameterAccess,
+    },
 };
 
 /// ParameterFeedbackMetadata collects parameter values from requests as they
-/// are made. This allows the harness to insert the values in subsequent requests
-/// if a parameter contains a backreference to an earlier request.
+/// are made and responses as they are received. This allows the harness to insert
+/// the values in subsequent requests if a parameter contains a backreference.
+///
+/// The struct wraps a Vec where feedback for the Nth request/response is stored
+/// in element N. Each element is a HashMap with ParameterAccess keys, so that
+/// any flavor (body, header, cookie, etc.) feedback can be stored for both
+/// requests and responses.
+///
+/// Note that for Body feedback, Object values are stored as-is; the
+/// ParameterAccess contains an empty ParameterAccessElements indicating
+/// that the Value is the entire request/response body. Any indexing with a
+/// ParameterAccess must be done manually.
 #[derive(Debug, Clone)]
-pub struct ParameterFeedback(Vec<HashMap<String, Value>>);
+pub struct ParameterFeedback(Vec<HashMap<ParameterAccess, ParameterContents>>);
 
-impl From<&Vec<HashMap<String, Value>>> for ParameterFeedback {
-    fn from(collection: &Vec<HashMap<String, Value>>) -> Self {
+impl From<&Vec<HashMap<ParameterAccess, ParameterContents>>> for ParameterFeedback {
+    fn from(collection: &Vec<HashMap<ParameterAccess, ParameterContents>>) -> Self {
         Self(collection.clone())
     }
 }
@@ -44,12 +56,43 @@ impl ParameterFeedback {
     }
 
     /// Returns the value saved for the given request
-    pub fn get(&self, request_index: usize, param: &str) -> Option<&Value> {
+    pub fn get(
+        &self,
+        request_index: usize,
+        access: &ParameterAccess,
+    ) -> Option<&ParameterContents> {
         // Tuple indexing leads to clones... Better to implement as double hashmap?
-        self.0.get(request_index)?.get(param)
+        let nth_feedbacks = self.0.get(request_index)?;
+        let nth_feedback = nth_feedbacks.get(access);
+        if nth_feedback.is_some() {
+            nth_feedback
+        } else {
+            // ParameterContents may be stored for "empty" access, if no root level key is used
+            // such as for an object in the Body.
+            match access {
+                ParameterAccess::Request(request_access) => {
+                    let root_value = nth_feedbacks.get(&ParameterAccess::request_body(
+                        ParameterAccessElements::new(),
+                    ))?;
+                    match request_access {
+                        RequestParameterAccess::Body(_) => root_value.resolve(access),
+                        _ => None,
+                    }
+                }
+                ParameterAccess::Response(response_access) => {
+                    let root_value = nth_feedbacks.get(&ParameterAccess::response_body(
+                        ParameterAccessElements::new(),
+                    ))?;
+                    match response_access {
+                        ResponseParameterAccess::Body(_) => root_value.resolve(access),
+                        _ => None,
+                    }
+                }
+            }
+        }
     }
 
-    pub fn contains(&self, request_index: usize, param: &str) -> bool {
+    pub fn contains(&self, request_index: usize, param: &ParameterAccess) -> bool {
         self.0
             .get(request_index)
             .map(|m| m.contains_key(param))
@@ -58,11 +101,23 @@ impl ParameterFeedback {
 
     /// Adds the given parameter/value combination to memory. Returns whether successful
     /// (if the request index is out of bounds, false is returned).
-    pub fn set(&mut self, request_index: usize, param: String, value: Value) -> bool {
+    pub(crate) fn set(
+        &mut self,
+        addressing: ParameterAddressing,
+        value: ParameterContents,
+    ) -> bool {
         self.0
-            .get_mut(request_index)
-            .map(|m| m.insert(param, value))
+            .get_mut(addressing.request_index)
+            .map(|m| m.insert(addressing.access, value))
             .is_some()
+    }
+
+    fn add_response_parameter(
+        &mut self,
+        addressing: ParameterAddressing,
+        field: ParameterContents,
+    ) {
+        self.set(addressing, field.clone());
     }
 
     /// Processes the values returned in a Response.
@@ -75,46 +130,24 @@ impl ParameterFeedback {
         // (e.g. id = 37) for use as parameters in later requests.
         match response.json::<serde_json::Value>() {
             // Objects in responses: save all field/value combinations
-            Ok(serde_json::Value::Object(hashmap)) => {
-                for (param, value) in hashmap.into_iter() {
-                    self.set(request_index, param, value);
-                }
+            Ok(field) => self.add_response_parameter(
+                ParameterAddressing::new(
+                    request_index,
+                    ParameterAccess::response_body(ParameterAccessElements::new()),
+                ),
+                field.into(),
+            ),
+            Err(e) => {
+                log::trace!("Error parsing response: {e:?}");
             }
-            // Arrays in responses: take the first element, which should be an object,
-            // and save all field/value combinations.
-            // Since we can only save one value per field name per request, we can only
-            // keep one object worth of values, and we forget the rest.
-            Ok(serde_json::Value::Array(vec)) => {
-                if let Some(serde_json::Value::Object(hashmap)) = vec.into_iter().next() {
-                    for (param, value) in hashmap.into_iter() {
-                        self.set(request_index, param, value);
-                    }
-                }
-            }
-            _ => (),
         }
         // We also record the values of any Set-Cookie headers
+        // TODO: try to parse cookies in validate_response.rs to also treat them as non-String types?
         for (name, value) in response.cookies() {
-            self.set(request_index, name, serde_json::Value::String(value));
-        }
-    }
-
-    /// Process any body values in a request if its type is POST.
-    ///
-    /// If there is a request body with fields, either JSON or form data, the contents are
-    /// added to the ParameterFeedback. This is useful because if create make a resource in the
-    /// program under test, future requests need to be able to refer back to it.
-    pub fn process_post_request(&mut self, request_index: usize, request: OpenApiRequest) {
-        match request.body {
-            Body::ApplicationJson(Object(obj_contents))
-            | Body::XWwwFormUrlencoded(Object(obj_contents))
-                if request.method == Method::Post =>
-            {
-                for (param, value) in obj_contents {
-                    self.set(request_index, param, value.to_value());
-                }
-            }
-            _ => (),
+            self.add_response_parameter(
+                ParameterAddressing::new(request_index, ParameterAccess::response_cookie(name)),
+                value.into(),
+            );
         }
     }
 

@@ -19,8 +19,8 @@ use unicode_truncate::UnicodeTruncateStr;
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
-    initial_corpus::dependency_graph::ParameterMatching,
     input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
+    parameter_access::ParameterMatching,
 };
 
 /// Takes a (path, method, operation) tuple and produces an OpenApiRequest
@@ -867,7 +867,7 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
 /// of all these parameter choices, i.e. for a single-request OpenApiInput with parameters A: bool and B: usize
 /// it may for example return (true, 0), (true, 1), (false, 0) and (false, 1).
 ///
-/// This allows the fuzzer to start with all the inputs that we might a priori consider promising, and then
+/// This allows the fuzzer to start with all the inputs that we might a priori consider useful, and then
 /// continue with random mutations (picking seeds based on coverage feedback).
 pub fn openapi_inputs_from_ops<'a>(
     api: &OpenAPI,
@@ -888,12 +888,7 @@ pub fn openapi_inputs_from_ops<'a>(
                         .parameters
                         .iter()
                         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-                        .filter(move |parameter| {
-                            let par_kind: ParameterKind = (*parameter).into();
-                            let par_data = &parameter.data;
-                            edge.weight().name_input == par_data.name
-                                && par_kind == edge.weight().kind_input
-                        })
+                        .filter(move |parameter| edge.weight().input_access().matches(parameter))
                 })
                 .collect();
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)
@@ -918,9 +913,10 @@ pub fn openapi_inputs_from_ops<'a>(
         log::warn!("Trying to create OpenApiInputs from QualifiedOperations gave empty result.");
         return Ok(vec![]);
     }
-    // Now take the cartesian product
+    // Now calculate combinations of requests:
     // Initialize "chains" of only the first request, then combine all chains built so far
     // with each of the OpenApiRequests in the next request (iteratively).
+    // TODO: improve this, see #36
     let mut all_chains: Vec<Vec<OpenApiRequest>> = concrete_requests
         .pop_front()
         .unwrap()

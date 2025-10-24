@@ -11,6 +11,10 @@ use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
 use super::utils::new_rand_input;
+use crate::parameter_access::{
+    ParameterAccess, ParameterAccessElement, ParameterAccessElements, RequestParameterAccess,
+    ResponseParameterAccess,
+};
 
 /// Structs that help describe parameters to HTTP requests in a way that the fuzzer can still
 /// mutate and reason about. The ParameterKind enum describes the places a parameter can occur
@@ -59,18 +63,19 @@ impl Display for SimpleValue {
 }
 
 /// The contents of a parameter or of the body of an HTTP request made by the fuzzer.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
-#[serde(tag = "DataType", content = "Contents")]
+#[derive(Clone, Debug, Hash)]
+// #[serde(tag = "DataType", content = "Contents")]
+// #[serde(untagged)]
 pub enum ParameterContents {
     /// If the parameter type is one of `object`, `array` or `leaf_value`, it is a
     /// structured value we can reason about.
     /// Mutators can attempt to mutate it using knowledge of the type, i.e. numbers
     /// will always be mutated into other numbers, and array elements can be shuffled.
-    #[serde(rename = "Object")]
+    // #[serde(rename = "Object")]
     Object(BTreeMap<String, ParameterContents>),
-    #[serde(rename = "Array")]
+    // #[serde(rename = "Array")]
     Array(Vec<ParameterContents>),
-    #[serde(rename = "PrimitiveValue")]
+    // #[serde(rename = "PrimitiveValue")]
     LeafValue(SimpleValue),
 
     /// If the parameter type is `bytes_b64`, it represents arbitrary binary contents.
@@ -80,29 +85,49 @@ pub enum ParameterContents {
     /// This parameter is named `bytes_b64` in the serialization to make clear that it
     /// should be encoded using Base64. It is stored unencoded internally, and is not
     /// required to be a valid String.
-    #[serde(rename = "RawBytes")]
-    #[serde(serialize_with = "super::serde_helpers::serialize_bytes_to_b64")]
-    #[serde(deserialize_with = "super::serde_helpers::deserialize_bytes_from_b64")]
+    // #[serde(rename = "RawBytes")]
+    // #[serde(serialize_with = "super::serde_helpers::serialize_bytes_to_b64")]
+    // #[serde(deserialize_with = "super::serde_helpers::deserialize_bytes_from_b64")]
     Bytes(Vec<u8>),
 
-    /// If the parameter type is `reference`, it represents a value copied from an
+    /// If the parameter type is `OReference`, it represents a value copied from an
     /// earlier request's response. For instance, the fuzzer might attempt to insert a
     /// record, receive an ID in return, and make further HTTP requests to amend the
     /// record by giving the returned ID parameter as the ID parameter of the later
     /// requests.
-    #[serde(rename = "ReferenceToEarlierResponse")]
-    Reference {
-        #[serde(rename = "request")]
-        request_index: usize,
-        #[serde(rename = "parameter_name")]
-        parameter_name: String,
-    },
+    // #[serde(rename = "ReferenceToEarlierResponse")]
+    OReference(OReference),
+    /// If the parameter type is `IReference`, it represents a value copied from an
+    /// earlier request. For instance, the fuzzer might pick a "username" early
+    /// in a request chain and make further HTTP requests to perform operations
+    /// relating to that user, in which the initial username must be reused.
+    // #[serde(rename = "ReferenceToEarlierRequest")]
+    IReference(IReference),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
+pub struct OReference {
+    #[serde(rename = "response")]
+    // Call this request_index rather than response_index so that
+    // IReference and OReference can be destructured together in match statements.
+    pub(crate) request_index: usize,
+    #[serde(rename = "parameter_access")]
+    pub(crate) parameter_access: ParameterAccess,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Hash)]
+pub struct IReference {
+    #[serde(rename = "request")]
+    pub(crate) request_index: usize,
+    #[serde(rename = "parameter_access")]
+    pub(crate) parameter_access: ParameterAccess,
 }
 
 impl ParameterContents {
-    /// Returns whether the `ParameterContents` is the `reference` variant.
+    /// Returns whether the `ParameterContents` is the `OReference` variant.
     pub fn is_reference(&self) -> bool {
-        matches!(self, ParameterContents::Reference { .. })
+        matches!(self, ParameterContents::OReference { .. })
+            || matches!(self, ParameterContents::IReference { .. })
     }
 
     /// Returns the bytes-representation of this `ParameterContents`.
@@ -115,7 +140,7 @@ impl ParameterContents {
             ParameterContents::Object(v) => {
                 let mut json_map = Map::new();
                 for (k, v) in v.iter() {
-                    json_map.insert(k.clone(), v.to_value());
+                    json_map.insert(k.clone().to_string(), v.to_value());
                 }
                 Some(Value::Object(json_map).to_string().into_bytes().into())
             }
@@ -125,7 +150,8 @@ impl ParameterContents {
             }
             ParameterContents::LeafValue(val) => Some(val.to_string().into_bytes().into()),
             ParameterContents::Bytes(bi) => Some(bi.into()),
-            ParameterContents::Reference { .. } => None,
+            ParameterContents::OReference { .. } => None,
+            ParameterContents::IReference { .. } => None,
         }
     }
 
@@ -137,7 +163,10 @@ impl ParameterContents {
         F: Fn(usize) -> bool,
     {
         match self {
-            ParameterContents::Reference { request_index, .. } if f(*request_index) => {
+            ParameterContents::OReference(OReference { request_index, .. })
+            | ParameterContents::IReference(IReference { request_index, .. })
+                if f(*request_index) =>
+            {
                 *self = ParameterContents::Bytes(new_rand_input(rand));
             }
             _ => (),
@@ -147,7 +176,10 @@ impl ParameterContents {
     /// Returns the mutable index of a `reference` variant of a `ParameterContents`.
     pub fn reference_index(&mut self) -> Option<&mut usize> {
         match self {
-            ParameterContents::Reference { request_index, .. } => Some(request_index),
+            ParameterContents::OReference(OReference { request_index, .. })
+            | ParameterContents::IReference(IReference { request_index, .. }) => {
+                Some(request_index)
+            }
             _ => None,
         }
     }
@@ -157,7 +189,7 @@ impl ParameterContents {
             ParameterContents::Object(content) => {
                 let mut json_map = Map::new();
                 for (key, val) in content {
-                    json_map.insert(key.clone(), val.to_value());
+                    json_map.insert(key.clone().to_string(), val.to_value());
                 }
                 Value::Object(json_map)
             }
@@ -169,8 +201,11 @@ impl ParameterContents {
                 // However, we can't really change this behaviour easily...
                 serde_json::Value::String(String::from_utf8_lossy(bytes).to_string())
             }
-            ParameterContents::Reference { .. } => {
-                panic!("Can not make a reqwest body out of a ParameterContents::Reference")
+            ParameterContents::OReference { .. } => {
+                panic!("Can not make a reqwest body out of a ParameterContents::OReference")
+            }
+            ParameterContents::IReference { .. } => {
+                panic!("Can not make a reqwest body out of a ParameterContents::IReference")
             }
         }
     }
@@ -209,6 +244,42 @@ impl ParameterContents {
             _ => self.to_string(),
         }
     }
+
+    pub fn resolve_mut(&mut self, path: &ParameterAccessElements) -> Option<&mut Self> {
+        let mut result = self;
+        for path_element in &path.0 {
+            match (result, path_element) {
+                (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
+                    result = mapping.get_mut(name)?
+                }
+                (ParameterContents::Array(vector), ParameterAccessElement::Offset(index)) => {
+                    result = vector.get_mut(*index)?
+                }
+                _ => return None,
+            }
+        }
+        Some(result)
+    }
+
+    /// Returns a nested field of this ParameterContents, as addressed by the parameter_access.
+    /// If the addressing does not identify a field (by having bad field names, out-of-bound indexes,
+    /// or too many elements), None is returned.
+    pub fn resolve(&self, parameter_access: &ParameterAccess) -> Option<&Self> {
+        let mut result = self;
+        let elements = parameter_access.get_body_access_elements().unwrap();
+        for path_element in &elements.0 {
+            match (result, path_element) {
+                (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
+                    result = mapping.get(name)?
+                }
+                (ParameterContents::Array(vector), ParameterAccessElement::Offset(index)) => {
+                    result = vector.get(*index)?
+                }
+                _ => return None,
+            }
+        }
+        Some(result)
+    }
 }
 
 impl Display for ParameterContents {
@@ -218,10 +289,20 @@ impl Display for ParameterContents {
             ParameterContents::Array(arr) => write!(f, "{:?}", &arr),
             ParameterContents::LeafValue(v) => Display::fmt(&v, f),
             ParameterContents::Bytes(bi) => Base64Display::new(bi, &STANDARD).fmt(f),
-            ParameterContents::Reference {
+            ParameterContents::OReference(OReference {
+                request_index: response_index,
+                parameter_access,
+            }) => write!(
+                f,
+                "parameter {parameter_access} from response {response_index}"
+            ),
+            ParameterContents::IReference(IReference {
                 request_index,
-                parameter_name,
-            } => write!(f, "parameter {parameter_name} from request {request_index}"),
+                parameter_access,
+            }) => write!(
+                f,
+                "parameter {parameter_access} from request {request_index}"
+            ),
         }
     }
 }
@@ -293,6 +374,32 @@ pub enum ParameterKind {
 impl ParameterKind {
     pub fn matches(&self, parameter: &Parameter) -> bool {
         self == &parameter.into()
+    }
+}
+
+impl From<&ParameterAccess> for ParameterKind {
+    fn from(access: &ParameterAccess) -> Self {
+        match access {
+            ParameterAccess::Request(request_parameter_access) => request_parameter_access.into(),
+            ParameterAccess::Response(response_parameter_access) => match response_parameter_access
+            {
+                ResponseParameterAccess::Body(_) => ParameterKind::Body,
+                ResponseParameterAccess::Header(_) => ParameterKind::Header,
+                ResponseParameterAccess::Cookie(_) => ParameterKind::Cookie,
+            },
+        }
+    }
+}
+
+impl From<&RequestParameterAccess> for ParameterKind {
+    fn from(access: &RequestParameterAccess) -> Self {
+        match access {
+            RequestParameterAccess::Body(_) => ParameterKind::Body,
+            RequestParameterAccess::Query(_) => ParameterKind::Query,
+            RequestParameterAccess::Path(_) => ParameterKind::Path,
+            RequestParameterAccess::Header(_) => ParameterKind::Header,
+            RequestParameterAccess::Cookie(_) => ParameterKind::Cookie,
+        }
     }
 }
 
