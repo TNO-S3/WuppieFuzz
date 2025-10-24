@@ -351,7 +351,9 @@ fn mutate_parameter_contents<S: HasRand>(
             "Non-nested input-reference parameters should have been filtered out of concrete_parameters"
         ),
     }
-    if let ParameterContents::OReference { .. } = random_element {
+    if let ParameterContents::OReference { .. } | ParameterContents::IReference { .. } =
+        random_element
+    {
         // References do not currently get mutated.
         Ok(MutationResult::Skipped)
     } else {
