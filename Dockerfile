@@ -13,13 +13,12 @@ RUN apt-get update \
     && apt-get install -qy cmake clang \
     && rm -rf /var/lib/apt/lists/*
 
-USER fuzzer
-
 COPY . .
 
 RUN cargo build --release
 
 FROM debian:bookworm-slim AS wuppiefuzz
+USER fuzzer
 WORKDIR /app
 COPY --from=builder /app/target/release/wuppiefuzz /app/wuppiefuzz
 
