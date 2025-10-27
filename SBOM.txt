@@ -64,10 +64,10 @@ cfg-if 1.0.4
 chrono 0.4.42
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.49
+clap 4.5.50
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.49
+clap_builder 4.5.50
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.6
@@ -112,13 +112,13 @@ ctor-proc-macro 0.0.6
 ctrlc 3.5.0
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
-deranged 0.5.4
+deranged 0.5.5
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
 dispatch 0.2.0
 	licensed under "MIT"
 	by Steven Sheldon
-document-features 0.2.11
+document-features 0.2.12
 	licensed under "Apache-2.0 OR MIT"
 	by Slint Developers <info@slint.dev>
 dtor 0.1.0
@@ -289,7 +289,7 @@ idna_adapter 1.2.1
 indexmap 2.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-indicatif 0.18.0
+indicatif 0.18.1
 	licensed under "MIT"
 	by unspecified authors
 ipnet 2.11.0
@@ -298,7 +298,7 @@ ipnet 2.11.0
 iri-string 0.7.8
 	licensed under "Apache-2.0 OR MIT"
 	by YOSHIOKA Takuma <nop_thread@nops.red>
-is_terminal_polyfill 1.70.1
+is_terminal_polyfill 1.70.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 iter-read 1.1.0
@@ -412,7 +412,7 @@ num_enum 0.7.5
 object 0.37.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-once_cell_polyfill 1.70.1
+once_cell_polyfill 1.70.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 openapiv3-extended 6.0.1
@@ -520,7 +520,7 @@ rustc-demangle 0.1.26
 rustix 1.1.2
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>|Jakub Konka <kubkon@jakubkonka.com>
-rustls 0.23.33
+rustls 0.23.34
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
 rustls-pki-types 1.12.0
@@ -667,7 +667,7 @@ typewit 1.14.2
 uds 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
-unicode-ident 1.0.19
+unicode-ident 1.0.20
 	licensed under "(Apache-2.0 OR MIT) AND Unicode-3.0"
 	by David Tolnay <dtolnay@gmail.com>
 unicode-segmentation 1.12.0
