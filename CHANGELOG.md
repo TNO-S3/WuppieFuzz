@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Fix vague error that would occur if timeout expires during corpus minimization, by not counting that phase against the timeout in [#199](https://github.com/TNO-S3/WuppieFuzz/pull/199)
+
 # v1.3.0 (2025-09-24)
 
 ## Highlights
