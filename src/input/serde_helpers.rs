@@ -17,9 +17,8 @@ use serde_yaml::{
     value::{Tag, TaggedValue},
 };
 
-use crate::input::parameter::{IReference, OReference, SimpleValue};
-
 use super::{Body, Method, OpenApiRequest, ParameterContents, parameter::ParameterKind};
+use crate::input::parameter::{IReference, OReference, SimpleValue};
 
 /// A helper struct to serialize `OpenApiRequest`s. It is identical to the
 /// original, but the contained `Body` type is serialized differently.
