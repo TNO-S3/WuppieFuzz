@@ -25,7 +25,6 @@ use libafl::{
 };
 use libafl_bolts::{AsIter, Named, current_time};
 use openapiv3::OpenAPI;
-use serde::{Deserialize, Serialize};
 
 use self::dependency_graph::DependencyGraph;
 use crate::{
@@ -33,13 +32,6 @@ use crate::{
     input::{OpenApiInput, OpenApiRequest},
     types::{EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType},
 };
-
-/// Wrapper to allow versioning in yaml files
-#[derive(Serialize, Deserialize)]
-pub(crate) struct Versioned<T> {
-    pub(crate) version: u32,
-    pub(crate) requests: T,
-}
 
 /// Loads an `OpenApiInput` from a yaml file.
 pub fn load_starting_corpus(
@@ -56,18 +48,8 @@ pub fn load_starting_corpus(
             true => log::debug!("File {file_name_str} is ignored as it starts with a '.'"),
             false => {
                 let file = file.path();
-                match serde_yaml::from_reader::<_, Versioned<OpenApiInput>>(std::fs::File::open(
-                    &file,
-                )?) {
-                    Ok(versioned_inputs) => {
-                        if versioned_inputs.version < 2 {
-                            log::error!(
-                                "Corpus file version must be at least 2, found {}",
-                                versioned_inputs.version
-                            )
-                        }
-                        corpus_vec.push(versioned_inputs.requests)
-                    }
+                match serde_yaml::from_reader(std::fs::File::open(&file)?) {
+                    Ok(input) => corpus_vec.push(input),
                     Err(err) => log::warn!("File {file_name_str} could not be parsed: {err:?}"),
                 }
             }
@@ -156,11 +138,7 @@ pub fn write_corpus_to_files(
             .write(true)
             .create(true)
             .open(file_path)?;
-        let wrapped_input = Versioned::<OpenApiInput> {
-            version: 2,
-            requests: input.clone(),
-        };
-        serde_yaml::to_writer(file, &wrapped_input)?;
+        serde_yaml::to_writer(file, input)?;
     }
     Ok(())
 }
