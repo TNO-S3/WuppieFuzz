@@ -4,6 +4,8 @@
 
 ## Features
 
+- Improve corpus reference abstraction, making sure references to earlier requests' responses are expressed and understood correctly. Also improves the corpus file format, making it less verbose, in [#122](https://github.com/TNO-S3/WuppieFuzz/pull/122)
+
 ## Fixes
 
 # v1.3.0 (2025-09-24)
