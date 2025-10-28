@@ -285,19 +285,15 @@ fn normalize_schema<'a>(
             normalize_schema(api, all_of[0].resolve(api), path, access)
         }
         openapiv3::SchemaKind::Any(_) => {
-            log::warn!(
-                "Normalizing example parameters for this schema is not supported, it's too flexible."
-            );
+            // Normalizing example parameters for the "Any" schema is not supported, it's too flexible.
             None
         }
         SchemaKind::AnyOf { any_of } if any_of.len() == 1 => {
             normalize_schema(api, any_of[0].resolve(api), path, access)
         }
         openapiv3::SchemaKind::Not { not: _ } => {
-            log::warn!(concat!(
-                "Normalizing example parameters for negated schemas is not supported, it is unclear what to generate. ",
-                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not"
-            ));
+            // Normalizing example parameters for negated schemas is not supported, it is unclear what to generate.
+            // See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not
             None
         }
         _ => None,
