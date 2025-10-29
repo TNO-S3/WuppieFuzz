@@ -1,6 +1,6 @@
 # WuppieFuzz Corpus YAML Format Documentation
 
-This document describes the structure and semantics of the YAML corpus (and crash) files used by WuppieFuzz. Each file represents one "input", and contains a sequence of HTTP requests, including methods, paths, parameters, and bodies. The format enables the fuzzer to reconstruct requests and parameters, including references to earlier responses.
+This document describes the structure and semantics of the YAML corpus (and crash) files used by WuppieFuzz. Each file represents one "input", and contains a sequence of HTTP requests, including methods, paths, parameters, and bodies. The format enables the fuzzer to reconstruct requests and parameters, including references to earlier requests and responses.
 
 ## Top-Level Structure
 
@@ -26,25 +26,23 @@ The second item in the key list specifies the parameter location, and is one of 
 
 ### Value Definition
 
-The value is a dictionary with:
-- `DataType`: One of:
-  - `PrimitiveValue`: A direct value, annotated by its type e.g. `!Number`, `!String`. Strings can be quoted if any special characters need to be escaped.
-  - `RawBytes`: a base64 encoded value that is sent as the parameter value without interpretation
-  - `ReferenceToEarlierResponse`: A reference to a value from a previous request
-- `Contents`: The actual value or reference details
+The value can be one of the following:
+- A simple value:  a tag indicating the value's type (one of  `!Number`, `!String`, `!Bool` and `!Null`), followed by the contents of the value. Strings can be quoted if any special characters need to be escaped.
+- Raw bytes: the tag `!RawBytes` followed by a base64 encoded value that is sent as the parameter value without interpretation.
+- A reference to a value from an earlier request. This value is specified with the tag `!ReferenceToEarlierRequest`, with fields `request` and `parameter_access` specifying which value the reference refers to.
+- A reference to a value from an earlier response. This value is specified with the tag `!ReferenceToEarlierResponse`, with fields `response` and `parameter_access` specifying which value the reference refers to.
 
 ### Reference Values
 
 Parameters and body fields can reference values from earlier requests using:
 
 ```yaml
-DataType: ReferenceToEarlierResponse
-Contents:
+: !ReferenceToEarlierResponse
   request: <index>
-  parameter_name: <name>
+  parameter_access: <parameter_access_definition>
 ```
 
-This allows chaining requests and reusing values dynamically. Requests are indexed implicitly by their order in the file (starting from 0). The parameter name is the name of the field you want to use, as it appears in the response body of the referenced request.
+This allows chaining requests and reusing values dynamically. Requests are indexed implicitly by their order in the file (starting from 0). The parameter access specifies which value in the response this reference refers to.
 
 ### Example: Primitive Parameter
 
@@ -52,8 +50,7 @@ This allows chaining requests and reusing values dynamically. Requests are index
 parameters:
   ? - orderId
     - Path
-  : DataType: PrimitiveValue
-    Contents: !Number 1
+  : !Number 1
 ```
 
 ### Example: Reference Parameter
@@ -62,10 +59,11 @@ parameters:
 parameters:
   ? - pet_id
     - Path
-  : DataType: ReferenceToEarlierResponse
-    Contents:
-      request: 0
-      parameter_name: id
+  : !ReferenceToEarlierResponse
+    response: 0
+    parameter_access: !Response
+    	Body:
+    	- !Name id
 ```
 
 ### Example: More complex parameter values
@@ -74,46 +72,28 @@ parameters:
 parameters:
 ? - api_key
   - Header
-: DataType: PrimitiveValue
-  Contents: !String "?\x1FO'Sitz"
+: !String "?\x1FO'Sitz"
 ? - petId
   - Path
-: DataType: RawBytes
-  Contents: IxEIRCIRSJw=
+: !RawBytes IxEIRCIRSJw=
 ```
 
 ## Request Body
 
-The `body` field describes the payload for methods like `POST` and `PUT`. It includes:
-
-- `DataType`: One of `Object`, `Array`, or `PrimitiveValue`
-- `Contents`: Nested structure of fields and values
-
-The body is annotated with a MIME type using e.g. `!ApplicationJson`.
+The `body` field describes the payload `POST` and `PUT` requests. It is annotated with a MIME type using e.g. `!ApplicationJson`.
 
 ### Example: Object Body
 
 ```yaml
 body: !ApplicationJson
-  DataType: Object
-  Contents:
-    id:
-      DataType: PrimitiveValue
-      Contents: !Number 0
-    name:
-      DataType: PrimitiveValue
-      Contents: !String doggie
+  id: !Number 0
+  name: !String doggie
 ```
 
 ### Example: Array of Objects
 
 ```yaml
 body: !ApplicationJson
-  DataType: Array
-  Contents:
-    - DataType: Object
-      Contents:
-        username:
-          DataType: PrimitiveValue
-          Contents: !String 🎵
+- username !String 🎵
+- password !String password123
 ```
