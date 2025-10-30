@@ -65,11 +65,18 @@ use std::{
 use ahash::RandomState;
 use libafl::{Error, corpus::CorpusId, inputs::Input};
 use libafl_bolts::{HasLen, fs::write_file_atomic, rands::Rand};
-use openapiv3::{OpenAPI, Operation, SchemaKind, Type};
+use openapiv3::{OpenAPI, Operation};
 
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
-use crate::{parameter_feedback::ParameterFeedback, state::HasRandAndOpenAPI};
+use crate::{
+    input::parameter::{IReference, OReference},
+    parameter_access::{
+        ParameterAccess, ParameterAccessElements, ParameterAddressing, RequestParameterAccess,
+    },
+    parameter_feedback::ParameterFeedback,
+    state::HasRandAndOpenAPI,
+};
 
 pub mod method;
 pub mod parameter;
@@ -88,9 +95,16 @@ mod utils;
 )]
 pub struct OpenApiRequest {
     pub method: Method,
+    // Parameters in the path are represented by {{parameter_name}}, which is replaced by a value
+    // based on the parameters map.
     pub path: String,
 
+    // The request body is always considered as variables/parameters. It must be an object
+    // in which keys are the names of the parameters.
     pub body: Body,
+
+    // Maps query-, header-, path-, and cookie-parameters to ParameterContents.
+    // These are all assumed to be identifiable by a name represented as a String.
     pub parameters: BTreeMap<(String, ParameterKind), ParameterContents>,
 }
 
@@ -151,21 +165,45 @@ impl OpenApiRequest {
             parameter: &mut ParameterContents,
             parameter_values: &ParameterFeedback,
         ) -> Result<(), libafl::Error> {
-            if let ParameterContents::Reference {
-                request_index,
-                parameter_name,
-            } = parameter
-            {
-                let resolved_backref = parameter_values
-                    .get(*request_index, parameter_name)
-                    .ok_or_else(|| {
+            match parameter {
+                ParameterContents::OReference(OReference {
+                    request_index,
+                    parameter_access,
+                }) => {
+                    let resolved_backref = parameter_values
+                        .get(*request_index, parameter_access)
+                        .ok_or_else(|| {
                         libafl::Error::unknown(format!(
-                            "invalid backreference to {request_index}:{parameter_name}"
+                            "invalid response-backreference to {request_index}:{parameter_access}"
                         ))
                     })?;
-                *parameter = ParameterContents::from(resolved_backref.clone());
+                    *parameter = resolved_backref.clone();
+                }
+                ParameterContents::IReference(IReference {
+                    request_index,
+                    parameter_access,
+                }) => {
+                    let resolved_backref = parameter_values
+                        .get(*request_index, parameter_access)
+                        .ok_or_else(|| {
+                        libafl::Error::unknown(format!(
+                            "invalid request-backreference to {request_index}:{parameter_access}"
+                        ))
+                    })?;
+                    *parameter = resolved_backref.clone();
+                }
+                ParameterContents::Object(obj_contents) => {
+                    for nested_parameter in obj_contents.values_mut() {
+                        resolve_single_parameter(nested_parameter, parameter_values)?;
+                    }
+                }
+                ParameterContents::Array(arr) => {
+                    for nested_parameter in arr {
+                        resolve_single_parameter(nested_parameter, parameter_values)?;
+                    }
+                }
+                ParameterContents::LeafValue(_) | ParameterContents::Bytes(_) => (),
             }
-
             Ok(())
         }
 
@@ -175,7 +213,7 @@ impl OpenApiRequest {
             Body::TextPlain(body)
             | Body::ApplicationJson(body)
             | Body::XWwwFormUrlencoded(body) => match body {
-                ParameterContents::Reference { .. } => {
+                ParameterContents::OReference { .. } | ParameterContents::IReference { .. } => {
                     resolve_single_parameter(body, parameter_values)?;
                 }
                 ParameterContents::Object(obj_contents) => {
@@ -218,10 +256,10 @@ impl OpenApiRequest {
                                     match first_level_concrete {
                                         // String must be handled separately, otherwise it gets surrounded by quotes.
                                         parameter::SimpleValue::String(inner_str) => {
-                                            encoded.append_pair(pair.0, inner_str)
+                                            encoded.append_pair(pair.0.as_ref(), inner_str)
                                         }
                                         _ => encoded.append_pair(
-                                            pair.0,
+                                            pair.0.as_ref(),
                                             first_level_concrete.to_string().as_str(),
                                         ),
                                     }
@@ -229,19 +267,22 @@ impl OpenApiRequest {
                                 ParameterContents::Array(inner_array) => encoded.extend_pairs(
                                     inner_array
                                         .iter()
-                                        .map(|element| (pair.0, element.to_string())),
+                                        .map(|element| (pair.0.to_string(), element.to_string())),
                                 ),
-                                ParameterContents::Object(inner_map) => encoded.extend_pairs(
-                                    inner_map
-                                        .iter()
-                                        .map(|(field, value)| (field, value.to_string())),
-                                ),
+                                ParameterContents::Object(inner_map) => {
+                                    encoded.extend_pairs(inner_map.iter().map(|(field, value)| {
+                                        (field.to_string(), value.to_string())
+                                    }))
+                                }
                                 _ => &mut encoded,
                             };
                         }
                     }
-                    ParameterContents::Reference { .. } => {
-                        todo!("Trying to create form body from reference: {body}")
+                    ParameterContents::OReference { .. } => {
+                        todo!("Trying to create form body from oreference: {body}")
+                    }
+                    ParameterContents::IReference { .. } => {
+                        todo!("Trying to create form body from ireference: {body}")
                     }
                     ParameterContents::Bytes(val) => {
                         todo!("Trying to create form body from bytes: {:?}", val)
@@ -266,39 +307,32 @@ impl OpenApiRequest {
         }
     }
 
-    /// Finds a parameter of ParameterKind (Query, Path, Cookie, etc.)
-    /// with the given name and returns a mutable reference to it.
-    /// If none exists, checks the body for a field with the given name.
+    /// Returns a mutable reference to a parameter identified by the RequestParameterAccess.
     pub fn get_mut_parameter<'a>(
         &'a mut self,
-        name: &str,
-        kind: ParameterKind,
+        req_parameter_access: &RequestParameterAccess,
     ) -> Option<&'a mut ParameterContents> {
         // Can't use or_else with a closure because you'd have to move self
         // which is not possible
         #[allow(clippy::or_fun_call)]
-        match kind {
-            ParameterKind::Path
-            | ParameterKind::Query
-            | ParameterKind::Header
-            | ParameterKind::Cookie => self.parameters.get_mut(&(name.to_owned(), kind)),
-            ParameterKind::Body => match &mut self.body {
+        match &req_parameter_access {
+            RequestParameterAccess::Body(parameter_access) => match &mut self.body {
                 Body::Empty => None,
                 Body::TextPlain(text) => Some(text),
-                // For getting named parameters, we consider only first-level parameters in object values
-                // TODO: implement a way to address nested parameters and non-object parameters.
                 Body::ApplicationJson(parameters) | Body::XWwwFormUrlencoded(parameters) => {
-                    if let ParameterContents::Object(obj_param) = parameters {
-                        obj_param.get_mut(name)
-                    } else {
-                        None
-                    }
+                    parameters.resolve_mut(parameter_access)
                 }
             },
+            RequestParameterAccess::Query(name)
+            | RequestParameterAccess::Path(name)
+            | RequestParameterAccess::Header(name)
+            | RequestParameterAccess::Cookie(name) => self
+                .parameters
+                .get_mut(&(name.clone(), req_parameter_access.into())),
         }
     }
 
-    /// Returns whether this request contains a parameter with the given name
+    /// Returns whether this request contains a (non-body) parameter with the given name
     pub fn contains_parameter(&self, find_name: &str) -> bool {
         self.parameters
             .iter()
@@ -366,6 +400,7 @@ impl OpenApiInput {
     /// Returns an iterator that yields all `ParameterContents` for which `filter`
     /// is true, from all requests in the series. Each item is accompanied by
     /// the index of the request it appears in.
+    // TODO: filter nested parameters too!
     pub fn parameter_filter<'a, F>(
         &'a mut self,
         filter: &'a F,
@@ -405,11 +440,10 @@ impl OpenApiInput {
             })
     }
 
-    /// This returns all reference parameters as follows:
-    /// (request idx, param name, param location, target request idx, target name)
-    pub fn reference_parameters(
+    /// This returns all reference parameters as (source, target) addressings.
+    pub(crate) fn reference_parameters(
         &self,
-    ) -> impl Iterator<Item = (usize, String, ParameterKind, usize, String)> + '_ {
+    ) -> impl Iterator<Item = (ParameterAddressing, ParameterAddressing)> + '_ {
         self.0
             .iter()
             .enumerate()
@@ -418,9 +452,11 @@ impl OpenApiInput {
                 openapi_request
                     .parameters
                     .iter()
+                    // .map(|((n, k), v)| (Cow::Borrowed(n), *k, v))
                     .map(|((n, k), v)| (Cow::Borrowed(n), *k, v))
                     //.. then add any fields from the body as well ..
                     .chain(
+                        // TODO: also return nested (reference) parameters
                         match &openapi_request.body {
                             Body::Empty => IterWrapper::WithOption(None),
                             Body::TextPlain(text) => IterWrapper::WithOption(Some(text)),
@@ -429,7 +465,10 @@ impl OpenApiInput {
                                 ParameterContents::Object(obj_params) => {
                                     IterWrapper::WithIter(obj_params.iter())
                                 }
-                                ParameterContents::Reference { .. } => {
+                                ParameterContents::OReference(..) => {
+                                    IterWrapper::WithOption(Some(contents))
+                                }
+                                ParameterContents::IReference(..) => {
                                     IterWrapper::WithOption(Some(contents))
                                 }
                                 _ => IterWrapper::WithOption(None),
@@ -437,22 +476,56 @@ impl OpenApiInput {
                         }
                         .map(|(n, v)| (n, ParameterKind::Body, v)),
                     )
+                    // Only preserve references
                     .filter_map(|(n, k, v)| match v {
-                        ParameterContents::Reference {
+                        ParameterContents::OReference(OReference {
                             request_index,
-                            parameter_name,
-                        } => Some(((n, k), (request_index, parameter_name))),
+                            parameter_access,
+                        })
+                        | ParameterContents::IReference(IReference {
+                            request_index,
+                            parameter_access,
+                        }) => Some(((n, k), (request_index, parameter_access))),
+
                         _ => None,
                     })
-                    .map(move |((n, k), (ti, tn))| {
-                        (request_idx, n.into_owned(), k, *ti, tn.to_owned())
+                    // Turn parameter name (here still a String) into ParameterAccess
+                    // and return the (request, target) ParameterAddressing tuple.
+                    .map(move |((n, parameter_kind), (ti, tn))| {
+                        (
+                            ParameterAddressing::new(
+                                request_idx,
+                                match parameter_kind {
+                                    ParameterKind::Path => ParameterAccess::Request(
+                                        RequestParameterAccess::Path(n.clone().into_owned()),
+                                    ),
+                                    ParameterKind::Query => ParameterAccess::Request(
+                                        RequestParameterAccess::Query(n.clone().into_owned()),
+                                    ),
+                                    ParameterKind::Header => ParameterAccess::Request(
+                                        RequestParameterAccess::Header(n.clone().into_owned()),
+                                    ),
+                                    ParameterKind::Cookie => ParameterAccess::Request(
+                                        RequestParameterAccess::Cookie(n.clone().into_owned()),
+                                    ),
+                                    ParameterKind::Body => {
+                                        ParameterAccess::Request(RequestParameterAccess::Body(
+                                            ParameterAccessElements::from_elements(&[n
+                                                .into_owned()
+                                                .into()]),
+                                        ))
+                                    }
+                                },
+                            ),
+                            ParameterAddressing::new(*ti, tn.to_owned()),
+                        )
                     })
             })
     }
 
-    /// Returns an iterator that yields all named return values from all
+    /// Returns an iterator that yields all (named) return value names from all
     /// requests, along with the index of the request they appear in.
-    pub fn return_values<'a>(&self, api: &'a OpenAPI) -> Vec<(usize, &'a str)> {
+    pub(crate) fn return_values(&self, api: &OpenAPI) -> Vec<ParameterAddressing> {
         self.0
             .iter()
             .enumerate()
@@ -477,12 +550,16 @@ impl OpenApiInput {
                         })
                     })
                     // Finally if the schema is an object, extract its field names
-                    .filter_map(|schema| match schema.resolve(api).kind {
-                        SchemaKind::Type(Type::Object(ref obj)) => Some(obj.properties.keys()),
-                        _ => None,
+                    .flat_map(|x| {
+                        ParameterAccessElements::parameter_accesses_from_schema(
+                            ParameterAccessElements::new(),
+                            x,
+                            api,
+                        )
                     })
-                    .flatten()
-                    .map(move |resps| (i, resps.as_ref()))
+                    .map(move |resps| {
+                        ParameterAddressing::new(i, ParameterAccess::response_body(resps))
+                    })
             })
             .collect()
     }
@@ -496,75 +573,101 @@ impl OpenApiInput {
         let to_replace: Vec<_> = self
             .reference_parameters()
             .filter(
-                // Select broken references: target request does not exist or does not
-                // contain the referenced parameter name
-                |(_, _, _, target_idx, target_name)| match self.0.get(*target_idx) {
-                    None => true,
-                    Some(request) => !request.contains_parameter(target_name),
+                // Select broken references: source- or target-request does not exist or the source
+                // request no longer has the reference parameter accessible.
+                // We do not have the response available at this point, so we cannot check whether
+                // the reference will actually be resolvable when we get the response.
+                |(src_addressing, target_addressing)| match (
+                    self.0.clone().get_mut(src_addressing.request_index),
+                    self.0.clone().get(target_addressing.request_index),
+                ) {
+                    (None, None) | (None, Some(_)) | (Some(_), None) => true,
+                    (Some(src), Some(_)) => src
+                        .get_mut_parameter(src_addressing.access.unwrap_request_variant())
+                        .is_none(),
                 },
             )
             // Reference is broken - replace (later... borrow checker forbids doing it here
             // since it can't verify we don't mess up the loop from reference_parameters)
-            .map(|(source_idx, source_name, source_kind, _, _)| {
-                (source_idx, source_name, source_kind)
-            })
+            .map(|(source_addressing, _)| source_addressing)
             .collect();
 
-        for (idx, name, kind) in to_replace {
-            match kind {
-                ParameterKind::Body => match &mut self.0[idx].body {
-                    Body::Empty | Body::TextPlain(_) => {
-                        log::warn!("Marked body parameter in request {idx} with name {name} for replacement,
-                                    but the body is Empty or TextPlain!");
-                        continue;
-                    }
-                    Body::ApplicationJson(contents) | Body::XWwwFormUrlencoded(contents) => {
-                        match contents {
-                            ParameterContents::Object(obj_param) => obj_param
-                                .get_mut(&name)
-                                .unwrap()
-                                .break_reference_if_target(rand, |_| true),
-                            // Note that a Reference parameter is not by itself named, but must be the value in an Object parameter.
-                            // The parameter_name-field in a Reference only identifies the target of the Reference.
-                            ParameterContents::Reference {
-                                parameter_name,
-                                request_index,
-                            } => {
-                                log::warn!("Marked body parameter in request {idx} with name {name} for replacement.
-                                        The body's immediate contents are however an (unnamed) reference, pointing to a parameter
-                                        with name {parameter_name} in request {request_index}.");
+        for src_addressing in to_replace {
+            let idx = src_addressing.request_index;
+            let parameter_access = src_addressing.access;
+            match &parameter_access {
+                ParameterAccess::Response(_response_parameter_access) => {
+                    unreachable!("References only occur in Request variants.");
+                }
+                ParameterAccess::Request(request_access) => match request_access {
+                    RequestParameterAccess::Body(parameter_access_elements) => {
+                        match &mut self.0[idx].body {
+                            Body::Empty | Body::TextPlain(_) => {
+                                log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
+                                but the body is Empty or TextPlain!");
                                 continue;
                             }
-                            // Note that Array fields currently cannot be addressed as variable parameters.
-                            // Therefore, Arrays currently should not contain any references.
-                            // If they do, we do not resolve them here.
-                            ParameterContents::Array(arr_param) => {
-                                for elem in arr_param.iter() {
-                                    if let ParameterContents::Reference { .. } = elem {
-                                        log::warn!("Array contains reference, but we cannot identify this with
-                                        request_idx, name, parameter_kind triplet. Therefore we cannot resolve the reference.");
-                                    }
+                            Body::ApplicationJson(contents)
+                            | Body::XWwwFormUrlencoded(contents) => match contents {
+                                ParameterContents::Object(_obj_param) => {
+                                    let resolved =
+                                        contents.resolve_mut(parameter_access_elements).unwrap();
+                                    resolved.break_reference_if_target(rand, |_| true);
                                 }
-                                continue;
-                            }
-                            ParameterContents::LeafValue(_) => {
-                                log::warn!("Marked body parameter in request {idx} with name {name} for replacement,
-                                            but the body is a LeafValue: {contents}");
-                                continue;
-                            }
-                            ParameterContents::Bytes(_) => {
-                                log::warn!("Marked body parameter in request {idx} with name {name} for replacement,
-                                            but the body is of type Bytes: {contents}");
-                                continue;
-                            }
+                                ParameterContents::OReference(OReference {
+                                    request_index,
+                                    parameter_access,
+                                }) => {
+                                    log::warn!("Marked body parameter in response {idx} with name {parameter_access} for replacement.
+                                    The body's immediate contents are however an (unnamed) reference, pointing to a parameter
+                                    with name {parameter_access} in response {request_index}.");
+                                    continue;
+                                }
+
+                                ParameterContents::IReference(IReference {
+                                    request_index,
+                                    parameter_access,
+                                }) => {
+                                    log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement.
+                                    The body's immediate contents are however an (unnamed) reference, pointing to a parameter
+                                    with name {parameter_access} in request {request_index}.");
+                                    continue;
+                                }
+                                ParameterContents::Array(arr_param) => {
+                                    for elem in arr_param.iter() {
+                                        if let ParameterContents::OReference { .. } = elem {
+                                            log::warn!("Array contains reference, but we cannot identify this with
+                                    request_idx, name, parameter_kind triplet. Therefore we cannot resolve the reference.");
+                                        }
+                                    }
+                                    continue;
+                                }
+                                ParameterContents::LeafValue(_) => {
+                                    log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
+                                        but the body is a LeafValue: {contents}");
+                                    continue;
+                                }
+                                ParameterContents::Bytes(_) => {
+                                    log::warn!("Marked body parameter in request {idx} with name {parameter_access} for replacement,
+                                        but the body is of type Bytes: {contents}");
+                                    continue;
+                                }
+                            },
                         }
                     }
+                    // RequestParameterAccess::Query(_) => todo!(),
+                    // RequestParameterAccess::Path(_) => todo!(),
+                    // RequestParameterAccess::Header(_) => todo!(),
+                    // RequestParameterAccess::Cookie(_) => todo!(),
+                    _ => self.0[idx]
+                        .parameters
+                        .get_mut(&(
+                            parameter_access.simple_name().to_string(),
+                            (&parameter_access).into(),
+                        ))
+                        .unwrap()
+                        .break_reference_if_target(rand, |_| true),
                 },
-                _ => self.0[idx]
-                    .parameters
-                    .get_mut(&(name, kind))
-                    .unwrap()
-                    .break_reference_if_target(rand, |_| true),
             }
         }
     }
@@ -602,7 +705,7 @@ impl Input for OpenApiInput {
             hasher.write(request.method.as_bytes());
             hasher.write(request.path.as_bytes());
             for (name, value) in &request.parameters {
-                hasher.write(name.0.as_bytes());
+                hasher.write(name.0.to_string().as_bytes());
                 hasher.write(&[name.1 as u8]);
                 hasher.write(value.to_string().as_bytes());
             }
