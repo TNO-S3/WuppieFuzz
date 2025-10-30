@@ -14,6 +14,7 @@ use crate::input::{Method, OpenApiRequest};
 ///
 /// This Response is created from a `reqwest::blocking::Response` and allows accessing the
 /// body contents by reference.
+#[derive(Clone)]
 pub struct Response {
     status: reqwest::StatusCode,
     cookies: Vec<(String, String)>,
