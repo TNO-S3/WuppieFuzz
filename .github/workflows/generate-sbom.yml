@@ -16,6 +16,13 @@ jobs:
       contents: write
 
     steps:
+      # More disk space please
+      - name: Reclaim disk space
+        uses: mathio/gha-cleanup@ce9480b80d151ff36572df0d3c54aef2653e6054 # v1.0.0
+        with:
+          remove-browsers: true
+          verbose: true
+
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
