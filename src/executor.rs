@@ -65,7 +65,7 @@ where
 
     manual_interrupt: Arc<AtomicBool>,
     maybe_timeout_secs: Option<Duration>,
-    starting_time: Instant,
+    starting_time: Option<Instant>,
 
     // Logging stats
     inputs_tested: usize,
@@ -136,7 +136,7 @@ where
 
             manual_interrupt: setup_interrupt()?,
             maybe_timeout_secs: config.timeout.map(|t| Duration::from_secs(t.get())),
-            starting_time: Instant::now(),
+            starting_time: None,
 
             inputs_tested: 0,
             performed_requests: 0,
@@ -309,10 +309,11 @@ where
 
         // If we interrupt using ctrl+c or the timeout is over, request stop!
         if self.manual_interrupt.load(Ordering::Relaxed)
-            | self
-                .maybe_timeout_secs
-                .map(|timeout| Instant::now() - self.starting_time > timeout)
-                .unwrap_or(false)
+            || (self.starting_time.is_some()
+                && self
+                    .maybe_timeout_secs
+                    .map(|timeout| Instant::now() - self.starting_time.unwrap() > timeout)
+                    .unwrap_or(false))
         {
             if let Err(e) = event_manager.fire(
                 state,
@@ -339,6 +340,12 @@ where
         if let Some(path) = report_path {
             self.generate_coverage_report(path);
         }
+    }
+
+    /// Records the current time as the start time of the fuzzing campaign,
+    /// and starts checking whether the timeout (`--timeout`) has expired.
+    pub fn start_timer(&mut self) {
+        self.starting_time = Some(Instant::now())
     }
 }
 

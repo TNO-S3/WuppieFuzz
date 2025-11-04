@@ -122,9 +122,11 @@ pub fn fuzz() -> Result<()> {
     )?;
 
     // Minimize corpus
-    minimize_corpus(&mut mgr, minimizer, &mut state, &mut fuzzer, &mut executor)?;
+    minimize_corpus(&mut mgr, minimizer, &mut state, &mut fuzzer, &mut executor)
+        .context("Error during corpus minimization")?;
 
     log::debug!("Start fuzzing loop");
+    executor.start_timer();
     loop {
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) => (),
