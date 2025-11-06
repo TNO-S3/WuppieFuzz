@@ -197,7 +197,7 @@ pub enum Commands {
         ///
         /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors,
         /// you can configure what behaviour is considered a bug by the fuzzer.
-        #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
+        #[arg(value_parser, long, value_enum, required = false, ignore_case = true, verbatim_doc_comment)]
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
         /// If present, ask the coverage monitor to generate a report after the
