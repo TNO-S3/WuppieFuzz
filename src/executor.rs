@@ -81,7 +81,7 @@ pub(crate) fn process_response(
     request: &OpenApiRequest,
     response: Response,
     api: &OpenAPI,
-    crash_criteria: &Vec<ValidationErrorDiscriminants>,
+    crash_criteria: &[ValidationErrorDiscriminants],
     exit_kind: &mut ExitKind,
     parameter_feedback: &mut ParameterFeedback,
 ) {
@@ -96,7 +96,7 @@ pub(crate) fn process_response(
         log::debug!(
             "OpenAPI-input resulted in server error response, ignoring rest of request chain."
         );
-    } else if let Err(validation_err) = validate_response(api, &request, &response)
+    } else if let Err(validation_err) = validate_response(api, request, &response)
         && crash_criteria.contains(&validation_err.discriminant())
     {
         log::debug!(
