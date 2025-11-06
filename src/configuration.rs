@@ -171,32 +171,20 @@ pub enum Commands {
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
         power_schedule: Option<BaseSchedule>,
 
-        /// Which errors the fuzzer considers a bug. By default, all behaviour that does not match
-        /// the specification is considered a bug.
+        /// Which errors the fuzzer considers a bug. By default, all behaviour that does not match the specification is considered a bug.
         ///
         /// The possible errors are:
-        /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally
-        ///   means it should not have been executed by the fuzzer to begin with.
-        /// - "StatusNotSpecified": The HTTP status code returned from the API is not one of the status codes
-        ///   mentioned for this path in the specification.
-        /// - "ResponseReferenceBroken":  The specification calls for an object to be returned, and refers to the
-        ///   correct structure of this object using a reference (`#/example/reference`).
-        ///   However, the reference path is not present in the specification or contains
-        ///   circular references.
-        /// - "ResponseObjectIncorrect": The response body returned by the API does not match the structure specified
-        ///   in the API specification.
-        /// - "ResponseEnumIncorrect": A field in the response body object is specified as an enumeration, but
-        ///   the returned value is not one of the possible variants.
+        /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally means it should not have been executed by the fuzzer to begin with.
+        /// - "StatusNotSpecified": The HTTP status code returned from the API is not one of the status codes mentioned for this path in the specification.
+        /// - "ResponseReferenceBroken":  The specification calls for an object to be returned, and refers to the correct structure of this object using a reference (`#/example/reference`). However, the reference path is not present in the specification or contains circular references.
+        /// - "ResponseObjectIncorrect": The response body returned by the API does not match the structure specified in the API specification.
+        /// - "ResponseEnumIncorrect": A field in the response body object is specified as an enumeration, but the returned value is not one of the possible variants.
         /// - "ResponseMalformedJSON": The response body returned by the API can not be parsed as JSON.
         /// - "UnexpectedContent": The API returned a response body, but no response is specified.
-        /// - "MediaTypeContainsNoSchema": The API contains a media type "application/json" with no schema for
-        ///   the data inside the json object. We can't validate the response if no
-        ///   model is given.
-        /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type)
-        ///   We cannot validate schemas that are this flexible.
+        /// - "MediaTypeContainsNoSchema": The API contains a media type "application/json" with no schema for the data inside the json object. We can't validate the response if no model is given.
+        /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type) we cannot validate schemas that are this flexible.
         ///
-        /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors,
-        /// you can configure what behaviour is considered a bug by the fuzzer.
+        /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors, you can configure what behaviour is considered a bug by the fuzzer.
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true, verbatim_doc_comment)]
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
@@ -539,32 +527,20 @@ pub struct Configuration {
     /// The power schedule to use for prioritizing seeds.
     pub power_schedule: BaseSchedule,
 
-    /// Which errors the fuzzer considers a bug. By default, all behaviour that does not match
-    /// the specification is considered a bug.
+    /// Which errors the fuzzer considers a bug. By default, all behaviour that does not match the specification is considered a bug.
     ///
     /// The possible errors are:
-    /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally
-    ///   means it should not have been executed by the fuzzer to begin with.
-    /// - "StatusNotSpecified": The HTTP status code returned from the API is not one of the status codes
-    ///   mentioned for this path in the specification.
-    /// - "ResponseReferenceBroken":  The specification calls for an object to be returned, and refers to the
-    ///   correct structure of this object using a reference (`#/example/reference`).
-    ///   However, the reference path is not present in the specification or contains
-    ///   circular references.
-    /// - "ResponseObjectIncorrect": The response body returned by the API does not match the structure specified
-    ///   in the API specification.
-    /// - "ResponseEnumIncorrect": A field in the response body object is specified as an enumeration, but
-    ///   the returned value is not one of the possible variants.
+    /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally means it should not have been executed by the fuzzer to begin with.
+    /// - "StatusNotSpecified": The HTTP status code returned from the API is not one of the status codes mentioned for this path in the specification.
+    /// - "ResponseReferenceBroken":  The specification calls for an object to be returned, and refers to the correct structure of this object using a reference (`#/example/reference`). However, the reference path is not present in the specification or contains circular references.
+    /// - "ResponseObjectIncorrect": The response body returned by the API does not match the structure specified in the API specification.
+    /// - "ResponseEnumIncorrect": A field in the response body object is specified as an enumeration, but the returned value is not one of the possible variants.
     /// - "ResponseMalformedJSON": The response body returned by the API can not be parsed as JSON.
     /// - "UnexpectedContent": The API returned a response body, but no response is specified.
-    /// - "MediaTypeContainsNoSchema": The API contains a media type "application/json" with no schema for
-    ///   the data inside the json object. We can't validate the response if no
-    ///   model is given.
-    /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type)
-    ///   We cannot validate schemas that are this flexible.
+    /// - "MediaTypeContainsNoSchema": The API contains a media type "application/json" with no schema for the data inside the json object. We can't validate the response if no model is given.
+    /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type) we cannot validate schemas that are this flexible.
     ///
-    /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors,
-    /// you can configure what behaviour is considered a bug by the fuzzer.
+    /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors, you can configure what behaviour is considered a bug by the fuzzer.
     pub crash_criteria: Vec<ValidationErrorDiscriminants>,
 
     /// If present, ask the coverage monitor to generate a report after the
