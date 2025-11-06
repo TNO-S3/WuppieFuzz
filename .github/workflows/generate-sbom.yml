@@ -46,8 +46,14 @@ jobs:
           git fetch
           git checkout "$GITHUB_HEAD_REF"
           git pull
-          git add SBOM.txt
-          git commit -m "Add SBOM.txt after build"
-          git push origin HEAD:"$GITHUB_HEAD_REF"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Uncommitted changes found after build!"
+            git status
+            git add SBOM.txt
+            git commit -m "Add SBOM.txt after build"
+            git push origin HEAD:"$GITHUB_HEAD_REF"
+          else
+            echo "No uncommitted changes found."
+          fi
           
 
