@@ -78,8 +78,9 @@ mod test {
 
     use super::DuplicateRequestMutator;
     use crate::{
-        input::{OpenApiInput, parameter::ParameterKind},
+        input::OpenApiInput,
         openapi_mutator::test_helpers::{linked_requests, simple_request},
+        parameter_access::RequestParameterAccess,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -132,7 +133,7 @@ mod test {
             let new_request = &mut input.0[2];
             if new_request.path == "/with-query-parameter" {
                 let parameter = new_request
-                    .get_mut_parameter("id", ParameterKind::Query)
+                    .get_mut_parameter(&RequestParameterAccess::Query("id".to_string()))
                     .expect("Parameter was not correctly duplicated");
                 assert!(parameter.is_reference());
                 assert_eq!(parameter.reference_index().copied(), Some(0));

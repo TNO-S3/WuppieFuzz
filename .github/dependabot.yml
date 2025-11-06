@@ -1,6 +1,8 @@
 version: 2
 updates:
   - package-ecosystem: "cargo"
+    cooldown:
+      default-days: 5
     directory: "/"
     schedule:
       interval: "weekly"
@@ -20,6 +22,8 @@ updates:
       - "rust"
 
   - package-ecosystem: "github-actions"
+    cooldown:
+      default-days: 5
     directory: "/"
     schedule:
       # Check for updates to GitHub Actions every week

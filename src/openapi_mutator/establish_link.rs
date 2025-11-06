@@ -12,7 +12,8 @@ use libafl::{
 use libafl_bolts::Named;
 
 use crate::{
-    input::{OpenApiInput, ParameterContents},
+    input::{OpenApiInput, ParameterContents, parameter::OReference},
+    parameter_access::ParameterAccessElement,
     state::HasRandAndOpenAPI,
 };
 
@@ -51,8 +52,8 @@ where
         // Build a list of (x, y),
         // x is the request index for which the response contains a parameter y
         // y is the parameter name
-        let request_index_and_parameter_name_pairs = input.return_values(api);
-        if request_index_and_parameter_name_pairs.is_empty() {
+        let request_index_and_parameter_access_pairs = input.return_values(api);
+        if request_index_and_parameter_access_pairs.is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
@@ -66,11 +67,11 @@ where
             // parameters
             .flat_map(|(current_request_index, request)| {
                 let request_index_and_parameter_name_pairs =
-                    &request_index_and_parameter_name_pairs; // allow the move|| later on
+                    &request_index_and_parameter_access_pairs; // allow the move|| later on
                 request
                     .parameters
                     .iter_mut()
-                    // only consider non-reference parameters for replacement with
+                    // only consider non-OReference parameters for replacement with
                     // a reference
                     .filter(|(_, v)| !v.is_reference())
                     // filter: this variable occurs in an earlier request's return value
@@ -79,8 +80,19 @@ where
                         request_index_and_parameter_name_pairs
                             .iter()
                             // Find the first request index that had the desired parameter name in a response
-                            .position(|(request_index, rv_name)| {
-                                *request_index < current_request_index && name == rv_name
+                            .position(|target_addressing| {
+                                let target_name = target_addressing
+                                    .access
+                                    .get_body_access_elements()
+                                    .unwrap()
+                                    .0
+                                    .last();
+                                if let Some(ParameterAccessElement::Name(rv_name)) = target_name {
+                                    target_addressing.request_index < current_request_index
+                                        && name == rv_name
+                                } else {
+                                    false
+                                }
                             })
                             .map(|index_return_values| (param, index_return_values))
                     })
@@ -92,12 +104,12 @@ where
         };
 
         // Make the link
-        *random_link.0 = ParameterContents::Reference {
-            request_index: request_index_and_parameter_name_pairs[random_link.1].0,
-            parameter_name: request_index_and_parameter_name_pairs[random_link.1]
-                .1
+        *random_link.0 = ParameterContents::OReference(OReference {
+            request_index: request_index_and_parameter_access_pairs[random_link.1].request_index,
+            parameter_access: request_index_and_parameter_access_pairs[random_link.1]
+                .access
                 .to_owned(),
-        };
+        });
 
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
@@ -116,6 +128,7 @@ mod test {
     use crate::{
         input::{Method, ParameterContents, parameter::ParameterKind},
         openapi_mutator::test_helpers::linked_requests,
+        parameter_access::RequestParameterAccess,
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -136,7 +149,7 @@ mod test {
 
             assert_eq!(result, MutationResult::Mutated);
             let parameter = input.0[1]
-                .get_mut_parameter("id", ParameterKind::Query)
+                .get_mut_parameter(&RequestParameterAccess::Query("id".to_string()))
                 .expect("Request got the wrong parameter");
             assert!(parameter.is_reference());
             assert_eq!(parameter.reference_index().copied(), Some(0));

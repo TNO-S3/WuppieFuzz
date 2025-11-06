@@ -16,6 +16,13 @@ jobs:
       contents: write
 
     steps:
+      # More disk space please
+      - name: Reclaim disk space
+        uses: mathio/gha-cleanup@ce9480b80d151ff36572df0d3c54aef2653e6054 # v1.0.0
+        with:
+          remove-browsers: true
+          verbose: true
+
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -39,8 +46,14 @@ jobs:
           git fetch
           git checkout "$GITHUB_HEAD_REF"
           git pull
-          git add SBOM.txt
-          git commit -m "Add SBOM.txt after build"
-          git push origin HEAD:"$GITHUB_HEAD_REF"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Uncommitted changes found after build!"
+            git status
+            git add SBOM.txt
+            git commit -m "Add SBOM.txt after build"
+            git push origin HEAD:"$GITHUB_HEAD_REF"
+          else
+            echo "No uncommitted changes found."
+          fi
           
 

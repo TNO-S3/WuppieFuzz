@@ -4,7 +4,11 @@
 
 ## Features
 
+- Improve corpus reference abstraction, making sure references to earlier requests' responses are expressed and understood correctly. Also improves the corpus file format, making it less verbose, in [#122](https://github.com/TNO-S3/WuppieFuzz/pull/122)
+
 ## Fixes
+
+- Fix vague error that would occur if timeout expires during corpus minimization, by not counting that phase against the timeout in [#199](https://github.com/TNO-S3/WuppieFuzz/pull/199)
 
 # v1.3.0 (2025-09-24)
 

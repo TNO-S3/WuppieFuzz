@@ -7,7 +7,7 @@ adler2 2.0.1
 ahash 0.8.12
 	licensed under "Apache-2.0 OR MIT"
 	by Tom Kaitchuck <Tom.Kaitchuck@gmail.com>
-aho-corasick 1.1.3
+aho-corasick 1.1.4
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
 android_system_properties 0.1.5
@@ -40,6 +40,9 @@ base64 0.22.1
 bitflags 2.10.0
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
+block2 0.6.2
+	licensed under "MIT"
+	by Mads Marquart <mads@marquart.dk>
 build_html 2.7.0
 	licensed under "MIT"
 	by Joseph Skubal
@@ -64,10 +67,10 @@ cfg-if 1.0.4
 chrono 0.4.42
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.49
+clap 4.5.50
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.49
+clap_builder 4.5.50
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.6
@@ -109,16 +112,16 @@ ctor 0.5.0
 ctor-proc-macro 0.0.6
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
-ctrlc 3.5.0
+ctrlc 3.5.1
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
-deranged 0.5.4
+deranged 0.5.5
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
-dispatch 0.2.0
-	licensed under "MIT"
-	by Steven Sheldon
-document-features 0.2.11
+dispatch2 0.3.0
+	licensed under "Apache-2.0 OR MIT OR Zlib"
+	by Mads Marquart <mads@marquart.dk>|Mary <mary@mary.zone>
+document-features 0.2.12
 	licensed under "Apache-2.0 OR MIT"
 	by Slint Developers <info@slint.dev>
 dtor 0.1.0
@@ -259,25 +262,25 @@ iana-time-zone 0.1.64
 iana-time-zone-haiku 0.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by René Kijewski <crates.io@k6i.de>
-icu_collections 2.0.0
+icu_collections 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_locale_core 2.0.0
+icu_locale_core 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_normalizer 2.0.0
+icu_normalizer 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_normalizer_data 2.0.0
+icu_normalizer_data 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_properties 2.0.1
+icu_properties 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_properties_data 2.0.1
+icu_properties_data 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_provider 2.0.0
+icu_provider 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 idna 1.1.0
@@ -289,7 +292,7 @@ idna_adapter 1.2.1
 indexmap 2.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-indicatif 0.18.0
+indicatif 0.18.2
 	licensed under "MIT"
 	by unspecified authors
 ipnet 2.11.0
@@ -298,7 +301,7 @@ ipnet 2.11.0
 iri-string 0.7.8
 	licensed under "Apache-2.0 OR MIT"
 	by YOSHIOKA Takuma <nop_thread@nops.red>
-is_terminal_polyfill 1.70.1
+is_terminal_polyfill 1.70.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 iter-read 1.1.0
@@ -352,7 +355,7 @@ libsqlite3-sys 0.35.0
 linux-raw-sys 0.11.0
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>
-litemap 0.8.0
+litemap 0.8.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 lock_api 0.4.14
@@ -409,10 +412,16 @@ num-rational 0.4.2
 num_enum 0.7.5
 	licensed under "Apache-2.0 OR BSD-3-Clause OR MIT"
 	by Daniel Wagner-Hall <dawagner@gmail.com>|Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>|Vincent Esche <regexident@gmail.com>
+objc2 0.6.3
+	licensed under "MIT"
+	by Mads Marquart <mads@marquart.dk>
+objc2-encode 4.1.0
+	licensed under "MIT"
+	by Mads Marquart <mads@marquart.dk>
 object 0.37.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-once_cell_polyfill 1.70.1
+once_cell_polyfill 1.70.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 openapiv3-extended 6.0.1
@@ -460,7 +469,7 @@ porter-stemmer 0.1.2
 postcard 1.1.3
 	licensed under "Apache-2.0 OR MIT"
 	by James Munns <james@onevariable.com>
-potential_utf 0.1.3
+potential_utf 0.1.4
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 powerfmt 0.2.0
@@ -520,13 +529,13 @@ rustc-demangle 0.1.26
 rustix 1.1.2
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>|Jakub Konka <kubkon@jakubkonka.com>
-rustls 0.23.33
+rustls 0.23.34
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
-rustls-pki-types 1.12.0
+rustls-pki-types 1.13.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-webpki 0.103.7
+rustls-webpki 0.103.8
 	licensed under "ISC"
 	by unspecified authors
 ryu 1.0.20
@@ -616,7 +625,7 @@ time 0.3.44
 time-macros 0.2.24
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
-tinystr 0.8.1
+tinystr 0.8.2
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 tokio 1.48.0
@@ -670,7 +679,7 @@ typewit 1.14.2
 uds 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
-unicode-ident 1.0.19
+unicode-ident 1.0.20
 	licensed under "(Apache-2.0 OR MIT) AND Unicode-3.0"
 	by David Tolnay <dtolnay@gmail.com>
 unicode-segmentation 1.12.0
@@ -871,16 +880,16 @@ windows_x86_64_msvc 0.53.0
 wit-bindgen 0.46.0
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-writeable 0.6.1
+writeable 0.6.2
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 xxhash-rust 0.8.15
 	licensed under "BSL-1.0"
 	by Douman <douman@gmx.se>
-yoke 0.8.0
+yoke 0.8.1
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-yoke-derive 0.8.0
+yoke-derive 0.8.1
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
 z3 0.18.2
@@ -904,12 +913,12 @@ zerofrom-derive 0.1.6
 zeroize 1.8.2
 	licensed under "Apache-2.0 OR MIT"
 	by The RustCrypto Project Developers
-zerotrie 0.2.2
+zerotrie 0.2.3
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-zerovec 0.11.4
+zerovec 0.11.5
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-zerovec-derive 0.11.1
+zerovec-derive 0.11.2
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>

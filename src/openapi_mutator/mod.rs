@@ -296,13 +296,14 @@ fn mutate_string<S: HasRand>(
 #[allow(clippy::needless_late_init)]
 /// Mutate parameter contents in-place
 fn mutate_parameter_contents<S: HasRand>(
-    param_contents: &mut ParameterContents,
+    non_reference_param_contents: &mut ParameterContents,
     state: &mut S,
     contents_mutator: &mut dyn Mutator<BytesInput, S>,
 ) -> Result<MutationResult, Error> {
-    // Used if we pick an element from an array or object to mutate
+    // random_element is used if we pick an element from an array or object to mutate,
+    // other ParameterContents return early with a mutated result.
     let random_element;
-    match param_contents {
+    match non_reference_param_contents {
         ParameterContents::Object(obj_properties) => {
             random_element = match state.rand_mut().choose(obj_properties.values_mut()) {
                 None => {
@@ -338,18 +339,22 @@ fn mutate_parameter_contents<S: HasRand>(
                 if contents == new_value.mutator_bytes() {
                     return Ok(MutationResult::Skipped);
                 }
-                *param_contents = ParameterContents::Bytes(new_value.mutator_bytes().to_owned())
+                *non_reference_param_contents =
+                    ParameterContents::Bytes(new_value.mutator_bytes().to_owned())
             }
             return mutation_result;
         }
-        ParameterContents::Reference { .. } => unreachable!(
-            "Non-nested reference parameters should have been filtered out of concrete_parameters"
+        ParameterContents::OReference { .. } => unreachable!(
+            "Non-nested output-reference parameters should have been filtered out of concrete_parameters"
+        ),
+        ParameterContents::IReference { .. } => unreachable!(
+            "Non-nested input-reference parameters should have been filtered out of concrete_parameters"
         ),
     }
-    if let ParameterContents::Reference { .. } = random_element {
-        log::warn!(
-            "Tried to mutate nested reference. If this happens a lot some solution should be implemented here. Skipping for now."
-        );
+    if let ParameterContents::OReference { .. } | ParameterContents::IReference { .. } =
+        random_element
+    {
+        // References do not currently get mutated.
         Ok(MutationResult::Skipped)
     } else {
         // This was nested in an array or object, recursively mutate
