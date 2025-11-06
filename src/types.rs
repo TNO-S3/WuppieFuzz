@@ -35,13 +35,7 @@ pub type EventManagerType = SimpleEventManager<
     OpenApiFuzzerState<OpenApiInput>,
 >;
 
-pub type ObserversTupleType<'a> = (
-    LineCovObserverType<'a>,
-    (
-        EndpointObserverType<'a>,
-        (CombinedMapObserverType<'a>, (TimeObserver, ())),
-    ),
-);
+pub type ObserversTupleType<'a> = (CombinedMapObserverType<'a>, (TimeObserver, ()));
 
 pub type CombinedFeedbackType<'a> = CombinedFeedback<
     EndpointFeedbackType<'a>,
@@ -67,11 +61,7 @@ pub type LineCovObserverType<'a> = ExplicitTracking<StdMapObserver<'a, u8, false
 pub type LineCovFeedbackType<'a> =
     MaxMapFeedback<LineCovObserverType<'a>, StdMapObserver<'a, u8, false>>;
 
-pub type LineCovClientObserverFeedbackType<'a> = (
-    Box<dyn CoverageClient>,
-    LineCovObserverType<'a>,
-    LineCovFeedbackType<'a>,
-);
+pub type LineCovClientObserverFeedbackType<'a> = (Box<dyn CoverageClient>, LineCovFeedbackType<'a>);
 
 pub type EndpointObserverType<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>;
 

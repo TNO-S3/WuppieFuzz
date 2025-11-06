@@ -65,9 +65,9 @@ pub fn fuzz() -> Result<()> {
     let mut mgr = construct_event_mgr();
 
     // Observers & feedback initialization
-    let (mut endpoint_coverage_client, endpoint_coverage_observer, endpoint_coverage_feedback) =
+    let (mut endpoint_coverage_client, endpoint_coverage_feedback) =
         setup_endpoint_coverage(api.clone())?;
-    let (mut code_coverage_client, code_coverage_observer, code_coverage_feedback) =
+    let (mut code_coverage_client, code_coverage_feedback) =
         setup_line_coverage(config, &report_path)?;
     let time_observer = TimeObserver::new("time");
     let time_feedback = TimeFeedback::new(&time_observer);
@@ -107,12 +107,7 @@ pub fn fuzz() -> Result<()> {
     validate_instrumentation(config, &mut code_coverage_client);
 
     // Create the executor for an in-process function with just one observer
-    let collective_observer: ObserversTupleType = tuple_list!(
-        code_coverage_observer,
-        endpoint_coverage_observer,
-        combined_map_observer,
-        time_observer
-    );
+    let collective_observer: ObserversTupleType = tuple_list!(combined_map_observer, time_observer);
     let mut executor = SequenceExecutor::new(
         collective_observer,
         &api,

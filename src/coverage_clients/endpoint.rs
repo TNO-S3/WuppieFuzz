@@ -41,11 +41,7 @@ const SUPERFLUOUS_SYMBOL: &str = "&#x26a0;&#xfe0f";
 pub fn setup_endpoint_coverage<'a>(
     api: OpenAPI,
 ) -> core::result::Result<
-    (
-        Arc<Mutex<EndpointCoverageClient>>,
-        EndpointObserverType<'a>,
-        EndpointFeedbackType<'a>,
-    ),
+    (Arc<Mutex<EndpointCoverageClient>>, EndpointFeedbackType<'a>),
     anyhow::Error,
 > {
     let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
@@ -66,11 +62,7 @@ pub fn setup_endpoint_coverage<'a>(
         EndpointObserverType,
         StdMapObserver<'_, u8, false>,
     > = MaxMapFeedback::new(&endpoint_coverage_observer);
-    Ok((
-        endpoint_coverage_client,
-        endpoint_coverage_observer,
-        endpoint_coverage_feedback,
-    ))
+    Ok((endpoint_coverage_client, endpoint_coverage_feedback))
 }
 
 /// Endpoint coverage client.

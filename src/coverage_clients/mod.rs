@@ -56,11 +56,7 @@ pub fn setup_line_coverage<'a>(
     .track_indices()
     .track_novelties();
     let code_coverage_feedback = MaxMapFeedback::new(&code_coverage_observer);
-    Ok((
-        code_coverage_client,
-        code_coverage_observer,
-        code_coverage_feedback,
-    ))
+    Ok((code_coverage_client, code_coverage_feedback))
 }
 
 /// APIs already create code coverage during boot. We check if the code coverage is non-zero.
