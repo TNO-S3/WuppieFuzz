@@ -9,7 +9,10 @@ use std::{
 use clap::{Parser, Subcommand, ValueEnum, value_parser};
 use libafl::schedulers::powersched::BaseSchedule;
 use serde::Deserialize;
+use strum::VariantArray;
 use url::Url;
+
+use crate::openapi::validate_response::ValidationErrorDiscriminants;
 
 const DEFAULT_REQUEST_TIMEOUT: u64 = 30000;
 const DEFAULT_METHOD_MUTATION_STRATEGY: MethodMutationStrategy = MethodMutationStrategy::FollowSpec;
@@ -168,12 +171,30 @@ pub enum Commands {
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
         power_schedule: Option<BaseSchedule>,
 
-        /// What the fuzzer considers a bug. By default, all behaviour that does not match
-        /// the specification is considered a bug (all-errors). If only-5xx is specified,
-        /// only requests for which the program under test returns a HTTP 5xx status are
-        /// considered to have triggered a bug.
-        #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
-        crash_criterion: Option<CrashCriterion>,
+        /// Which errors the fuzzer considers a bug.
+        ///
+        /// The possible errors are:
+        /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally means it should not have been executed by the fuzzer to begin with.
+        /// - "Status5xxNotSpecified": The HTTP status code 5xx returned from the API is not one of the status codes mentioned for this path in the specification.
+        /// - "OtherStatusNotSpecified": The HTTP status code 1xx - 4xx returned from the API is not one of the status codes mentioned for this path in the specification.
+        /// - "ResponseReferenceBroken":  The specification calls for an object to be returned, and refers to the correct structure of this object using a reference (`#/example/reference`). However, the reference path is not present in the specification or contains circular references.
+        /// - "ResponseObjectIncorrect": The response body returned by the API does not match the structure specified in the API specification.
+        /// - "ResponseEnumIncorrect": A field in the response body object is specified as an enumeration, but the returned value is not one of the possible variants.
+        /// - "ResponseMalformedJSON": The response body returned by the API can not be parsed as JSON.
+        /// - "UnexpectedContent": The API returned a response body, but no response is specified.
+        /// - "MediaTypeContainsNoSchema": The API contains a media type "application/json" with no schema for the data inside the json object. We can't validate the response if no model is given.
+        /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type) we cannot validate schemas that are this flexible.
+        ///
+        /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors, you can configure what behaviour is considered a bug by the fuzzer.
+        #[arg(
+            value_parser,
+            long,
+            value_enum,
+            required = false,
+            ignore_case = true,
+            verbatim_doc_comment
+        )]
+        crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
         /// If present, ask the coverage monitor to generate a report after the
         /// time-out passes
@@ -281,7 +302,7 @@ impl Commands {
                 timeout,
                 request_timeout,
                 power_schedule,
-                crash_criterion,
+                crash_criteria,
                 report,
                 method_mutation_strategy,
                 jacoco_class_dir,
@@ -301,7 +322,7 @@ impl Commands {
                 timeout,
                 request_timeout,
                 power_schedule,
-                crash_criterion,
+                crash_criteria,
                 report,
                 method_mutation_strategy,
                 jacoco_class_dir,
@@ -378,12 +399,9 @@ struct PartialConfiguration {
     #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
     pub power_schedule: Option<BaseSchedule>,
 
-    /// What the fuzzer considers a bug. By default, all behaviour that does not match
-    /// the specification is considered a bug (all-errors). If only-5xx is specified,
-    /// only requests for which the program under test returns a HTTP 5xx status are
-    /// considered to have triggered a bug.
+    /// Which errors the fuzzer considers a bug.
     #[clap(value_parser, long, value_enum, required = false, ignore_case = true)]
-    pub crash_criterion: Option<CrashCriterion>,
+    pub crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
     /// If present, ask the coverage monitor to generate a report after the
     /// time-out passes
@@ -471,14 +489,6 @@ pub enum MethodMutationStrategy {
     Common7,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
-pub enum CrashCriterion {
-    #[serde(alias = "all-errors", alias = "all_errors", alias = "allerrors")]
-    AllErrors,
-    #[serde(alias = "only-5xx", alias = "only_5xx", alias = "only5xx")]
-    Only5xx,
-}
-
 /// The main configuration object.
 #[derive(PartialEq, Eq)]
 pub struct Configuration {
@@ -512,11 +522,10 @@ pub struct Configuration {
     /// The power schedule to use for prioritizing seeds.
     pub power_schedule: BaseSchedule,
 
-    /// What the fuzzer considers a bug. By default, all behaviour that does not match
-    /// the specification is considered a bug (all-errors). If only-5xx is specified,
-    /// only requests for which the program under test returns a HTTP 5xx status are
-    /// considered to have triggered a bug.
-    pub crash_criterion: CrashCriterion,
+    /// Which errors the fuzzer considers a bug. By default, the value for this
+    /// option is a list of all validation error variants. By specifying a subset
+    /// you can configure what behaviour is considered a bug by the fuzzer.
+    pub crash_criteria: Vec<ValidationErrorDiscriminants>,
 
     /// If present, ask the coverage monitor to generate a report after the
     /// time-out passes.
@@ -633,7 +642,9 @@ impl TryFrom<PartialConfiguration> for Configuration {
             timeout: value.timeout,
             request_timeout: value.request_timeout.unwrap_or(DEFAULT_REQUEST_TIMEOUT),
             power_schedule: value.power_schedule.unwrap_or(BaseSchedule::FAST),
-            crash_criterion: value.crash_criterion.unwrap_or(CrashCriterion::AllErrors),
+            crash_criteria: value
+                .crash_criteria
+                .unwrap_or_else(|| ValidationErrorDiscriminants::VARIANTS.to_vec()),
             report: value.report.unwrap_or(false),
             method_mutation_strategy: value
                 .method_mutation_strategy
@@ -682,7 +693,7 @@ impl PartialConfiguration {
             timeout: other.timeout.or(self.timeout.take()),
             request_timeout: other.request_timeout.or(self.request_timeout.take()),
             power_schedule: other.power_schedule.or(self.power_schedule.take()),
-            crash_criterion: other.crash_criterion.or(self.crash_criterion.take()),
+            crash_criteria: other.crash_criteria.or(self.crash_criteria.take()),
             report: other.report.or(self.report.take()),
             method_mutation_strategy: other
                 .method_mutation_strategy

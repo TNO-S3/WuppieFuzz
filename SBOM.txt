@@ -595,6 +595,9 @@ stable_deref_trait 1.2.1
 strsim 0.11.1
 	licensed under "MIT"
 	by Danny Guo <danny@dannyguo.com>|maxbachmann <oss@maxbachmann.de>
+strum 0.27.2
+	licensed under "MIT"
+	by Peter Glotfelty <peter.glotfelty@microsoft.com>
 subtle 2.6.1
 	licensed under "BSD-3-Clause"
 	by Isis Lovecruft <isis@patternsinthevoid.net>|Henry de Valence <hdevalence@hdevalence.ca>

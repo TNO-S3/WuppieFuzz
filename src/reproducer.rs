@@ -98,7 +98,7 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
                     &request,
                     response.clone(),
                     &api,
-                    &config.crash_criterion,
+                    &config.crash_criteria,
                     &mut exit_kind,
                     &mut parameter_feedback,
                 );
