@@ -110,7 +110,7 @@ install-updater = true
 aarch64-apple-darwin = "macos-14"
 
 [workspace.metadata.dist.dependencies.apt]
-g++ = { targets = ["x86_64-unknown-linux-musl"] }
+musl-tools = { targets = ["x86_64-unknown-linux-musl"] }
 
 [workspace.metadata.dist.dependencies.chocolatey]
 strawberryperl = { targets = ["aarch64-pc-windows-msvc"] }
