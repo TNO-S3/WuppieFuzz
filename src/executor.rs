@@ -23,16 +23,17 @@ use libafl_bolts::{current_time, prelude::RefIndexable};
 use openapiv3::OpenAPI;
 use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
+use strum::IntoDiscriminant;
 
 use crate::{
     authentication::{Authentication, build_http_client},
-    configuration::{Configuration, CrashCriterion},
+    configuration::Configuration,
     coverage_clients::{CoverageClient, endpoint::EndpointCoverageClient},
     input::{OpenApiInput, OpenApiRequest},
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
-        validate_response::{Response, validate_response},
+        validate_response::{Response, ValidationErrorDiscriminants, validate_response},
     },
     parameter_feedback::ParameterFeedback,
     reporting::{Reporting, sqlite::MySqLite},
@@ -76,11 +77,11 @@ where
 }
 
 pub(crate) fn process_response(
-    request_idx: usize,
+    request_index: usize,
     request: &OpenApiRequest,
     response: Response,
     api: &OpenAPI,
-    crash_criterion: &CrashCriterion,
+    crash_criteria: &[ValidationErrorDiscriminants],
     exit_kind: &mut ExitKind,
     parameter_feedback: &mut ParameterFeedback,
 ) {
@@ -95,15 +96,15 @@ pub(crate) fn process_response(
         log::debug!(
             "OpenAPI-input resulted in server error response, ignoring rest of request chain."
         );
-    } else if *crash_criterion == CrashCriterion::AllErrors
-        && let Err(validation_err) = validate_response(api, request, &response)
+    } else if let Err(validation_err) = validate_response(api, request, &response)
+        && crash_criteria.contains(&validation_err.discriminant())
     {
         log::debug!(
             "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
         );
         *exit_kind = ExitKind::Crash;
     }
-    parameter_feedback.process_response(request_idx, response);
+    parameter_feedback.process_response(request_index, response);
 }
 
 impl<'h, OT> SequenceExecutor<'h, OT>
@@ -216,7 +217,7 @@ where
                         &request,
                         response,
                         self.api,
-                        &self.config.crash_criterion,
+                        &self.config.crash_criteria,
                         &mut exit_kind,
                         &mut parameter_feedback,
                     );

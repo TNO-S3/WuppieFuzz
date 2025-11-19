@@ -5,6 +5,7 @@
 ## Features
 
 - Improve corpus reference abstraction, making sure references to earlier requests' responses are expressed and understood correctly. Also improves the corpus file format, making it less verbose, in [#122](https://github.com/TNO-S3/WuppieFuzz/pull/122)
+- Improve crash criteria granularity in [#162](https://github.com/TNO-S3/WuppieFuzz/pull/162)
 
 ## Fixes
 
