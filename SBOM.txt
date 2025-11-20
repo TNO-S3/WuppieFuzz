@@ -67,10 +67,10 @@ cfg-if 1.0.4
 chrono 0.4.42
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.50
+clap 4.5.51
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.50
+clap_builder 4.5.51
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.6
@@ -106,10 +106,10 @@ core-foundation 0.9.4
 core-foundation-sys 0.8.7
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
-ctor 0.5.0
+ctor 0.6.1
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
-ctor-proc-macro 0.0.6
+ctor-proc-macro 0.0.7
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
 ctrlc 3.5.1
@@ -124,7 +124,7 @@ dispatch2 0.3.0
 document-features 0.2.12
 	licensed under "Apache-2.0 OR MIT"
 	by Slint Developers <info@slint.dev>
-dtor 0.1.0
+dtor 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
 dtor-proc-macro 0.0.6
@@ -175,6 +175,9 @@ fnv 1.0.7
 foldhash 0.1.5
 	licensed under "Zlib"
 	by Orson Peters <orsonpeters@gmail.com>
+foldhash 0.2.0
+	licensed under "Zlib"
+	by Orson Peters <orsonpeters@gmail.com>
 foreign-types 0.3.2
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
@@ -217,9 +220,6 @@ gimli 0.32.3
 h2 0.4.12
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
-hashbrown 0.14.5
-	licensed under "Apache-2.0 OR MIT"
-	by Amanieu d'Antras <amanieu@gmail.com>
 hashbrown 0.15.5
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
@@ -298,7 +298,7 @@ indicatif 0.18.2
 ipnet 2.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by Kris Price <kris@krisprice.nz>
-iri-string 0.7.8
+iri-string 0.7.9
 	licensed under "Apache-2.0 OR MIT"
 	by YOSHIOKA Takuma <nop_thread@nops.red>
 is_terminal_polyfill 1.70.2
@@ -343,9 +343,6 @@ libafl 0.15.4
 libafl_bolts 0.15.4
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libafl_wide 0.7.33
-	licensed under "Apache-2.0 OR MIT OR Zlib"
-	by Lokathor <zefria@gmail.com>
 libm 0.2.15
 	licensed under "MIT"
 	by Jorge Aparicio <jorge@japaric.io>
@@ -529,7 +526,7 @@ rustc-demangle 0.1.26
 rustix 1.1.2
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>|Jakub Konka <kubkon@jakubkonka.com>
-rustls 0.23.34
+rustls 0.23.35
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
 rustls-pki-types 1.13.0
@@ -577,6 +574,9 @@ serde_yaml 0.9.34+deprecated
 serial_test 3.2.0
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
+simd-adler32 0.3.7
+	licensed under "MIT"
+	by Marvin Countryman <me@maar.vin>
 siphasher 1.0.1
 	licensed under "Apache-2.0 OR MIT"
 	by Frank Denis <github@pureftpd.org>
@@ -595,6 +595,9 @@ stable_deref_trait 1.2.1
 strsim 0.11.1
 	licensed under "MIT"
 	by Danny Guo <danny@dannyguo.com>|maxbachmann <oss@maxbachmann.de>
+strum 0.27.2
+	licensed under "MIT"
+	by Peter Glotfelty <peter.glotfelty@microsoft.com>
 subtle 2.6.1
 	licensed under "BSD-3-Clause"
 	by Isis Lovecruft <isis@patternsinthevoid.net>|Henry de Valence <hdevalence@hdevalence.ca>
@@ -634,7 +637,7 @@ tokio-native-tls 0.3.1
 tokio-rustls 0.26.4
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-tokio-util 0.7.16
+tokio-util 0.7.17
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
 tower 0.5.2
@@ -661,10 +664,10 @@ try-lock 0.2.5
 tuple_list 0.1.3
 	licensed under "MIT"
 	by Valerii Lashmanov <vflashm@gmail.com>
-typed-builder 0.21.2
+typed-builder 0.22.0
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
-typed-builder-macro 0.21.2
+typed-builder-macro 0.22.0
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
 typeid 1.0.3
@@ -676,7 +679,7 @@ typewit 1.14.2
 uds 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
-unicode-ident 1.0.20
+unicode-ident 1.0.22
 	licensed under "(Apache-2.0 OR MIT) AND Unicode-3.0"
 	by David Tolnay <dtolnay@gmail.com>
 unicode-segmentation 1.12.0
@@ -757,6 +760,9 @@ web-sys 0.3.80
 web-time 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
+wide 0.7.33
+	licensed under "Apache-2.0 OR MIT OR Zlib"
+	by Lokathor <zefria@gmail.com>
 winapi 0.3.9
 	licensed under "Apache-2.0 OR MIT"
 	by Peter Atashian <retep998@gmail.com>
@@ -769,28 +775,37 @@ winapi-util 0.1.11
 winapi-x86_64-pc-windows-gnu 0.4.0
 	licensed under "Apache-2.0 OR MIT"
 	by Peter Atashian <retep998@gmail.com>
-windows 0.59.0
+windows 0.62.2
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
+windows-collections 0.3.2
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
 windows-core 0.59.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-core 0.62.0
+windows-core 0.62.2
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
+windows-future 0.3.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 windows-implement 0.59.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-implement 0.60.0
+windows-implement 0.60.2
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
 windows-interface 0.59.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 windows-link 0.1.3
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-link 0.2.0
+windows-link 0.2.1
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
+windows-numerics 0.3.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 windows-registry 0.5.3
@@ -799,7 +814,7 @@ windows-registry 0.5.3
 windows-result 0.3.4
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-result 0.4.0
+windows-result 0.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 windows-strings 0.3.1
@@ -808,7 +823,7 @@ windows-strings 0.3.1
 windows-strings 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-strings 0.5.0
+windows-strings 0.5.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 windows-sys 0.52.0
@@ -826,6 +841,9 @@ windows-targets 0.52.6
 windows-targets 0.53.3
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
+windows-threading 0.2.1
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
 windows_aarch64_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
@@ -889,12 +907,12 @@ yoke 0.8.1
 yoke-derive 0.8.1
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-z3 0.18.2
+z3 0.19.4
 	licensed under "MIT"
-	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>
-z3-sys 0.9.10
+	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
+z3-sys 0.10.2
 	licensed under "MIT"
-	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>
+	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
 zerocopy 0.8.27
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
