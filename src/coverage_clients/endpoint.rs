@@ -19,17 +19,10 @@ use std::{
 
 use build_html::{Container, ContainerType, Html, HtmlContainer, HtmlPage, escape_html};
 use indexmap::{IndexMap, map::Entry};
-use libafl::{
-    feedbacks::MaxMapFeedback,
-    observers::{CanTrack, StdMapObserver},
-};
 use openapiv3::{OpenAPI, StatusCode};
 
 use super::{CoverageClient, MAP_SIZE};
-use crate::{
-    input::Method,
-    types::{EndpointFeedbackType, EndpointObserverType},
-};
+use crate::input::Method;
 
 const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";
 const MISS_SYMBOL: &str = "&#x274c;";
@@ -38,39 +31,14 @@ const SUPERFLUOUS_SYMBOL: &str = "&#x26a0;&#xfe0f";
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
-pub fn setup_endpoint_coverage<'a>(
+pub fn setup_endpoint_coverage(
     api: OpenAPI,
-) -> core::result::Result<
-    (
-        Arc<Mutex<EndpointCoverageClient>>,
-        EndpointObserverType<'a>,
-        EndpointFeedbackType<'a>,
-    ),
-    anyhow::Error,
-> {
+) -> core::result::Result<Arc<Mutex<EndpointCoverageClient>>, anyhow::Error> {
     let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
     endpoint_coverage_client.fetch_coverage(true);
     // no-op for this particular CoverageClient
-    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
-    // this is only possible if it does not touch the map while the harness is running. We must
-    // assume they have designed their algorithms for this to work correctly.
-    let endpoint_coverage_observer = unsafe {
-        StdMapObserver::from_mut_ptr(
-            "endpoint_coverage",
-            endpoint_coverage_client.get_coverage_ptr(),
-            endpoint_coverage_client.get_coverage_len(),
-        )
-    }
-    .track_novelties();
-    let endpoint_coverage_feedback: MaxMapFeedback<
-        EndpointObserverType,
-        StdMapObserver<'_, u8, false>,
-    > = MaxMapFeedback::new(&endpoint_coverage_observer);
-    Ok((
-        endpoint_coverage_client,
-        endpoint_coverage_observer,
-        endpoint_coverage_feedback,
-    ))
+
+    Ok(endpoint_coverage_client)
 }
 
 /// Endpoint coverage client.

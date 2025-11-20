@@ -21,7 +21,7 @@ pub fn get_api_spec(path: &Path) -> Result<Box<OpenAPI>, anyhow::Error> {
         .with_context(|| format!("Error parsing OpenAPI-file at {}", path.to_string_lossy()))
 }
 
-pub fn parse_api_spec(config: &&'static Configuration) -> Result<OpenAPI, anyhow::Error> {
+pub fn parse_api_spec(config: &'static Configuration) -> Result<OpenAPI, anyhow::Error> {
     let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
     if let Some(server_override) = &config.target {
         api.servers = vec![Server {
