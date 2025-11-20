@@ -52,7 +52,7 @@ where
 {
     observers: OT,
 
-    api: OpenAPI,
+    api: &'static OpenAPI,
     config: &'static Configuration,
     authentication: Authentication,
     cookie_store: Arc<CookieStoreMutex>,
@@ -113,12 +113,12 @@ where
     /// Create a new SequenceExecutor.
     pub fn new(
         observers: OT,
-        api: OpenAPI,
+        api: &'static OpenAPI,
         config: &'static Configuration,
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
     ) -> anyhow::Result<Self> {
-        let (authentication, cookie_store, http_client) = build_http_client(&api)?;
+        let (authentication, cookie_store, http_client) = build_http_client(api)?;
 
         Ok(Self {
             observers,
@@ -169,7 +169,7 @@ where
                 &self.http_client,
                 &mut self.authentication,
                 &self.cookie_store,
-                &self.api,
+                self.api,
                 &request,
             ) {
                 Err(err) => {
@@ -215,7 +215,7 @@ where
                         request_index,
                         &request,
                         response,
-                        &self.api,
+                        self.api,
                         &self.config.crash_criterion,
                         &mut exit_kind,
                         &mut parameter_feedback,

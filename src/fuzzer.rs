@@ -22,6 +22,7 @@ use libafl::{
 };
 use libafl_bolts::{current_time, prelude::OwnedMutSlice, tuples::tuple_list};
 use log::error;
+use openapiv3::OpenAPI;
 
 use crate::{
     configuration::Configuration,
@@ -44,6 +45,12 @@ use crate::{
     },
 };
 
+lazy_static! {
+    static ref API: Result<OpenAPI, anyhow::Error> = Configuration::get()
+        .map_err(anyhow::Error::msg)
+        .and_then(parse_api_spec);
+}
+
 /// Main fuzzer function.
 ///
 /// Sets up the various nuts and bolts required by LibAFL and runs the fuzzer until the configured
@@ -51,12 +58,13 @@ use crate::{
 pub fn fuzz() -> Result<()> {
     // Preparatory stuff
     let config = &Configuration::get().map_err(anyhow::Error::msg)?;
+    let api = API.as_ref().map_err(anyhow::Error::msg)?;
+
     crate::setup_logging(config);
     let report_path = config.report.then(generate_report_path);
-    let api = parse_api_spec(config)?;
 
     let initial_corpus = crate::initial_corpus::initialize_corpus(
-        &api,
+        api,
         config.initial_corpus.as_deref(),
         &report_path.as_deref(),
     );
@@ -108,7 +116,7 @@ pub fn fuzz() -> Result<()> {
     let collective_observer: ObserversTupleType = tuple_list!(combined_map_observer, time_observer);
     let mut executor = SequenceExecutor::new(
         collective_observer,
-        api.clone(),
+        api,
         config,
         code_coverage_client,
         endpoint_coverage_client,
