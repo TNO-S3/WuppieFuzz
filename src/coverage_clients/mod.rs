@@ -9,15 +9,8 @@ use std::{
 };
 
 use anyhow::Context;
-use libafl::{
-    feedbacks::MaxMapFeedback,
-    observers::{CanTrack, StdMapObserver},
-};
 
-use crate::{
-    configuration::{self, Configuration},
-    types::LineCovClientObserverFeedbackType,
-};
+use crate::configuration::{self, Configuration};
 
 /// Size of the coverage map. This is a bitmap containing a bit for each line in the target
 /// (or each endpoint, if using endpoint coverage as the guidance). The fuzzer will crash if
@@ -35,34 +28,22 @@ pub mod lcov_client;
 
 /// Sets up the line coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
-pub fn setup_line_coverage<'a>(
+pub fn setup_line_coverage(
     config: &'static Configuration,
     report_path: &Option<PathBuf>,
-) -> Result<LineCovClientObserverFeedbackType<'a>, anyhow::Error> {
+) -> Result<Box<dyn CoverageClient>, anyhow::Error> {
     let mut code_coverage_client: Box<dyn CoverageClient> =
         crate::coverage_clients::get_coverage_client(config, report_path)?;
     // This is very important, we want to fetch and reset the coverage before interacting with the target
     code_coverage_client.fetch_coverage(true);
-    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
-    // this is only possible if it does not touch the map while the harness is running. We must
-    // assume they have designed their algorithms for this to work correctly.
-    let code_coverage_observer = unsafe {
-        StdMapObserver::from_mut_ptr(
-            "code_coverage",
-            code_coverage_client.get_coverage_ptr(),
-            code_coverage_client.get_coverage_len(),
-        )
-    }
-    .track_indices()
-    .track_novelties();
-    let code_coverage_feedback = MaxMapFeedback::new(&code_coverage_observer);
-    Ok((code_coverage_client, code_coverage_feedback))
+
+    Ok(code_coverage_client)
 }
 
 /// APIs already create code coverage during boot. We check if the code coverage is non-zero.
 /// Zero coverage might indicate an issue with the coverage agent or a target that was not rebooted between fuzzing runs.
 pub fn validate_instrumentation(
-    config: &&'static Configuration,
+    config: &'static Configuration,
     code_coverage_client: &mut Box<dyn CoverageClient>,
 ) {
     if config.coverage_configuration != crate::configuration::CoverageConfiguration::Endpoint {

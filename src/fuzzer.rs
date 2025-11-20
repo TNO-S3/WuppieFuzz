@@ -9,7 +9,7 @@ use libafl::{
     corpus::minimizer::MapCorpusMinimizer,
     events::{Event, EventFirer, EventWithStats, ExecStats},
     feedback_or,
-    feedbacks::{CrashFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MapFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, MultiMapObserver, TimeObserver},
@@ -38,7 +38,10 @@ use crate::{
     openapi_mutator::havoc_mutations_openapi,
     reporting::generate_report_path,
     state::OpenApiFuzzerState,
-    types::{CombinedMapObserverType, ObserversTupleType, OpenApiFuzzerStateType, SchedulerType},
+    types::{
+        CombinedMapObserverType, CoverageFeedbackType, ObserversTupleType, OpenApiFuzzerStateType,
+        SchedulerType,
+    },
 };
 
 /// Main fuzzer function.
@@ -65,27 +68,23 @@ pub fn fuzz() -> Result<()> {
     let mut mgr = construct_event_mgr();
 
     // Observers & feedback initialization
-    let (mut endpoint_coverage_client, endpoint_coverage_feedback) =
-        setup_endpoint_coverage(api.clone())?;
-    let (mut code_coverage_client, code_coverage_feedback) =
-        setup_line_coverage(config, &report_path)?;
+    let mut endpoint_coverage_client = setup_endpoint_coverage(api.clone())?;
+    let mut code_coverage_client = setup_line_coverage(config, &report_path)?;
+    let combined_map_observer: CombinedMapObserverType<'_> =
+        construct_observer(&mut endpoint_coverage_client, &mut code_coverage_client);
     let time_observer = TimeObserver::new("time");
     let time_feedback = TimeFeedback::new(&time_observer);
+    let coverage_feedback: CoverageFeedbackType = MapFeedback::new(&combined_map_observer);
 
     // Stages
-    let calibration = CalibrationStage::new(&code_coverage_feedback);
+    let calibration = CalibrationStage::new(&coverage_feedback);
     let power: StdPowerMutationalStage<_, _, OpenApiInput, _, _, _> =
         StdPowerMutationalStage::new(mutator_openapi);
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, power);
 
     // Scheduler
-    let (scheduler, combined_map_observer) = construct_scheduler(
-        config,
-        &mut state_uninit,
-        &mut endpoint_coverage_client,
-        &mut code_coverage_client,
-    );
+    let scheduler = construct_scheduler(config, &mut state_uninit, &combined_map_observer);
 
     // Corpus minimizer
     let minimizer: MapCorpusMinimizer<_, _, _, _, _, _, LenTimeMulTestcasePenalty> =
@@ -94,8 +93,7 @@ pub fn fuzz() -> Result<()> {
     // Initialize state
     let mut objective = CrashFeedback::new();
     let mut collective_feedback = feedback_or!(
-        endpoint_coverage_feedback,
-        code_coverage_feedback,
+        coverage_feedback,
         time_feedback, // Time feedback, this one does not need a feedback state
     );
     let mut state = state_uninit.initialize(&mut objective, &mut collective_feedback)?;
@@ -110,7 +108,7 @@ pub fn fuzz() -> Result<()> {
     let collective_observer: ObserversTupleType = tuple_list!(combined_map_observer, time_observer);
     let mut executor = SequenceExecutor::new(
         collective_observer,
-        &api,
+        api.clone(),
         config,
         code_coverage_client,
         endpoint_coverage_client,
@@ -150,32 +148,35 @@ pub fn fuzz() -> Result<()> {
 }
 
 fn construct_scheduler<'a>(
-    config: &&'static Configuration,
+    config: &'static Configuration,
     state: &mut OpenApiFuzzerStateType,
-    endpoint_coverage_client: &mut Arc<Mutex<EndpointCoverageClient>>,
-    code_coverage_client: &mut Box<dyn CoverageClient>,
-) -> (SchedulerType<'a>, CombinedMapObserverType<'a>) {
-    let combined_map_observer: CombinedMapObserverType<'_> =
-        MultiMapObserver::new("all_maps", unsafe {
-            vec![
-                OwnedMutSlice::from_raw_parts_mut(
-                    endpoint_coverage_client.get_coverage_ptr(),
-                    endpoint_coverage_client.get_coverage_len(),
-                ),
-                OwnedMutSlice::from_raw_parts_mut(
-                    code_coverage_client.get_coverage_ptr(),
-                    code_coverage_client.get_coverage_len(),
-                ),
-            ]
-        })
-        .track_indices();
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(
-        &combined_map_observer,
+    combined_map_observer: &CombinedMapObserverType<'a>,
+) -> SchedulerType<'a> {
+    IndexesLenTimeMinimizerScheduler::new(
+        combined_map_observer,
         PowerQueueScheduler::new(
             state,
-            &combined_map_observer,
+            combined_map_observer,
             PowerSchedule::new(config.power_schedule),
         ),
-    );
-    (scheduler, combined_map_observer)
+    )
+}
+
+fn construct_observer<'a>(
+    endpoint_coverage_client: &mut Arc<Mutex<EndpointCoverageClient>>,
+    code_coverage_client: &mut Box<dyn CoverageClient>,
+) -> CombinedMapObserverType<'a> {
+    MultiMapObserver::new("all_maps", unsafe {
+        vec![
+            OwnedMutSlice::from_raw_parts_mut(
+                endpoint_coverage_client.get_coverage_ptr(),
+                endpoint_coverage_client.get_coverage_len(),
+            ),
+            OwnedMutSlice::from_raw_parts_mut(
+                code_coverage_client.get_coverage_ptr(),
+                code_coverage_client.get_coverage_len(),
+            ),
+        ]
+    })
+    .track_indices()
 }

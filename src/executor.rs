@@ -46,14 +46,14 @@ type FuzzerState = crate::state::OpenApiFuzzerState<OpenApiInput>;
 /// The Executor for sending Sequences of OpenAPI requests to the target.
 /// It is responsible for executing inputs chosen by the fuzzer, and tracking
 /// statistics about coverage and errors.
-pub struct SequenceExecutor<'h, OT>
+pub struct SequenceExecutor<OT>
 where
     OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     observers: OT,
 
-    api: &'h OpenAPI,
-    config: &'h Configuration,
+    api: OpenAPI,
+    config: &'static Configuration,
     authentication: Authentication,
     cookie_store: Arc<CookieStoreMutex>,
 
@@ -106,19 +106,19 @@ pub(crate) fn process_response(
     parameter_feedback.process_response(request_idx, response);
 }
 
-impl<'h, OT> SequenceExecutor<'h, OT>
+impl<OT> SequenceExecutor<OT>
 where
-    OT: ObserversTuple<OpenApiInput, FuzzerState>,
+    OT: for<'all> ObserversTuple<OpenApiInput, FuzzerState>,
 {
     /// Create a new SequenceExecutor.
     pub fn new(
         observers: OT,
-        api: &'h OpenAPI,
-        config: &'h Configuration,
+        api: OpenAPI,
+        config: &'static Configuration,
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
     ) -> anyhow::Result<Self> {
-        let (authentication, cookie_store, http_client) = build_http_client(api)?;
+        let (authentication, cookie_store, http_client) = build_http_client(&api)?;
 
         Ok(Self {
             observers,
@@ -169,7 +169,7 @@ where
                 &self.http_client,
                 &mut self.authentication,
                 &self.cookie_store,
-                self.api,
+                &self.api,
                 &request,
             ) {
                 Err(err) => {
@@ -215,7 +215,7 @@ where
                         request_index,
                         &request,
                         response,
-                        self.api,
+                        &self.api,
                         &self.config.crash_criterion,
                         &mut exit_kind,
                         &mut parameter_feedback,
@@ -349,7 +349,7 @@ where
     }
 }
 
-impl<EM, FZ, OT> Executor<EM, OpenApiInput, FuzzerState, FZ> for SequenceExecutor<'_, OT>
+impl<EM, FZ, OT> Executor<EM, OpenApiInput, FuzzerState, FZ> for SequenceExecutor<OT>
 where
     EM: EventFirer<OpenApiInput, FuzzerState> + EventRestarter<FuzzerState> + SendExiting,
     OT: ObserversTuple<OpenApiInput, FuzzerState>,
@@ -416,7 +416,7 @@ fn update_stats<EM>(
     }
 }
 
-impl<OT> HasObservers for SequenceExecutor<'_, OT>
+impl<OT> HasObservers for SequenceExecutor<OT>
 where
     OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {

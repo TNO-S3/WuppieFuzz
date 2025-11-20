@@ -30,6 +30,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::CombinedFeedbackType;
 
+// use crate::types::CombinedFeedbackType;
+
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///
 /// We have a bespoke one so we're able to pass the api spec to mutators,

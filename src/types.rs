@@ -6,17 +6,18 @@ use libafl::{
     NopInputFilter, StdFuzzer,
     events::SimpleEventManager,
     feedbacks::{
-        CombinedFeedback, CrashLogic, ExitKindFeedback, LogicEagerOr, MapIndexesMetadata,
-        MaxMapFeedback, TimeFeedback,
+        CombinedFeedback, CrashLogic, DifferentIsNovel, ExitKindFeedback, LogicEagerOr,
+        MapFeedback, MapIndexesMetadata, TimeFeedback,
     },
     inputs::NopToTargetBytes,
-    observers::{ExplicitTracking, MultiMapObserver, StdMapObserver, TimeObserver},
+    observers::{ExplicitTracking, MultiMapObserver, TimeObserver},
     schedulers::{LenTimeMulTestcasePenalty, MinimizerScheduler, PowerQueueScheduler},
 };
+use libafl_bolts::simd::MaxReducer;
 
 use crate::{
-    coverage_clients::CoverageClient, executor::SequenceExecutor, input::OpenApiInput,
-    monitors::CoverageMonitor, state::OpenApiFuzzerState,
+    executor::SequenceExecutor, input::OpenApiInput, monitors::CoverageMonitor,
+    state::OpenApiFuzzerState,
 };
 
 pub type FuzzerType<'a> = StdFuzzer<
@@ -27,7 +28,7 @@ pub type FuzzerType<'a> = StdFuzzer<
     ExitKindFeedback<CrashLogic>,
 >;
 
-pub type ExecutorType<'a> = SequenceExecutor<'a, ObserversTupleType<'a>>;
+pub type ExecutorType<'a> = SequenceExecutor<ObserversTupleType<'a>>;
 
 pub type EventManagerType = SimpleEventManager<
     OpenApiInput,
@@ -37,11 +38,8 @@ pub type EventManagerType = SimpleEventManager<
 
 pub type ObserversTupleType<'a> = (CombinedMapObserverType<'a>, (TimeObserver, ()));
 
-pub type CombinedFeedbackType<'a> = CombinedFeedback<
-    EndpointFeedbackType<'a>,
-    CombinedFeedback<LineCovFeedbackType<'a>, TimeFeedback, LogicEagerOr>,
-    LogicEagerOr,
->;
+pub type CombinedFeedbackType<'a> =
+    CombinedFeedback<CoverageFeedbackType<'a>, TimeFeedback, LogicEagerOr>;
 
 pub type OpenApiFuzzerStateType = OpenApiFuzzerState<OpenApiInput>;
 
@@ -56,14 +54,9 @@ pub type SchedulerType<'a> = MinimizerScheduler<
     CombinedMapObserverType<'a>,
 >;
 
-pub type LineCovObserverType<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, true, true>;
-
-pub type LineCovFeedbackType<'a> =
-    MaxMapFeedback<LineCovObserverType<'a>, StdMapObserver<'a, u8, false>>;
-
-pub type LineCovClientObserverFeedbackType<'a> = (Box<dyn CoverageClient>, LineCovFeedbackType<'a>);
-
-pub type EndpointObserverType<'a> = ExplicitTracking<StdMapObserver<'a, u8, false>, false, true>;
-
-pub type EndpointFeedbackType<'a> =
-    MaxMapFeedback<EndpointObserverType<'a>, StdMapObserver<'a, u8, false>>;
+pub type CoverageFeedbackType<'a> = MapFeedback<
+    ExplicitTracking<MultiMapObserver<'a, u8, false>, true, false>,
+    DifferentIsNovel,
+    MultiMapObserver<'a, u8, false>,
+    MaxReducer,
+>;
