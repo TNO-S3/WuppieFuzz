@@ -174,6 +174,10 @@ fn construct_observer<'a>(
     endpoint_coverage_client: &mut Arc<Mutex<EndpointCoverageClient>>,
     code_coverage_client: &mut Box<dyn CoverageClient>,
 ) -> CombinedMapObserverType<'a> {
+    // Safety: libafl wants to read the coverage map directly that we also update in the harness;
+    // this is only possible if it does not touch the map while the harness is running. In
+    // single-thread fuzzing this is feasible, but it will likely prevent any kind of
+    // multi-threading approach.
     MultiMapObserver::new("all_maps", unsafe {
         vec![
             OwnedMutSlice::from_raw_parts_mut(
