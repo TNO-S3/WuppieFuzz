@@ -22,7 +22,6 @@ use libafl::{
 };
 use libafl_bolts::{current_time, prelude::OwnedMutSlice, tuples::tuple_list};
 use log::error;
-use openapiv3::OpenAPI;
 
 use crate::{
     configuration::Configuration,
@@ -35,7 +34,7 @@ use crate::{
     initial_corpus::minimize_corpus,
     input::OpenApiInput,
     monitors::construct_event_mgr,
-    openapi::parse_api_spec,
+    openapi::{parse_api_spec, spec::Spec},
     openapi_mutator::havoc_mutations_openapi,
     reporting::generate_report_path,
     state::OpenApiFuzzerState,
@@ -46,7 +45,7 @@ use crate::{
 };
 
 lazy_static! {
-    static ref API: Result<OpenAPI, anyhow::Error> = Configuration::get()
+    static ref API: Result<Spec, anyhow::Error> = Configuration::get()
         .map_err(anyhow::Error::msg)
         .and_then(parse_api_spec);
 }

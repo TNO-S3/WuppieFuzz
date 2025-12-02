@@ -12,6 +12,7 @@ use crate::{
 pub mod build_request;
 pub mod curl_request;
 pub mod examples;
+pub mod spec;
 pub mod validate_response;
 
 /// Loads the OpenAPI specification from the given path
