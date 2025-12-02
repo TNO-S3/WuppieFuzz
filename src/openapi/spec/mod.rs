@@ -9,7 +9,7 @@
 use std::{collections::BTreeMap, default::Default};
 
 use indexmap::IndexMap;
-use serde_json::{Number, json};
+use serde_json::Number;
 
 /// The representation of the API specification. Internally uses the version
 /// from the `oas3` crate, which is hopefully future-proof.
@@ -390,7 +390,8 @@ fn convert_elementary_type(r#type: openapiv3::Type) -> oas3::spec::ObjectSchema 
                 enum_values: number_type
                     .enumeration
                     .into_iter()
-                    .flat_map(|of| of.map(|f| json!(f)))
+                    .flat_map(|of| of.and_then(Number::from_f64))
+                    .map(serde_json::Value::Number)
                     .collect(),
                 ..Default::default()
             }
