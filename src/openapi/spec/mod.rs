@@ -9,9 +9,7 @@
 use std::{collections::BTreeMap, default::Default};
 
 use indexmap::IndexMap;
-use serde_json::Number;
-
-use crate::openapi;
+use serde_json::{Number, json};
 
 /// The representation of the API specification. Internally uses the version
 /// from the `oas3` crate, which is hopefully future-proof.
@@ -154,11 +152,47 @@ fn convert_parameters(
 }
 
 fn convert_parameter(parameter: openapiv3::Parameter) -> oas3::spec::Parameter {
-    todo!()
+    let openapiv3::Parameter { data, kind } = parameter;
+    let mut new_parameter = oas3::spec::Parameter {
+        name: data.name,
+        location: match kind {
+            openapiv3::ParameterKind::Query { .. } => oas3::spec::ParameterIn::Query,
+            openapiv3::ParameterKind::Header { .. } => oas3::spec::ParameterIn::Header,
+            openapiv3::ParameterKind::Path { .. } => oas3::spec::ParameterIn::Path,
+            openapiv3::ParameterKind::Cookie { .. } => oas3::spec::ParameterIn::Cookie,
+        },
+        required: Some(data.required),
+        schema: None,  // To be set later
+        content: None, // To be set later
+        example: data.example,
+        examples: convert_ref_map(data.examples.into(), &convert_example),
+
+        description: None,
+        deprecated: None,
+        allow_empty_value: None,
+        style: None,
+        explode: None,
+        allow_reserved: None,
+        extensions: Default::default(),
+    };
+    match data.format {
+        openapiv3::ParameterSchemaOrContent::Schema(ref_schema) => {
+            new_parameter.schema = Some(convert_ref_schema(ref_schema))
+        }
+        openapiv3::ParameterSchemaOrContent::Content(content) => {
+            new_parameter.content = Some(convert_map_media_type(content))
+        }
+    };
+    new_parameter
 }
 
 fn convert_request_body(body: openapiv3::RequestBody) -> oas3::spec::RequestBody {
-    todo!() //TODO
+    oas3::spec::RequestBody {
+        description: body.description,
+        content: convert_map_media_type(body.content),
+
+        required: Some(body.required),
+    }
 }
 
 fn convert_responses(
@@ -184,13 +218,18 @@ fn convert_responses(
 
 fn convert_response(response: openapiv3::Response) -> oas3::spec::Response {
     oas3::spec::Response {
-        content: response
-            .content
-            .into_iter()
-            .map(|(key, value)| (key, convert_media_type(value)))
-            .collect(),
+        content: convert_map_media_type(response.content),
         ..Default::default()
     }
+}
+
+fn convert_map_media_type(
+    map_media: IndexMap<String, openapiv3::MediaType>,
+) -> BTreeMap<String, oas3::spec::MediaType> {
+    map_media
+        .into_iter()
+        .map(|(key, value)| (key, convert_media_type(value)))
+        .collect()
 }
 
 fn convert_media_type(media_type: openapiv3::MediaType) -> oas3::spec::MediaType {
@@ -218,7 +257,7 @@ fn convert_ref_schema(
 fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
     let openapiv3::Schema { data, kind } = schema;
     match kind {
-        openapiv3::SchemaKind::Type(type_) => todo!(), //TODO
+        openapiv3::SchemaKind::Type(r#type) => convert_elementary_type(r#type),
         openapiv3::SchemaKind::OneOf { one_of } => oas3::spec::ObjectSchema {
             one_of: convert_vec_ref(one_of, &convert_schema),
             ..Default::default()
@@ -323,6 +362,85 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
     }
 }
 
+fn convert_elementary_type(r#type: openapiv3::Type) -> oas3::spec::ObjectSchema {
+    use oas3::spec::{ObjectSchema, SchemaType, SchemaTypeSet};
+    match r#type {
+        openapiv3::Type::String(string_type) => ObjectSchema {
+            schema_type: Some(SchemaTypeSet::Single(SchemaType::String)),
+            pattern: string_type.pattern,
+            enum_values: string_type
+                .enumeration
+                .into_iter()
+                .map(|s| serde_json::Value::String(s))
+                .collect(),
+            min_length: string_type.min_length.map(|v| v as u64),
+            max_length: string_type.max_length.map(|v| v as u64),
+            ..Default::default()
+        },
+        openapiv3::Type::Number(number_type) => {
+            let (minimum, exclusive_minimum, maximum, exclusive_maximum) =
+                split_min_max(&number_type);
+            ObjectSchema {
+                schema_type: Some(SchemaTypeSet::Single(SchemaType::Number)),
+                multiple_of: number_type.multiple_of.and_then(Number::from_f64),
+                maximum,
+                exclusive_maximum,
+                minimum,
+                exclusive_minimum,
+                enum_values: number_type
+                    .enumeration
+                    .into_iter()
+                    .flat_map(|of| of.map(|f| json!(f)))
+                    .collect(),
+                ..Default::default()
+            }
+        }
+        openapiv3::Type::Integer(integer_type) => {
+            let (minimum, exclusive_minimum, maximum, exclusive_maximum) =
+                split_min_max(&integer_type);
+            ObjectSchema {
+                schema_type: Some(SchemaTypeSet::Single(SchemaType::Integer)),
+                multiple_of: integer_type.multiple_of.map(Number::from),
+                maximum,
+                exclusive_maximum,
+                minimum,
+                exclusive_minimum,
+                enum_values: integer_type
+                    .enumeration
+                    .into_iter()
+                    .flat_map(|oi| oi.map(Number::from))
+                    .map(serde_json::Value::Number)
+                    .collect(),
+                ..Default::default()
+            }
+        }
+        openapiv3::Type::Object(object_type) => ObjectSchema {
+            schema_type: Some(SchemaTypeSet::Single(SchemaType::Object)),
+            properties: convert_ref_map(object_type.properties, &convert_schema),
+            required: object_type.required,
+            min_properties: object_type.min_properties.map(|v| v as u64),
+            max_properties: object_type.max_properties.map(|v| v as u64),
+            ..Default::default()
+        },
+        openapiv3::Type::Array(array_type) => ObjectSchema {
+            schema_type: Some(SchemaTypeSet::Single(SchemaType::Array)),
+            items: array_type.items.and_then(|boxed_ref_schema| {
+                Some(Box::new(oas3::spec::Schema::Object(Box::new(
+                    convert_ref_schema(*boxed_ref_schema),
+                ))))
+            }),
+            min_items: array_type.min_items.map(|v| v as u64),
+            max_items: array_type.max_items.map(|v| v as u64),
+            unique_items: Some(array_type.unique_items),
+            ..Default::default()
+        },
+        openapiv3::Type::Boolean {} => ObjectSchema {
+            schema_type: Some(SchemaTypeSet::Single(SchemaType::Boolean)),
+            ..Default::default()
+        },
+    }
+}
+
 fn convert_type_set(typ: Option<String>, nullable: bool) -> Option<oas3::spec::SchemaTypeSet> {
     match typ {
         None => nullable.then_some(oas3::spec::SchemaTypeSet::Single(
@@ -410,27 +528,77 @@ fn convert_ref_map<T, U>(
         .collect()
 }
 
-fn split_min_max(
-    any: &openapiv3::AnySchema,
+trait HasMinMax {
+    fn minimum(&self) -> Option<f64>;
+    fn maximum(&self) -> Option<f64>;
+    fn exclusive_minimum(&self) -> Option<bool>;
+    fn exclusive_maximum(&self) -> Option<bool>;
+}
+
+fn split_min_max<T: HasMinMax>(
+    schema: &T,
 ) -> (
-    Option<Number>,
-    Option<Number>,
-    Option<Number>,
-    Option<Number>,
+    Option<serde_json::Number>,
+    Option<serde_json::Number>,
+    Option<serde_json::Number>,
+    Option<serde_json::Number>,
 ) {
-    // minimum / exclusiveMinimum
-    let (minimum, exclusive_minimum) = match (any.minimum, any.exclusive_minimum) {
-        (Some(min), Some(true)) => (None, Number::from_f64(min)),
-        (Some(min), _) => (Number::from_f64(min), None),
+    let (minimum, exclusive_minimum) = match (schema.minimum(), schema.exclusive_minimum()) {
+        (Some(min), Some(true)) => (None, serde_json::Number::from_f64(min)),
+        (Some(min), _) => (serde_json::Number::from_f64(min), None),
         (None, _) => (None, None),
     };
 
-    // maximum / exclusiveMaximum
-    let (maximum, exclusive_maximum) = match (any.maximum, any.exclusive_maximum) {
-        (Some(max), Some(true)) => (None, Number::from_f64(max)),
-        (Some(max), _) => (Number::from_f64(max), None),
+    let (maximum, exclusive_maximum) = match (schema.maximum(), schema.exclusive_maximum()) {
+        (Some(max), Some(true)) => (None, serde_json::Number::from_f64(max)),
+        (Some(max), _) => (serde_json::Number::from_f64(max), None),
         (None, _) => (None, None),
     };
 
     (minimum, exclusive_minimum, maximum, exclusive_maximum)
+}
+
+impl HasMinMax for openapiv3::AnySchema {
+    fn minimum(&self) -> Option<f64> {
+        self.minimum
+    }
+    fn maximum(&self) -> Option<f64> {
+        self.maximum
+    }
+    fn exclusive_minimum(&self) -> Option<bool> {
+        self.exclusive_minimum
+    }
+    fn exclusive_maximum(&self) -> Option<bool> {
+        self.exclusive_maximum
+    }
+}
+
+impl HasMinMax for openapiv3::NumberType {
+    fn minimum(&self) -> Option<f64> {
+        self.minimum
+    }
+    fn maximum(&self) -> Option<f64> {
+        self.maximum
+    }
+    fn exclusive_minimum(&self) -> Option<bool> {
+        Some(self.exclusive_minimum)
+    }
+    fn exclusive_maximum(&self) -> Option<bool> {
+        Some(self.exclusive_maximum)
+    }
+}
+
+impl HasMinMax for openapiv3::IntegerType {
+    fn minimum(&self) -> Option<f64> {
+        self.minimum.map(|v| v as f64)
+    }
+    fn maximum(&self) -> Option<f64> {
+        self.maximum.map(|v| v as f64)
+    }
+    fn exclusive_minimum(&self) -> Option<bool> {
+        Some(self.exclusive_minimum)
+    }
+    fn exclusive_maximum(&self) -> Option<bool> {
+        Some(self.exclusive_maximum)
+    }
 }
