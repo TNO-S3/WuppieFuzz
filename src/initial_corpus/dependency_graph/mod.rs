@@ -37,6 +37,7 @@ use crate::{
     openapi::{
         QualifiedOperation,
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
+        spec::Spec,
     },
     parameter_access::{ParameterAddressing, ParameterMatching},
 };
@@ -44,7 +45,7 @@ use crate::{
 /// Returns OpenApiInputs generated from a dependency graph derived from the OpenAPI
 /// specification. If rigorously generating parameter combinations would result in
 /// too many inputs, it just generates a single example.
-pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
+pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
     let dependency_graph = DependencyGraph::new(api);
 
     // Turn all subgraphs into sorted lists of node indices
@@ -251,19 +252,12 @@ pub struct DependencyGraph<'a> {
 }
 
 impl<'a> DependencyGraph<'a> {
-    pub fn new(api: &'a OpenAPI) -> Self {
+    pub fn new(api: &'a Spec) -> Self {
         let mut graph = DiGraph::new();
 
         // Add all operations to the graph as nodes
-        for (path, method, operation, path_item) in api.operations() {
-            match QualifiedOperation::new(path, method, operation, path_item) {
-                Ok(qualified_operation) => {
-                    graph.add_node(qualified_operation);
-                }
-                Err(invalid_method) => {
-                    log::error!("Invalid method for operation {method} {path}: {invalid_method}");
-                }
-            }
+        for (path, method, operation) in api.operations() {
+            graph.add_node(QualifiedOperation::new(path, method, operation));
         }
 
         // Find all input, response_output and request_output parameters for all operations,

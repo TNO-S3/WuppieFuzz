@@ -11,6 +11,8 @@ use std::{collections::BTreeMap, default::Default};
 use indexmap::IndexMap;
 use serde_json::Number;
 
+pub mod load;
+
 /// The representation of the API specification. Internally uses the version
 /// from the `oas3` crate, which is hopefully future-proof.
 pub struct Spec(oas3::Spec);

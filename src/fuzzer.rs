@@ -45,7 +45,7 @@ use crate::{
 };
 
 lazy_static! {
-    static ref API: Result<Spec, anyhow::Error> = Configuration::get()
+    static ref API: Result<Box<Spec>, anyhow::Error> = Configuration::get()
         .map_err(anyhow::Error::msg)
         .and_then(parse_api_spec);
 }
@@ -67,7 +67,7 @@ pub fn fuzz() -> Result<()> {
         config.initial_corpus.as_deref(),
         &report_path.as_deref(),
     );
-    let mut state_uninit = OpenApiFuzzerState::new_uninit(initial_corpus, api.clone())?;
+    let mut state_uninit = OpenApiFuzzerState::new_uninit(initial_corpus, api)?;
 
     let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 
@@ -75,7 +75,7 @@ pub fn fuzz() -> Result<()> {
     let mut mgr = construct_event_mgr();
 
     // Observers & feedback initialization
-    let mut endpoint_coverage_client = setup_endpoint_coverage(api.clone())?;
+    let mut endpoint_coverage_client = setup_endpoint_coverage(api)?;
     let mut code_coverage_client = setup_line_coverage(config, &report_path)?;
     let combined_map_observer: CombinedMapObserverType<'_> =
         construct_observer(&mut endpoint_coverage_client, &mut code_coverage_client);

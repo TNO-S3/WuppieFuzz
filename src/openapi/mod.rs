@@ -1,13 +1,11 @@
-use std::{convert::TryFrom, fmt::Debug, path::Path};
+use std::{collections::BTreeMap, fmt::Debug};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use indexmap::IndexMap;
-use openapiv3::{MediaType, OpenAPI, Operation, PathItem, Server, VersionedOpenAPI};
+use oas3::spec::{Operation, Server};
+use openapiv3::MediaType;
 
-use crate::{
-    configuration::Configuration,
-    input::{Method, method::InvalidMethodError},
-};
+use crate::{configuration::Configuration, input::Method, openapi::spec::Spec};
 
 pub mod build_request;
 pub mod curl_request;
@@ -15,24 +13,24 @@ pub mod examples;
 pub mod spec;
 pub mod validate_response;
 
-/// Loads the OpenAPI specification from the given path
-pub fn get_api_spec(path: &Path) -> Result<Box<OpenAPI>, anyhow::Error> {
-    openapi_from_yaml_file(path)
-        .map(Box::new)
-        .with_context(|| format!("Error parsing OpenAPI-file at {}", path.to_string_lossy()))
-}
-
-pub fn parse_api_spec(config: &'static Configuration) -> Result<OpenAPI, anyhow::Error> {
-    let mut api = crate::openapi::get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+/// Load the API spec file specified in the Configuration, attempt to parse it,
+/// and replace the Servers statement inside it by the Configuration's server override
+pub fn parse_api_spec(config: &'static Configuration) -> Result<Box<Spec>, anyhow::Error> {
+    let mut api = spec::load::get_api_spec(
+        config
+            .openapi_spec
+            .as_ref()
+            .expect("A path for the API specification file should be known at this point"),
+    )?;
     if let Some(server_override) = &config.target {
         api.servers = vec![Server {
             url: server_override.as_str().trim_end_matches('/').to_string(),
             description: None,
-            variables: None,
-            extensions: IndexMap::new(),
+            variables: BTreeMap::new(),
+            extensions: BTreeMap::new(),
         }];
     }
-    Ok(*api)
+    Ok(api)
 }
 
 /// A QualifiedOperation is the (path, method, operation) tuple returned from
@@ -40,47 +38,36 @@ pub fn parse_api_spec(config: &'static Configuration) -> Result<OpenAPI, anyhow:
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct QualifiedOperation<'a> {
-    pub path: &'a str,
+    pub path: String,
     pub method: Method,
     pub operation: &'a Operation,
-    #[allow(dead_code)]
-    pub path_item: &'a PathItem,
 }
 
 impl<'a> QualifiedOperation<'a> {
-    pub fn new(
-        path: &'a str,
-        method: &'a str,
-        operation: &'a Operation,
-        path_item: &'a PathItem,
-    ) -> Result<Self, InvalidMethodError> {
-        Ok(Self {
+    /// Convenience function to create a QualifiedOperation from a reqwest/http Method
+    pub fn new(path: String, method: reqwest::Method, operation: &'a Operation) -> Self {
+        Self {
             path,
-            method: Method::try_from(method)?,
+            method: method.into(),
             operation,
-            path_item,
-        })
+        }
     }
 }
 
-pub fn openapi_from_yaml_file(filename: &Path) -> Result<OpenAPI> {
-    let file = std::fs::File::open(filename)?;
-    let open_api: VersionedOpenAPI = serde_yaml::from_reader(file)?;
-    Ok(open_api.upgrade())
-}
-
-pub fn find_method_indices_for_path<'a>(api: &'a OpenAPI, path: &str) -> Vec<(&'a str, usize)> {
+/// For a given path, gives the available methods and the operation index corresponding to them
+pub fn find_method_indices_for_path<'a>(api: &'a Spec, path: &str) -> Vec<(Method, usize)> {
     api.operations()
         .enumerate()
-        .filter(|(_, (this_path, _, _, _))| path.eq_ignore_ascii_case(this_path))
-        .map(|(i, (_, this_method, _, _))| (this_method, i))
+        .filter(|(_, (this_path, _, _))| path.eq_ignore_ascii_case(this_path))
+        .map(|(i, (_, this_method, _))| (this_method, i))
         .collect()
 }
 
-pub fn find_operation<'a>(api: &'a OpenAPI, path: &str, method: Method) -> Option<&'a Operation> {
+/// Finds the Operation corresponding to a path and method
+pub fn find_operation<'a>(api: &'a Spec, path: &str, method: Method) -> Option<&'a Operation> {
     api.operations()
-        .find(|&(p, m, _, _)| path.eq_ignore_ascii_case(p) && method == m)
-        .map(|t| t.2)
+        .find(|&(p, m, _)| path.eq_ignore_ascii_case(&p) && method == m)
+        .map(|(_, _, operation)| operation)
 }
 
 pub trait JsonContent {

@@ -30,6 +30,7 @@ use self::dependency_graph::DependencyGraph;
 use crate::{
     initial_corpus::dependency_graph::initial_corpus_from_api,
     input::{OpenApiInput, OpenApiRequest},
+    openapi::spec::Spec,
     types::{EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType},
 };
 
@@ -152,7 +153,7 @@ pub fn print_starting_corpus(filename: &Path) {
 }
 
 pub fn initialize_corpus(
-    api: &OpenAPI,
+    api: &Spec,
     initial_corpus_path: Option<&Path>,
     report_path: &Option<&Path>,
 ) -> InMemoryOnDiskCorpus<OpenApiInput> {
@@ -249,7 +250,7 @@ fn fill_corpus_from_file(
 
 fn fill_corpus_from_api(
     corpus: &mut InMemoryOnDiskCorpus<OpenApiInput>,
-    api: &OpenAPI,
+    api: &Spec,
     report_path: &Option<&Path>,
 ) {
     let inputs = initial_corpus_from_api(api);
