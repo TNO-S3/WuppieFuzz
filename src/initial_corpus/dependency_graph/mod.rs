@@ -481,7 +481,7 @@ fn find_links<'a>(
 ///
 /// The order of the return value is: (inputs, response_outputs, request_outputs).
 fn inout_params<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     op: &QualifiedOperation<'a>,
 ) -> (
     Vec<ParameterNormalization>,
@@ -492,8 +492,8 @@ fn inout_params<'a>(
     let response_output_fields: Vec<_> = op
         .operation
         .responses
-        .responses
         .iter()
+        .flatten()
         .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
         .filter_map(|response| {
             normalize_response(

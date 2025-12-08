@@ -9,12 +9,10 @@
 //! later refers to an 'artist_id', there is an opportunity to match it to the 'id' found
 //! earlier.
 
-use openapiv3::{
-    MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, Schema, SchemaKind,
-};
+use oas3::spec::{MediaType, ObjectSchema, Operation, Parameter, RequestBody, Response};
 
 use crate::{
-    openapi::JsonContent,
+    openapi::{JsonContent, spec::Spec},
     parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
 };
 
@@ -168,7 +166,7 @@ impl ParameterNormalization {
 /// Finds all request parameters used in an operation and returns their normalized name.
 /// See `normalize_parameter` for treatment of parameters named 'id'.
 pub fn normalize_parameters<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     path: &str,
     operation: &'a Operation,
 ) -> Vec<ParameterNormalization> {
@@ -195,24 +193,23 @@ fn normalize_parameter(
     path: &str,
     parameter: &Parameter,
 ) -> Result<ParameterNormalization, String> {
-    let parameter_name = parameter.data.name.clone();
     let path_parts: Vec<_> = path.split('/').collect();
 
-    match &parameter.kind {
-        openapiv3::ParameterKind::Query { .. } => Ok(ParameterNormalization::query_header_cookie(
-            ParameterAccess::request_query(parameter_name.clone()),
+    match &parameter.location {
+        oas3::spec::ParameterIn::Query => Ok(ParameterNormalization::query_header_cookie(
+            ParameterAccess::request_query(parameter.name.clone()),
             path_parts,
         )),
-        openapiv3::ParameterKind::Header { .. } => Ok(ParameterNormalization::query_header_cookie(
-            ParameterAccess::request_header(parameter_name.clone()),
+        oas3::spec::ParameterIn::Header => Ok(ParameterNormalization::query_header_cookie(
+            ParameterAccess::request_header(parameter.name.clone()),
             path_parts,
         )),
-        openapiv3::ParameterKind::Cookie { .. } => Ok(ParameterNormalization::query_header_cookie(
-            ParameterAccess::request_cookie(parameter_name.clone()),
+        oas3::spec::ParameterIn::Cookie => Ok(ParameterNormalization::query_header_cookie(
+            ParameterAccess::request_cookie(parameter.name.clone()),
             path_parts,
         )),
-        openapiv3::ParameterKind::Path { .. } => ParameterNormalization::path(
-            ParameterAccess::request_path(parameter_name.clone()),
+        oas3::spec::ParameterIn::Path => ParameterNormalization::path(
+            ParameterAccess::request_path(parameter.name.clone()),
             path_parts,
         ),
     }
@@ -226,7 +223,7 @@ fn normalize_parameter(
 /// with the stem of the last non-parameter component of the URL. For example,
 /// an "id" parameter returned from `PATCH /tank/{id}` is renamed to "tankid".
 pub fn normalize_response<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     response: &'a Response,
     path: Vec<String>,
 ) -> Option<Vec<ParameterNormalization>> {
@@ -246,7 +243,7 @@ pub fn normalize_response<'a>(
 /// with the stem of the last non-parameter component of the URL. For example,
 /// an "id" parameter sent to `POST /tank` is renamed to "tankid".
 pub fn normalize_request_body<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     body: &'a RequestBody,
     path: Vec<String>,
 ) -> Option<Vec<ParameterNormalization>> {
@@ -256,12 +253,12 @@ pub fn normalize_request_body<'a>(
 /// Schema describes contents of objects and arrays. This function normalizes field
 /// names in a schema if it contains an object or an array of objects.
 fn normalize_schema<'a>(
-    api: &'a OpenAPI,
-    schema: &'a Schema,
+    api: &'a Spec,
+    schema: ObjectSchema,
     path: Vec<String>,
     access: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
-    match &schema.kind {
+    match &schema.schema_type {
         SchemaKind::Type(openapiv3::Type::Object(o)) => {
             Some(normalize_object_type(api, o, path, access))
         }
@@ -282,7 +279,7 @@ fn normalize_schema<'a>(
         }
         openapiv3::SchemaKind::AllOf { all_of } if all_of.len() == 1 => {
             // If only a single property is in this AllOf, return an example from it.
-            normalize_schema(api, all_of[0].resolve(api), path, access)
+            normalize_schema(api, all_of[0].resolve(api).ok(), path, access)
         }
         openapiv3::SchemaKind::Any(_) => {
             // Normalizing example parameters for the "Any" schema is not supported, it's too flexible.
@@ -303,12 +300,12 @@ fn normalize_schema<'a>(
 /// MediaType is the internal type used for objects, both input (POST) and
 /// output (GET). This function normalizes the field names.
 fn normalize_media_type<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     media_type: &'a MediaType,
     path: Vec<String>,
     req_or_resp: ReqResp,
 ) -> Option<Vec<ParameterNormalization>> {
-    let schema = media_type.schema.as_ref()?.resolve(api);
+    let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
     let access = match req_or_resp {
         ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
         ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
@@ -318,7 +315,7 @@ fn normalize_media_type<'a>(
 
 /// Returns ParameterNormalizations for all fields in the object.
 fn normalize_object_type<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     object_type: &'a ObjectType,
     path: Vec<String>,
     parameter_access: ParameterAccess,
