@@ -67,10 +67,10 @@ cfg-if 1.0.4
 chrono 0.4.42
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.52
+clap 4.5.53
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.52
+clap_builder 4.5.53
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.6
@@ -229,13 +229,13 @@ h2 0.4.12
 hashbrown 0.15.5
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-hashbrown 0.16.0
+hashbrown 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
 hashlink 0.10.0
 	licensed under "Apache-2.0 OR MIT"
 	by kyren <kerriganw@gmail.com>
-hostname 0.4.1
+hostname 0.4.2
 	licensed under "MIT"
 	by unspecified authors
 http 1.4.0
@@ -295,7 +295,7 @@ idna 1.1.0
 idna_adapter 1.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-indexmap 2.12.0
+indexmap 2.12.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 indicatif 0.18.3
@@ -532,7 +532,7 @@ rustix 1.1.2
 rustls 0.23.35
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
-rustls-pki-types 1.13.0
+rustls-pki-types 1.13.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 rustls-webpki 0.103.8
@@ -649,7 +649,7 @@ tokio-util 0.7.17
 tower 0.5.2
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
-tower-http 0.6.6
+tower-http 0.6.7
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
 tower-layer 0.3.3
@@ -658,10 +658,10 @@ tower-layer 0.3.3
 tower-service 0.3.3
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
-tracing 0.1.41
+tracing 0.1.43
 	licensed under "MIT"
 	by Eliza Weisman <eliza@buoyant.io>|Tokio Contributors <team@tokio.rs>
-tracing-core 0.1.34
+tracing-core 0.1.35
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
 try-lock 0.2.5
@@ -724,7 +724,7 @@ utf8parse 0.2.2
 uuid 1.18.1
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
-value-bag 1.11.1
+value-bag 1.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix <ashleymannix@live.com.au>
 wait-timeout 0.2.1
@@ -898,16 +898,16 @@ yoke 0.8.1
 yoke-derive 0.8.1
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-z3 0.19.4
+z3 0.19.5
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-z3-sys 0.10.2
+z3-sys 0.10.3
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.27
+zerocopy 0.8.31
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
-zerocopy-derive 0.8.27
+zerocopy-derive 0.8.31
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
 zerofrom 0.1.6
