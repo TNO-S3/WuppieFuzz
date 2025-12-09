@@ -759,7 +759,7 @@ where
         // Keep only concrete values and valid references
         .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
         // Convert to (parameter_name, parameter_kind) tuples
-        .map(|param| (param.data.name.clone(), param.into()))
+        .map(|param| (param.name.clone(), param.into()))
         .map(|(name, kind)| {
             let key = (name, kind);
             // Remove *AND RETURN*, meaning we *keep* the parameter for this key

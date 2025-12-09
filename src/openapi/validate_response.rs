@@ -1,7 +1,7 @@
 use std::{error::Error, str::Utf8Error};
 
 use anyhow::Result;
-use openapiv3::{OpenAPI, ReferenceOr, Schema, Type};
+use openapiv3::{ReferenceOr, Schema, Type};
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
@@ -221,10 +221,9 @@ pub fn validate_response(
         }
     })?;
 
-    let desired_response = op
+    let ref_or_desired_response = op
         .responses
-        .responses
-        .get(&openapiv3::StatusCode::Code(response.status().as_u16()))
+        .and_then(|map| map.get(response.status().as_str()))
         .ok_or_else(|| {
             if response.status().is_server_error() {
                 ValidationError::Status5xxNotSpecified {
@@ -236,17 +235,20 @@ pub fn validate_response(
                 }
             }
         })?;
-    let response_options =
-        desired_response
+
+    let response_options = match *ref_or_desired_response {
+        oas3::spec::ObjectOrReference::Ref { ref_path, .. } => ref_or_desired_response
             .resolve(api)
             .map_err(|err| ValidationError::ResponseReferenceBroken {
-                reference: desired_response.as_ref_str().unwrap_or_default().to_owned(),
-                inner_err: err,
-            })?;
+                reference: ref_path,
+                inner_err: err.into(),
+            })?,
+        oas3::spec::ObjectOrReference::Object(response) => response,
+    };
 
     // We now have a response and the list of valid response_options.
     // If there is no valid option for application/json, the response should also be empty.
-    let media_type = match response_options.content.get_json_content() {
+    let media_type = match response_options.content.get("application/json") {
         Some(media_type) => media_type,
         None => {
             let content_length = response.content_length();

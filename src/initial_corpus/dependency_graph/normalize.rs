@@ -16,7 +16,7 @@ use oas3::spec::{
 };
 
 use crate::{
-    openapi::{JsonContent, spec::Spec},
+    openapi::spec::Spec,
     parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
 };
 

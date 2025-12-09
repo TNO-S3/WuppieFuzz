@@ -66,7 +66,7 @@ pub fn find_method_indices_for_path<'a>(api: &'a Spec, path: &str) -> Vec<(Metho
 /// Finds the Operation corresponding to a path and method
 pub fn find_operation<'a>(api: &'a Spec, path: &str, method: Method) -> Option<&'a Operation> {
     api.operations()
-        .find(|&(p, m, _)| path.eq_ignore_ascii_case(&p) && method == m)
+        .find(|(p, m, _)| path.eq_ignore_ascii_case(&p) && method == Method::from(m))
         .map(|(_, _, operation)| operation)
 }
 

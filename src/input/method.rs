@@ -66,16 +66,22 @@ impl From<Method> for reqwest::Method {
 
 impl From<reqwest::Method> for Method {
     fn from(m: reqwest::Method) -> Self {
+        Self::from(&m)
+    }
+}
+
+impl From<&reqwest::Method> for Method {
+    fn from(m: &reqwest::Method) -> Self {
         match m {
-            reqwest::Method::GET => Method::Get,
-            reqwest::Method::POST => Method::Post,
-            reqwest::Method::PUT => Method::Put,
-            reqwest::Method::PATCH => Method::Patch,
-            reqwest::Method::DELETE => Method::Delete,
-            reqwest::Method::HEAD => Method::Head,
-            reqwest::Method::TRACE => Method::Trace,
-            reqwest::Method::OPTIONS => Method::Options,
-            reqwest::Method::CONNECT => Method::Connect,
+            &reqwest::Method::GET => Method::Get,
+            &reqwest::Method::POST => Method::Post,
+            &reqwest::Method::PUT => Method::Put,
+            &reqwest::Method::PATCH => Method::Patch,
+            &reqwest::Method::DELETE => Method::Delete,
+            &reqwest::Method::HEAD => Method::Head,
+            &reqwest::Method::TRACE => Method::Trace,
+            &reqwest::Method::OPTIONS => Method::Options,
+            &reqwest::Method::CONNECT => Method::Connect,
             _ => panic!("Extensions (inline/allocated) cannot be converted to Methods."),
         }
     }

@@ -15,7 +15,6 @@ use std::{
     path::Path,
 };
 
-use openapiv3::OpenAPI;
 use petgraph::{
     prelude::{DiGraph, NodeIndex},
     stable_graph::DefaultIx,
