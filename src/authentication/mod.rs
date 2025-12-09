@@ -6,7 +6,7 @@ use reqwest::header::{AUTHORIZATION, HeaderMap, IntoHeaderName};
 use reqwest_cookie_store::RawCookie;
 use url::Url;
 
-use crate::{configuration::Configuration, header};
+use crate::{configuration::Configuration, header, openapi::spec::Spec};
 
 pub mod basic;
 pub mod bearer;
@@ -219,7 +219,7 @@ where
     headers
 }
 
-pub fn verify_authentication(api: OpenAPI) -> Result<()> {
+pub fn verify_authentication(api: Spec) -> Result<()> {
     verify_auth::verify_auth(api)
 }
 

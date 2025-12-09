@@ -76,6 +76,7 @@ impl From<reqwest::Method> for Method {
             reqwest::Method::TRACE => Method::Trace,
             reqwest::Method::OPTIONS => Method::Options,
             reqwest::Method::CONNECT => Method::Connect,
+            _ => panic!("Extensions (inline/allocated) cannot be converted to Methods."),
         }
     }
 }

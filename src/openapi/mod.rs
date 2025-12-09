@@ -59,7 +59,7 @@ pub fn find_method_indices_for_path<'a>(api: &'a Spec, path: &str) -> Vec<(Metho
     api.operations()
         .enumerate()
         .filter(|(_, (this_path, _, _))| path.eq_ignore_ascii_case(this_path))
-        .map(|(i, (_, this_method, _))| (this_method, i))
+        .map(|(i, (_, this_method, _))| (this_method.into(), i))
         .collect()
 }
 

@@ -67,7 +67,7 @@ pub fn fuzz() -> Result<()> {
         config.initial_corpus.as_deref(),
         &report_path.as_deref(),
     );
-    let mut state_uninit = OpenApiFuzzerState::new_uninit(initial_corpus, api)?;
+    let mut state_uninit = OpenApiFuzzerState::new_uninit(initial_corpus, *api.as_ref())?;
 
     let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
 

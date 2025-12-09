@@ -8,9 +8,8 @@ use std::{
     f64::consts::PI,
 };
 
-use openapiv3::{
-    OpenAPI, Operation, Parameter, ParameterData, RefOr, Schema, SchemaKind, StringFormat, Type,
-};
+use oas3::spec::Operation;
+// use openapiv3::{OpenAPI, Parameter, ParameterData, RefOr, Schema, SchemaKind, StringFormat, Type};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
 use rand::{Rng, prelude::Distribution};
 use regex::Regex;
@@ -20,6 +19,7 @@ use unicode_truncate::UnicodeTruncateStr;
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
     input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
+    openapi::spec::Spec,
     parameter_access::ParameterMatching,
 };
 
@@ -27,7 +27,7 @@ use crate::{
 /// filled with example values from the API specification, and default values
 /// for parameters with no explicit examples.
 pub fn example_from_qualified_operation(
-    api: &OpenAPI,
+    api: &Spec,
     operation: QualifiedOperation,
 ) -> OpenApiRequest {
     OpenApiRequest {
@@ -45,15 +45,16 @@ pub fn example_from_qualified_operation(
 /// Generates body parameter values for the given operation if the operation has a supported
 /// body type, otherwise None. Examples can be based on various sources, such as being
 /// provided directly in the OpenAPI-spec or as defaults based on their type.
-fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<ParameterContents> {
+fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterContents> {
     let body = operation.request_body.as_ref()?.resolve(api).ok()?;
 
-    // Get either application/json or form content, if neither is present this function will return an empty body.
+    // Get either application/json or form content, if neither is present return None.
     let media_type = None
-        .or_else(|| body.content.get_json_content())
-        .or_else(|| body.content.get_www_form_content())?;
+        .or_else(|| body.content.get("application/json"))
+        .or_else(|| body.content.get("application/x-www-form-urlcontent"))?;
 
-    let schema = media_type.schema.as_ref()?.resolve(api);
+    // Return None if the schema cannot be resolved
+    let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
 
     match &schema.kind {
         SchemaKind::Type(Type::Object(obj)) => {
@@ -870,7 +871,7 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
 /// This allows the fuzzer to start with all the inputs that we might a priori consider useful, and then
 /// continue with random mutations (picking seeds based on coverage feedback).
 pub fn openapi_inputs_from_ops<'a>(
-    api: &OpenAPI,
+    api: &Spec,
     ops_iter: impl Iterator<Item = QualifiedOperation<'a>>,
     subgraph: &DiGraph<QualifiedOperation, ParameterMatching, DefaultIx>,
     sorted_nodes: &[NodeIndex],

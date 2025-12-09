@@ -24,7 +24,6 @@ use libafl::{
     state::HasCorpus,
 };
 use libafl_bolts::{AsIter, Named, current_time};
-use openapiv3::OpenAPI;
 
 use self::dependency_graph::DependencyGraph;
 use crate::{
@@ -110,8 +109,8 @@ where
 /// the dependencies between parameters of the requests in each series generated
 /// as the initial corpus) used to generate the initial corpus is then written
 /// to the `report_path`.
-pub fn generate_corpus_to_files(api: &OpenAPI, corpus_dir: &Path, report_path: Option<&Path>) {
-    let inputs = initial_corpus_from_api(api);
+pub fn generate_corpus_to_files(spec: &Spec, corpus_dir: &Path, report_path: Option<&Path>) {
+    let inputs = initial_corpus_from_api(spec);
     log::debug!("Writing corpus to file...");
     if let Err(e) = write_corpus_to_files(&inputs, corpus_dir) {
         log::warn!("Error writing corpus to file: {e}");
@@ -121,7 +120,7 @@ pub fn generate_corpus_to_files(api: &OpenAPI, corpus_dir: &Path, report_path: O
     if let Some(report_path) = report_path {
         // The dependency graph was already generated while creating it from the API
         // but it is cheap to build, so we can afford to do it again for reporting.
-        let dependency_graph = DependencyGraph::new(api);
+        let dependency_graph = DependencyGraph::new(spec);
         let _ = dependency_graph.write_report(report_path);
         let _ = write_corpus_report(&inputs, report_path);
     }

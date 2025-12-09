@@ -8,7 +8,10 @@ use serde_json::Value;
 use strum::{EnumDiscriminants, EnumString, VariantArray};
 
 use super::JsonContent;
-use crate::input::{Method, OpenApiRequest};
+use crate::{
+    input::{Method, OpenApiRequest},
+    openapi::spec::Spec,
+};
 
 /// The Response object provided by Reqwest is unwieldy, since its body contents
 /// can only be obtained once by consuming the object. This prevents later reading
@@ -207,7 +210,7 @@ impl Error for ValidationError {}
 // Validates whether the response matches the API.
 // The return value contains a description of the particular mismatch.
 pub fn validate_response(
-    api: &OpenAPI,
+    api: &Spec,
     request: &OpenApiRequest,
     response: &Response,
 ) -> Result<(), ValidationError> {
@@ -272,7 +275,7 @@ pub fn validate_response(
 
 /// Validates whether an object is correct according to a schema.
 fn validate_object_against_schema(
-    api: &OpenAPI,
+    api: &Spec,
     schema: &Schema,
     response_contents: &Value,
 ) -> Result<(), ValidationError> {
@@ -346,7 +349,7 @@ fn validate_object_against_schema(
 /// containing a schema, and if it resolves, validating the object against the contained
 /// schema
 fn validate_object_against_ref_or_schema(
-    api: &OpenAPI,
+    api: &Spec,
     ref_or_schema: &ReferenceOr<Schema>,
     response_contents: &Value,
 ) -> Result<(), ValidationError> {
@@ -356,7 +359,7 @@ fn validate_object_against_ref_or_schema(
 
 /// Validates whether an object is correct according to a concrete type
 fn validate_object_against_type(
-    api: &OpenAPI,
+    api: &Spec,
     expected_type: &Type,
     response_contents: &Value,
 ) -> Result<(), ValidationError> {

@@ -22,7 +22,7 @@ use indexmap::{IndexMap, map::Entry};
 use openapiv3::{OpenAPI, StatusCode};
 
 use super::{CoverageClient, MAP_SIZE};
-use crate::input::Method;
+use crate::{input::Method, openapi::spec::Spec};
 
 const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";
 const MISS_SYMBOL: &str = "&#x274c;";
@@ -32,7 +32,7 @@ const SUPERFLUOUS_SYMBOL: &str = "&#x26a0;&#xfe0f";
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
 pub fn setup_endpoint_coverage(
-    api: OpenAPI,
+    api: Spec,
 ) -> core::result::Result<Arc<Mutex<EndpointCoverageClient>>, anyhow::Error> {
     let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
     endpoint_coverage_client.fetch_coverage(true);
@@ -43,7 +43,8 @@ pub fn setup_endpoint_coverage(
 
 /// Endpoint coverage client.
 pub struct EndpointCoverageClient {
-    endpoint_cov_map: IndexMap<(Method, String, StatusCode), Coverage>,
+    // Keys: (Method, String, StatusCode) - oas3 uses a String for the status code.
+    endpoint_cov_map: IndexMap<(Method, String, String), Coverage>,
     cov_map: [u8; MAP_SIZE],
     cov_map_total: [u8; MAP_SIZE],
     len: usize,
@@ -63,18 +64,23 @@ enum Coverage {
 
 impl EndpointCoverageClient {
     /// Creates a new endpoint coverage client given an API specification.
-    pub fn new(api: &OpenAPI) -> Self {
+    pub fn new(api: &Spec) -> Self {
         let coverage_index_map: IndexMap<_, _> = api
             .operations()
             // Collect all method-path-status tuples from the API spec
-            .flat_map(|(path, method, operation, _)| {
-                operation.responses.responses.keys().map(move |status| {
-                    (
-                        Method::try_from(method).unwrap(),
-                        path.to_owned(),
-                        status.clone(),
-                    )
-                })
+            .flat_map(|(path, method, operation)| {
+                operation
+                    .responses
+                    .as_ref()
+                    .unwrap()
+                    .keys()
+                    .map(move |status| {
+                        (
+                            Method::try_from(method.clone()).unwrap(),
+                            path.to_owned(),
+                            status.clone(),
+                        )
+                    })
             })
             // Mark them all as un-covered
             .map(|key| (key, Coverage::ExpectedNotFound))
@@ -110,7 +116,8 @@ impl EndpointCoverageClient {
         // The entry may be Vacant or Occupied, see below for what this means.
         let entry = self
             .endpoint_cov_map
-            .entry((method, path, StatusCode::Code(status.as_u16())));
+            // TODO: check that status.to_string does what we want
+            .entry((method, path, status.to_string()));
         // Must get the index before entry.insert below, which needs ownership of the entry
         let index = entry.index();
 
@@ -147,14 +154,15 @@ impl EndpointCoverageClient {
         // Make a tree in the same structure as the html page will contain:
         // path -> method -> status codes
         let mut operation_tree =
-            IndexMap::<&String, IndexMap<Method, IndexMap<StatusCode, &Coverage>>>::new();
+            IndexMap::<&String, IndexMap<Method, IndexMap<String, &Coverage>>>::new();
         for ((method, path, status), cov_entry) in &self.endpoint_cov_map {
             operation_tree
                 .entry(path)
                 .or_default()
                 .entry(*method)
                 .or_default()
-                .insert(status.clone(), cov_entry);
+                // TODO: check that status.to_string does what we want
+                .insert(status.to_string(), cov_entry);
         }
         operation_tree.sort_keys();
 

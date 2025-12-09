@@ -28,7 +28,7 @@ use libafl_bolts::{
 use openapiv3::OpenAPI;
 use serde::{Deserialize, Serialize};
 
-use crate::types::CombinedFeedbackType;
+use crate::{openapi::spec::Spec, types::CombinedFeedbackType};
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///
@@ -64,7 +64,7 @@ pub struct OpenApiFuzzerState<I> {
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
     phantom: PhantomData<I>,
-    api: OpenAPI,
+    api: Spec,
 }
 
 impl<I> HasCurrentStageId for OpenApiFuzzerState<I> {
@@ -308,7 +308,7 @@ where
         solutions: OnDiskCorpus<I>,
         feedback: &mut F,
         objective: &mut O,
-        api: OpenAPI,
+        api: Spec,
     ) -> Result<Self, Error>
     where
         F: StateInitializer<Self>,
@@ -340,10 +340,7 @@ where
     }
 
     /// Creates a new partially initialized `State`, which needs to be `initialize`d later.
-    pub fn new_uninit(
-        initial_corpus: InMemoryOnDiskCorpus<I>,
-        api: OpenAPI,
-    ) -> Result<Self, Error> {
+    pub fn new_uninit(initial_corpus: InMemoryOnDiskCorpus<I>, api: Spec) -> Result<Self, Error> {
         let mut state = Self {
             rand: StdRand::with_seed(current_nanos()),
             executions: 0,
@@ -382,7 +379,7 @@ where
 // Necessary because of borrow checking conflicts
 pub trait HasRandAndOpenAPI {
     type Rand: Rand;
-    fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &OpenAPI);
+    fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &Spec);
 }
 
 impl<I> HasRandAndOpenAPI for OpenApiFuzzerState<I>
@@ -390,7 +387,7 @@ where
     I: Input,
 {
     type Rand = <Self as HasRand>::Rand;
-    fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &OpenAPI) {
+    fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &Spec) {
         (&mut self.rand, &self.api)
     }
 }
@@ -401,11 +398,13 @@ pub mod tests {
     use libafl_bolts::rands::StdRand;
     use openapiv3::OpenAPI;
 
+    use crate::openapi::spec::Spec;
+
     use super::HasRandAndOpenAPI;
 
     pub struct TestOpenApiFuzzerState {
         rand: StdRand,
-        openapi: OpenAPI,
+        openapi: Spec,
     }
 
     impl TestOpenApiFuzzerState {
@@ -481,7 +480,7 @@ pub mod tests {
     impl HasRandAndOpenAPI for TestOpenApiFuzzerState {
         type Rand = StdRand;
 
-        fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &openapiv3::OpenAPI) {
+        fn rand_mut_and_openapi(&mut self) -> (&mut Self::Rand, &Spec) {
             (&mut self.rand, &self.openapi)
         }
     }

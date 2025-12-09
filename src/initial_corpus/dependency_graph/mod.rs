@@ -106,7 +106,7 @@ fn ops_from_subgraph<'a>(
 
 /// Creates an example OpenApiInput from the sequence of QualifiedOperations given by ops_iter for the given api.
 fn openapi_example_input_from_ops<'a>(
-    api: &OpenAPI,
+    api: &Spec,
     ops_iter: impl Iterator<Item = QualifiedOperation<'a>>,
 ) -> OpenApiInput {
     OpenApiInput(
@@ -498,7 +498,7 @@ fn inout_params<'a>(
         .filter_map(|response| {
             normalize_response(
                 api,
-                response,
+                &response,
                 op.path.split('/').map(String::from).collect(),
             )
         })
@@ -507,7 +507,7 @@ fn inout_params<'a>(
         .collect();
 
     // All parameters are inputs for the request. Collect those.
-    let mut input_fields = normalize_parameters(api, op.path, op.operation);
+    let mut input_fields = normalize_parameters(api, &op.path, op.operation);
     // If two operations have the same parameters, they can be input-linked, so also consider these "request outputs".
     let mut request_output_fields = input_fields.clone();
 
@@ -519,7 +519,7 @@ fn inout_params<'a>(
         .iter()
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
         .find_map(|body| {
-            normalize_request_body(api, body, op.path.split('/').map(String::from).collect())
+            normalize_request_body(api, &body, op.path.split('/').map(String::from).collect())
         })
         .unwrap_or_default();
     if op.method == Method::Post {
