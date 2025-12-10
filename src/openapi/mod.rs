@@ -100,6 +100,15 @@ impl WwwForm for IndexMap<String, MediaType> {
     }
 }
 
+impl WwwForm for BTreeMap<String, MediaType> {
+    fn get_www_form_content(&self) -> Option<&MediaType> {
+        self.iter().find_map(|(key, value)| {
+            key.starts_with("application/x-www-form-urlencoded")
+                .then_some(value)
+        })
+    }
+}
+
 pub trait TextPlain {
     #[allow(dead_code)]
     fn get_text_plain(&self) -> Option<&MediaType>;

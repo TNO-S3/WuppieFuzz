@@ -8,8 +8,7 @@ use std::{
     f64::consts::PI,
 };
 
-use oas3::spec::Operation;
-// use openapiv3::{OpenAPI, Parameter, ParameterData, RefOr, Schema, SchemaKind, StringFormat, Type};
+use oas3::spec::{ObjectOrReference, ObjectSchema, Operation, SchemaType};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
 use rand::{Rng, prelude::Distribution};
 use regex::Regex;
@@ -56,49 +55,39 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
     // Return None if the schema cannot be resolved
     let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
 
-    match &schema.kind {
-        SchemaKind::Type(Type::Object(obj)) => {
-            let body_map: BTreeMap<String, ParameterContents> = obj
-                .properties
-                .iter()
-                .filter_map(|(param, ref_or_schema)| {
-                    Some((
-                        param.clone(),
-                        ParameterContents::from(example_from_schema(
-                            api,
-                            ref_or_schema.resolve(api),
-                        )?),
-                    ))
-                })
-                .collect();
-            Some(body_map.into())
-        }
-        SchemaKind::Type(Type::Array(arr)) => match &arr.items {
-            Some(items) => {
-                let result = items.resolve(api);
-                Some(ParameterContents::from(example_from_schema(api, result)?))
-            }
-            None => None,
-        },
-        // TODO: create other body types, or document why not
-        SchemaKind::Type(unimplemented_type) => {
-            log::warn!(
-                "Cannot create an example body for schema type {unimplemented_type:?}. Using empty body."
-            );
-            None
-        }
-        ref unimplemented_kind => {
-            log::warn!(
-                "Cannot create an example body for schema kind {unimplemented_kind:?}. Using empty body."
-            );
-            None
-        }
+    if schema
+        .schema_type
+        .is_some_and(|st| st.contains(SchemaType::Object))
+    {
+        let body_map: BTreeMap<String, ParameterContents> = schema
+            .properties
+            .iter()
+            .filter_map(|(param, ref_or_schema)| {
+                Some((
+                    param.clone(),
+                    ParameterContents::from(example_from_schema(api, ref_or_schema.resolve(api))?),
+                ))
+            })
+            .collect();
+        return Some(body_map.into());
     }
+    if schema
+        .schema_type
+        .is_some_and(|st| st.contains(SchemaType::Array))
+    {
+        return match &schema.items {
+            Some(items) => Some(ParameterContents::from(example_from_schema(api, items)?)),
+            None => None,
+        };
+    }
+    // TODO this is a bit lackluster
+    log::warn!("Cannot create an example body. Using empty body.");
+    None
 }
 
 /// Generates all interesting body contents
 fn all_interesting_body_contents(
-    api: &OpenAPI,
+    api: &Spec,
     operation: &Operation,
 ) -> Option<Vec<ParameterContents>> {
     let body = operation.request_body.as_ref()?.resolve(api).ok()?;
@@ -349,8 +338,8 @@ fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
 // when resolving discriminator variants, which may refer back to their parent object
 // circularly.
 fn interesting_params_from_schema(
-    api: &OpenAPI,
-    schema: &RefOr<Schema>,
+    api: &Spec,
+    schema: &ObjectOrReference<ObjectSchema>,
     ignore_names: &[&str],
 ) -> Vec<Value> {
     // Add the current schema name to the list of names not to descend into again, to prevent cycles
