@@ -1,7 +1,9 @@
 use std::{error::Error, str::Utf8Error};
 
 use anyhow::Result;
-use openapiv3::{ReferenceOr, Schema, Type};
+use oas3::spec::{
+    BooleanSchema, ObjectOrReference, ObjectSchema, Schema, SchemaType, SchemaTypeSet,
+};
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
@@ -136,6 +138,10 @@ pub enum ValidationError {
     /// The schema can be anything (occurs e.g. when it does not specify a type)
     /// We cannot validate schemas that are this flexible.
     SchemaIsAny(String),
+
+    /// The schema is BooleanSchema::false, which does not describe any response.
+    /// https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-01#name-boolean-json-schemas
+    SchemaIsFalse,
 }
 
 impl ValidationError {
@@ -162,6 +168,28 @@ impl ValidationError {
         };
         self
     }
+}
+
+/// Resolves the reference, wrapping any error in a ValidationError.
+/// Returns a clone of T since this is also how oas3 works.
+fn resolve_ref_or_validation_error<T>(
+    ref_or_obj: &ObjectOrReference<T>,
+    api: &Spec,
+) -> Result<T, ValidationError>
+where
+    T: oas3::spec::FromRef,
+{
+    Ok(match ref_or_obj {
+        oas3::spec::ObjectOrReference::Ref { ref_path, .. } => {
+            ref_or_obj
+                .resolve(api)
+                .map_err(|err| ValidationError::ResponseReferenceBroken {
+                    reference: ref_path.clone(), // Hopefully moved by the compiler :(
+                    inner_err: err.into(),
+                })?
+        }
+        oas3::spec::ObjectOrReference::Object(object) => object.clone(),
+    })
 }
 
 impl std::fmt::Display for ValidationError {
@@ -202,6 +230,10 @@ impl std::fmt::Display for ValidationError {
                 "The specification accepts any schema for this response, which is too flexible for us to validate. \
                 Make sure the schema specifies a type!\nSchema description: {schema_str}"
             ),
+            ValidationError::SchemaIsFalse => write!(
+                fmt,
+                "The specification contains the `false` schema for this response, which must never validate."
+            ),
         }
     }
 }
@@ -223,6 +255,7 @@ pub fn validate_response(
 
     let ref_or_desired_response = op
         .responses
+        .as_ref()
         .and_then(|map| map.get(response.status().as_str()))
         .ok_or_else(|| {
             if response.status().is_server_error() {
@@ -236,19 +269,11 @@ pub fn validate_response(
             }
         })?;
 
-    let response_options = match *ref_or_desired_response {
-        oas3::spec::ObjectOrReference::Ref { ref_path, .. } => ref_or_desired_response
-            .resolve(api)
-            .map_err(|err| ValidationError::ResponseReferenceBroken {
-                reference: ref_path,
-                inner_err: err.into(),
-            })?,
-        oas3::spec::ObjectOrReference::Object(response) => response,
-    };
+    let response_options = resolve_ref_or_validation_error(ref_or_desired_response, api)?;
 
     // We now have a response and the list of valid response_options.
     // If there is no valid option for application/json, the response should also be empty.
-    let media_type = match response_options.content.get("application/json") {
+    let media_type = match response_options.content.get_json_content() {
         Some(media_type) => media_type,
         None => {
             let content_length = response.content_length();
@@ -262,89 +287,89 @@ pub fn validate_response(
 
     // Extract the schema for a correct response. If none exists, we can't really check
     // anything, and we consider that a specification error.
-    let response_schema = media_type
+    let ref_or_response_schema = media_type
         .schema
         .as_ref()
-        .ok_or_else(|| ValidationError::MediaTypeContainsNoSchema)?
-        .resolve(api);
+        .ok_or_else(|| ValidationError::MediaTypeContainsNoSchema)?;
+    let response_schema = resolve_ref_or_validation_error(ref_or_response_schema, api)?;
 
     let response_contents = response
         .json()
         .map_err(|e| ValidationError::ResponseMalformedJSON { error: e })?;
 
-    validate_object_against_schema(api, response_schema, &response_contents)
+    validate_object_against_object_schema(api, &response_schema, &response_contents)
 }
 
 /// Validates whether an object is correct according to a schema.
+/// This special variant `Schema` of the schema object `ObjectSchema`
+/// allows boolean schemas, which are assertion-only.
 fn validate_object_against_schema(
     api: &Spec,
     schema: &Schema,
     response_contents: &Value,
 ) -> Result<(), ValidationError> {
-    match &schema.kind {
-        openapiv3::SchemaKind::Type(expected_type) => {
-            validate_object_against_type(api, expected_type, response_contents)
-        }
+    match schema {
+        Schema::Boolean(BooleanSchema(true)) => Ok(()),
+        Schema::Boolean(BooleanSchema(false)) => Err(ValidationError::SchemaIsFalse),
+        Schema::Object(object_or_reference) => validate_object_against_object_schema(
+            api,
+            &resolve_ref_or_validation_error(object_or_reference, api)?,
+            response_contents,
+        ),
+    }
+}
 
+/// Validates whether an object is correct according to a schema.
+fn validate_object_against_object_schema(
+    api: &Spec,
+    schema: &ObjectSchema,
+    response_contents: &Value,
+) -> Result<(), ValidationError> {
+    if schema.schema_type.is_some() {
+        return validate_object_against_type_set(api, schema, response_contents);
+    }
+
+    if !schema.any_of.is_empty() {
         // AnyOf: the response must validate against at least one of the schemas
-        openapiv3::SchemaKind::AnyOf {
-            any_of: expected_schemas,
-        } => expected_schemas
+        schema
+            .any_of
             .iter()
             .map(|ref_or_schema| {
                 validate_object_against_ref_or_schema(api, ref_or_schema, response_contents)
             })
             // If any schema validates the response, return Ok(())
             .reduce(Result::or)
-            // If there were no schemas (AnyOf(empty set) ??), return Ok(())
-            .unwrap_or(Ok(())),
-
-        // OneOf: the response must validate against exactly one of the schemas
-        openapiv3::SchemaKind::OneOf {
-            one_of: expected_schemas,
-        } => {
-            if expected_schemas
-                .iter()
-                .filter_map(|ref_or_schema| {
-                    validate_object_against_ref_or_schema(api, ref_or_schema, response_contents)
-                        .ok()
-                })
-                // Count the Ok(())s, must be exactly one
-                .count()
-                == 1
-            {
-                Ok(())
-            } else {
-                Err(ValidationError::ResponseObjectIncorrect {
-                    msg: format!(
-                        "Response content {response_contents:?} did not match against exactly one expected schema"
-                    ),
-                })
-            }
-        }
-
-        // AllOf: the response must validate against all of the schemas
-        openapiv3::SchemaKind::AllOf {
-            all_of: expected_schemas,
-        } => expected_schemas.iter().try_for_each(|ref_or_schema| {
-            validate_object_against_ref_or_schema(api, ref_or_schema, response_contents)
-        }),
-
-        // Not: the response must fail to validate the given schema
-        openapiv3::SchemaKind::Not { not: ref_or_schema } => {
-            match validate_object_against_ref_or_schema(api, ref_or_schema, response_contents) {
-                Ok(()) => Err(ValidationError::ResponseObjectIncorrect {
-                    msg: format!(
-                        "Response content {response_contents} matched schema when it should not."
-                    ),
-                }),
-                Err(_) => Ok(()),
-            }
-        }
-        openapiv3::SchemaKind::Any(schema) => {
-            Err(ValidationError::SchemaIsAny(format!("{schema:?}")))
-        }
+            .expect("any_of was checked to be nonempty")?;
     }
+
+    if !schema.one_of.is_empty() {
+        if schema
+            .one_of
+            .iter()
+            .filter_map(|ref_or_schema| {
+                validate_object_against_ref_or_schema(api, ref_or_schema, response_contents).ok()
+            })
+            // Count the Ok(())s, must be exactly one
+            .count()
+            == 1
+        {
+            Ok(())
+        } else {
+            Err(ValidationError::ResponseObjectIncorrect {
+                msg: format!(
+                    "Response content {response_contents:?} did not match against exactly one expected schema"
+                ),
+            })
+        }?;
+    }
+
+    if !schema.all_of.is_empty() {
+        schema.all_of.iter().try_for_each(|ref_or_schema| {
+            validate_object_against_ref_or_schema(api, ref_or_schema, response_contents)
+        })?;
+    }
+
+    Ok(())
 }
 
 /// Validates whether an object is correct by attempting to resolve a `reference_or`
@@ -352,49 +377,82 @@ fn validate_object_against_schema(
 /// schema
 fn validate_object_against_ref_or_schema(
     api: &Spec,
-    ref_or_schema: &ReferenceOr<Schema>,
+    ref_or_schema: &ObjectOrReference<ObjectSchema>,
     response_contents: &Value,
 ) -> Result<(), ValidationError> {
     // First resolve the ReferenceOr object using the API ... and then use the schema to validate the given response
-    validate_object_against_schema(api, ref_or_schema.resolve(api), response_contents)
+    validate_object_against_object_schema(
+        api,
+        &resolve_ref_or_validation_error(ref_or_schema, api)?,
+        response_contents,
+    )
 }
 
-/// Validates whether an object is correct according to a concrete type
+/// Validates whether an object is correct according to a type set
+fn validate_object_against_type_set(
+    api: &Spec,
+    schema: &ObjectSchema,
+    response_contents: &Value,
+) -> Result<(), ValidationError> {
+    match &schema.schema_type {
+        None => Ok(()),
+        Some(SchemaTypeSet::Single(schema_type)) => {
+            validate_object_against_type(api, schema_type, schema, response_contents)
+        }
+        Some(SchemaTypeSet::Multiple(schema_types)) => {
+            for schema_type in schema_types {
+                if validate_object_against_type(api, schema_type, schema, response_contents).is_ok()
+                {
+                    return Ok(());
+                }
+            }
+            Err(ValidationError::ResponseObjectIncorrect {
+                msg: format!(
+                    "Expected the response to be one of {schema_types:?}, but it was {response_contents:?}"
+                ),
+            })
+        }
+    }
+}
+
+/// Validates whether an object is correct according to a concrete type.
+/// The SchemaType given should be an element of the schema_type member.
 fn validate_object_against_type(
     api: &Spec,
-    expected_type: &Type,
+    expected_type: &SchemaType,
+    schema: &ObjectSchema,
     response_contents: &Value,
 ) -> Result<(), ValidationError> {
     let make_err = |err_str| Err(ValidationError::ResponseObjectIncorrect { msg: err_str });
 
     match (expected_type, response_contents) {
-        (Type::Boolean { .. }, Value::Bool(_)) => Ok(()),
-        (Type::Integer(_), Value::Number(n)) => match n.as_i64() {
+        (SchemaType::Boolean { .. }, Value::Bool(_)) => Ok(()),
+        (SchemaType::Integer, Value::Number(n)) => match n.as_i64() {
             Some(_) => Ok(()),
             None => make_err(
                 format!("Response number {n} does not match expected type Integer (as i64)"),
             ),
         },
-        (Type::Number(_), Value::Number(n)) => match n.as_f64() {
+        (SchemaType::Number, Value::Number(n)) => match n.as_f64() {
             Some(_) => Ok(()),
             None => make_err(
                 format!("Response number {n} does not match expected type Number (as f64)"),
             ),
         },
-        (Type::String(s_type), Value::String(a_string)) => {
+        (SchemaType::String, Value::String(a_string)) => {
             // If the type is an enum, check that the value is one of the correct variants.
-            if !s_type.enumeration.is_empty() && !s_type.enumeration.iter().any(|v| v == a_string) {
+            if !schema.enum_values.is_empty() && !schema.enum_values.iter().any(|v| v == a_string) {
                 return Err(ValidationError::ResponseEnumIncorrect {
                     incorrect_variant: a_string.clone(),
                 });
             }
             Ok(())
         }
-        (Type::Array(a_type), Value::Array(a_vec)) => {
+        (SchemaType::Array, Value::Array(a_vec)) => {
             // Find the schema for the array items. If there is no schema, we accept
             // any item we find
-            let item_schema: &Schema = match a_type.items {
-                Some(ref ref_or) => ref_or.resolve(api),
+            let item_schema: &Schema = match schema.items {
+                Some(ref schema) => schema,
                 None => return Ok(()),
             };
             // Check for each item that it matches the schema
@@ -405,28 +463,28 @@ fn validate_object_against_type(
 
             Ok(())
         }
-        (Type::Object(o_type), Value::Object(o_map)) => {
+        (SchemaType::Object, Value::Object(o_map)) => {
             // Check for each field in the response object if it should be there,
             // and if it matches the schema. If we find no schema, we assume that is
             // because the field shouldn't be there
             for (key, value) in o_map.iter() {
-                let item_schema: &Schema = match o_type.properties.get(key) {
-                    Some(ref_or) => ref_or.resolve(api),
+                let item_schema: ObjectSchema = match schema.properties.get(key) {
+                    Some(ref_or) => resolve_ref_or_validation_error(ref_or,api).map_err(|err| err.nested(key))?,
                     None => {
                         return make_err(format!(
                             "Object property \"{key}\" in response not expected \
                             in specified object schema. Expected properties: {:?}",
-                            o_type.properties,
+                            schema.properties,
                         )).map_err(|err| err.nested(key));
                     }
                 };
-                validate_object_against_schema(api, item_schema, value)
+                validate_object_against_object_schema(api, &item_schema, value)
                     .map_err(|err| err.nested(key))?;
             }
 
             // Check for each required field in the schema whether it is contained
             // in the response object
-            for key in &o_type.required {
+            for key in &schema.required {
                 if !o_map.contains_key(key) {
                     return make_err(
                         format!("Response object does not contain specified property \"{key}\"."),

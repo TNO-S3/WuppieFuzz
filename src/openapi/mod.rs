@@ -2,8 +2,7 @@ use std::{collections::BTreeMap, fmt::Debug};
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use oas3::spec::{Operation, Server};
-use openapiv3::MediaType;
+use oas3::spec::{MediaType, Operation, Server};
 
 use crate::{configuration::Configuration, input::Method, openapi::spec::Spec};
 
@@ -75,6 +74,13 @@ pub trait JsonContent {
 }
 
 impl JsonContent for IndexMap<String, MediaType> {
+    fn get_json_content(&self) -> Option<&MediaType> {
+        self.iter()
+            .find_map(|(key, value)| key.starts_with("application/json").then_some(value))
+    }
+}
+
+impl JsonContent for std::collections::BTreeMap<String, MediaType> {
     fn get_json_content(&self) -> Option<&MediaType> {
         self.iter()
             .find_map(|(key, value)| key.starts_with("application/json").then_some(value))

@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use log::Level::Info;
-use openapiv3::OpenAPI;
 use url::Url;
 
 use crate::{header, openapi::spec::Spec};
