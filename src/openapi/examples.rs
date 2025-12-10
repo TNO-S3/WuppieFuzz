@@ -8,7 +8,7 @@ use std::{
     f64::consts::PI,
 };
 
-use oas3::spec::{ObjectOrReference, ObjectSchema, Operation, SchemaType};
+use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, SchemaType};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
 use rand::{Rng, prelude::Distribution};
 use regex::Regex;
@@ -167,7 +167,7 @@ fn example_parameters(
 /// would be replaced by references later.
 fn all_interesting_parameters(
     operation: &Operation,
-    api: &OpenAPI,
+    api: &Spec,
     single_valued: &[&Parameter],
 ) -> Vec<BTreeMap<(String, ParameterKind), ParameterContents>> {
     // For each parameter in the operation, generate a list of plausible values
@@ -177,18 +177,22 @@ fn all_interesting_parameters(
         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
         .map(|parameter| {
             let par_kind: ParameterKind = parameter.into();
-            let par_data = &parameter.data;
             let mut interesting_combinations: Vec<Value> = vec![];
-            if single_valued.contains(&parameter) {
-                if par_data.example.is_some() {
-                    interesting_combinations.push(par_data.example.clone().unwrap());
+            if single_valued.contains(&&parameter) {
+                if let Some(example) = parameter.example {
+                    interesting_combinations.push(example.clone());
+                } else if let Some(example) = parameter.examples.first_entry()
+                    && let Ok(exvalue) = example.get().resolve(api)
+                    && let Some(value) = exvalue.value
+                {
+                    interesting_combinations.push(value)
                 } else {
-                    match example_parameter_value(api, par_data) {
+                    match example_parameter_value(api, parameter) {
                         Ok(value) => interesting_combinations.push(value),
                         Err(err) => {
                             log::warn!(
                                 "Failed to create single value for parameter {}: {}",
-                                par_data.name,
+                                parameter.name,
                                 err
                             )
                         }
@@ -197,30 +201,25 @@ fn all_interesting_parameters(
             } else {
                 // if this parameter is a reference target (it will get replaced with a reference)
                 // only return a single possible value here to avoid duplication down the line.
-                if let Some(example) = par_data.example.clone() {
-                    interesting_combinations.push(example);
+                if let Some(example) = parameter.example {
+                    interesting_combinations.push(example.clone());
                 };
-                match &(par_data.format) {
-                    openapiv3::ParameterSchemaOrContent::Schema(ref_or_schema) => {
-                        interesting_combinations.extend(interesting_params_from_schema(
-                            api,
-                            ref_or_schema,
-                            &[],
-                        ));
-                    }
-                    openapiv3::ParameterSchemaOrContent::Content(content) => {
-                        if let Some(media_type) = content.get("application/json") {
-                            interesting_combinations
-                                .extend(interesting_params_from_media_type(api, media_type));
-                        }
-                    }
-                };
+                interesting_combinations.extend(
+                    parameter
+                        .examples
+                        .iter()
+                        .filter_map(|(_, ref_or)| ref_or.resolve(api).ok())
+                        .filter_map(|ex| ex.value),
+                );
+                if let Ok(value) = example_parameter_value(api, parameter) {
+                    interesting_combinations.push(value);
+                }
             }
             let possible_values = interesting_combinations
                 .into_iter()
                 .map(ParameterContents::from)
                 .collect();
-            ((par_data.name.clone(), par_kind), possible_values)
+            ((parameter.name.clone(), par_kind), possible_values)
         })
         .collect();
 
@@ -250,23 +249,36 @@ fn all_interesting_parameters(
     maps
 }
 
-fn example_from_media_type(api: &OpenAPI, contents: &openapiv3::MediaType) -> Option<Value> {
-    contents.example.clone().or_else(|| {
-        contents
-            .schema
-            .as_ref()
-            .and_then(|ref_or_schema| example_from_schema(api, ref_or_schema.resolve(api)))
-    })
+/// Produces one example (or none) based on the given MediaType
+fn example_from_media_type(api: &Spec, contents: &MediaType) -> Option<Value> {
+    contents
+        .examples
+        .as_ref()
+        .and_then(|examples| {
+            examples
+                .resolve_all(api)
+                .into_iter()
+                .filter_map(|(_, val)| val.value)
+                .next()
+        })
+        .or_else(|| {
+            contents.schema.as_ref().and_then(|ref_or_schema| {
+                example_from_schema(api, &ref_or_schema.resolve(api).ok()?)
+            })
+        })
 }
 
-fn interesting_params_from_media_type(
-    api: &OpenAPI,
-    contents: &openapiv3::MediaType,
-) -> Vec<Value> {
+/// Produces all examples for the given MediaType
+fn interesting_params_from_media_type(api: &Spec, contents: &MediaType) -> Vec<Value> {
     let mut result = vec![];
-    if contents.example.is_some() {
-        result.push(contents.example.clone().unwrap());
-    }
+    if let Some(examples) = &contents.examples {
+        result.extend(
+            examples
+                .resolve_all(api)
+                .into_iter()
+                .filter_map(|(_, ex)| ex.value),
+        );
+    };
     if let Some(more_examples) = contents
         .schema
         .as_ref()
@@ -277,7 +289,7 @@ fn interesting_params_from_media_type(
     result
 }
 
-fn log_schema_debug(schema: &Schema) {
+fn log_schema_debug(schema: &ObjectSchema) {
     if !log::log_enabled!(log::Level::Debug) {
         log::warn!("To output the schema, run with --log-level=debug.");
     }
@@ -285,15 +297,15 @@ fn log_schema_debug(schema: &Schema) {
 }
 
 // Attempts to build a value that matches the given schema using default values
-fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
-    if schema.data.read_only {
+fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
+    if Some(true) == schema.read_only {
         return None;
     }
-    if schema.data.default.is_some() {
-        return schema.data.default.clone();
+    if schema.default.is_some() {
+        return schema.default.clone();
     }
-    if schema.data.example.is_some() {
-        return schema.data.example.clone();
+    if schema.example.is_some() {
+        return schema.example.clone();
     }
     match &schema.kind {
         openapiv3::SchemaKind::Type(t) => example_from_type(api, t),
@@ -457,33 +469,33 @@ fn carthesian_product_values(xs: Vec<Value>, ys: Vec<Value>) -> Vec<Value> {
 /// discriminator parameter.
 ///
 /// * https://swagger.io/specification/#discriminator-object
-fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&str]) -> Vec<Value> {
+fn all_discriminator_variants(
+    api: &Spec,
+    schema: &ObjectSchema,
+    ignore_names: &[&str],
+) -> Vec<Value> {
     // There is a strong assumption from here on that we're dealing with an
     // object schema, with the fields collected from the variant specified by
     // the discriminator, and merged with the fields from the parent type.
-    let discriminator = match &schema.data.discriminator {
-        Some(discriminator) => discriminator,
-        None => unreachable!(), // Should not be called if there is no discriminator
-    };
+    let discriminator = &schema
+        .discriminator
+        .expect("Should not be called if there is no discriminator");
 
     // Make a mapping "path to api schema" -> "variant name" for the variants
     let mut mapping: BTreeMap<String, String> = BTreeMap::new();
     // Collect variants and default names from OneOf/AnyOf
-    if let openapiv3::SchemaKind::OneOf { one_of: variants }
-    | openapiv3::SchemaKind::AnyOf { any_of: variants } = &schema.kind
-    {
-        // Only references are allowed by the spec, no inline schemas
-        for variant in variants {
-            if let RefOr::Reference { reference } = variant {
-                // Select the Dog in '#/components/schemas/Dog'
-                if let Some(name) = reference.split('/').next_back() {
-                    mapping.insert(reference.clone(), name.to_string());
-                }
+    // Only references are allowed by the spec, no inline schemas
+    for variant in schema.one_of.iter().chain(schema.any_of.iter()) {
+        if let ObjectOrReference::Ref { ref_path, .. } = variant {
+            // Select the Dog in '#/components/schemas/Dog'
+            if let Some(name) = ref_path.split('/').next_back() {
+                mapping.insert(ref_path.clone(), name.to_string());
             }
         }
     }
+
     // Overwrite variant names with specifically defined mapping keys
-    for (name, path) in &discriminator.mapping {
+    for (name, path) in discriminator.mapping.iter().flatten() {
         mapping.insert(path.clone(), name.clone());
     }
 
@@ -502,7 +514,11 @@ fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&s
         all_examples.extend(
             interesting_params_from_schema(
                 api,
-                &RefOr::Reference { reference: path },
+                &ObjectOrReference::Ref {
+                    ref_path: path,
+                    summary: None,
+                    description: None,
+                },
                 ignore_names,
             )
             .into_iter()
@@ -516,7 +532,7 @@ fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&s
 
 /// Gives a slice of example string references based on the StringFormat given.
 /// The examples are correct values for their type, if perhaps surprising.
-fn strings_from_format(str_format: &openapiv3::VariantOrUnknownOrEmpty<StringFormat>) -> &[&str] {
+fn strings_from_format(str_format: bool) -> &[&str] {
     match str_format {
         openapiv3::VariantOrUnknownOrEmpty::Item(StringFormat::Date) => {
             &["1981-09-05", "0000-01-01", "9999999-12-31"]
@@ -870,7 +886,7 @@ pub fn openapi_inputs_from_ops<'a>(
     let mut concrete_requests: VecDeque<Vec<OpenApiRequest>> = ops_iter
         .enumerate()
         .map(|(request_idx, op)| {
-            let single_valued: Vec<&Parameter> = subgraph
+            let single_valued: Vec<Parameter> = subgraph
                 .edge_references()
                 .filter(|edge| edge.target() == sorted_nodes[request_idx])
                 .flat_map(|edge| {
@@ -938,9 +954,9 @@ pub fn openapi_inputs_from_ops<'a>(
 
 /// Returns a NON-EMPTY vector of interesting requests that can be made for the given operation.
 fn all_interesting_inputs_for_qualified_operation(
-    api: &OpenAPI,
+    api: &Spec,
     operation: QualifiedOperation,
-    single_valued: &[&Parameter],
+    single_valued: &[Parameter],
 ) -> Vec<OpenApiRequest> {
     // There may be multiple parameters, create an OpenApiRequest for each combination
     // of interesting values for these parameters.
