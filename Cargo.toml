@@ -109,6 +109,6 @@ install-updater = true
 aarch64-apple-darwin = "macos-14"
 
 [workspace.metadata.dist.github-action-commits]
-"actions/checkout" = "1af3b93b6815bc44a9784bd300feb67ff0d1eeb3"
+"actions/checkout" = "8e8c483db84b4bee98b60c0593521ed34d9990e8"
 "actions/upload-artifact" = "330a01c490aca151604b8cf639adc76d48f6c5d4"
 "actions/download-artifact" = "018cc2cf5baa6db3ef3c5f8a56943fffe632ef53"
