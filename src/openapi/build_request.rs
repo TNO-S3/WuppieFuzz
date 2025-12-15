@@ -1,11 +1,11 @@
 use anyhow::Context;
-use openapiv3::OpenAPI;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest_cookie_store::RawCookie as Cookie;
 
 use crate::{
     authentication,
     input::{OpenApiRequest, parameter::ParameterKind},
+    openapi::spec::Spec,
 };
 
 /// Build a request to a path from the API using the input values.
@@ -13,7 +13,7 @@ pub fn build_request_from_input(
     client: &reqwest::blocking::Client,
     authentication: &mut authentication::Authentication,
     cookie_store: &std::sync::Arc<reqwest_cookie_store::CookieStoreMutex>,
-    api: &OpenAPI,
+    api: &Spec,
     input: &OpenApiRequest,
 ) -> anyhow::Result<reqwest::blocking::RequestBuilder> {
     let server = &api

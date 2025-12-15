@@ -20,7 +20,6 @@ use libafl::{
     state::{HasExecutions, Stoppable},
 };
 use libafl_bolts::{current_time, prelude::RefIndexable};
-use openapiv3::OpenAPI;
 use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
 use strum::IntoDiscriminant;
@@ -33,6 +32,7 @@ use crate::{
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
+        spec::Spec,
         validate_response::{Response, ValidationErrorDiscriminants, validate_response},
     },
     parameter_feedback::ParameterFeedback,
@@ -53,7 +53,7 @@ where
 {
     observers: OT,
 
-    api: &'static OpenAPI,
+    api: &'static Spec,
     config: &'static Configuration,
     authentication: Authentication,
     cookie_store: Arc<CookieStoreMutex>,
@@ -80,7 +80,7 @@ pub(crate) fn process_response(
     request_index: usize,
     request: &OpenApiRequest,
     response: Response,
-    api: &OpenAPI,
+    api: &Spec,
     crash_criteria: &[ValidationErrorDiscriminants],
     exit_kind: &mut ExitKind,
     parameter_feedback: &mut ParameterFeedback,
@@ -114,7 +114,7 @@ where
     /// Create a new SequenceExecutor.
     pub fn new(
         observers: OT,
-        api: &'static OpenAPI,
+        api: &'static Spec,
         config: &'static Configuration,
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,

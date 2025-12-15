@@ -6,7 +6,7 @@ use std::{
 
 use base64::{Engine as _, display::Base64Display, engine::general_purpose::STANDARD};
 use libafl_bolts::rands::Rand;
-use openapiv3::Parameter;
+use oas3::spec::Parameter;
 use reqwest::header::HeaderValue;
 use serde_json::{Map, Number, Value};
 
@@ -372,8 +372,8 @@ pub enum ParameterKind {
 }
 
 impl ParameterKind {
-    pub fn matches(&self, parameter: &Parameter) -> bool {
-        self == &parameter.into()
+    pub fn matches(&self, parameter: Parameter) -> bool {
+        self == &ParameterKind::from(parameter)
     }
 }
 
@@ -403,13 +403,13 @@ impl From<&RequestParameterAccess> for ParameterKind {
     }
 }
 
-impl From<&Parameter> for ParameterKind {
-    fn from(parameter: &Parameter) -> Self {
-        match parameter.kind {
-            openapiv3::ParameterKind::Query { .. } => Self::Query,
-            openapiv3::ParameterKind::Header { .. } => Self::Header,
-            openapiv3::ParameterKind::Path { .. } => Self::Path,
-            openapiv3::ParameterKind::Cookie { .. } => Self::Cookie,
+impl From<Parameter> for ParameterKind {
+    fn from(parameter: Parameter) -> Self {
+        match parameter.location {
+            oas3::spec::ParameterIn::Query => Self::Query,
+            oas3::spec::ParameterIn::Header => Self::Header,
+            oas3::spec::ParameterIn::Path => Self::Path,
+            oas3::spec::ParameterIn::Cookie => Self::Cookie,
         }
     }
 }

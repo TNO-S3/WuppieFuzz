@@ -15,7 +15,6 @@ use std::{
     path::Path,
 };
 
-use openapiv3::OpenAPI;
 use petgraph::{
     prelude::{DiGraph, NodeIndex},
     stable_graph::DefaultIx,
@@ -37,6 +36,7 @@ use crate::{
     openapi::{
         QualifiedOperation,
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
+        spec::Spec,
     },
     parameter_access::{ParameterAddressing, ParameterMatching},
 };
@@ -44,7 +44,7 @@ use crate::{
 /// Returns OpenApiInputs generated from a dependency graph derived from the OpenAPI
 /// specification. If rigorously generating parameter combinations would result in
 /// too many inputs, it just generates a single example.
-pub fn initial_corpus_from_api(api: &OpenAPI) -> Vec<OpenApiInput> {
+pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
     let dependency_graph = DependencyGraph::new(api);
 
     // Turn all subgraphs into sorted lists of node indices
@@ -105,7 +105,7 @@ fn ops_from_subgraph<'a>(
 
 /// Creates an example OpenApiInput from the sequence of QualifiedOperations given by ops_iter for the given api.
 fn openapi_example_input_from_ops<'a>(
-    api: &OpenAPI,
+    api: &Spec,
     ops_iter: impl Iterator<Item = QualifiedOperation<'a>>,
 ) -> OpenApiInput {
     OpenApiInput(
@@ -251,19 +251,12 @@ pub struct DependencyGraph<'a> {
 }
 
 impl<'a> DependencyGraph<'a> {
-    pub fn new(api: &'a OpenAPI) -> Self {
+    pub fn new(api: &'a Spec) -> Self {
         let mut graph = DiGraph::new();
 
         // Add all operations to the graph as nodes
-        for (path, method, operation, path_item) in api.operations() {
-            match QualifiedOperation::new(path, method, operation, path_item) {
-                Ok(qualified_operation) => {
-                    graph.add_node(qualified_operation);
-                }
-                Err(invalid_method) => {
-                    log::error!("Invalid method for operation {method} {path}: {invalid_method}");
-                }
-            }
+        for (path, method, operation) in api.operations() {
+            graph.add_node(QualifiedOperation::new(path, method, operation));
         }
 
         // Find all input, response_output and request_output parameters for all operations,
@@ -487,7 +480,7 @@ fn find_links<'a>(
 ///
 /// The order of the return value is: (inputs, response_outputs, request_outputs).
 fn inout_params<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     op: &QualifiedOperation<'a>,
 ) -> (
     Vec<ParameterNormalization>,
@@ -498,13 +491,13 @@ fn inout_params<'a>(
     let response_output_fields: Vec<_> = op
         .operation
         .responses
-        .responses
         .iter()
+        .flatten()
         .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
         .filter_map(|response| {
             normalize_response(
                 api,
-                response,
+                &response,
                 op.path.split('/').map(String::from).collect(),
             )
         })
@@ -513,7 +506,7 @@ fn inout_params<'a>(
         .collect();
 
     // All parameters are inputs for the request. Collect those.
-    let mut input_fields = normalize_parameters(api, op.path, op.operation);
+    let mut input_fields = normalize_parameters(api, &op.path, op.operation);
     // If two operations have the same parameters, they can be input-linked, so also consider these "request outputs".
     let mut request_output_fields = input_fields.clone();
 
@@ -525,7 +518,7 @@ fn inout_params<'a>(
         .iter()
         .filter_map(|ref_or_body| ref_or_body.resolve(api).ok())
         .find_map(|body| {
-            normalize_request_body(api, body, op.path.split('/').map(String::from).collect())
+            normalize_request_body(api, &body, op.path.split('/').map(String::from).collect())
         })
         .unwrap_or_default();
     if op.method == Method::Post {

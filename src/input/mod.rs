@@ -65,12 +65,14 @@ use std::{
 use ahash::RandomState;
 use libafl::{Error, corpus::CorpusId, inputs::Input};
 use libafl_bolts::{HasLen, fs::write_file_atomic, rands::Rand};
-use openapiv3::{OpenAPI, Operation};
+use oas3::spec::Operation;
+use openapiv3::OpenAPI;
 
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
 use crate::{
     input::parameter::{IReference, OReference},
+    openapi::spec::Spec,
     parameter_access::{
         ParameterAccess, ParameterAccessElements, ParameterAddressing, RequestParameterAccess,
     },
@@ -119,11 +121,7 @@ pub enum Body {
 
 impl Body {
     /// Build a body with variables from contents and their type determined by the operation
-    pub fn build(
-        api: &OpenAPI,
-        operation: &Operation,
-        contents: Option<ParameterContents>,
-    ) -> Self {
+    pub fn build(api: &Spec, operation: &Operation, contents: Option<ParameterContents>) -> Self {
         let (param_contents, ref_or_body) = match (contents, &operation.request_body) {
             (Some(indexmap), Some(ref_or_body)) => (indexmap, ref_or_body),
             _ => return Body::Empty,
@@ -761,7 +759,7 @@ where
         // Keep only concrete values and valid references
         .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
         // Convert to (parameter_name, parameter_kind) tuples
-        .map(|param| (param.data.name.clone(), param.into()))
+        .map(|param| (param.name.clone(), param.into()))
         .map(|(name, kind)| {
             let key = (name, kind);
             // Remove *AND RETURN*, meaning we *keep* the parameter for this key

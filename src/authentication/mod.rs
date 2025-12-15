@@ -1,12 +1,11 @@
 use std::{borrow::Cow, fs::File, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
-use openapiv3::OpenAPI;
 use reqwest::header::{AUTHORIZATION, HeaderMap, IntoHeaderName};
 use reqwest_cookie_store::RawCookie;
 use url::Url;
 
-use crate::{configuration::Configuration, header};
+use crate::{configuration::Configuration, header, openapi::spec::Spec};
 
 pub mod basic;
 pub mod bearer;
@@ -219,13 +218,13 @@ where
     headers
 }
 
-pub fn verify_authentication(api: OpenAPI) -> Result<()> {
+pub fn verify_authentication(api: Spec) -> Result<()> {
     verify_auth::verify_auth(api)
 }
 
 /// Initializes the authentication module and cookie store and builds a Reqwest HTTP client
 pub fn build_http_client(
-    api: &openapiv3::OpenAPI,
+    api: &Spec,
 ) -> Result<
     (
         Authentication,

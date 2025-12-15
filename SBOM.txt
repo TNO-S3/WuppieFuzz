@@ -118,6 +118,12 @@ ctrlc 3.5.1
 deranged 0.5.5
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
+derive_more 2.0.1
+	licensed under "MIT"
+	by Jelte Fennema <github-tech@jeltef.nl>
+derive_more-impl 2.0.1
+	licensed under "MIT"
+	by Jelte Fennema <github-tech@jeltef.nl>
 dispatch2 0.3.0
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Mads Marquart <mads@marquart.dk>|Mary <mary@mary.zone>
@@ -307,12 +313,6 @@ is_terminal_polyfill 1.70.2
 iter-read 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Georg Brandl <georg@python.org>
-itertools 0.13.0
-	licensed under "Apache-2.0 OR MIT"
-	by bluss
-itertools 0.14.0
-	licensed under "Apache-2.0 OR MIT"
-	by bluss
 itoa 1.0.15
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
@@ -409,6 +409,9 @@ num-rational 0.4.2
 num_enum 0.7.5
 	licensed under "Apache-2.0 OR BSD-3-Clause OR MIT"
 	by Daniel Wagner-Hall <dawagner@gmail.com>|Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>|Vincent Esche <regexident@gmail.com>
+oas3 0.20.1
+	licensed under "MIT"
+	by softprops <d.tangren@gmail.com>|Rob Ede <robjtede@icloud.com>
 objc2 0.6.3
 	licensed under "MIT"
 	by Mads Marquart <mads@marquart.dk>
@@ -562,6 +565,9 @@ security-framework 2.11.1
 security-framework-sys 2.15.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>
+semver 1.0.27
+	licensed under "Apache-2.0 OR MIT"
+	by David Tolnay <dtolnay@gmail.com>
 serde_core 1.0.228
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>

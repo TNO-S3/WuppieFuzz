@@ -1,9 +1,8 @@
 use anyhow::{Context, Result};
 use log::Level::Info;
-use openapiv3::OpenAPI;
 use url::Url;
 
-use crate::header;
+use crate::{header, openapi::spec::Spec};
 
 fn send_request(
     client: reqwest::blocking::Client,
@@ -26,7 +25,7 @@ fn print_response(mode: &str, response: &str) {
     println!("\t{:<24}{}", "Response:", response);
 }
 
-pub fn verify_auth(api: OpenAPI) -> Result<()> {
+pub fn verify_auth(api: Spec) -> Result<()> {
     println!("\n=============================================================================");
     println!("\n[*] Running authentication verification!\n\n");
 
@@ -76,40 +75,42 @@ pub fn verify_auth(api: OpenAPI) -> Result<()> {
     };
 
     // Check all paths for a "401 Unauthorized" error, which means authentication has failed
-    for (path, _path_item) in api.paths.iter() {
-        let url = server.url.clone() + path;
-        let t_response = send_request(client.clone(), &url);
-        if log::log_enabled!(Info) {
-            println!("Path: {path}");
-        }
-        match t_response {
-            Ok(r) => {
-                if r.status() == reqwest::StatusCode::UNAUTHORIZED {
+    if let Some(paths) = &api.paths {
+        for (path, _path_item) in paths.iter() {
+            let url = server.url.clone() + path;
+            let t_response = send_request(client.clone(), &url);
+            if log::log_enabled!(Info) {
+                println!("Path: {path}");
+            }
+            match t_response {
+                Ok(r) => {
+                    if r.status() == reqwest::StatusCode::UNAUTHORIZED {
+                        println!("\n\nAuthentication verification:");
+                        println!("\tResult:   failed");
+                        println!("\tReason:   received status code: 401 Unauthorized");
+                        println!("\tEndpoint: {url}\n");
+                        println!(
+                            "\n\nTip: for less verbose logging, set the flag \"--log-level=warn\""
+                        );
+                        println!(
+                            "============================================================================="
+                        );
+                        bail!("Could not authenticate: 401 Unauthorized");
+                    }
+                    // println!("\tResponse: {:?}", r.status());
+                    if log::log_enabled!(Info) {
+                        println!("\tResponse: {:?}", r.text().unwrap());
+                    }
+                }
+                Err(e) => {
                     println!("\n\nAuthentication verification:");
                     println!("\tResult:   failed");
-                    println!("\tReason:   received status code: 401 Unauthorized");
-                    println!("\tEndpoint: {url}\n");
-                    println!(
-                        "\n\nTip: for less verbose logging, set the flag \"--log-level=warn\""
-                    );
-                    println!(
-                        "============================================================================="
-                    );
-                    bail!("Could not authenticate: 401 Unauthorized");
+                    println!("\tError in sending request: {e}");
+                    println!("\tIs the API up and running?");
+                    return Err(e).context("Error sending request to the API");
                 }
-                // println!("\tResponse: {:?}", r.status());
-                if log::log_enabled!(Info) {
-                    println!("\tResponse: {:?}", r.text().unwrap());
-                }
-            }
-            Err(e) => {
-                println!("\n\nAuthentication verification:");
-                println!("\tResult:   failed");
-                println!("\tError in sending request: {e}");
-                println!("\tIs the API up and running?");
-                return Err(e).context("Error sending request to the API");
-            }
-        };
+            };
+        }
     }
 
     // No authorization errors found: success!
