@@ -106,7 +106,7 @@ core-foundation 0.9.4
 core-foundation-sys 0.8.7
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
-ctor 0.6.1
+ctor 0.6.3
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
 ctor-proc-macro 0.0.7
@@ -253,7 +253,7 @@ hyper-rustls 0.27.7
 hyper-tls 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-hyper-util 0.1.18
+hyper-util 0.1.19
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 iana-time-zone 0.1.64
@@ -358,7 +358,7 @@ litemap 0.8.1
 lock_api 0.4.14
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-log 0.4.28
+log 0.4.29
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 mach2 0.5.0
@@ -379,7 +379,7 @@ mime 0.3.17
 miniz_oxide 0.8.9
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Frommi <daniil.liferenko@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>|Rich Geldreich richgel99@gmail.com
-mio 1.1.0
+mio 1.1.1
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>|Tokio Contributors <team@tokio.rs>
 native-tls 0.2.14
@@ -715,7 +715,7 @@ utf8_iter 1.0.4
 utf8parse 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Joe Wilm <joe@jwilm.com>|Christian Duerr <contact@christianduerr.com>
-uuid 1.18.1
+uuid 1.19.0
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
 value-bag 1.12.0
