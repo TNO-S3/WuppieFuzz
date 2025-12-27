@@ -274,10 +274,10 @@ icu_normalizer 2.1.1
 icu_normalizer_data 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_properties 2.1.1
+icu_properties 2.1.2
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_properties_data 2.1.1
+icu_properties_data 2.1.2
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 icu_provider 2.1.1
@@ -508,7 +508,7 @@ regex-automata 0.4.13
 regex-syntax 0.8.8
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-reqwest 0.12.24
+reqwest 0.12.25
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 reqwest_cookie_store 0.9.0
@@ -574,7 +574,7 @@ serde_yaml 0.9.34+deprecated
 serial_test 3.2.0
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
-simd-adler32 0.3.7
+simd-adler32 0.3.8
 	licensed under "MIT"
 	by Marvin Countryman <me@maar.vin>
 siphasher 1.0.1
@@ -643,7 +643,7 @@ tokio-util 0.7.17
 tower 0.5.2
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
-tower-http 0.6.7
+tower-http 0.6.8
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
 tower-layer 0.3.3
@@ -892,7 +892,7 @@ yoke 0.8.1
 yoke-derive 0.8.1
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-z3 0.19.5
+z3 0.19.6
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
 z3-sys 0.10.3
