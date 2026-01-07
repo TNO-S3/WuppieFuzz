@@ -12,12 +12,15 @@ use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Paramete
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
 use rand::{Rng, prelude::Distribution};
 use regex::Regex;
-use serde_json::Value;
+use serde_json::{Value, json};
 use unicode_truncate::UnicodeTruncateStr;
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
-    input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
+    input::{
+        Body, OpenApiInput, OpenApiRequest, ParameterContents,
+        parameter::{ParameterKind, SimpleValue},
+    },
     openapi::spec::Spec,
     parameter_access::ParameterMatching,
 };
@@ -57,6 +60,7 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
 
     if schema
         .schema_type
+        .as_ref()
         .is_some_and(|st| st.contains(SchemaType::Object))
     {
         let body_map: BTreeMap<String, ParameterContents> = schema
@@ -65,7 +69,10 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
             .filter_map(|(param, ref_or_schema)| {
                 Some((
                     param.clone(),
-                    ParameterContents::from(example_from_schema(api, ref_or_schema.resolve(api))?),
+                    ParameterContents::from(example_from_schema(
+                        api,
+                        &ref_or_schema.resolve(api).ok()?,
+                    )?),
                 ))
             })
             .collect();
@@ -76,7 +83,20 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
         .is_some_and(|st| st.contains(SchemaType::Array))
     {
         return match &schema.items {
-            Some(items) => Some(ParameterContents::from(example_from_schema(api, items)?)),
+            Some(items) => match &**items {
+                oas3::spec::Schema::Boolean(boolean_schema) => {
+                    // Boolean schemas only serve to signal whether something will (true) or will not (false) validate against it.
+                    // For the true variant any example will do, and we choose to return an empty object as an example.
+                    // For the false variant no examples will validate, so we choose to not return any example.
+                    match boolean_schema.0 {
+                        true => Some(ParameterContents::Object(Default::default())),
+                        false => None,
+                    }
+                }
+                oas3::spec::Schema::Object(object_or_reference) => Some(ParameterContents::from(
+                    example_from_schema(api, &object_or_reference.resolve(&api).ok()?)?,
+                )),
+            },
             None => None,
         };
     }
@@ -107,51 +127,58 @@ fn all_interesting_body_contents(
 /// Create an example body from an operation. This function is meant for requests that do
 /// not have a structured body object, but a simple value.
 #[allow(unused)]
-fn example_plain_body(operation: &Operation, api: &OpenAPI) -> Option<ParameterContents> {
+fn example_plain_body(operation: &Operation, api: &Spec) -> Option<ParameterContents> {
     operation
         .request_body
         .as_ref()
         .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
-        .and_then(|body| body.content.get_json_content())
-        .and_then(|media_type| example_from_media_type(api, media_type))
+        .and_then(|body| body.content.get_json_content().cloned())
+        .and_then(|media_type| example_from_media_type(api, &media_type))
         .map(ParameterContents::from)
 }
 
-fn example_parameter_value(api: &OpenAPI, par_data: &ParameterData) -> Result<Value, String> {
-    let example = par_data.example.clone();
+fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, String> {
+    let example = param.example.clone();
     if example.is_some() {
         example.ok_or("".to_owned())
     } else {
         // The specification allows for a theoretically infinite tower of
         // media types, examples, schemas and references. We put in some effort
         // to extract any useful value that may exist.
-        match &(par_data.format) {
-            openapiv3::ParameterSchemaOrContent::Schema(ref_or_schema) => {
-                example_from_schema(api, ref_or_schema.resolve(api))
-                    .ok_or("Could not create example from schema".to_owned())
-            }
-            openapiv3::ParameterSchemaOrContent::Content(content) => content
+        if param.schema.is_some() {
+            let schema = param.schema.as_ref().unwrap();
+            example_from_schema(api, &schema.resolve(api).expect("Could not resolve schema"))
+                .ok_or("Could not create example from schema".to_owned())
+        } else if param.content.is_some() {
+            param
+                .content
+                .as_ref()
+                .unwrap()
                 .get_json_content()
                 .and_then(|media_type| example_from_media_type(api, media_type))
-                .ok_or("Could not create example from content".to_owned()),
+                .ok_or("Could not create example from content".to_owned())
+        } else {
+            Err(format!(
+                "Parameter {} must contain either schema or content.",
+                param.name
+            ))
         }
     }
 }
 
 fn example_parameters(
-    api: &OpenAPI,
+    api: &Spec,
     operation: &Operation,
 ) -> BTreeMap<(String, ParameterKind), ParameterContents> {
     operation
         .parameters
         .iter()
         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-        .map(|parameter| (parameter.into(), &parameter.data))
-        .filter_map(|(par_kind, par_data)| {
-            example_parameter_value(api, par_data)
+        .filter_map(|parameter| {
+            example_parameter_value(api, &parameter)
                 .map(|value| {
                     (
-                        (par_data.name.clone(), par_kind),
+                        (parameter.name.clone(), parameter.into()),
                         ParameterContents::from(value),
                     )
                 })
@@ -175,8 +202,8 @@ fn all_interesting_parameters(
         .parameters
         .iter()
         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-        .map(|parameter| {
-            let par_kind: ParameterKind = parameter.into();
+        .map(|mut parameter| {
+            let par_kind: ParameterKind = parameter.clone().into();
             let mut interesting_combinations: Vec<Value> = vec![];
             if single_valued.contains(&&parameter) {
                 if let Some(example) = parameter.example {
@@ -187,7 +214,7 @@ fn all_interesting_parameters(
                 {
                     interesting_combinations.push(value)
                 } else {
-                    match example_parameter_value(api, parameter) {
+                    match example_parameter_value(api, &parameter) {
                         Ok(value) => interesting_combinations.push(value),
                         Err(err) => {
                             log::warn!(
@@ -201,7 +228,7 @@ fn all_interesting_parameters(
             } else {
                 // if this parameter is a reference target (it will get replaced with a reference)
                 // only return a single possible value here to avoid duplication down the line.
-                if let Some(example) = parameter.example {
+                if let Some(ref example) = parameter.example {
                     interesting_combinations.push(example.clone());
                 };
                 interesting_combinations.extend(
@@ -211,7 +238,7 @@ fn all_interesting_parameters(
                         .filter_map(|(_, ref_or)| ref_or.resolve(api).ok())
                         .filter_map(|ex| ex.value),
                 );
-                if let Ok(value) = example_parameter_value(api, parameter) {
+                if let Ok(value) = example_parameter_value(api, &parameter) {
                     interesting_combinations.push(value);
                 }
             }
