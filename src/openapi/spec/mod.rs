@@ -15,7 +15,9 @@ pub mod load;
 
 /// The representation of the API specification. Internally uses the version
 /// from the `oas3` crate, which is hopefully future-proof.
-#[derive(Clone, serde::Deserialize)]
+/// The reason to wrap it like this is so we can implement traits such as From
+/// for our Spec.
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
 pub struct Spec(oas3::Spec);
 
 impl std::ops::Deref for Spec {

@@ -523,27 +523,28 @@ impl OpenApiInput {
 
     /// Returns an iterator that yields all (named) return value names from all
     /// requests, along with the index of the request they appear in.
-    pub(crate) fn return_values(&self, api: &OpenAPI) -> Vec<ParameterAddressing> {
+    pub(crate) fn return_values(&self, api: &Spec) -> Vec<ParameterAddressing> {
         self.0
             .iter()
             .enumerate()
             // Find the request's corresponding operation in the API spec
             .filter_map(|(i, e)| {
                 api.operations()
-                    .find(|&(p, m, _, _)| e.path.eq_ignore_ascii_case(p) && e.method == m)
+                    .find(|(p, m, _)| e.path == *p && e.method == Method::from(m))
                     .map(|op| (i, op.2))
             })
             // Extract the specification of each operation's possible responses
             .flat_map(|(i, op)| {
                 op.responses
-                    .responses
+                    .clone()
+                    .unwrap_or_default()
                     .iter()
                     .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
                     // Filter this by extracting only json responses, which contain usable return values
                     .flat_map(|response| {
                         response.content.iter().find_map(|(key, value)| {
                             key.starts_with("application/json")
-                                .then_some(value.schema.as_ref())
+                                .then_some(value.schema.clone())
                                 .flatten()
                         })
                     })
@@ -551,13 +552,14 @@ impl OpenApiInput {
                     .flat_map(|x| {
                         ParameterAccessElements::parameter_accesses_from_schema(
                             ParameterAccessElements::new(),
-                            x,
+                            &x,
                             api,
                         )
                     })
                     .map(move |resps| {
                         ParameterAddressing::new(i, ParameterAccess::response_body(resps))
                     })
+                    .collect::<Vec<_>>()
             })
             .collect()
     }

@@ -32,7 +32,7 @@ const SUPERFLUOUS_SYMBOL: &str = "&#x26a0;&#xfe0f";
 /// and constructs a LibAFL observer and feedback
 #[allow(clippy::type_complexity)]
 pub fn setup_endpoint_coverage(
-    api: Spec,
+    api: &Spec,
 ) -> core::result::Result<Arc<Mutex<EndpointCoverageClient>>, anyhow::Error> {
     let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
     endpoint_coverage_client.fetch_coverage(true);

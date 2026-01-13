@@ -57,7 +57,7 @@ impl<'a> QualifiedOperation<'a> {
 pub fn find_method_indices_for_path<'a>(api: &'a Spec, path: &str) -> Vec<(Method, usize)> {
     api.operations()
         .enumerate()
-        .filter(|(_, (this_path, _, _))| path.eq_ignore_ascii_case(this_path))
+        .filter(|(_, (this_path, _, _))| path == this_path)
         .map(|(i, (_, this_method, _))| (this_method.into(), i))
         .collect()
 }
@@ -65,7 +65,7 @@ pub fn find_method_indices_for_path<'a>(api: &'a Spec, path: &str) -> Vec<(Metho
 /// Finds the Operation corresponding to a path and method
 pub fn find_operation<'a>(api: &'a Spec, path: &str, method: Method) -> Option<&'a Operation> {
     api.operations()
-        .find(|(p, m, _)| path.eq_ignore_ascii_case(&p) && method == Method::from(m))
+        .find(|(p, m, _)| path == p && method == Method::from(m))
         .map(|(_, _, operation)| operation)
 }
 

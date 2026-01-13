@@ -8,7 +8,9 @@ use std::{
     f64::consts::PI,
 };
 
-use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, SchemaType};
+use oas3::spec::{
+    MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, RefError, SchemaType,
+};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
 use rand::{Rng, prelude::Distribution};
 use regex::Regex;
@@ -195,7 +197,7 @@ fn example_parameters(
 fn all_interesting_parameters(
     operation: &Operation,
     api: &Spec,
-    single_valued: &[&Parameter],
+    single_valued: &[Parameter],
 ) -> Vec<BTreeMap<(String, ParameterKind), ParameterContents>> {
     // For each parameter in the operation, generate a list of plausible values
     let param_combinations: BTreeMap<(String, ParameterKind), Vec<ParameterContents>> = operation
@@ -325,6 +327,9 @@ fn log_schema_debug(schema: &ObjectSchema) {
 
 // Attempts to build a value that matches the given schema using default values
 fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
+    // TODO: Skip this read-only check? Read-onliness does not mean we can or should not generate one I think?
+    // Perhaps mutating the example would be unintended, but that could even be a potential problem that
+    // we could detect.
     if Some(true) == schema.read_only {
         return None;
     }
@@ -334,42 +339,43 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
     if schema.example.is_some() {
         return schema.example.clone();
     }
-    match &schema.kind {
-        openapiv3::SchemaKind::Type(t) => example_from_type(api, t),
-        openapiv3::SchemaKind::OneOf { one_of }
-        | openapiv3::SchemaKind::AnyOf { any_of: one_of } => one_of
-            .iter()
-            .filter_map(|ref_or_schema| example_from_schema(api, ref_or_schema.resolve(api)))
-            .next(),
-        openapiv3::SchemaKind::AllOf { all_of } => {
-            // If only a single property is in this AllOf, return an example from it.
-            if all_of.len() == 1 {
-                example_from_schema(api, all_of[0].resolve(api))
-            } else {
-                log::warn!(concat!(
-                    "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
-                    "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
-                ));
-                log_schema_debug(schema);
-                None
-            }
-        }
-        openapiv3::SchemaKind::Any(_) => {
-            log::warn!(
-                "Generating example parameters for this schema is not supported, it's too flexible."
-            );
-            log_schema_debug(schema);
-            None
-        }
-        openapiv3::SchemaKind::Not { not: _ } => {
+    // Return an example from all_of if it has exactly one entry
+    match schema.all_of.len() {
+        0 => (),
+        1 => return example_from_schema(api, &schema.all_of[0].resolve(api).ok()?),
+        _ => {
             log::warn!(concat!(
-                "Generating example parameters for negated schemas is not supported, it is unclear what to generate. ",
-                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not"
+                "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
+                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
             ));
             log_schema_debug(schema);
-            None
+            return None;
         }
     }
+    // Return the first schema that produces an example if one_of is populated
+    let one_of_example = schema
+        .one_of
+        .iter()
+        .filter_map(|ref_or_schema| example_from_schema(api, &ref_or_schema.resolve(api).ok()?))
+        .next();
+    if one_of_example.is_some() {
+        if schema.one_of.len() > 1 {
+            log::warn!(
+                "Schema has more than one entry in one_of - an example is generated but exclusiveness is not guaranteed."
+            )
+        }
+        return one_of_example;
+    }
+    let any_of_example = schema
+        .any_of
+        .iter()
+        .filter_map(|ref_or_schema| example_from_schema(api, &ref_or_schema.resolve(api).ok()?))
+        .next();
+    if any_of_example.is_some() {
+        return any_of_example;
+    }
+    // Returning None explicitly if no example could be generated.
+    None
 }
 
 // Returns all interesting (default, example) values for the given schema.
@@ -379,79 +385,77 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
 fn interesting_params_from_schema(
     api: &Spec,
     schema: &ObjectOrReference<ObjectSchema>,
-    ignore_names: &[&str],
+    ignore_reference_names: &[&str],
 ) -> Vec<Value> {
     // Add the current schema name to the list of names not to descend into again, to prevent cycles
-    let mut ignore_reference = ignore_names.to_owned();
-    if let RefOr::Reference { reference } = schema {
-        ignore_reference.push(reference);
+    let mut ignore_references = ignore_reference_names.to_owned();
+    if let ObjectOrReference::Ref { ref_path, .. } = schema {
+        ignore_references.push(ref_path);
     }
-    let schema = schema.resolve(api);
-    if schema.data.read_only {
+    let schema = schema.resolve(api).ok().expect("Failed to resolve schema.");
+    if schema.read_only.is_some_and(|x| x) {
         // schema property may only be sent in responses, never in requests.
         return vec![];
     }
     let mut result = vec![];
-    if schema.data.default.is_some() {
-        result.push(schema.data.default.clone().unwrap());
+    if let Some(default_schema) = schema.default.clone() {
+        result.push(default_schema);
     }
-    if schema.data.example.is_some() {
-        result.push(schema.data.example.clone().unwrap());
+    if let Some(example_schema) = schema.example.clone() {
+        result.push(example_schema);
     }
-    if schema.data.discriminator.is_some() {
-        result.extend(all_discriminator_variants(api, schema, &ignore_reference));
+    result.extend(schema.examples.clone().into_iter());
+    if schema.discriminator.is_some() {
+        result.extend(all_discriminator_variants(api, &schema, &ignore_references));
     } else {
-        match &schema.kind {
-            openapiv3::SchemaKind::Type(t) => {
-                result.extend(interesting_params_from_type(api, t));
-            }
-            openapiv3::SchemaKind::OneOf { one_of }
-            | openapiv3::SchemaKind::AnyOf { any_of: one_of } => {
-                // For each OneOf variant, generate the list of examples, and then merge
-                // the lists of examples into one big list (flat_map) and add them to the
-                // result-ing list of examples
-                result.extend(one_of.iter().flat_map(|ref_or_schema| {
-                    match ref_or_schema {
-                        // If this is a reference, and it's the one we want to ignore, return empty vec
-                        RefOr::Reference { reference }
-                            if ignore_reference.contains(&reference.as_str()) =>
-                        {
-                            Vec::new()
-                        }
-                        _ => interesting_params_from_schema(api, ref_or_schema, &ignore_reference),
-                    }
-                }));
-            }
-            openapiv3::SchemaKind::AllOf { all_of } => {
-                // For each AllOf variant, generate the list of examples. Then, to get the
-                // full set of examples, merge them in every possible way!
-                // all_examples will be a vec of vecs: for each variant in allOf, many examples.
-                let all_examples: Vec<Vec<Value>> = all_of
-                    .iter()
-                    .filter_map(|ref_or_schema| {
-                        match ref_or_schema {
-                            // If this is a reference, and it's the one we want to ignore, return empty vec
-                            RefOr::Reference { reference }
-                                if ignore_reference.contains(&reference.as_str()) =>
+        // INTERESTING ALL_OF VALUES
+        // Creates the union of all interesting values we find for each schema,
+        // which might blow up quite a bit depending on the schema.
+        let all_examples: Vec<Vec<Value>> = schema
+            .all_of
+            .iter()
+            .filter_map(|ref_or_schema| match ref_or_schema {
+                ObjectOrReference::Ref { ref_path, .. }
+                    if ignore_references.contains(&ref_path.as_str()) =>
+                {
+                    None
+                }
+                _ => Some(interesting_params_from_schema(
+                    api,
+                    ref_or_schema,
+                    &ignore_references,
+                )),
+            })
+            .collect();
+        let all_combinations: Vec<Value> = all_examples
+            .into_iter()
+            .reduce(carthesian_product_values)
+            .unwrap_or_default();
+        result.extend(all_combinations);
+        // INTERESTING ONE_OF AND ANY_OF VALUES
+        if schema.one_of.len() > 1 {
+            log::warn!("Schema has more than one_of schema: conflicting examples may be generated.")
+        }
+        result.extend(
+            [schema.one_of, schema.any_of]
+                .iter()
+                .flat_map(|schema_vec| {
+                    schema_vec
+                        .iter()
+                        .flat_map(|ref_or_schema| match ref_or_schema {
+                            ObjectOrReference::Ref { ref_path, .. }
+                                if ignore_references.contains(&ref_path.as_str()) =>
                             {
-                                None
+                                Vec::new()
                             }
-                            _ => Some(interesting_params_from_schema(
+                            _ => interesting_params_from_schema(
                                 api,
                                 ref_or_schema,
-                                &ignore_reference,
-                            )),
-                        }
-                    })
-                    .collect();
-                let all_combinations: Vec<Value> = all_examples
-                    .into_iter()
-                    .reduce(carthesian_product_values)
-                    .unwrap_or_default();
-                result.extend(all_combinations)
-            }
-            _ => (),
-        }
+                                &ignore_references,
+                            ),
+                        })
+                }),
+        );
     }
     result
 }
@@ -485,7 +489,7 @@ fn carthesian_product_values(xs: Vec<Value>, ys: Vec<Value>) -> Vec<Value> {
 
 /// Generates all variants of a discrminator-based schema; i.e. one that has a
 /// Discrminator in the schema_data.
-/// Supports both OAPI3.0 style discrminators, which have `OneOf`/`AnyOf` as the
+/// Supports both OAPI3.0 style discriminators, which have `OneOf`/`AnyOf` as the
 /// SchemaType and combine it with mappings to select the correct one (sometimes),
 ///
 /// * https://swagger.io/docs/specification/data-models/inheritance-and-polymorphism/
@@ -506,6 +510,7 @@ fn all_discriminator_variants(
     // the discriminator, and merged with the fields from the parent type.
     let discriminator = &schema
         .discriminator
+        .as_ref()
         .expect("Should not be called if there is no discriminator");
 
     // Make a mapping "path to api schema" -> "variant name" for the variants
@@ -558,35 +563,38 @@ fn all_discriminator_variants(
 }
 
 /// Gives a slice of example string references based on the StringFormat given.
-/// The examples are correct values for their type, if perhaps surprising.
-fn strings_from_format(str_format: bool) -> &[&str] {
+/// String formats are essentially free-form, but there are some values that
+/// "SHOULD" be implemented according to https://json-schema.org/draft/2020-12/json-schema-validation#section-7.2
+/// See section 7.3 on that page for defined formats, which are implemented below.
+fn strings_from_format(str_format: &str) -> &[&str] {
     match str_format {
-        openapiv3::VariantOrUnknownOrEmpty::Item(StringFormat::Date) => {
-            &["1981-09-05", "0000-01-01", "9999999-12-31"]
-        }
-        openapiv3::VariantOrUnknownOrEmpty::Item(StringFormat::DateTime) => &[
+        "date" => &["1981-09-05", "0000-01-01", "9999999-12-31"],
+        "date-time" => &[
             "1981-09-05T10:00:00Z",    // Regular date
             "0000-01-01T00:00:00Z",    // Used to crash MySQL servers
             "9999999-12-31T20:00:00Z", // At the end of the universe
             "2016-12-31T23:59:60Z",    // Valid leap second
         ],
-        openapiv3::VariantOrUnknownOrEmpty::Item(StringFormat::Byte) => &["V3VwcGllRnV6elROTyE=="],
-        // Though the specification allows for other StringFormats, like email,
-        // the openapi crate does not. Just in case, we default to an email-like
-        // value.
-        openapiv3::VariantOrUnknownOrEmpty::Unknown(s) if s == "email" => {
-            &["leaf@example.com", "a+b@c.onion"]
-        }
-        openapiv3::VariantOrUnknownOrEmpty::Unknown(s) if s == "uuid" => &[
-            "550e8400-e29b-41d4-a716-446655440000",
-            "00000000-0000-0000-0000-000000000000",
+        "time" => &["23:59:59.999Z"],
+        "duration" => &["P3Y6M4DT12H30M5.123S"],
+        "email" => &["user.name+tag@example.co.uk"],
+        "idn-email" => &["δοκιμή@παράδειγμα.δοκιμή"],
+        "ipv4" => &["192.0.2.255"],
+        "ipv6" => &["2001:0db8:85a3:0000:0000:8a2e:0370:7334"],
+        "uri" => &[
+            "https://user:pass@example.com:8443/path/to/resource;param?query=one%20two&flag=true#section-3",
         ],
-        openapiv3::VariantOrUnknownOrEmpty::Unknown(s) if s == "ipv4" => {
-            &["1.1.1.1", "0.0.0.0", "127.0.0.1"]
-        }
-        openapiv3::VariantOrUnknownOrEmpty::Unknown(s) if s == "hostname" => {
-            &["example.com", "localhost", "router.local"]
-        }
+        "uri-reference" => &["../assets/images/logo.png?size=2x#icon"],
+        "iri" => &["https://例え.テスト/パス/検索?q=東京#結果"],
+        "iri-reference" => &["../../資料/設計書.html#概要"],
+        "uuid" => &["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+        "uri-template" => &["https://api.example.com/users/{userId}/orders{?status,from,to}"],
+        "json-pointer" => &["/store/book/0/author"],
+        "relative-json-pointer" => &["2/highlighted/0"],
+        "regex" => &["^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[!@#$%^&*])[A-Za-z\\d!@#$%^&*]{12,}$"],
+        // Extra, "non-defined" formats:
+        "base64" => &["V3VwcGllRnV6elROTyE=="],
+        // If not matching any of the formats above:
         _ => &["", "A", "🎵"],
     }
 }
@@ -608,292 +616,298 @@ fn enforce_length_bounds(
     result
 }
 
+// TODO: Remove interesting_params_from_type function or make sure it is used somewhere
+
 /// Generate parameters based on the type specified. The values returned
 /// should adhere to any constraints from the spec, any deviations to
 /// test robustness of the server should be introduced by fuzzing.
-fn interesting_params_from_type(api: &OpenAPI, openapi_type: &Type) -> Vec<Value> {
-    // For numeric types, take exclusive_minimum and -maximum bools into account.
-    match openapi_type {
-        Type::String(string) => interesting_params_from_string_type(string),
-        Type::Number(number) => {
-            let interesting = match (number.minimum, number.maximum, number.multiple_of) {
-                (Some(min), Some(max), Some(base)) => {
-                    let mut constrained = vec![];
-                    let range = min..=max;
-                    for val in [-base, 0., base] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), Some(max), None) => {
-                    let mut constrained = vec![min, max];
-                    let range = min..=max;
-                    for val in [-1., 0., 1., PI] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, Some(base)) => {
-                    let mut constrained = vec![];
-                    for val in [-base, 0., base] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, None) => {
-                    let mut constrained = vec![min];
-                    for val in [-1., 0., 1., PI] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), Some(base)) => {
-                    let mut constrained = vec![max];
-                    for val in [-base, 0., base] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), None) => {
-                    let mut constrained = vec![max];
-                    for val in [-PI, -1., 0., 1.] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, None, Some(base)) => {
-                    vec![-base, 0., base]
-                }
-                (None, None, None) => vec![-1., 0., 1., PI],
-            };
-            // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
-            interesting
-                .iter()
-                .map(|num| Value::Number(serde_json::Number::from_f64(*num).unwrap()))
-                .collect()
-        }
-        Type::Integer(integer) => {
-            let interesting = match (integer.minimum, integer.maximum, integer.multiple_of) {
-                (Some(min), Some(max), Some(base)) => {
-                    let mut constrained = vec![];
-                    let range = min..=max;
-                    for val in [-base, 0, base] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), Some(max), None) => {
-                    let mut constrained = vec![min, max];
-                    let range = min..=max;
-                    for val in [min, -1, 0, 1, max] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, Some(base)) => {
-                    let mut constrained = vec![];
-                    for val in [-base, 0, base] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, None) => {
-                    let mut constrained = vec![min];
-                    for val in [min, -1, 0, 1] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), Some(base)) => {
-                    let mut constrained = vec![max];
-                    for val in [-base, 0, base] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), None) => {
-                    let mut constrained = vec![max];
-                    for val in [-1, 0, 1, max] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, None, Some(base)) => {
-                    vec![-base, 0, base]
-                }
-                (None, None, None) => {
-                    vec![-1, 0, 1]
-                }
-            };
-            // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
-            interesting
-                .iter()
-                .map(|num| Value::Number(serde_json::Number::from(*num)))
-                .collect()
-        }
-        Type::Object(object) => vec![Value::Object(
-            object
-                .properties
-                .iter()
-                .filter_map(|(k, v)| Some((k.clone(), example_from_schema(api, v.resolve(api))?)))
-                .collect(),
-        )],
-        Type::Array(array) => {
-            // The 'items' specification is required according to the spec, but
-            // we still get an Option and a possibly broken reference and what not.
-            // Extract any usable specification of an item, and make an example.
-            let item =
-                example_from_schema(api, array.items.as_ref().unwrap().resolve(api)).unwrap();
-            // Repeat the example. If a maximum number of array elements is specified,
-            // we use that many, otherwise the minimum number, otherwise 3.
-            vec![Value::Array(vec![
-                item;
-                array
-                    .max_items
-                    .or(array.min_items)
-                    .unwrap_or(3)
-            ])]
-        }
-        Type::Boolean {} => vec![Value::Bool(true), Value::Bool(false)],
-    }
-}
+// fn interesting_params_from_type(api: &Spec, openapi_type: &str) -> Vec<Value> {
+//     // For numeric types, take exclusive_minimum and -maximum bools into account.
+//     match openapi_type {
+//         "string" => interesting_params_from_string_type(string),
+//         "number" => {
+//             let interesting = match (number.minimum, number.maximum, number.multiple_of) {
+//                 (Some(min), Some(max), Some(base)) => {
+//                     let mut constrained = vec![];
+//                     let range = min..=max;
+//                     for val in [-base, 0., base] {
+//                         if range.contains(&val) {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (Some(min), Some(max), None) => {
+//                     let mut constrained = vec![min, max];
+//                     let range = min..=max;
+//                     for val in [-1., 0., 1., PI] {
+//                         if range.contains(&val) {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (Some(min), None, Some(base)) => {
+//                     let mut constrained = vec![];
+//                     for val in [-base, 0., base] {
+//                         if min <= val {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (Some(min), None, None) => {
+//                     let mut constrained = vec![min];
+//                     for val in [-1., 0., 1., PI] {
+//                         if min <= val {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (None, Some(max), Some(base)) => {
+//                     let mut constrained = vec![max];
+//                     for val in [-base, 0., base] {
+//                         if max >= val {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (None, Some(max), None) => {
+//                     let mut constrained = vec![max];
+//                     for val in [-PI, -1., 0., 1.] {
+//                         if max >= val {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (None, None, Some(base)) => {
+//                     vec![-base, 0., base]
+//                 }
+//                 (None, None, None) => vec![-1., 0., 1., PI],
+//             };
+//             // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
+//             interesting
+//                 .iter()
+//                 .map(|num| Value::Number(serde_json::Number::from_f64(*num).unwrap()))
+//                 .collect()
+//         }
+//         "integer" => {
+//             let interesting = match (integer.minimum, integer.maximum, integer.multiple_of) {
+//                 (Some(min), Some(max), Some(base)) => {
+//                     let mut constrained = vec![];
+//                     let range = min..=max;
+//                     for val in [-base, 0, base] {
+//                         if range.contains(&val) {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (Some(min), Some(max), None) => {
+//                     let mut constrained = vec![min, max];
+//                     let range = min..=max;
+//                     for val in [min, -1, 0, 1, max] {
+//                         if range.contains(&val) {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (Some(min), None, Some(base)) => {
+//                     let mut constrained = vec![];
+//                     for val in [-base, 0, base] {
+//                         if min <= val {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (Some(min), None, None) => {
+//                     let mut constrained = vec![min];
+//                     for val in [min, -1, 0, 1] {
+//                         if min <= val {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (None, Some(max), Some(base)) => {
+//                     let mut constrained = vec![max];
+//                     for val in [-base, 0, base] {
+//                         if max >= val {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (None, Some(max), None) => {
+//                     let mut constrained = vec![max];
+//                     for val in [-1, 0, 1, max] {
+//                         if max >= val {
+//                             constrained.push(val);
+//                         }
+//                     }
+//                     constrained
+//                 }
+//                 (None, None, Some(base)) => {
+//                     vec![-base, 0, base]
+//                 }
+//                 (None, None, None) => {
+//                     vec![-1, 0, 1]
+//                 }
+//             };
+//             // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
+//             interesting
+//                 .iter()
+//                 .map(|num| Value::Number(serde_json::Number::from(*num)))
+//                 .collect()
+//         }
+//         "object" => vec![Value::Object(
+//             object
+//                 .properties
+//                 .iter()
+//                 .filter_map(|(k, v)| Some((k.clone(), example_from_schema(api, v.resolve(api))?)))
+//                 .collect(),
+//         )],
+//         "array" => {
+//             // The 'items' specification is required according to the spec, but
+//             // we still get an Option and a possibly broken reference and what not.
+//             // Extract any usable specification of an item, and make an example.
+//             let item =
+//                 example_from_schema(api, array.items.as_ref().unwrap().resolve(api)).unwrap();
+//             // Repeat the example. If a maximum number of array elements is specified,
+//             // we use that many, otherwise the minimum number, otherwise 3.
+//             vec![Value::Array(vec![
+//                 item;
+//                 array
+//                     .max_items
+//                     .or(array.min_items)
+//                     .unwrap_or(3)
+//             ])]
+//         }
+//         "boolean" => vec![Value::Bool(true), Value::Bool(false)],
+//     }
+// }
 
-fn example_from_type(api: &OpenAPI, t: &Type) -> Option<Value> {
-    match t {
-        Type::String(string) => interesting_params_from_string_type(string).pop(),
-        Type::Number(number) => {
-            let value = match (number.minimum, number.maximum, number.multiple_of) {
-                (Some(min), Some(max), Some(base)) => ((min + max) / 2.0 / base).round() * base,
-                (Some(min), Some(max), None) => (min + max) / 2.0,
-                (Some(min), None, Some(base)) => (min / base).ceil() * base,
-                (Some(min), None, None) => min,
-                (None, Some(max), Some(base)) => (max / base).floor() * base,
-                (None, Some(max), None) => max,
-                (None, None, Some(base)) => 1.0 * base,
-                (None, None, None) => 0.0,
-            };
-            Some(Value::Number(serde_json::Number::from_f64(value)?))
-        }
-        Type::Integer(integer) => {
-            let value = match (integer.minimum, integer.maximum, integer.multiple_of) {
-                (Some(min), Some(max), Some(base)) => ((min + max) / 2 / base) * base,
-                (Some(min), Some(max), None) => (min + max) / 2,
-                (Some(min), None, Some(base)) => ((min + base - 1) / base) * base,
-                (Some(min), None, None) => min,
-                (None, Some(max), Some(base)) => (max / base) * base,
-                (None, Some(max), None) => max,
-                (None, None, Some(base)) => base,
-                (None, None, None) => 0,
-            };
-            Some(Value::Number(serde_json::Number::from(value)))
-        }
-        Type::Object(object) => Some(Value::Object(
-            object
-                .properties
-                .iter()
-                .filter_map(|(k, v)| Some((k.clone(), example_from_schema(api, v.resolve(api))?)))
-                .collect(),
-        )),
-        Type::Array(array) => {
-            // The 'items' specification is required according to the spec, but
-            // we still get an Option and a possibly broken reference and what not.
-            // Extract any usable specification of an item, and make an example.
-            let item = example_from_schema(api, array.items.as_ref()?.resolve(api))?;
-            // Repeat the example. If a maximum number of array elements is specified,
-            // we use that many, otherwise the minimum number, otherwise 2.
-            Some(Value::Array(vec![
-                item;
-                array
-                    .max_items
-                    .or(array.min_items)
-                    .unwrap_or(2)
-            ]))
-        }
-        Type::Boolean {} => Some(Value::Bool(true)),
-    }
-}
+// TODO: make sure example_from_type is removed or used somewhere
+// fn example_from_type(api: &OpenAPI, t: &Type) -> Option<Value> {
+//     match t {
+//         Type::String(string) => interesting_params_from_string_type(string).pop(),
+//         Type::Number(number) => {
+//             let value = match (number.minimum, number.maximum, number.multiple_of) {
+//                 (Some(min), Some(max), Some(base)) => ((min + max) / 2.0 / base).round() * base,
+//                 (Some(min), Some(max), None) => (min + max) / 2.0,
+//                 (Some(min), None, Some(base)) => (min / base).ceil() * base,
+//                 (Some(min), None, None) => min,
+//                 (None, Some(max), Some(base)) => (max / base).floor() * base,
+//                 (None, Some(max), None) => max,
+//                 (None, None, Some(base)) => 1.0 * base,
+//                 (None, None, None) => 0.0,
+//             };
+//             Some(Value::Number(serde_json::Number::from_f64(value)?))
+//         }
+//         Type::Integer(integer) => {
+//             let value = match (integer.minimum, integer.maximum, integer.multiple_of) {
+//                 (Some(min), Some(max), Some(base)) => ((min + max) / 2 / base) * base,
+//                 (Some(min), Some(max), None) => (min + max) / 2,
+//                 (Some(min), None, Some(base)) => ((min + base - 1) / base) * base,
+//                 (Some(min), None, None) => min,
+//                 (None, Some(max), Some(base)) => (max / base) * base,
+//                 (None, Some(max), None) => max,
+//                 (None, None, Some(base)) => base,
+//                 (None, None, None) => 0,
+//             };
+//             Some(Value::Number(serde_json::Number::from(value)))
+//         }
+//         Type::Object(object) => Some(Value::Object(
+//             object
+//                 .properties
+//                 .iter()
+//                 .filter_map(|(k, v)| Some((k.clone(), example_from_schema(api, v.resolve(api))?)))
+//                 .collect(),
+//         )),
+//         Type::Array(array) => {
+//             // The 'items' specification is required according to the spec, but
+//             // we still get an Option and a possibly broken reference and what not.
+//             // Extract any usable specification of an item, and make an example.
+//             let item = example_from_schema(api, array.items.as_ref()?.resolve(api))?;
+//             // Repeat the example. If a maximum number of array elements is specified,
+//             // we use that many, otherwise the minimum number, otherwise 2.
+//             Some(Value::Array(vec![
+//                 item;
+//                 array
+//                     .max_items
+//                     .or(array.min_items)
+//                     .unwrap_or(2)
+//             ]))
+//         }
+//         Type::Boolean {} => Some(Value::Bool(true)),
+//     }
+// }
+
+// TODO: remove interesting_params_from_string_type if it is not going to be used since we may
+// remove the *_from_type functions altogether.
 
 /// We return all variants if an enumeration is present, try the pattern regex if one is present,
 /// or fall back to some defaults based on the StringFormat. Returns a serde_json::Value::String.
-fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<serde_json::Value> {
-    // Enumeration present? Return the first variant
-    if !string.enumeration.is_empty() {
-        return string
-            .enumeration
-            .iter()
-            .cloned()
-            .map(serde_json::Value::String)
-            .collect();
-    }
+// fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<serde_json::Value> {
+//     // Enumeration present? Return the first variant
+//     if !string.enumeration.is_empty() {
+//         return string
+//             .enumeration
+//             .iter()
+//             .cloned()
+//             .map(serde_json::Value::String)
+//             .collect();
+//     }
 
-    // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
-    if let Some(pattern) = &string.pattern {
-        if let Ok(compiled_regex) = rand_regex::Regex::compile(pattern, 100) {
-            return vec![serde_json::Value::String(
-                compiled_regex.sample(&mut rand::rng()),
-            )];
-        }
+//     // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
+//     if let Some(pattern) = &string.pattern {
+//         if let Ok(compiled_regex) = rand_regex::Regex::compile(pattern, 100) {
+//             return vec![serde_json::Value::String(
+//                 compiled_regex.sample(&mut rand::rng()),
+//             )];
+//         }
 
-        // The regex does have anchors, which the generator can not work with
-        // Remove anchors from the pattern for the generator
-        let pattern_without_anchors = pattern.replace("^", "").replace("$", "");
+//         // The regex does have anchors, which the generator can not work with
+//         // Remove anchors from the pattern for the generator
+//         let pattern_without_anchors = pattern.replace("^", "").replace("$", "");
 
-        match rand_regex::Regex::compile(&pattern_without_anchors, 100) {
-            Ok(compiled_regex) => {
-                // Define the filter regex with the original pattern including anchors
-                let filter_regex = Regex::new(pattern).unwrap();
+//         match rand_regex::Regex::compile(&pattern_without_anchors, 100) {
+//             Ok(compiled_regex) => {
+//                 // Define the filter regex with the original pattern including anchors
+//                 let filter_regex = Regex::new(pattern).unwrap();
 
-                // Generate 1000 sample strings from the regex pattern without anchors
-                // and test if one matches the regex with the anchors
-                if let Some(sample) = rand::rng()
-                    .sample_iter::<String, _>(&compiled_regex)
-                    .take(1000)
-                    .find(|s| filter_regex.is_match(s))
-                {
-                    return vec![serde_json::Value::String(sample)];
-                }
-                log::warn!("Could not generate an example string that matches the regex {pattern}");
-            }
-            Err(err) => {
-                log::warn!("Broken regex pattern {pattern}, Error message: {err}");
-            }
-        }
-    }
+//                 // Generate 1000 sample strings from the regex pattern without anchors
+//                 // and test if one matches the regex with the anchors
+//                 if let Some(sample) = rand::rng()
+//                     .sample_iter::<String, _>(&compiled_regex)
+//                     .take(1000)
+//                     .find(|s| filter_regex.is_match(s))
+//                 {
+//                     return vec![serde_json::Value::String(sample)];
+//                 }
+//                 log::warn!("Could not generate an example string that matches the regex {pattern}");
+//             }
+//             Err(err) => {
+//                 log::warn!("Broken regex pattern {pattern}, Error message: {err}");
+//             }
+//         }
+//     }
 
-    // Attempt to generate a string based on other format hints
-    strings_from_format(&string.format)
-        .iter()
-        .map(|&example| {
-            serde_json::Value::String(
-                enforce_length_bounds(example, string.min_length, string.max_length).into_owned(),
-            )
-        })
-        .collect()
-}
+//     // Attempt to generate a string based on other format hints
+//     strings_from_format(&string.format)
+//         .iter()
+//         .map(|&example| {
+//             serde_json::Value::String(
+//                 enforce_length_bounds(example, string.min_length, string.max_length).into_owned(),
+//             )
+//         })
+//         .collect()
+// }
 
 /// Creates a set of OpenApiInputs for the given sequence of QualifiedOperations based on a number of interesting
 /// values for each of the parameters found in the OpenApiInputs. Specifically, it returns the cartesian product
@@ -921,7 +935,9 @@ pub fn openapi_inputs_from_ops<'a>(
                         .parameters
                         .iter()
                         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-                        .filter(move |parameter| edge.weight().input_access().matches(parameter))
+                        .filter(move |parameter| {
+                            edge.weight().input_access().matches(parameter.clone())
+                        })
                 })
                 .collect();
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)

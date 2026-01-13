@@ -25,7 +25,6 @@ use libafl_bolts::{
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
-use openapiv3::OpenAPI;
 use serde::{Deserialize, Serialize};
 
 use crate::{openapi::spec::Spec, types::CombinedFeedbackType};
@@ -396,7 +395,6 @@ where
 pub mod tests {
     use libafl::state::HasRand;
     use libafl_bolts::rands::StdRand;
-    use openapiv3::OpenAPI;
 
     use crate::openapi::spec::Spec;
 
