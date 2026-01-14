@@ -19,7 +19,6 @@ use std::{
 
 use build_html::{Container, ContainerType, Html, HtmlContainer, HtmlPage, escape_html};
 use indexmap::{IndexMap, map::Entry};
-use openapiv3::{OpenAPI, StatusCode};
 
 use super::{CoverageClient, MAP_SIZE};
 use crate::{input::Method, openapi::spec::Spec};

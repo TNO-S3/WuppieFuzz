@@ -1,7 +1,7 @@
 //! Mutates a request series by changing the method (GET, POST, ...) of one of the HTTP
 //! requests to a random different method.
 
-use std::{borrow::Cow, convert::TryInto};
+use std::borrow::Cow;
 
 pub use libafl::mutators::mutations::*;
 use libafl::{

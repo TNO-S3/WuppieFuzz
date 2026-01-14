@@ -66,7 +66,6 @@ use ahash::RandomState;
 use libafl::{Error, corpus::CorpusId, inputs::Input};
 use libafl_bolts::{HasLen, fs::write_file_atomic, rands::Rand};
 use oas3::spec::Operation;
-use openapiv3::OpenAPI;
 
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
