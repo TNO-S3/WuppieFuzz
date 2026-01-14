@@ -396,9 +396,8 @@ pub mod tests {
     use libafl::state::HasRand;
     use libafl_bolts::rands::StdRand;
 
-    use crate::openapi::spec::Spec;
-
     use super::HasRandAndOpenAPI;
+    use crate::openapi::spec::Spec;
 
     pub struct TestOpenApiFuzzerState {
         rand: StdRand,

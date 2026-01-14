@@ -430,9 +430,11 @@ fn convert_elementary_type(r#type: openapiv3::Type) -> oas3::spec::ObjectSchema 
         },
         openapiv3::Type::Array(array_type) => ObjectSchema {
             schema_type: Some(SchemaTypeSet::Single(SchemaType::Array)),
-            items: array_type.items.map(|boxed_ref_schema| Box::new(oas3::spec::Schema::Object(Box::new(
-                    convert_ref_schema(*boxed_ref_schema),
-                )))),
+            items: array_type.items.map(|boxed_ref_schema| {
+                Box::new(oas3::spec::Schema::Object(Box::new(convert_ref_schema(
+                    *boxed_ref_schema,
+                ))))
+            }),
             min_items: array_type.min_items.map(|v| v as u64),
             max_items: array_type.max_items.map(|v| v as u64),
             unique_items: Some(array_type.unique_items),
