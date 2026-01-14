@@ -6,23 +6,19 @@ use std::{
     borrow::Cow,
     collections::{BTreeMap, VecDeque},
     f64::consts::PI,
+    u64,
 };
 
-use oas3::spec::{
-    MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, RefError, SchemaType,
-};
+use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, SchemaType};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
 use rand::{Rng, prelude::Distribution};
 use regex::Regex;
-use serde_json::{Value, json};
+use serde_json::{Number, Value, json};
 use unicode_truncate::UnicodeTruncateStr;
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
-    input::{
-        Body, OpenApiInput, OpenApiRequest, ParameterContents,
-        parameter::{ParameterKind, SimpleValue},
-    },
+    input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
     openapi::spec::Spec,
     parameter_access::ParameterMatching,
 };
@@ -385,11 +381,11 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
     if let Some(type_set) = &schema.schema_type {
         match type_set {
             oas3::spec::SchemaTypeSet::Single(single_type) => {
-                return example_from_type(api, single_type);
+                return example_from_type(api, single_type, &schema);
             }
             oas3::spec::SchemaTypeSet::Multiple(multiple_types) => {
                 if let Some(first_type) = multiple_types.first() {
-                    return example_from_type(api, first_type);
+                    return example_from_type(api, first_type, &schema);
                 }
             }
         }
@@ -622,15 +618,15 @@ fn strings_from_format(str_format: &str) -> &[&str] {
 /// with "A"s or truncating it.
 fn enforce_length_bounds(
     string: &str,
-    min_length: Option<usize>,
-    max_length: Option<usize>,
+    min_length: Option<u64>,
+    max_length: Option<u64>,
 ) -> Cow<'_, str> {
     let mut result = Cow::from(string);
     if let Some(min) = min_length {
-        *result.to_mut() += &"A".repeat(min);
+        *result.to_mut() += &"A".repeat(min as usize);
     }
     if let Some(max) = max_length {
-        result.to_mut().unicode_truncate(max);
+        result.to_mut().unicode_truncate(max as usize);
     }
     result
 }
@@ -638,184 +634,118 @@ fn enforce_length_bounds(
 /// Generate parameters based on the type specified. The values returned
 /// should adhere to any constraints from the spec, any deviations to
 /// test robustness of the server should be introduced by fuzzing.
-//TODO: supply the (Object)Schema to get the relevant fields that were previously wrapped up in the Type-enum
-fn interesting_params_from_type(api: &Spec, openapi_type: &SchemaType, schema: O) -> Vec<Value> {
+//TODO: supply the Schema
+fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value> {
     // For numeric types, take exclusive_minimum and -maximum bools into account.
-    match openapi_type {
-        SchemaType::String => interesting_params_from_string_type(string),
-        SchemaType::Number => {
-            let interesting = match (number.minimum, number.maximum, number.multiple_of) {
-                (Some(min), Some(max), Some(base)) => {
-                    let mut constrained = vec![];
-                    let range = min..=max;
-                    for val in [-base, 0., base] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), Some(max), None) => {
-                    let mut constrained = vec![min, max];
-                    let range = min..=max;
-                    for val in [-1., 0., 1., PI] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, Some(base)) => {
-                    let mut constrained = vec![];
-                    for val in [-base, 0., base] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, None) => {
-                    let mut constrained = vec![min];
-                    for val in [-1., 0., 1., PI] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), Some(base)) => {
-                    let mut constrained = vec![max];
-                    for val in [-base, 0., base] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), None) => {
-                    let mut constrained = vec![max];
-                    for val in [-PI, -1., 0., 1.] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, None, Some(base)) => {
-                    vec![-base, 0., base]
-                }
-                (None, None, None) => vec![-1., 0., 1., PI],
+    schema.schema_type.clone().map_or(vec![], |type_set| {
+        {
+            let types_vec = match type_set {
+                oas3::spec::SchemaTypeSet::Single(single_type) => vec![single_type],
+                oas3::spec::SchemaTypeSet::Multiple(multiple_types) => multiple_types,
             };
-            // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
-            interesting
+            types_vec
                 .iter()
-                .map(|num| Value::Number(serde_json::Number::from_f64(*num).unwrap()))
+                .flat_map(|schema_type| {
+                    match schema_type {
+                        SchemaType::String => interesting_params_from_string_type(
+                            &schema.enum_values,
+                            &schema.pattern,
+                            &schema.format,
+                            schema.min_length,
+                            schema.max_length,
+                        ),
+                        SchemaType::Number | SchemaType::Integer => {
+                            interesting_params_from_number_type(
+                                &schema.minimum,
+                                &schema.maximum,
+                                &schema.multiple_of,
+                            )
+                        }
+                        SchemaType::Object => vec![Value::Object(
+                            schema
+                                .properties
+                                .iter()
+                                .filter_map(|(k, v)| {
+                                    Some((
+                                        k.clone(),
+                                        example_from_schema(
+                                            api,
+                                            &v.resolve(api).expect("Could not resolve schema."),
+                                        )?,
+                                    ))
+                                })
+                                .collect(),
+                        )],
+                        SchemaType::Array => {
+                            // The 'items' specification is required according to the spec, but
+                            // we still get an Option and a possibly broken reference and what not.
+                            // Extract any usable specification of an item, and make an example.
+                            let items_schema = *schema
+                                .items
+                                .clone()
+                                .expect("Array-schema should have a schema for its items.");
+                            let item_value = match items_schema {
+                                oas3::spec::Schema::Boolean(boolean_schema) => {
+                                    match &boolean_schema.0 {
+                                        true => Value::Object(Default::default()),
+                                        false => Value::Null,
+                                    }
+                                }
+                                oas3::spec::Schema::Object(object_or_reference) => {
+                                    example_from_schema(
+                                        api,
+                                        &object_or_reference
+                                            .resolve(api)
+                                            .expect("Could not resolve schema."),
+                                    )
+                                    .unwrap()
+                                }
+                            };
+                            // Repeat the example. If a maximum number of array elements is specified,
+                            // we use that many, otherwise the minimum number, otherwise 3.
+                            vec![Value::Array(vec![
+                                item_value;
+                                schema.max_items.or(schema.min_items).unwrap_or(3)
+                                    as usize
+                            ])]
+                        }
+                        SchemaType::Boolean => vec![Value::Bool(true), Value::Bool(false)],
+                        SchemaType::Null => vec![Value::Null],
+                    }
+                })
                 .collect()
         }
-        SchemaType::Integer => {
-            let interesting = match (integer.minimum, integer.maximum, integer.multiple_of) {
-                (Some(min), Some(max), Some(base)) => {
-                    let mut constrained = vec![];
-                    let range = min..=max;
-                    for val in [-base, 0, base] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), Some(max), None) => {
-                    let mut constrained = vec![min, max];
-                    let range = min..=max;
-                    for val in [min, -1, 0, 1, max] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, Some(base)) => {
-                    let mut constrained = vec![];
-                    for val in [-base, 0, base] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, None) => {
-                    let mut constrained = vec![min];
-                    for val in [min, -1, 0, 1] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), Some(base)) => {
-                    let mut constrained = vec![max];
-                    for val in [-base, 0, base] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), None) => {
-                    let mut constrained = vec![max];
-                    for val in [-1, 0, 1, max] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, None, Some(base)) => {
-                    vec![-base, 0, base]
-                }
-                (None, None, None) => {
-                    vec![-1, 0, 1]
-                }
-            };
-            // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
-            interesting
-                .iter()
-                .map(|num| Value::Number(serde_json::Number::from(*num)))
-                .collect()
-        }
-        SchemaType::Object => vec![Value::Object(
-            object
-                .properties
-                .iter()
-                .filter_map(|(k, v)| Some((k.clone(), example_from_schema(api, v.resolve(api))?)))
-                .collect(),
-        )],
-        SchemaType::Array => {
-            // The 'items' specification is required according to the spec, but
-            // we still get an Option and a possibly broken reference and what not.
-            // Extract any usable specification of an item, and make an example.
-            let item =
-                example_from_schema(api, array.items.as_ref().unwrap().resolve(api)).unwrap();
-            // Repeat the example. If a maximum number of array elements is specified,
-            // we use that many, otherwise the minimum number, otherwise 3.
-            vec![Value::Array(vec![
-                item;
-                array
-                    .max_items
-                    .or(array.min_items)
-                    .unwrap_or(3)
-            ])]
-        }
-        SchemaType::Boolean => vec![Value::Bool(true), Value::Bool(false)],
-        SchemaType::Null => vec![Value::Null],
-    }
+    })
 }
 
-fn example_from_type(api: &Spec, t: &SchemaType) -> Option<Value> {
-    match t {
-        SchemaType::String(string) => interesting_params_from_string_type(string).pop(),
-        SchemaType::Number(number) => {
-            let value = match (number.minimum, number.maximum, number.multiple_of) {
+// We supply the schema_type separately since the schema can have a TypeSet with one or multiple schemas.
+fn example_from_type(api: &Spec, schema_type: &SchemaType, schema: &ObjectSchema) -> Option<Value> {
+    match schema_type {
+        SchemaType::String => interesting_params_from_string_type(
+            &schema.enum_values,
+            &schema.pattern,
+            &schema.format,
+            schema.min_length,
+            schema.max_length,
+        )
+        .pop(),
+        SchemaType::Number => {
+            // Try to interpret all JSON numbers as f64 and then create an example based on the results.
+            let (min, max, base) = match (
+                schema.minimum.clone(),
+                schema.maximum.clone(),
+                schema.multiple_of.clone(),
+            ) {
+                (Some(min), Some(max), Some(base)) => (min.as_f64(), max.as_f64(), base.as_f64()),
+                (Some(min), Some(max), None) => (min.as_f64(), max.as_f64(), None),
+                (Some(min), None, Some(base)) => (min.as_f64(), None, base.as_f64()),
+                (Some(min), None, None) => (min.as_f64(), None, None),
+                (None, Some(max), Some(base)) => (None, max.as_f64(), base.as_f64()),
+                (None, Some(max), None) => (None, max.as_f64(), None),
+                (None, None, Some(base)) => (None, None, base.as_f64()),
+                (None, None, None) => (None, None, None),
+            };
+            let value = match (min, max, base) {
                 (Some(min), Some(max), Some(base)) => ((min + max) / 2.0 / base).round() * base,
                 (Some(min), Some(max), None) => (min + max) / 2.0,
                 (Some(min), None, Some(base)) => (min / base).ceil() * base,
@@ -827,61 +757,87 @@ fn example_from_type(api: &Spec, t: &SchemaType) -> Option<Value> {
             };
             Some(Value::Number(serde_json::Number::from_f64(value)?))
         }
-        SchemaType::Integer(integer) => {
-            let value = match (integer.minimum, integer.maximum, integer.multiple_of) {
-                (Some(min), Some(max), Some(base)) => ((min + max) / 2 / base) * base,
+        SchemaType::Integer => {
+            // Try to interpret all JSON-numbers as i128 and then create an example based on the results.
+            let (min, max, base) = match (
+                schema.minimum.clone(),
+                schema.maximum.clone(),
+                schema.multiple_of.clone(),
+            ) {
+                (Some(min), Some(max), Some(base)) => {
+                    (min.as_i128(), max.as_i128(), base.as_i128())
+                }
+                (Some(min), Some(max), None) => (min.as_i128(), max.as_i128(), None),
+                (Some(min), None, Some(base)) => (min.as_i128(), None, base.as_i128()),
+                (Some(min), None, None) => (min.as_i128(), None, None),
+                (None, Some(max), Some(base)) => (None, max.as_i128(), base.as_i128()),
+                (None, Some(max), None) => (None, max.as_i128(), None),
+                (None, None, Some(base)) => (None, None, base.as_i128()),
+                (None, None, None) => (None, None, None),
+            };
+            let value = match (min, max, base) {
+                (Some(min), Some(max), Some(base)) => {
+                    ((min + max) as f64 / 2.0 / (base as f64)).round() as i128 * base
+                }
                 (Some(min), Some(max), None) => (min + max) / 2,
-                (Some(min), None, Some(base)) => ((min + base - 1) / base) * base,
+                (Some(min), None, Some(base)) => (min as f64 / base as f64).ceil() as i128 * base,
                 (Some(min), None, None) => min,
-                (None, Some(max), Some(base)) => (max / base) * base,
+                (None, Some(max), Some(base)) => (max as f64 / base as f64).floor() as i128 * base,
                 (None, Some(max), None) => max,
                 (None, None, Some(base)) => base,
                 (None, None, None) => 0,
             };
-            Some(Value::Number(serde_json::Number::from(value)))
+            Some(json![value])
         }
-        SchemaType::Object(object) => Some(Value::Object(
-            object
+        SchemaType::Object => Some(Value::Object(
+            schema
                 .properties
                 .iter()
-                .filter_map(|(k, v)| Some((k.clone(), example_from_schema(api, v.resolve(api))?)))
+                .filter_map(|(k, v)| {
+                    Some((
+                        k.clone(),
+                        example_from_schema(
+                            api,
+                            &v.resolve(api).expect("Could not resolve schema."),
+                        )?,
+                    ))
+                })
                 .collect(),
         )),
-        SchemaType::Array(array) => {
+        SchemaType::Array => {
             // The 'items' specification is required according to the spec, but
             // we still get an Option and a possibly broken reference and what not.
             // Extract any usable specification of an item, and make an example.
-            let item = example_from_schema(api, array.items.as_ref()?.resolve(api))?;
-            // Repeat the example. If a maximum number of array elements is specified,
-            // we use that many, otherwise the minimum number, otherwise 2.
-            Some(Value::Array(vec![
-                item;
-                array
-                    .max_items
-                    .or(array.min_items)
-                    .unwrap_or(2)
-            ]))
+            interesting_params_from_type(api, schema)
+                .iter()
+                .next()
+                .cloned()
         }
         SchemaType::Boolean {} => Some(Value::Bool(true)),
+        SchemaType::Null => Some(Value::Null),
     }
 }
 
 /// We return all variants if an enumeration is present, try the pattern regex if one is present,
 /// or fall back to some defaults based on the StringFormat. Returns a serde_json::Value::String.
-fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<serde_json::Value> {
-    // Enumeration present? Return the first variant
-    if !string.enumeration.is_empty() {
-        return string
-            .enumeration
-            .iter()
-            .cloned()
-            .map(serde_json::Value::String)
-            .collect();
+fn interesting_params_from_string_type(
+    enumeration: &Vec<Value>,
+    pattern: &Option<String>,
+    format: &Option<String>,
+    min_length: Option<u64>,
+    max_length: Option<u64>,
+) -> Vec<serde_json::Value> {
+    // Enumeration present? Return all String values.
+    let enum_strings: Vec<&Value> = enumeration
+        .into_iter()
+        .filter(|val| val.is_string())
+        .collect();
+    if !enum_strings.is_empty() {
+        return enum_strings.into_iter().cloned().collect();
     }
-
     // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
-    if let Some(pattern) = &string.pattern {
-        if let Ok(compiled_regex) = rand_regex::Regex::compile(pattern, 100) {
+    if let Some(pattern) = pattern {
+        if let Ok(compiled_regex) = rand_regex::Regex::compile(&pattern, 100) {
             return vec![serde_json::Value::String(
                 compiled_regex.sample(&mut rand::rng()),
             )];
@@ -894,7 +850,7 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
         match rand_regex::Regex::compile(&pattern_without_anchors, 100) {
             Ok(compiled_regex) => {
                 // Define the filter regex with the original pattern including anchors
-                let filter_regex = Regex::new(pattern).unwrap();
+                let filter_regex = Regex::new(&pattern).unwrap();
 
                 // Generate 1000 sample strings from the regex pattern without anchors
                 // and test if one matches the regex with the anchors
@@ -914,14 +870,128 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
     }
 
     // Attempt to generate a string based on other format hints
-    strings_from_format(&string.format)
-        .iter()
-        .map(|&example| {
-            serde_json::Value::String(
-                enforce_length_bounds(example, string.min_length, string.max_length).into_owned(),
-            )
-        })
-        .collect()
+    if let Some(format) = format {
+        let result: Vec<Value> = strings_from_format(&format)
+            .iter()
+            .map(|&example| {
+                serde_json::Value::String(
+                    enforce_length_bounds(example, min_length, max_length).into_owned(),
+                )
+            })
+            .collect();
+        if !result.is_empty() {
+            return result;
+        }
+    };
+    log::warn!(
+        "Generating interesting strings did not have usable inputs (enumeration, pattern or format). Not returning anything."
+    );
+    vec![]
+}
+
+fn interesting_params_from_number_type(
+    minimum: &Option<Number>,
+    maximum: &Option<Number>,
+    multiple_of: &Option<Number>,
+) -> Vec<Value> {
+    match (minimum, maximum, multiple_of) {
+        (Some(min), Some(max), Some(base)) => {
+            let mut constrained = vec![];
+            let (base128, min128, max128) = (base.as_i128(), min.as_i128(), max.as_i128());
+            if let (Some(base128), Some(min128), Some(max128)) = (base128, min128, max128) {
+                for candidate in [-base128, 0, base128] {
+                    if min128 <= candidate && candidate <= max128 {
+                        constrained.push(json![candidate]);
+                    }
+                }
+                constrained
+            } else {
+                log::warn!("Base, Min or Max could not be converted to 128-bits signed integer.");
+                vec![]
+            }
+        }
+        (Some(min), Some(max), None) => {
+            let mut constrained = vec![json![min], json![max]];
+            if let (Some(minfloat), Some(maxfloat)) = (min.as_f64(), max.as_f64()) {
+                let range = minfloat..=maxfloat;
+                for val in [-1., 0., 1., PI] {
+                    if range.contains(&val) {
+                        constrained.push(json![val]);
+                    }
+                }
+            }
+            constrained
+        }
+        (Some(min), None, Some(base)) => {
+            let (base128, min128) = (base.as_i128(), min.as_i128());
+            if let (Some(base128), Some(min128)) = (base128, min128) {
+                let mut constrained = vec![];
+                if base128 > 0 {
+                    let smallest_multiple = base128 * (min128 / base128);
+                    constrained.push(json![smallest_multiple]);
+                }
+                for candidate in [-base128, 0, base128] {
+                    if min128 <= candidate {
+                        constrained.push(json![candidate]);
+                    }
+                }
+                constrained
+            } else {
+                log::warn!("Base or Min could not be converted to 128-bits signed integer.");
+                vec![]
+            }
+        }
+        (Some(min), None, None) => {
+            let mut constrained = vec![json![min]];
+            if let Some(min) = min.as_f64() {
+                for val in [-1., 0., 1., PI] {
+                    if min <= val {
+                        constrained.push(json![val]);
+                    }
+                }
+            }
+            constrained
+        }
+        (None, Some(max), Some(base)) => {
+            if let (Some(max), Some(base)) = (max.as_f64(), base.as_f64()) {
+                let mut constrained = vec![json![max]];
+                for val in [-base, 0., base] {
+                    if max >= val {
+                        constrained.push(json![val]);
+                    }
+                }
+                constrained
+            } else {
+                log::warn!("Base or Max could not be converted to 128-bits signed integer.");
+                vec![]
+            }
+        }
+        (None, Some(max), None) => {
+            if let Some(max) = max.as_f64() {
+                let mut constrained = vec![json![max]];
+                for val in [-PI, -1., 0., 1.] {
+                    if max >= val {
+                        constrained.push(json![val]);
+                    }
+                }
+                constrained
+            } else {
+                log::warn!("Max could not be converted to 128-bits signed integer.");
+                vec![]
+            }
+        }
+        (None, None, Some(base)) => {
+            let mut result = vec![];
+            if let Some(min_base) = base.as_i64() {
+                result.push(json![-min_base])
+            }
+            result.push(json![0]);
+            result.push(Value::Number(base.clone()));
+            result
+        }
+        (None, None, None) => vec![json![-1.], json![0.], json![1.], json![PI]],
+    }
+    // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
 }
 
 /// Creates a set of OpenApiInputs for the given sequence of QualifiedOperations based on a number of interesting
