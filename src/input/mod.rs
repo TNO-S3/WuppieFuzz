@@ -558,7 +558,6 @@ impl OpenApiInput {
                     .map(move |resps| {
                         ParameterAddressing::new(i, ParameterAccess::response_body(resps))
                     })
-                    .collect::<Vec<_>>()
             })
             .collect()
     }
