@@ -419,7 +419,7 @@ fn interesting_params_from_schema(
         result.extend(all_discriminator_variants(api, &schema, &ignore_references));
     } else {
         // INTERESTING ALL_OF VALUES
-        // Creates the union of all interesting values we find for each schema,
+        // Creates the union of fields of all interesting values we find for each schema,
         // which might blow up quite a bit depending on the schema.
         let all_examples: Vec<Vec<Value>> = schema
             .all_of
@@ -437,6 +437,8 @@ fn interesting_params_from_schema(
                 )),
             })
             .collect();
+        // By combining fields like this, we ensure each example satisfies
+        // all of the all_of entries.
         let all_combinations: Vec<Value> = all_examples
             .into_iter()
             .reduce(cartesian_product_values)
