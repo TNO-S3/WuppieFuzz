@@ -54,7 +54,7 @@ impl<'a> QualifiedOperation<'a> {
 }
 
 /// For a given path, gives the available methods and the operation index corresponding to them
-pub fn find_method_indices_for_path<'a>(api: &'a Spec, path: &str) -> Vec<(Method, usize)> {
+pub fn find_method_indices_for_path(api: &Spec, path: &str) -> Vec<(Method, usize)> {
     api.operations()
         .enumerate()
         .filter(|(_, (this_path, _, _))| path == this_path)

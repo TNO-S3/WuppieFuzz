@@ -426,7 +426,7 @@ fn validate_object_against_type(
     let make_err = |err_str| Err(ValidationError::ResponseObjectIncorrect { msg: err_str });
 
     match (expected_type, response_contents) {
-        (SchemaType::Boolean { .. }, Value::Bool(_)) => Ok(()),
+        (SchemaType::Boolean, Value::Bool(_)) => Ok(()),
         (SchemaType::Integer, Value::Number(n)) => match n.as_i64() {
             Some(_) => Ok(()),
             None => make_err(

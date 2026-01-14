@@ -10,7 +10,6 @@
 //! of programming languages.
 
 use std::{
-    convert::TryFrom,
     fs::{File, create_dir_all},
     io::Write,
     path::Path,
@@ -33,7 +32,7 @@ const SUPERFLUOUS_SYMBOL: &str = "&#x26a0;&#xfe0f";
 pub fn setup_endpoint_coverage(
     api: &Spec,
 ) -> core::result::Result<Arc<Mutex<EndpointCoverageClient>>, anyhow::Error> {
-    let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(&api)));
+    let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(api)));
     endpoint_coverage_client.fetch_coverage(true);
     // no-op for this particular CoverageClient
 
@@ -73,13 +72,7 @@ impl EndpointCoverageClient {
                     .as_ref()
                     .unwrap()
                     .keys()
-                    .map(move |status| {
-                        (
-                            Method::try_from(method.clone()).unwrap(),
-                            path.to_owned(),
-                            status.clone(),
-                        )
-                    })
+                    .map(move |status| (Method::from(&method), path.to_owned(), status.clone()))
             })
             // Mark them all as un-covered
             .map(|key| (key, Coverage::ExpectedNotFound))

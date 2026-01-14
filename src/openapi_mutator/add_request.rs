@@ -1,7 +1,7 @@
 //! Mutates a request series by adding a new request to it. The new request is taken
 //! at random from the API specification.
 
-use std::{borrow::Cow, collections::BTreeMap, convert::TryInto};
+use std::{borrow::Cow, collections::BTreeMap};
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -11,8 +11,8 @@ use libafl::{
 };
 use libafl_bolts::{Named, rands::Rand};
 use oas3::spec::RequestBody;
-// use openapiv3::{OpenAPI, RequestBody};
 
+// use openapiv3::{OpenAPI, RequestBody};
 use crate::{
     input::{
         Body, OpenApiInput, OpenApiRequest, ParameterContents, new_rand_input,
@@ -58,7 +58,7 @@ where
         let new_path_i = rand.below(core::num::NonZero::new(n_ops).unwrap());
 
         let (new_path, new_method, new_op) = api.operations().nth(new_path_i).unwrap();
-        let (method, path) = (new_method.try_into().unwrap(), new_path.to_owned());
+        let (method, path) = (new_method.into(), new_path.to_owned());
 
         let parameters: BTreeMap<(String, ParameterKind), ParameterContents> = new_op
             .parameters

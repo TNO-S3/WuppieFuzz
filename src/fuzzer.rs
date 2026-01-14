@@ -75,7 +75,7 @@ pub fn fuzz() -> Result<()> {
     let mut mgr = construct_event_mgr();
 
     // Observers & feedback initialization
-    let mut endpoint_coverage_client = setup_endpoint_coverage(&*api)?;
+    let mut endpoint_coverage_client = setup_endpoint_coverage(api)?;
     let mut code_coverage_client = setup_line_coverage(config, &report_path)?;
     let combined_map_observer: CombinedMapObserverType<'_> =
         construct_observer(&mut endpoint_coverage_client, &mut code_coverage_client);

@@ -261,8 +261,8 @@ pub fn normalize_request_body<'a>(
 
 /// Schema describes contents of objects and arrays. This function normalizes field
 /// names in a schema if it contains an object or an array of objects.
-fn normalize_schema<'a>(
-    api: &'a Spec,
+fn normalize_schema(
+    api: &Spec,
     schema: ObjectSchema,
     path: Vec<String>,
     access: ParameterAccess,
@@ -392,7 +392,7 @@ fn normalize_object_type<'a>(
             )];
             let nested_schema = object_properties[key]
                 .resolve(api)
-                .expect(&format!("Could not resolve nested schema {}", key));
+                .unwrap_or_else(|_| panic!("Could not resolve nested schema {}", key));
             let nested_params =
                 normalize_schema(api, nested_schema, path.clone(), new_parameter_access)
                     .unwrap_or_default();

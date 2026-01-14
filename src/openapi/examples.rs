@@ -6,7 +6,6 @@ use std::{
     borrow::Cow,
     collections::{BTreeMap, VecDeque},
     f64::consts::PI,
-    u64,
 };
 
 use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, SchemaType};
@@ -92,7 +91,7 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
                     }
                 }
                 oas3::spec::Schema::Object(object_or_reference) => Some(ParameterContents::from(
-                    example_from_schema(api, &object_or_reference.resolve(&api).ok()?)?,
+                    example_from_schema(api, &object_or_reference.resolve(api).ok()?)?,
                 )),
             },
             None => None,
@@ -143,15 +142,11 @@ fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, Strin
         // The specification allows for a theoretically infinite tower of
         // media types, examples, schemas and references. We put in some effort
         // to extract any useful value that may exist.
-        if param.schema.is_some() {
-            let schema = param.schema.as_ref().unwrap();
+        if let Some(schema) = param.schema.as_ref() {
             example_from_schema(api, &schema.resolve(api).expect("Could not resolve schema"))
                 .ok_or("Could not create example from schema".to_owned())
-        } else if param.content.is_some() {
-            param
-                .content
-                .as_ref()
-                .unwrap()
+        } else if let Some(content) = param.content.as_ref() {
+            content
                 .get_json_content()
                 .and_then(|media_type| example_from_media_type(api, media_type))
                 .ok_or("Could not create example from content".to_owned())
@@ -203,7 +198,7 @@ fn all_interesting_parameters(
         .map(|mut parameter| {
             let par_kind: ParameterKind = parameter.clone().into();
             let mut interesting_combinations: Vec<Value> = vec![];
-            if single_valued.contains(&&parameter) {
+            if single_valued.contains(&parameter) {
                 if let Some(example) = parameter.example {
                     interesting_combinations.push(example.clone());
                 } else if let Some(example) = parameter.examples.first_entry()
@@ -381,11 +376,11 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
     if let Some(type_set) = &schema.schema_type {
         match type_set {
             oas3::spec::SchemaTypeSet::Single(single_type) => {
-                return example_from_type(api, single_type, &schema);
+                return example_from_type(api, single_type, schema);
             }
             oas3::spec::SchemaTypeSet::Multiple(multiple_types) => {
                 if let Some(first_type) = multiple_types.first() {
-                    return example_from_type(api, first_type, &schema);
+                    return example_from_type(api, first_type, schema);
                 }
             }
         }
@@ -407,7 +402,7 @@ fn interesting_params_from_schema(
     if let ObjectOrReference::Ref { ref_path, .. } = schema {
         ignore_references.push(ref_path);
     }
-    let schema = schema.resolve(api).ok().expect("Failed to resolve schema.");
+    let schema = schema.resolve(api).expect("Failed to resolve schema.");
     if schema.read_only.is_some_and(|x| x) {
         // schema property may only be sent in responses, never in requests.
         return vec![];
@@ -419,7 +414,7 @@ fn interesting_params_from_schema(
     if let Some(example_schema) = schema.example.clone() {
         result.push(example_schema);
     }
-    result.extend(schema.examples.clone().into_iter());
+    result.extend(schema.examples.clone());
     if schema.discriminator.is_some() {
         result.extend(all_discriminator_variants(api, &schema, &ignore_references));
     } else {
@@ -807,12 +802,9 @@ fn example_from_type(api: &Spec, schema_type: &SchemaType, schema: &ObjectSchema
             // The 'items' specification is required according to the spec, but
             // we still get an Option and a possibly broken reference and what not.
             // Extract any usable specification of an item, and make an example.
-            interesting_params_from_type(api, schema)
-                .iter()
-                .next()
-                .cloned()
+            interesting_params_from_type(api, schema).first().cloned()
         }
-        SchemaType::Boolean {} => Some(Value::Bool(true)),
+        SchemaType::Boolean => Some(Value::Bool(true)),
         SchemaType::Null => Some(Value::Null),
     }
 }
@@ -820,23 +812,20 @@ fn example_from_type(api: &Spec, schema_type: &SchemaType, schema: &ObjectSchema
 /// We return all variants if an enumeration is present, try the pattern regex if one is present,
 /// or fall back to some defaults based on the StringFormat. Returns a serde_json::Value::String.
 fn interesting_params_from_string_type(
-    enumeration: &Vec<Value>,
+    enumeration: &[Value],
     pattern: &Option<String>,
     format: &Option<String>,
     min_length: Option<u64>,
     max_length: Option<u64>,
 ) -> Vec<serde_json::Value> {
     // Enumeration present? Return all String values.
-    let enum_strings: Vec<&Value> = enumeration
-        .into_iter()
-        .filter(|val| val.is_string())
-        .collect();
+    let enum_strings: Vec<&Value> = enumeration.iter().filter(|val| val.is_string()).collect();
     if !enum_strings.is_empty() {
         return enum_strings.into_iter().cloned().collect();
     }
     // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
     if let Some(pattern) = pattern {
-        if let Ok(compiled_regex) = rand_regex::Regex::compile(&pattern, 100) {
+        if let Ok(compiled_regex) = rand_regex::Regex::compile(pattern, 100) {
             return vec![serde_json::Value::String(
                 compiled_regex.sample(&mut rand::rng()),
             )];
@@ -849,7 +838,7 @@ fn interesting_params_from_string_type(
         match rand_regex::Regex::compile(&pattern_without_anchors, 100) {
             Ok(compiled_regex) => {
                 // Define the filter regex with the original pattern including anchors
-                let filter_regex = Regex::new(&pattern).unwrap();
+                let filter_regex = Regex::new(pattern).unwrap();
 
                 // Generate 1000 sample strings from the regex pattern without anchors
                 // and test if one matches the regex with the anchors
@@ -870,7 +859,7 @@ fn interesting_params_from_string_type(
 
     // Attempt to generate a string based on other format hints
     if let Some(format) = format {
-        let result: Vec<Value> = strings_from_format(&format)
+        let result: Vec<Value> = strings_from_format(format)
             .iter()
             .map(|&example| {
                 serde_json::Value::String(

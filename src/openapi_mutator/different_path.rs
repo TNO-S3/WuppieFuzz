@@ -1,7 +1,7 @@
 //! Mutates a request series by changing the path and method on one of the HTTP requests.
 //! The new path and method are taken from the API specification.
 
-use std::{borrow::Cow, convert::TryInto};
+use std::borrow::Cow;
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -61,11 +61,7 @@ where
                 {
                     continue;
                 }
-                random_input.method = (&new_method).try_into().unwrap_or_else(|_| {
-                    panic!(
-                        "Picked unsupported HTTP method {new_method} from the OpenAPI specification"
-                    )
-                });
+                random_input.method = new_method.into();
                 new_path.clone_into(&mut random_input.path);
             }
             fix_input_parameters(state, new_path_i, random_input);

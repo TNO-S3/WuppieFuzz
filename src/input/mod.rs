@@ -541,9 +541,9 @@ impl OpenApiInput {
                     .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
                     // Filter this by extracting only json responses, which contain usable return values
                     .flat_map(|response| {
-                        response.content.iter().find_map(|(key, value)| {
+                        response.content.into_iter().find_map(|(key, value)| {
                             key.starts_with("application/json")
-                                .then_some(value.schema.clone())
+                                .then_some(value.schema)
                                 .flatten()
                         })
                     })
