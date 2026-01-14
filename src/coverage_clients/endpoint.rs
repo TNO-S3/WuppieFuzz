@@ -160,7 +160,6 @@ impl EndpointCoverageClient {
                 .or_default()
                 .entry(*method)
                 .or_default()
-                // TODO: check that status.to_string does what we want
                 .insert(status.to_string(), cov_entry);
         }
         operation_tree.sort_keys();

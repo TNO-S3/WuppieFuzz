@@ -634,7 +634,6 @@ fn enforce_length_bounds(
 /// Generate parameters based on the type specified. The values returned
 /// should adhere to any constraints from the spec, any deviations to
 /// test robustness of the server should be introduced by fuzzing.
-//TODO: supply the Schema
 fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value> {
     // For numeric types, take exclusive_minimum and -maximum bools into account.
     schema.schema_type.clone().map_or(vec![], |type_set| {
