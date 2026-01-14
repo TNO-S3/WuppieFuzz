@@ -128,7 +128,7 @@ impl Body {
 
         match ref_or_body.resolve(api) {
             Ok(body) => {
-                for (key, _value) in &body.content {
+                for key in body.content.keys() {
                     if key.starts_with("application/json") {
                         return Body::ApplicationJson(param_contents);
                     }
@@ -535,9 +535,9 @@ impl OpenApiInput {
             // Extract the specification of each operation's possible responses
             .flat_map(|(i, op)| {
                 op.responses
-                    .clone()
-                    .unwrap_or_default()
-                    .iter()
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(|btm| btm.iter())
                     .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
                     // Filter this by extracting only json responses, which contain usable return values
                     .flat_map(|response| {
