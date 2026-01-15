@@ -694,7 +694,7 @@ fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value>
                                             .resolve(api)
                                             .expect("Could not resolve schema."),
                                     )
-                                    .unwrap()
+                                    .unwrap_or_default()
                                 }
                             };
                             // Repeat the example. If a maximum number of array elements is specified,
