@@ -36,11 +36,10 @@ use anyhow::Result;
 use clap::Parser;
 use configuration::{Commands, OutputFormat};
 use env_logger::{Builder, Env};
-use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use log::warn;
-use openapiv3::Server;
+use oas3::spec::Server;
 
 mod authentication;
 mod configuration;
@@ -61,7 +60,10 @@ mod state;
 mod types;
 mod wuppie_version;
 
-use crate::{configuration::Configuration, openapi::get_api_spec};
+use crate::{
+    configuration::Configuration,
+    openapi::{parse_api_spec, spec::load::get_api_spec},
+};
 
 /// The entry point. Dispatches to other modules based on the CLI command.
 #[allow(clippy::unit_arg)]
@@ -74,15 +76,16 @@ pub fn main() -> Result<()> {
         Commands::VerifyAuth { .. } => {
             let config = &Configuration::get().map_err(anyhow::Error::msg)?;
             setup_logging(config);
-            let mut api = get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+            // let mut api = get_api_spec(config.openapi_spec.as_ref().unwrap())?;
+            let mut api = parse_api_spec(config)?;
             // Override the `servers` field in the OpenAPI specification if a server override
             // was specified on the CLI.
             if let Some(server_override) = &config.target {
                 api.servers = vec![Server {
                     url: server_override.as_str().trim_end_matches('/').to_string(),
                     description: None,
-                    variables: None,
-                    extensions: IndexMap::new(),
+                    variables: Default::default(),
+                    extensions: Default::default(),
                 }];
             }
             authentication::verify_authentication(*api)

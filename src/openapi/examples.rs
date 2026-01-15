@@ -8,18 +8,17 @@ use std::{
     f64::consts::PI,
 };
 
-use openapiv3::{
-    OpenAPI, Operation, Parameter, ParameterData, RefOr, Schema, SchemaKind, StringFormat, Type,
-};
+use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, SchemaType};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
 use rand::{Rng, prelude::Distribution};
 use regex::Regex;
-use serde_json::Value;
+use serde_json::{Number, Value, json};
 use unicode_truncate::UnicodeTruncateStr;
 
 use super::{JsonContent, QualifiedOperation, WwwForm};
 use crate::{
     input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
+    openapi::spec::Spec,
     parameter_access::ParameterMatching,
 };
 
@@ -27,7 +26,7 @@ use crate::{
 /// filled with example values from the API specification, and default values
 /// for parameters with no explicit examples.
 pub fn example_from_qualified_operation(
-    api: &OpenAPI,
+    api: &Spec,
     operation: QualifiedOperation,
 ) -> OpenApiRequest {
     OpenApiRequest {
@@ -45,59 +44,67 @@ pub fn example_from_qualified_operation(
 /// Generates body parameter values for the given operation if the operation has a supported
 /// body type, otherwise None. Examples can be based on various sources, such as being
 /// provided directly in the OpenAPI-spec or as defaults based on their type.
-fn example_body_contents(api: &OpenAPI, operation: &Operation) -> Option<ParameterContents> {
+fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterContents> {
     let body = operation.request_body.as_ref()?.resolve(api).ok()?;
 
-    // Get either application/json or form content, if neither is present this function will return an empty body.
+    // Get either application/json or form content, if neither is present return None.
     let media_type = None
-        .or_else(|| body.content.get_json_content())
-        .or_else(|| body.content.get_www_form_content())?;
+        .or_else(|| body.content.get("application/json"))
+        .or_else(|| body.content.get("application/x-www-form-urlcontent"))?;
 
-    let schema = media_type.schema.as_ref()?.resolve(api);
+    // Return None if the schema cannot be resolved
+    let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
 
-    match &schema.kind {
-        SchemaKind::Type(Type::Object(obj)) => {
-            let body_map: BTreeMap<String, ParameterContents> = obj
-                .properties
-                .iter()
-                .filter_map(|(param, ref_or_schema)| {
-                    Some((
-                        param.clone(),
-                        ParameterContents::from(example_from_schema(
-                            api,
-                            ref_or_schema.resolve(api),
-                        )?),
-                    ))
-                })
-                .collect();
-            Some(body_map.into())
-        }
-        SchemaKind::Type(Type::Array(arr)) => match &arr.items {
-            Some(items) => {
-                let result = items.resolve(api);
-                Some(ParameterContents::from(example_from_schema(api, result)?))
-            }
-            None => None,
-        },
-        // TODO: create other body types, or document why not
-        SchemaKind::Type(unimplemented_type) => {
-            log::warn!(
-                "Cannot create an example body for schema type {unimplemented_type:?}. Using empty body."
-            );
-            None
-        }
-        ref unimplemented_kind => {
-            log::warn!(
-                "Cannot create an example body for schema kind {unimplemented_kind:?}. Using empty body."
-            );
-            None
-        }
+    if schema
+        .schema_type
+        .as_ref()
+        .is_some_and(|st| st.contains(SchemaType::Object))
+    {
+        let body_map: BTreeMap<String, ParameterContents> = schema
+            .properties
+            .iter()
+            .filter_map(|(param, ref_or_schema)| {
+                Some((
+                    param.clone(),
+                    ParameterContents::from(example_from_schema(
+                        api,
+                        &ref_or_schema.resolve(api).ok()?,
+                    )?),
+                ))
+            })
+            .collect();
+        return Some(body_map.into());
     }
+    if schema
+        .schema_type
+        .is_some_and(|st| st.contains(SchemaType::Array))
+    {
+        return match &schema.items {
+            Some(items) => match &**items {
+                oas3::spec::Schema::Boolean(boolean_schema) => {
+                    // Boolean schemas only serve to signal whether something will (true) or will not (false) validate against it.
+                    // For the true variant any example will do, and we choose to return an empty object as an example.
+                    // For the false variant no examples will validate, so we choose to not return any example.
+                    match boolean_schema.0 {
+                        true => Some(ParameterContents::Object(Default::default())),
+                        false => None,
+                    }
+                }
+                oas3::spec::Schema::Object(object_or_reference) => Some(ParameterContents::from(
+                    example_from_schema(api, &object_or_reference.resolve(api).ok()?)?,
+                )),
+            },
+            None => None,
+        };
+    }
+    // TODO this is a bit lackluster
+    log::warn!("Cannot create an example body. Using empty body.");
+    None
 }
 
 /// Generates all interesting body contents
 fn all_interesting_body_contents(
-    api: &OpenAPI,
+    api: &Spec,
     operation: &Operation,
 ) -> Option<Vec<ParameterContents>> {
     let body = operation.request_body.as_ref()?.resolve(api).ok()?;
@@ -117,51 +124,54 @@ fn all_interesting_body_contents(
 /// Create an example body from an operation. This function is meant for requests that do
 /// not have a structured body object, but a simple value.
 #[allow(unused)]
-fn example_plain_body(operation: &Operation, api: &OpenAPI) -> Option<ParameterContents> {
+fn example_plain_body(operation: &Operation, api: &Spec) -> Option<ParameterContents> {
     operation
         .request_body
         .as_ref()
         .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
-        .and_then(|body| body.content.get_json_content())
-        .and_then(|media_type| example_from_media_type(api, media_type))
+        .and_then(|body| body.content.get_json_content().cloned())
+        .and_then(|media_type| example_from_media_type(api, &media_type))
         .map(ParameterContents::from)
 }
 
-fn example_parameter_value(api: &OpenAPI, par_data: &ParameterData) -> Result<Value, String> {
-    let example = par_data.example.clone();
+fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, String> {
+    let example = param.example.clone();
     if example.is_some() {
         example.ok_or("".to_owned())
     } else {
         // The specification allows for a theoretically infinite tower of
         // media types, examples, schemas and references. We put in some effort
         // to extract any useful value that may exist.
-        match &(par_data.format) {
-            openapiv3::ParameterSchemaOrContent::Schema(ref_or_schema) => {
-                example_from_schema(api, ref_or_schema.resolve(api))
-                    .ok_or("Could not create example from schema".to_owned())
-            }
-            openapiv3::ParameterSchemaOrContent::Content(content) => content
+        if let Some(schema) = param.schema.as_ref() {
+            example_from_schema(api, &schema.resolve(api).expect("Could not resolve schema"))
+                .ok_or("Could not create example from schema".to_owned())
+        } else if let Some(content) = param.content.as_ref() {
+            content
                 .get_json_content()
                 .and_then(|media_type| example_from_media_type(api, media_type))
-                .ok_or("Could not create example from content".to_owned()),
+                .ok_or("Could not create example from content".to_owned())
+        } else {
+            Err(format!(
+                "Parameter {} must contain either schema or content.",
+                param.name
+            ))
         }
     }
 }
 
 fn example_parameters(
-    api: &OpenAPI,
+    api: &Spec,
     operation: &Operation,
 ) -> BTreeMap<(String, ParameterKind), ParameterContents> {
     operation
         .parameters
         .iter()
         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-        .map(|parameter| (parameter.into(), &parameter.data))
-        .filter_map(|(par_kind, par_data)| {
-            example_parameter_value(api, par_data)
+        .filter_map(|parameter| {
+            example_parameter_value(api, &parameter)
                 .map(|value| {
                     (
-                        (par_data.name.clone(), par_kind),
+                        (parameter.name.clone(), parameter.into()),
                         ParameterContents::from(value),
                     )
                 })
@@ -177,28 +187,32 @@ fn example_parameters(
 /// would be replaced by references later.
 fn all_interesting_parameters(
     operation: &Operation,
-    api: &OpenAPI,
-    single_valued: &[&Parameter],
+    api: &Spec,
+    single_valued: &[Parameter],
 ) -> Vec<BTreeMap<(String, ParameterKind), ParameterContents>> {
     // For each parameter in the operation, generate a list of plausible values
     let param_combinations: BTreeMap<(String, ParameterKind), Vec<ParameterContents>> = operation
         .parameters
         .iter()
         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-        .map(|parameter| {
-            let par_kind: ParameterKind = parameter.into();
-            let par_data = &parameter.data;
+        .map(|mut parameter| {
+            let par_kind: ParameterKind = parameter.clone().into();
             let mut interesting_combinations: Vec<Value> = vec![];
             if single_valued.contains(&parameter) {
-                if par_data.example.is_some() {
-                    interesting_combinations.push(par_data.example.clone().unwrap());
+                if let Some(example) = parameter.example {
+                    interesting_combinations.push(example.clone());
+                } else if let Some(example) = parameter.examples.first_entry()
+                    && let Ok(exvalue) = example.get().resolve(api)
+                    && let Some(value) = exvalue.value
+                {
+                    interesting_combinations.push(value)
                 } else {
-                    match example_parameter_value(api, par_data) {
+                    match example_parameter_value(api, &parameter) {
                         Ok(value) => interesting_combinations.push(value),
                         Err(err) => {
                             log::warn!(
                                 "Failed to create single value for parameter {}: {}",
-                                par_data.name,
+                                parameter.name,
                                 err
                             )
                         }
@@ -207,30 +221,25 @@ fn all_interesting_parameters(
             } else {
                 // if this parameter is a reference target (it will get replaced with a reference)
                 // only return a single possible value here to avoid duplication down the line.
-                if let Some(example) = par_data.example.clone() {
-                    interesting_combinations.push(example);
+                if let Some(ref example) = parameter.example {
+                    interesting_combinations.push(example.clone());
                 };
-                match &(par_data.format) {
-                    openapiv3::ParameterSchemaOrContent::Schema(ref_or_schema) => {
-                        interesting_combinations.extend(interesting_params_from_schema(
-                            api,
-                            ref_or_schema,
-                            &[],
-                        ));
-                    }
-                    openapiv3::ParameterSchemaOrContent::Content(content) => {
-                        if let Some(media_type) = content.get("application/json") {
-                            interesting_combinations
-                                .extend(interesting_params_from_media_type(api, media_type));
-                        }
-                    }
-                };
+                interesting_combinations.extend(
+                    parameter
+                        .examples
+                        .iter()
+                        .filter_map(|(_, ref_or)| ref_or.resolve(api).ok())
+                        .filter_map(|ex| ex.value),
+                );
+                if let Ok(value) = example_parameter_value(api, &parameter) {
+                    interesting_combinations.push(value);
+                }
             }
             let possible_values = interesting_combinations
                 .into_iter()
                 .map(ParameterContents::from)
                 .collect();
-            ((par_data.name.clone(), par_kind), possible_values)
+            ((parameter.name.clone(), par_kind), possible_values)
         })
         .collect();
 
@@ -260,23 +269,36 @@ fn all_interesting_parameters(
     maps
 }
 
-fn example_from_media_type(api: &OpenAPI, contents: &openapiv3::MediaType) -> Option<Value> {
-    contents.example.clone().or_else(|| {
-        contents
-            .schema
-            .as_ref()
-            .and_then(|ref_or_schema| example_from_schema(api, ref_or_schema.resolve(api)))
-    })
+/// Produces one example (or none) based on the given MediaType
+fn example_from_media_type(api: &Spec, contents: &MediaType) -> Option<Value> {
+    contents
+        .examples
+        .as_ref()
+        .and_then(|examples| {
+            examples
+                .resolve_all(api)
+                .into_iter()
+                .filter_map(|(_, val)| val.value)
+                .next()
+        })
+        .or_else(|| {
+            contents.schema.as_ref().and_then(|ref_or_schema| {
+                example_from_schema(api, &ref_or_schema.resolve(api).ok()?)
+            })
+        })
 }
 
-fn interesting_params_from_media_type(
-    api: &OpenAPI,
-    contents: &openapiv3::MediaType,
-) -> Vec<Value> {
+/// Produces all examples for the given MediaType
+fn interesting_params_from_media_type(api: &Spec, contents: &MediaType) -> Vec<Value> {
     let mut result = vec![];
-    if contents.example.is_some() {
-        result.push(contents.example.clone().unwrap());
-    }
+    if let Some(examples) = &contents.examples {
+        result.extend(
+            examples
+                .resolve_all(api)
+                .into_iter()
+                .filter_map(|(_, ex)| ex.value),
+        );
+    };
     if let Some(more_examples) = contents
         .schema
         .as_ref()
@@ -287,7 +309,7 @@ fn interesting_params_from_media_type(
     result
 }
 
-fn log_schema_debug(schema: &Schema) {
+fn log_schema_debug(schema: &ObjectSchema) {
     if !log::log_enabled!(log::Level::Debug) {
         log::warn!("To output the schema, run with --log-level=debug.");
     }
@@ -295,52 +317,75 @@ fn log_schema_debug(schema: &Schema) {
 }
 
 // Attempts to build a value that matches the given schema using default values
-fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
-    if schema.data.read_only {
+fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
+    // TODO: Probably remove this read_only check.
+    // Returning None below is likely because we misinterpreted read_only as pertaining to a type, rather than a schema.
+    // The documentation of schema explains readOnly as meaning:
+    //
+    // "the value of the instance is managed exclusively by the owning authority, and attempts by an application to modify the
+    // value of this property are expected to be ignored or rejected by that owning authority."
+    //
+    // and refers to the json-schema definition. By contrast, readOnly on types means they should only be used in responses
+    // as defined here: https://swagger.io/docs/specification/v3_0/data-models/data-types/
+    // (hence returning None here, since we generate examples for requests only)
+    if Some(true) == schema.read_only {
         return None;
     }
-    if schema.data.default.is_some() {
-        return schema.data.default.clone();
+    if schema.default.is_some() {
+        return schema.default.clone();
     }
-    if schema.data.example.is_some() {
-        return schema.data.example.clone();
+    if schema.example.is_some() {
+        return schema.example.clone();
     }
-    match &schema.kind {
-        openapiv3::SchemaKind::Type(t) => example_from_type(api, t),
-        openapiv3::SchemaKind::OneOf { one_of }
-        | openapiv3::SchemaKind::AnyOf { any_of: one_of } => one_of
-            .iter()
-            .filter_map(|ref_or_schema| example_from_schema(api, ref_or_schema.resolve(api)))
-            .next(),
-        openapiv3::SchemaKind::AllOf { all_of } => {
-            // If only a single property is in this AllOf, return an example from it.
-            if all_of.len() == 1 {
-                example_from_schema(api, all_of[0].resolve(api))
-            } else {
-                log::warn!(concat!(
-                    "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
-                    "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
-                ));
-                log_schema_debug(schema);
-                None
-            }
-        }
-        openapiv3::SchemaKind::Any(_) => {
-            log::warn!(
-                "Generating example parameters for this schema is not supported, it's too flexible."
-            );
-            log_schema_debug(schema);
-            None
-        }
-        openapiv3::SchemaKind::Not { not: _ } => {
+    // Return an example from all_of if it has exactly one entry
+    match schema.all_of.len() {
+        0 => (),
+        1 => return example_from_schema(api, &schema.all_of[0].resolve(api).ok()?),
+        _ => {
             log::warn!(concat!(
-                "Generating example parameters for negated schemas is not supported, it is unclear what to generate. ",
-                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not"
+                "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
+                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
             ));
             log_schema_debug(schema);
-            None
+            return None;
         }
     }
+    // Return the first schema that produces an example if one_of is populated
+    let one_of_example = schema
+        .one_of
+        .iter()
+        .filter_map(|ref_or_schema| example_from_schema(api, &ref_or_schema.resolve(api).ok()?))
+        .next();
+    if one_of_example.is_some() {
+        if schema.one_of.len() > 1 {
+            log::warn!(
+                "Schema has more than one entry in one_of - an example is generated but exclusiveness is not guaranteed."
+            )
+        }
+        return one_of_example;
+    }
+    let any_of_example = schema
+        .any_of
+        .iter()
+        .filter_map(|ref_or_schema| example_from_schema(api, &ref_or_schema.resolve(api).ok()?))
+        .next();
+    if any_of_example.is_some() {
+        return any_of_example;
+    }
+    // Returning None explicitly if no example could be generated.
+    if let Some(type_set) = &schema.schema_type {
+        match type_set {
+            oas3::spec::SchemaTypeSet::Single(single_type) => {
+                return example_from_type(api, single_type, schema);
+            }
+            oas3::spec::SchemaTypeSet::Multiple(multiple_types) => {
+                if let Some(first_type) = multiple_types.first() {
+                    return example_from_type(api, first_type, schema);
+                }
+            }
+        }
+    }
+    None
 }
 
 // Returns all interesting (default, example) values for the given schema.
@@ -348,81 +393,81 @@ fn example_from_schema(api: &OpenAPI, schema: &Schema) -> Option<Value> {
 // when resolving discriminator variants, which may refer back to their parent object
 // circularly.
 fn interesting_params_from_schema(
-    api: &OpenAPI,
-    schema: &RefOr<Schema>,
-    ignore_names: &[&str],
+    api: &Spec,
+    schema: &ObjectOrReference<ObjectSchema>,
+    ignore_reference_names: &[&str],
 ) -> Vec<Value> {
     // Add the current schema name to the list of names not to descend into again, to prevent cycles
-    let mut ignore_reference = ignore_names.to_owned();
-    if let RefOr::Reference { reference } = schema {
-        ignore_reference.push(reference);
+    let mut ignore_references = ignore_reference_names.to_owned();
+    if let ObjectOrReference::Ref { ref_path, .. } = schema {
+        ignore_references.push(ref_path);
     }
-    let schema = schema.resolve(api);
-    if schema.data.read_only {
+    let schema = schema.resolve(api).expect("Failed to resolve schema.");
+    if schema.read_only.is_some_and(|x| x) {
         // schema property may only be sent in responses, never in requests.
         return vec![];
     }
     let mut result = vec![];
-    if schema.data.default.is_some() {
-        result.push(schema.data.default.clone().unwrap());
+    if let Some(default_schema) = schema.default.clone() {
+        result.push(default_schema);
     }
-    if schema.data.example.is_some() {
-        result.push(schema.data.example.clone().unwrap());
+    if let Some(example_schema) = schema.example.clone() {
+        result.push(example_schema);
     }
-    if schema.data.discriminator.is_some() {
-        result.extend(all_discriminator_variants(api, schema, &ignore_reference));
+    result.extend(schema.examples.clone());
+    if schema.discriminator.is_some() {
+        result.extend(all_discriminator_variants(api, &schema, &ignore_references));
     } else {
-        match &schema.kind {
-            openapiv3::SchemaKind::Type(t) => {
-                result.extend(interesting_params_from_type(api, t));
-            }
-            openapiv3::SchemaKind::OneOf { one_of }
-            | openapiv3::SchemaKind::AnyOf { any_of: one_of } => {
-                // For each OneOf variant, generate the list of examples, and then merge
-                // the lists of examples into one big list (flat_map) and add them to the
-                // result-ing list of examples
-                result.extend(one_of.iter().flat_map(|ref_or_schema| {
-                    match ref_or_schema {
-                        // If this is a reference, and it's the one we want to ignore, return empty vec
-                        RefOr::Reference { reference }
-                            if ignore_reference.contains(&reference.as_str()) =>
-                        {
-                            Vec::new()
-                        }
-                        _ => interesting_params_from_schema(api, ref_or_schema, &ignore_reference),
-                    }
-                }));
-            }
-            openapiv3::SchemaKind::AllOf { all_of } => {
-                // For each AllOf variant, generate the list of examples. Then, to get the
-                // full set of examples, merge them in every possible way!
-                // all_examples will be a vec of vecs: for each variant in allOf, many examples.
-                let all_examples: Vec<Vec<Value>> = all_of
-                    .iter()
-                    .filter_map(|ref_or_schema| {
-                        match ref_or_schema {
-                            // If this is a reference, and it's the one we want to ignore, return empty vec
-                            RefOr::Reference { reference }
-                                if ignore_reference.contains(&reference.as_str()) =>
+        // INTERESTING ALL_OF VALUES
+        // Creates the union of fields of all interesting values we find for each schema,
+        // which might blow up quite a bit depending on the schema.
+        let all_examples: Vec<Vec<Value>> = schema
+            .all_of
+            .iter()
+            .filter_map(|ref_or_schema| match ref_or_schema {
+                ObjectOrReference::Ref { ref_path, .. }
+                    if ignore_references.contains(&ref_path.as_str()) =>
+                {
+                    None
+                }
+                _ => Some(interesting_params_from_schema(
+                    api,
+                    ref_or_schema,
+                    &ignore_references,
+                )),
+            })
+            .collect();
+        // By combining fields like this, we ensure each example satisfies
+        // all of the all_of entries.
+        let all_combinations: Vec<Value> = all_examples
+            .into_iter()
+            .reduce(cartesian_product_values)
+            .unwrap_or_default();
+        result.extend(all_combinations);
+        // INTERESTING ONE_OF AND ANY_OF VALUES
+        if schema.one_of.len() > 1 {
+            log::warn!("Schema has more than one_of schema: conflicting examples may be generated.")
+        }
+        result.extend(
+            [schema.one_of, schema.any_of]
+                .iter()
+                .flat_map(|schema_vec| {
+                    schema_vec
+                        .iter()
+                        .flat_map(|ref_or_schema| match ref_or_schema {
+                            ObjectOrReference::Ref { ref_path, .. }
+                                if ignore_references.contains(&ref_path.as_str()) =>
                             {
-                                None
+                                Vec::new()
                             }
-                            _ => Some(interesting_params_from_schema(
+                            _ => interesting_params_from_schema(
                                 api,
                                 ref_or_schema,
-                                &ignore_reference,
-                            )),
-                        }
-                    })
-                    .collect();
-                let all_combinations: Vec<Value> = all_examples
-                    .into_iter()
-                    .reduce(carthesian_product_values)
-                    .unwrap_or_default();
-                result.extend(all_combinations)
-            }
-            _ => (),
-        }
+                                &ignore_references,
+                            ),
+                        })
+                }),
+        );
     }
     result
 }
@@ -437,7 +482,7 @@ fn merge_object_values(mut left: Value, mut right: Value) -> Value {
     left
 }
 
-/// Carthesian product of two vectors of Values.
+/// Cartesian product of two vectors of Values.
 /// Merges the Values using merge_object_values.
 ///
 /// For example, &[v1, v2], &[w1, w2] result in a vec containing
@@ -447,7 +492,7 @@ fn merge_object_values(mut left: Value, mut right: Value) -> Value {
 /// - a value containing all fields in v2 and all fields in w2.
 ///
 /// Inspiration from https://stackoverflow.com/a/74805365
-fn carthesian_product_values(xs: Vec<Value>, ys: Vec<Value>) -> Vec<Value> {
+fn cartesian_product_values(xs: Vec<Value>, ys: Vec<Value>) -> Vec<Value> {
     xs.into_iter()
         .flat_map(|x| std::iter::repeat(x).zip(&ys))
         .map(|(left, right)| merge_object_values(left, right.clone()))
@@ -456,7 +501,7 @@ fn carthesian_product_values(xs: Vec<Value>, ys: Vec<Value>) -> Vec<Value> {
 
 /// Generates all variants of a discrminator-based schema; i.e. one that has a
 /// Discrminator in the schema_data.
-/// Supports both OAPI3.0 style discrminators, which have `OneOf`/`AnyOf` as the
+/// Supports both OAPI3.0 style discriminators, which have `OneOf`/`AnyOf` as the
 /// SchemaType and combine it with mappings to select the correct one (sometimes),
 ///
 /// * https://swagger.io/docs/specification/data-models/inheritance-and-polymorphism/
@@ -467,33 +512,34 @@ fn carthesian_product_values(xs: Vec<Value>, ys: Vec<Value>) -> Vec<Value> {
 /// discriminator parameter.
 ///
 /// * https://swagger.io/specification/#discriminator-object
-fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&str]) -> Vec<Value> {
+fn all_discriminator_variants(
+    api: &Spec,
+    schema: &ObjectSchema,
+    ignore_names: &[&str],
+) -> Vec<Value> {
     // There is a strong assumption from here on that we're dealing with an
     // object schema, with the fields collected from the variant specified by
     // the discriminator, and merged with the fields from the parent type.
-    let discriminator = match &schema.data.discriminator {
-        Some(discriminator) => discriminator,
-        None => unreachable!(), // Should not be called if there is no discriminator
-    };
+    let discriminator = &schema
+        .discriminator
+        .as_ref()
+        .expect("Should not be called if there is no discriminator");
 
     // Make a mapping "path to api schema" -> "variant name" for the variants
     let mut mapping: BTreeMap<String, String> = BTreeMap::new();
     // Collect variants and default names from OneOf/AnyOf
-    if let openapiv3::SchemaKind::OneOf { one_of: variants }
-    | openapiv3::SchemaKind::AnyOf { any_of: variants } = &schema.kind
-    {
-        // Only references are allowed by the spec, no inline schemas
-        for variant in variants {
-            if let RefOr::Reference { reference } = variant {
-                // Select the Dog in '#/components/schemas/Dog'
-                if let Some(name) = reference.split('/').next_back() {
-                    mapping.insert(reference.clone(), name.to_string());
-                }
+    // Only references are allowed by the spec, no inline schemas
+    for variant in schema.one_of.iter().chain(schema.any_of.iter()) {
+        if let ObjectOrReference::Ref { ref_path, .. } = variant {
+            // Select the Dog in '#/components/schemas/Dog'
+            if let Some(name) = ref_path.split('/').next_back() {
+                mapping.insert(ref_path.clone(), name.to_string());
             }
         }
     }
+
     // Overwrite variant names with specifically defined mapping keys
-    for (name, path) in &discriminator.mapping {
+    for (name, path) in discriminator.mapping.iter().flatten() {
         mapping.insert(path.clone(), name.clone());
     }
 
@@ -512,7 +558,11 @@ fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&s
         all_examples.extend(
             interesting_params_from_schema(
                 api,
-                &RefOr::Reference { reference: path },
+                &ObjectOrReference::Ref {
+                    ref_path: path,
+                    summary: None,
+                    description: None,
+                },
                 ignore_names,
             )
             .into_iter()
@@ -525,35 +575,38 @@ fn all_discriminator_variants(api: &OpenAPI, schema: &Schema, ignore_names: &[&s
 }
 
 /// Gives a slice of example string references based on the StringFormat given.
-/// The examples are correct values for their type, if perhaps surprising.
-fn strings_from_format(str_format: &openapiv3::VariantOrUnknownOrEmpty<StringFormat>) -> &[&str] {
+/// String formats are essentially free-form, but there are some values that
+/// "SHOULD" be implemented according to https://json-schema.org/draft/2020-12/json-schema-validation#section-7.2
+/// See section 7.3 on that page for defined formats, which are implemented below.
+fn strings_from_format(str_format: &str) -> &[&str] {
     match str_format {
-        openapiv3::VariantOrUnknownOrEmpty::Item(StringFormat::Date) => {
-            &["1981-09-05", "0000-01-01", "9999999-12-31"]
-        }
-        openapiv3::VariantOrUnknownOrEmpty::Item(StringFormat::DateTime) => &[
+        "date" => &["1981-09-05", "0000-01-01", "9999999-12-31"],
+        "date-time" => &[
             "1981-09-05T10:00:00Z",    // Regular date
             "0000-01-01T00:00:00Z",    // Used to crash MySQL servers
             "9999999-12-31T20:00:00Z", // At the end of the universe
             "2016-12-31T23:59:60Z",    // Valid leap second
         ],
-        openapiv3::VariantOrUnknownOrEmpty::Item(StringFormat::Byte) => &["V3VwcGllRnV6elROTyE=="],
-        // Though the specification allows for other StringFormats, like email,
-        // the openapi crate does not. Just in case, we default to an email-like
-        // value.
-        openapiv3::VariantOrUnknownOrEmpty::Unknown(s) if s == "email" => {
-            &["leaf@example.com", "a+b@c.onion"]
-        }
-        openapiv3::VariantOrUnknownOrEmpty::Unknown(s) if s == "uuid" => &[
-            "550e8400-e29b-41d4-a716-446655440000",
-            "00000000-0000-0000-0000-000000000000",
+        "time" => &["23:59:59.999Z"],
+        "duration" => &["P3Y6M4DT12H30M5.123S"],
+        "email" => &["user.name+tag@example.co.uk"],
+        "idn-email" => &["δοκιμή@παράδειγμα.δοκιμή"],
+        "ipv4" => &["192.0.2.255"],
+        "ipv6" => &["2001:0db8:85a3:0000:0000:8a2e:0370:7334"],
+        "uri" => &[
+            "https://user:pass@example.com:8443/path/to/resource;param?query=one%20two&flag=true#section-3",
         ],
-        openapiv3::VariantOrUnknownOrEmpty::Unknown(s) if s == "ipv4" => {
-            &["1.1.1.1", "0.0.0.0", "127.0.0.1"]
-        }
-        openapiv3::VariantOrUnknownOrEmpty::Unknown(s) if s == "hostname" => {
-            &["example.com", "localhost", "router.local"]
-        }
+        "uri-reference" => &["../assets/images/logo.png?size=2x#icon"],
+        "iri" => &["https://例え.テスト/パス/検索?q=東京#結果"],
+        "iri-reference" => &["../../資料/設計書.html#概要"],
+        "uuid" => &["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+        "uri-template" => &["https://api.example.com/users/{userId}/orders{?status,from,to}"],
+        "json-pointer" => &["/store/book/0/author"],
+        "relative-json-pointer" => &["2/highlighted/0"],
+        "regex" => &["^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[!@#$%^&*])[A-Za-z\\d!@#$%^&*]{12,}$"],
+        // Extra, "non-defined" formats:
+        "base64" => &["V3VwcGllRnV6elROTyE=="],
+        // If not matching any of the formats above:
         _ => &["", "A", "🎵"],
     }
 }
@@ -562,15 +615,15 @@ fn strings_from_format(str_format: &openapiv3::VariantOrUnknownOrEmpty<StringFor
 /// with "A"s or truncating it.
 fn enforce_length_bounds(
     string: &str,
-    min_length: Option<usize>,
-    max_length: Option<usize>,
+    min_length: Option<u64>,
+    max_length: Option<u64>,
 ) -> Cow<'_, str> {
     let mut result = Cow::from(string);
     if let Some(min) = min_length {
-        *result.to_mut() += &"A".repeat(min);
+        *result.to_mut() += &"A".repeat(min as usize);
     }
     if let Some(max) = max_length {
-        result.to_mut().unicode_truncate(max);
+        result.to_mut().unicode_truncate(max as usize);
     }
     result
 }
@@ -578,182 +631,117 @@ fn enforce_length_bounds(
 /// Generate parameters based on the type specified. The values returned
 /// should adhere to any constraints from the spec, any deviations to
 /// test robustness of the server should be introduced by fuzzing.
-fn interesting_params_from_type(api: &OpenAPI, openapi_type: &Type) -> Vec<Value> {
+fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value> {
     // For numeric types, take exclusive_minimum and -maximum bools into account.
-    match openapi_type {
-        Type::String(string) => interesting_params_from_string_type(string),
-        Type::Number(number) => {
-            let interesting = match (number.minimum, number.maximum, number.multiple_of) {
-                (Some(min), Some(max), Some(base)) => {
-                    let mut constrained = vec![];
-                    let range = min..=max;
-                    for val in [-base, 0., base] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), Some(max), None) => {
-                    let mut constrained = vec![min, max];
-                    let range = min..=max;
-                    for val in [-1., 0., 1., PI] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, Some(base)) => {
-                    let mut constrained = vec![];
-                    for val in [-base, 0., base] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, None) => {
-                    let mut constrained = vec![min];
-                    for val in [-1., 0., 1., PI] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), Some(base)) => {
-                    let mut constrained = vec![max];
-                    for val in [-base, 0., base] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), None) => {
-                    let mut constrained = vec![max];
-                    for val in [-PI, -1., 0., 1.] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, None, Some(base)) => {
-                    vec![-base, 0., base]
-                }
-                (None, None, None) => vec![-1., 0., 1., PI],
+    schema.schema_type.clone().map_or(vec![], |type_set| {
+        {
+            let types_vec = match type_set {
+                oas3::spec::SchemaTypeSet::Single(single_type) => vec![single_type],
+                oas3::spec::SchemaTypeSet::Multiple(multiple_types) => multiple_types,
             };
-            // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
-            interesting
+            types_vec
                 .iter()
-                .map(|num| Value::Number(serde_json::Number::from_f64(*num).unwrap()))
+                .flat_map(|schema_type| {
+                    match schema_type {
+                        SchemaType::String => interesting_params_from_string_type(
+                            &schema.enum_values,
+                            &schema.pattern,
+                            &schema.format,
+                            schema.min_length,
+                            schema.max_length,
+                        ),
+                        SchemaType::Number | SchemaType::Integer => {
+                            interesting_params_from_number_type(
+                                &schema.minimum,
+                                &schema.maximum,
+                                &schema.multiple_of,
+                            )
+                        }
+                        SchemaType::Object => vec![Value::Object(
+                            schema
+                                .properties
+                                .iter()
+                                .filter_map(|(k, v)| {
+                                    Some((
+                                        k.clone(),
+                                        example_from_schema(
+                                            api,
+                                            &v.resolve(api).expect("Could not resolve schema."),
+                                        )?,
+                                    ))
+                                })
+                                .collect(),
+                        )],
+                        SchemaType::Array => {
+                            // The 'items' specification is required according to the spec, but
+                            // we still get an Option and a possibly broken reference and what not.
+                            // Extract any usable specification of an item, and make an example.
+                            let items_schema = *schema
+                                .items
+                                .clone()
+                                .expect("Array-schema should have a schema for its items.");
+                            let item_value = match items_schema {
+                                oas3::spec::Schema::Boolean(boolean_schema) => {
+                                    match &boolean_schema.0 {
+                                        true => Value::Object(Default::default()),
+                                        false => Value::Null,
+                                    }
+                                }
+                                oas3::spec::Schema::Object(object_or_reference) => {
+                                    example_from_schema(
+                                        api,
+                                        &object_or_reference
+                                            .resolve(api)
+                                            .expect("Could not resolve schema."),
+                                    )
+                                    .unwrap_or_default()
+                                }
+                            };
+                            // Repeat the example. If a maximum number of array elements is specified,
+                            // we use that many, otherwise the minimum number, otherwise 3.
+                            vec![Value::Array(vec![
+                                item_value;
+                                schema.max_items.or(schema.min_items).unwrap_or(3)
+                                    as usize
+                            ])]
+                        }
+                        SchemaType::Boolean => vec![Value::Bool(true), Value::Bool(false)],
+                        SchemaType::Null => vec![Value::Null],
+                    }
+                })
                 .collect()
         }
-        Type::Integer(integer) => {
-            let interesting = match (integer.minimum, integer.maximum, integer.multiple_of) {
-                (Some(min), Some(max), Some(base)) => {
-                    let mut constrained = vec![];
-                    let range = min..=max;
-                    for val in [-base, 0, base] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), Some(max), None) => {
-                    let mut constrained = vec![min, max];
-                    let range = min..=max;
-                    for val in [min, -1, 0, 1, max] {
-                        if range.contains(&val) {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, Some(base)) => {
-                    let mut constrained = vec![];
-                    for val in [-base, 0, base] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (Some(min), None, None) => {
-                    let mut constrained = vec![min];
-                    for val in [min, -1, 0, 1] {
-                        if min <= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), Some(base)) => {
-                    let mut constrained = vec![max];
-                    for val in [-base, 0, base] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, Some(max), None) => {
-                    let mut constrained = vec![max];
-                    for val in [-1, 0, 1, max] {
-                        if max >= val {
-                            constrained.push(val);
-                        }
-                    }
-                    constrained
-                }
-                (None, None, Some(base)) => {
-                    vec![-base, 0, base]
-                }
-                (None, None, None) => {
-                    vec![-1, 0, 1]
-                }
-            };
-            // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
-            interesting
-                .iter()
-                .map(|num| Value::Number(serde_json::Number::from(*num)))
-                .collect()
-        }
-        Type::Object(object) => vec![Value::Object(
-            object
-                .properties
-                .iter()
-                .filter_map(|(k, v)| Some((k.clone(), example_from_schema(api, v.resolve(api))?)))
-                .collect(),
-        )],
-        Type::Array(array) => {
-            // The 'items' specification is required according to the spec, but
-            // we still get an Option and a possibly broken reference and what not.
-            // Extract any usable specification of an item, and make an example.
-            let item =
-                example_from_schema(api, array.items.as_ref().unwrap().resolve(api)).unwrap();
-            // Repeat the example. If a maximum number of array elements is specified,
-            // we use that many, otherwise the minimum number, otherwise 3.
-            vec![Value::Array(vec![
-                item;
-                array
-                    .max_items
-                    .or(array.min_items)
-                    .unwrap_or(3)
-            ])]
-        }
-        Type::Boolean {} => vec![Value::Bool(true), Value::Bool(false)],
-    }
+    })
 }
 
-fn example_from_type(api: &OpenAPI, t: &Type) -> Option<Value> {
-    match t {
-        Type::String(string) => interesting_params_from_string_type(string).pop(),
-        Type::Number(number) => {
-            let value = match (number.minimum, number.maximum, number.multiple_of) {
+// We supply the schema_type separately since the schema can have a TypeSet with one or multiple schemas.
+fn example_from_type(api: &Spec, schema_type: &SchemaType, schema: &ObjectSchema) -> Option<Value> {
+    match schema_type {
+        SchemaType::String => interesting_params_from_string_type(
+            &schema.enum_values,
+            &schema.pattern,
+            &schema.format,
+            schema.min_length,
+            schema.max_length,
+        )
+        .pop(),
+        SchemaType::Number => {
+            // Try to interpret all JSON numbers as f64 and then create an example based on the results.
+            let (min, max, base) = match (
+                schema.minimum.clone(),
+                schema.maximum.clone(),
+                schema.multiple_of.clone(),
+            ) {
+                (Some(min), Some(max), Some(base)) => (min.as_f64(), max.as_f64(), base.as_f64()),
+                (Some(min), Some(max), None) => (min.as_f64(), max.as_f64(), None),
+                (Some(min), None, Some(base)) => (min.as_f64(), None, base.as_f64()),
+                (Some(min), None, None) => (min.as_f64(), None, None),
+                (None, Some(max), Some(base)) => (None, max.as_f64(), base.as_f64()),
+                (None, Some(max), None) => (None, max.as_f64(), None),
+                (None, None, Some(base)) => (None, None, base.as_f64()),
+                (None, None, None) => (None, None, None),
+            };
+            let value = match (min, max, base) {
                 (Some(min), Some(max), Some(base)) => ((min + max) / 2.0 / base).round() * base,
                 (Some(min), Some(max), None) => (min + max) / 2.0,
                 (Some(min), None, Some(base)) => (min / base).ceil() * base,
@@ -765,60 +753,80 @@ fn example_from_type(api: &OpenAPI, t: &Type) -> Option<Value> {
             };
             Some(Value::Number(serde_json::Number::from_f64(value)?))
         }
-        Type::Integer(integer) => {
-            let value = match (integer.minimum, integer.maximum, integer.multiple_of) {
-                (Some(min), Some(max), Some(base)) => ((min + max) / 2 / base) * base,
+        SchemaType::Integer => {
+            // Try to interpret all JSON-numbers as i128 and then create an example based on the results.
+            let (min, max, base) = match (
+                schema.minimum.clone(),
+                schema.maximum.clone(),
+                schema.multiple_of.clone(),
+            ) {
+                (Some(min), Some(max), Some(base)) => {
+                    (min.as_i128(), max.as_i128(), base.as_i128())
+                }
+                (Some(min), Some(max), None) => (min.as_i128(), max.as_i128(), None),
+                (Some(min), None, Some(base)) => (min.as_i128(), None, base.as_i128()),
+                (Some(min), None, None) => (min.as_i128(), None, None),
+                (None, Some(max), Some(base)) => (None, max.as_i128(), base.as_i128()),
+                (None, Some(max), None) => (None, max.as_i128(), None),
+                (None, None, Some(base)) => (None, None, base.as_i128()),
+                (None, None, None) => (None, None, None),
+            };
+            let value = match (min, max, base) {
+                (Some(min), Some(max), Some(base)) => {
+                    ((min + max) as f64 / 2.0 / (base as f64)).round() as i128 * base
+                }
                 (Some(min), Some(max), None) => (min + max) / 2,
-                (Some(min), None, Some(base)) => ((min + base - 1) / base) * base,
+                (Some(min), None, Some(base)) => (min as f64 / base as f64).ceil() as i128 * base,
                 (Some(min), None, None) => min,
-                (None, Some(max), Some(base)) => (max / base) * base,
+                (None, Some(max), Some(base)) => (max as f64 / base as f64).floor() as i128 * base,
                 (None, Some(max), None) => max,
                 (None, None, Some(base)) => base,
                 (None, None, None) => 0,
             };
-            Some(Value::Number(serde_json::Number::from(value)))
+            Some(json![value])
         }
-        Type::Object(object) => Some(Value::Object(
-            object
+        SchemaType::Object => Some(Value::Object(
+            schema
                 .properties
                 .iter()
-                .filter_map(|(k, v)| Some((k.clone(), example_from_schema(api, v.resolve(api))?)))
+                .filter_map(|(k, v)| {
+                    Some((
+                        k.clone(),
+                        example_from_schema(
+                            api,
+                            &v.resolve(api).expect("Could not resolve schema."),
+                        )?,
+                    ))
+                })
                 .collect(),
         )),
-        Type::Array(array) => {
+        SchemaType::Array => {
             // The 'items' specification is required according to the spec, but
             // we still get an Option and a possibly broken reference and what not.
             // Extract any usable specification of an item, and make an example.
-            let item = example_from_schema(api, array.items.as_ref()?.resolve(api))?;
-            // Repeat the example. If a maximum number of array elements is specified,
-            // we use that many, otherwise the minimum number, otherwise 2.
-            Some(Value::Array(vec![
-                item;
-                array
-                    .max_items
-                    .or(array.min_items)
-                    .unwrap_or(2)
-            ]))
+            interesting_params_from_type(api, schema).first().cloned()
         }
-        Type::Boolean {} => Some(Value::Bool(true)),
+        SchemaType::Boolean => Some(Value::Bool(true)),
+        SchemaType::Null => Some(Value::Null),
     }
 }
 
 /// We return all variants if an enumeration is present, try the pattern regex if one is present,
 /// or fall back to some defaults based on the StringFormat. Returns a serde_json::Value::String.
-fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<serde_json::Value> {
-    // Enumeration present? Return the first variant
-    if !string.enumeration.is_empty() {
-        return string
-            .enumeration
-            .iter()
-            .cloned()
-            .map(serde_json::Value::String)
-            .collect();
+fn interesting_params_from_string_type(
+    enumeration: &[Value],
+    pattern: &Option<String>,
+    format: &Option<String>,
+    min_length: Option<u64>,
+    max_length: Option<u64>,
+) -> Vec<serde_json::Value> {
+    // Enumeration present? Return all String values.
+    let enum_strings: Vec<&Value> = enumeration.iter().filter(|val| val.is_string()).collect();
+    if !enum_strings.is_empty() {
+        return enum_strings.into_iter().cloned().collect();
     }
-
     // Regex (without anchors) present? Attempt to compile it, and generate a string that matches it
-    if let Some(pattern) = &string.pattern {
+    if let Some(pattern) = pattern {
         if let Ok(compiled_regex) = rand_regex::Regex::compile(pattern, 100) {
             return vec![serde_json::Value::String(
                 compiled_regex.sample(&mut rand::rng()),
@@ -852,14 +860,127 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
     }
 
     // Attempt to generate a string based on other format hints
-    strings_from_format(&string.format)
-        .iter()
-        .map(|&example| {
-            serde_json::Value::String(
-                enforce_length_bounds(example, string.min_length, string.max_length).into_owned(),
-            )
-        })
-        .collect()
+    if let Some(format) = format {
+        let result: Vec<Value> = strings_from_format(format)
+            .iter()
+            .map(|&example| {
+                serde_json::Value::String(
+                    enforce_length_bounds(example, min_length, max_length).into_owned(),
+                )
+            })
+            .collect();
+        if !result.is_empty() {
+            return result;
+        }
+    };
+
+    // Return generic string examples
+    vec!["".into(), "A".into(), "🎵".into()]
+}
+
+fn interesting_params_from_number_type(
+    minimum: &Option<Number>,
+    maximum: &Option<Number>,
+    multiple_of: &Option<Number>,
+) -> Vec<Value> {
+    match (minimum, maximum, multiple_of) {
+        (Some(min), Some(max), Some(base)) => {
+            let mut constrained = vec![];
+            let (base128, min128, max128) = (base.as_i128(), min.as_i128(), max.as_i128());
+            if let (Some(base128), Some(min128), Some(max128)) = (base128, min128, max128) {
+                for candidate in [-base128, 0, base128] {
+                    if min128 <= candidate && candidate <= max128 {
+                        constrained.push(json![candidate]);
+                    }
+                }
+                constrained
+            } else {
+                log::warn!("Base, Min or Max could not be converted to 128-bits signed integer.");
+                vec![]
+            }
+        }
+        (Some(min), Some(max), None) => {
+            let mut constrained = vec![json![min], json![max]];
+            if let (Some(minfloat), Some(maxfloat)) = (min.as_f64(), max.as_f64()) {
+                let range = minfloat..=maxfloat;
+                for val in [-1., 0., 1., PI] {
+                    if range.contains(&val) {
+                        constrained.push(json![val]);
+                    }
+                }
+            }
+            constrained
+        }
+        (Some(min), None, Some(base)) => {
+            let (base128, min128) = (base.as_i128(), min.as_i128());
+            if let (Some(base128), Some(min128)) = (base128, min128) {
+                let mut constrained = vec![];
+                if base128 > 0 {
+                    let smallest_multiple = base128 * (min128 / base128);
+                    constrained.push(json![smallest_multiple]);
+                }
+                for candidate in [-base128, 0, base128] {
+                    if min128 <= candidate {
+                        constrained.push(json![candidate]);
+                    }
+                }
+                constrained
+            } else {
+                log::warn!("Base or Min could not be converted to 128-bits signed integer.");
+                vec![]
+            }
+        }
+        (Some(min), None, None) => {
+            let mut constrained = vec![json![min]];
+            if let Some(min) = min.as_f64() {
+                for val in [-1., 0., 1., PI] {
+                    if min <= val {
+                        constrained.push(json![val]);
+                    }
+                }
+            }
+            constrained
+        }
+        (None, Some(max), Some(base)) => {
+            if let (Some(max), Some(base)) = (max.as_f64(), base.as_f64()) {
+                let mut constrained = vec![json![max]];
+                for val in [-base, 0., base] {
+                    if max >= val {
+                        constrained.push(json![val]);
+                    }
+                }
+                constrained
+            } else {
+                log::warn!("Base or Max could not be converted to 128-bits signed integer.");
+                vec![]
+            }
+        }
+        (None, Some(max), None) => {
+            if let Some(max) = max.as_f64() {
+                let mut constrained = vec![json![max]];
+                for val in [-PI, -1., 0., 1.] {
+                    if max >= val {
+                        constrained.push(json![val]);
+                    }
+                }
+                constrained
+            } else {
+                log::warn!("Max could not be converted to 128-bits signed integer.");
+                vec![]
+            }
+        }
+        (None, None, Some(base)) => {
+            let mut result = vec![];
+            if let Some(min_base) = base.as_i64() {
+                result.push(json![-min_base])
+            }
+            result.push(json![0]);
+            result.push(Value::Number(base.clone()));
+            result
+        }
+        (None, None, None) => vec![json![-1.], json![0.], json![1.], json![PI]],
+    }
+    // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
 }
 
 /// Creates a set of OpenApiInputs for the given sequence of QualifiedOperations based on a number of interesting
@@ -870,7 +991,7 @@ fn interesting_params_from_string_type(string: &openapiv3::StringType) -> Vec<se
 /// This allows the fuzzer to start with all the inputs that we might a priori consider useful, and then
 /// continue with random mutations (picking seeds based on coverage feedback).
 pub fn openapi_inputs_from_ops<'a>(
-    api: &OpenAPI,
+    api: &Spec,
     ops_iter: impl Iterator<Item = QualifiedOperation<'a>>,
     subgraph: &DiGraph<QualifiedOperation, ParameterMatching, DefaultIx>,
     sorted_nodes: &[NodeIndex],
@@ -880,7 +1001,7 @@ pub fn openapi_inputs_from_ops<'a>(
     let mut concrete_requests: VecDeque<Vec<OpenApiRequest>> = ops_iter
         .enumerate()
         .map(|(request_idx, op)| {
-            let single_valued: Vec<&Parameter> = subgraph
+            let single_valued: Vec<Parameter> = subgraph
                 .edge_references()
                 .filter(|edge| edge.target() == sorted_nodes[request_idx])
                 .flat_map(|edge| {
@@ -888,7 +1009,9 @@ pub fn openapi_inputs_from_ops<'a>(
                         .parameters
                         .iter()
                         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-                        .filter(move |parameter| edge.weight().input_access().matches(parameter))
+                        .filter(move |parameter| {
+                            edge.weight().input_access().matches(parameter.clone())
+                        })
                 })
                 .collect();
             all_interesting_inputs_for_qualified_operation(api, op, &single_valued)
@@ -948,9 +1071,9 @@ pub fn openapi_inputs_from_ops<'a>(
 
 /// Returns a NON-EMPTY vector of interesting requests that can be made for the given operation.
 fn all_interesting_inputs_for_qualified_operation(
-    api: &OpenAPI,
+    api: &Spec,
     operation: QualifiedOperation,
-    single_valued: &[&Parameter],
+    single_valued: &[Parameter],
 ) -> Vec<OpenApiRequest> {
     // There may be multiple parameters, create an OpenApiRequest for each combination
     // of interesting values for these parameters.

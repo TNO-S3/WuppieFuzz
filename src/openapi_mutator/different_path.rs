@@ -1,7 +1,7 @@
 //! Mutates a request series by changing the path and method on one of the HTTP requests.
 //! The new path and method are taken from the API specification.
 
-use std::{borrow::Cow, convert::TryInto};
+use std::borrow::Cow;
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -12,7 +12,7 @@ use libafl::{
 use libafl_bolts::{Named, rands::Rand};
 
 use crate::{
-    input::{OpenApiInput, fix_input_parameters},
+    input::{Method, OpenApiInput, fix_input_parameters},
     state::HasRandAndOpenAPI,
 };
 
@@ -55,18 +55,13 @@ where
             let n_ops = api.operations().count();
             let new_path_i = rand.below(core::num::NonZero::new(n_ops).unwrap());
             {
-                let (new_path, new_method, _, _) = api.operations().nth(new_path_i).unwrap();
+                let (new_path, new_method, _) = api.operations().nth(new_path_i).unwrap();
                 // Only set "mutated" if it's actually different
-                if new_path.eq_ignore_ascii_case(&random_input.path)
-                    && new_method == random_input.method
+                if new_path == random_input.path && Method::from(&new_method) == random_input.method
                 {
                     continue;
                 }
-                random_input.method = new_method.try_into().unwrap_or_else(|_| {
-                    panic!(
-                        "Picked unsupported HTTP method {new_method} from the OpenAPI specification"
-                    )
-                });
+                random_input.method = new_method.into();
                 new_path.clone_into(&mut random_input.path);
             }
             fix_input_parameters(state, new_path_i, random_input);

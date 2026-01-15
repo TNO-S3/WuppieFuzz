@@ -65,12 +65,13 @@ use std::{
 use ahash::RandomState;
 use libafl::{Error, corpus::CorpusId, inputs::Input};
 use libafl_bolts::{HasLen, fs::write_file_atomic, rands::Rand};
-use openapiv3::{OpenAPI, Operation};
+use oas3::spec::Operation;
 
 use self::parameter::ParameterKind;
 pub use self::{method::Method, parameter::ParameterContents, utils::new_rand_input};
 use crate::{
     input::parameter::{IReference, OReference},
+    openapi::spec::Spec,
     parameter_access::{
         ParameterAccess, ParameterAccessElements, ParameterAddressing, RequestParameterAccess,
     },
@@ -119,11 +120,7 @@ pub enum Body {
 
 impl Body {
     /// Build a body with variables from contents and their type determined by the operation
-    pub fn build(
-        api: &OpenAPI,
-        operation: &Operation,
-        contents: Option<ParameterContents>,
-    ) -> Self {
+    pub fn build(api: &Spec, operation: &Operation, contents: Option<ParameterContents>) -> Self {
         let (param_contents, ref_or_body) = match (contents, &operation.request_body) {
             (Some(indexmap), Some(ref_or_body)) => (indexmap, ref_or_body),
             _ => return Body::Empty,
@@ -131,7 +128,7 @@ impl Body {
 
         match ref_or_body.resolve(api) {
             Ok(body) => {
-                for (key, _value) in &body.content {
+                for key in body.content.keys() {
                     if key.starts_with("application/json") {
                         return Body::ApplicationJson(param_contents);
                     }
@@ -525,27 +522,28 @@ impl OpenApiInput {
 
     /// Returns an iterator that yields all (named) return value names from all
     /// requests, along with the index of the request they appear in.
-    pub(crate) fn return_values(&self, api: &OpenAPI) -> Vec<ParameterAddressing> {
+    pub(crate) fn return_values(&self, api: &Spec) -> Vec<ParameterAddressing> {
         self.0
             .iter()
             .enumerate()
             // Find the request's corresponding operation in the API spec
             .filter_map(|(i, e)| {
                 api.operations()
-                    .find(|&(p, m, _, _)| e.path.eq_ignore_ascii_case(p) && e.method == m)
+                    .find(|(p, m, _)| e.path == *p && e.method == Method::from(m))
                     .map(|op| (i, op.2))
             })
             // Extract the specification of each operation's possible responses
             .flat_map(|(i, op)| {
                 op.responses
-                    .responses
-                    .iter()
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(|btm| btm.iter())
                     .filter_map(|(_, ref_or_response)| ref_or_response.resolve(api).ok())
                     // Filter this by extracting only json responses, which contain usable return values
                     .flat_map(|response| {
-                        response.content.iter().find_map(|(key, value)| {
+                        response.content.into_iter().find_map(|(key, value)| {
                             key.starts_with("application/json")
-                                .then_some(value.schema.as_ref())
+                                .then_some(value.schema)
                                 .flatten()
                         })
                     })
@@ -553,7 +551,7 @@ impl OpenApiInput {
                     .flat_map(|x| {
                         ParameterAccessElements::parameter_accesses_from_schema(
                             ParameterAccessElements::new(),
-                            x,
+                            &x,
                             api,
                         )
                     })
@@ -761,7 +759,7 @@ where
         // Keep only concrete values and valid references
         .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
         // Convert to (parameter_name, parameter_kind) tuples
-        .map(|param| (param.data.name.clone(), param.into()))
+        .map(|param| (param.name.clone(), param.into()))
         .map(|(name, kind)| {
             let key = (name, kind);
             // Remove *AND RETURN*, meaning we *keep* the parameter for this key

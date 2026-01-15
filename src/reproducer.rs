@@ -1,12 +1,11 @@
-use std::path::Path;
+use std::{collections::BTreeMap, path::Path};
 
 use anyhow::Result;
-use indexmap::IndexMap;
 #[allow(unused_imports)]
 use libafl::Fuzzer; // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{executors::ExitKind, inputs::Input};
 use log::{error, info, warn};
-use openapiv3::Server;
+use oas3::spec::Server;
 
 use crate::{
     authentication::build_http_client,
@@ -36,8 +35,8 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
         api.servers = vec![Server {
             url: server_override.as_str().trim_end_matches('/').to_string(),
             description: None,
-            variables: None,
-            extensions: IndexMap::new(),
+            variables: BTreeMap::new(),
+            extensions: BTreeMap::new(),
         }];
     }
     let inputs = OpenApiInput::from_file(input_file)?;

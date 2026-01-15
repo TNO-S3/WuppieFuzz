@@ -1,7 +1,7 @@
 //! Mutates a request series by adding a new request to it. The new request is taken
 //! at random from the API specification.
 
-use std::{borrow::Cow, collections::BTreeMap, convert::TryInto};
+use std::{borrow::Cow, collections::BTreeMap};
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -10,14 +10,15 @@ use libafl::{
     mutators::{MutationResult, Mutator},
 };
 use libafl_bolts::{Named, rands::Rand};
-use openapiv3::{OpenAPI, RequestBody};
+use oas3::spec::RequestBody;
 
+// use openapiv3::{OpenAPI, RequestBody};
 use crate::{
     input::{
         Body, OpenApiInput, OpenApiRequest, ParameterContents, new_rand_input,
         parameter::ParameterKind,
     },
-    openapi::JsonContent,
+    openapi::{JsonContent, spec::Spec},
     state::HasRandAndOpenAPI,
 };
 
@@ -56,9 +57,8 @@ where
         let n_ops = api.operations().count();
         let new_path_i = rand.below(core::num::NonZero::new(n_ops).unwrap());
 
-        let (new_path, new_method, new_op, _new_path_item) =
-            api.operations().nth(new_path_i).unwrap();
-        let (method, path) = (new_method.try_into().unwrap(), new_path.to_owned());
+        let (new_path, new_method, new_op) = api.operations().nth(new_path_i).unwrap();
+        let (method, path) = (new_method.into(), new_path.to_owned());
 
         let parameters: BTreeMap<(String, ParameterKind), ParameterContents> = new_op
             .parameters
@@ -66,7 +66,7 @@ where
             // Keep only concrete values and valid references
             .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
             // Convert to (parameter_name, parameter_kind) tuples
-            .map(|param| (param.data.name.clone(), param.into()))
+            .map(|param| (param.name.clone(), param.into()))
             .map(|name_kind| (name_kind, ParameterContents::Bytes(new_rand_input(rand))))
             .collect();
         let body_contents: Option<BTreeMap<String, ParameterContents>> = new_op
@@ -74,7 +74,7 @@ where
             .as_ref()
             .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
             .map(|request_body| {
-                field_names(api, request_body)
+                field_names(api, &request_body)
                     .unwrap_or_default()
                     .iter()
                     .map(|name| (name.clone(), ParameterContents::Bytes(new_rand_input(rand))))
@@ -101,20 +101,20 @@ where
     }
 }
 
-fn field_names(api: &OpenAPI, request_body: &RequestBody) -> Option<Vec<String>> {
-    match request_body
-        .content
-        .get_json_content()?
-        .schema
-        .as_ref()?
-        .resolve(api)
-        .kind
-    {
-        openapiv3::SchemaKind::Type(openapiv3::Type::Object(ref obj)) => {
-            Some(obj.properties.keys().cloned().collect())
-        }
-        _ => None,
-    }
+fn field_names(api: &Spec, request_body: &RequestBody) -> Option<Vec<String>> {
+    Some(
+        request_body
+            .content
+            .get_json_content()?
+            .schema
+            .as_ref()?
+            .resolve(api)
+            .ok()?
+            .properties
+            .keys()
+            .cloned()
+            .collect(),
+    )
 }
 
 #[cfg(test)]

@@ -17,10 +17,10 @@ use std::{
     hash::Hash,
 };
 
-use openapiv3::Schema;
+use oas3::spec::{ObjectOrReference, ObjectSchema, Parameter};
 use serde::{Deserialize, Serialize};
 
-use crate::input::parameter::ParameterKind;
+use crate::{input::parameter::ParameterKind, openapi::spec::Spec};
 
 #[derive(
     Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
@@ -82,11 +82,11 @@ impl ParameterAccessElements {
 
     pub fn parameter_accesses_from_schema(
         parent_access: ParameterAccessElements,
-        schema: &openapiv3::RefOr<Schema>,
-        api: &openapiv3::OpenAPI,
+        schema: &ObjectOrReference<ObjectSchema>,
+        api: &Spec,
     ) -> Vec<ParameterAccessElements> {
-        match schema.resolve(api).kind {
-            openapiv3::SchemaKind::Type(openapiv3::Type::Object(ref obj)) => obj
+        match schema.resolve(api) {
+            Ok(schema) => schema
                 .properties
                 .iter()
                 .flat_map(|(name, child_schema)| {
@@ -102,7 +102,7 @@ impl ParameterAccessElements {
                     accesses
                 })
                 .collect(),
-            _ => vec![],
+            Err(_) => vec![],
         }
     }
 
@@ -267,8 +267,8 @@ impl ParameterAccess {
             }
         }
     }
-    pub fn matches(&self, param: &openapiv3::Parameter) -> bool {
-        ParameterKind::from(param) == self.into() && param.name == self.simple_name()
+    pub fn matches(&self, param: Parameter) -> bool {
+        ParameterKind::from(param.clone()) == self.into() && param.name == self.simple_name()
     }
     pub(crate) fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {
         match self {

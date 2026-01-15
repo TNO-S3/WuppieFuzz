@@ -9,12 +9,14 @@
 //! later refers to an 'artist_id', there is an opportunity to match it to the 'id' found
 //! earlier.
 
-use openapiv3::{
-    MediaType, ObjectType, OpenAPI, Operation, Parameter, RequestBody, Response, Schema, SchemaKind,
+use std::collections::BTreeMap;
+
+use oas3::spec::{
+    MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, RequestBody, Response,
 };
 
 use crate::{
-    openapi::JsonContent,
+    openapi::spec::Spec,
     parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
 };
 
@@ -168,7 +170,7 @@ impl ParameterNormalization {
 /// Finds all request parameters used in an operation and returns their normalized name.
 /// See `normalize_parameter` for treatment of parameters named 'id'.
 pub fn normalize_parameters<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     path: &str,
     operation: &'a Operation,
 ) -> Vec<ParameterNormalization> {
@@ -178,7 +180,7 @@ pub fn normalize_parameters<'a>(
         // Keep only concrete values and valid references
         .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
         .filter_map(|param| {
-            let normalization_attempt = normalize_parameter(path, param);
+            let normalization_attempt = normalize_parameter(path, &param);
             if normalization_attempt.is_err() {
                 log::error!("Cannot normalize parameter {param:?}: {normalization_attempt:?}")
             }
@@ -195,24 +197,23 @@ fn normalize_parameter(
     path: &str,
     parameter: &Parameter,
 ) -> Result<ParameterNormalization, String> {
-    let parameter_name = parameter.data.name.clone();
     let path_parts: Vec<_> = path.split('/').collect();
 
-    match &parameter.kind {
-        openapiv3::ParameterKind::Query { .. } => Ok(ParameterNormalization::query_header_cookie(
-            ParameterAccess::request_query(parameter_name.clone()),
+    match &parameter.location {
+        oas3::spec::ParameterIn::Query => Ok(ParameterNormalization::query_header_cookie(
+            ParameterAccess::request_query(parameter.name.clone()),
             path_parts,
         )),
-        openapiv3::ParameterKind::Header { .. } => Ok(ParameterNormalization::query_header_cookie(
-            ParameterAccess::request_header(parameter_name.clone()),
+        oas3::spec::ParameterIn::Header => Ok(ParameterNormalization::query_header_cookie(
+            ParameterAccess::request_header(parameter.name.clone()),
             path_parts,
         )),
-        openapiv3::ParameterKind::Cookie { .. } => Ok(ParameterNormalization::query_header_cookie(
-            ParameterAccess::request_cookie(parameter_name.clone()),
+        oas3::spec::ParameterIn::Cookie => Ok(ParameterNormalization::query_header_cookie(
+            ParameterAccess::request_cookie(parameter.name.clone()),
             path_parts,
         )),
-        openapiv3::ParameterKind::Path { .. } => ParameterNormalization::path(
-            ParameterAccess::request_path(parameter_name.clone()),
+        oas3::spec::ParameterIn::Path => ParameterNormalization::path(
+            ParameterAccess::request_path(parameter.name.clone()),
             path_parts,
         ),
     }
@@ -226,13 +227,13 @@ fn normalize_parameter(
 /// with the stem of the last non-parameter component of the URL. For example,
 /// an "id" parameter returned from `PATCH /tank/{id}` is renamed to "tankid".
 pub fn normalize_response<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     response: &'a Response,
     path: Vec<String>,
 ) -> Option<Vec<ParameterNormalization>> {
     normalize_media_type(
         api,
-        response.content.get_json_content()?,
+        response.content.get("application/json")?,
         path,
         ReqResp::Resp,
     )
@@ -246,69 +247,126 @@ pub fn normalize_response<'a>(
 /// with the stem of the last non-parameter component of the URL. For example,
 /// an "id" parameter sent to `POST /tank` is renamed to "tankid".
 pub fn normalize_request_body<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     body: &'a RequestBody,
     path: Vec<String>,
 ) -> Option<Vec<ParameterNormalization>> {
-    normalize_media_type(api, body.content.get_json_content()?, path, ReqResp::Req)
+    normalize_media_type(
+        api,
+        body.content.get("application/json")?,
+        path,
+        ReqResp::Req,
+    )
 }
 
 /// Schema describes contents of objects and arrays. This function normalizes field
 /// names in a schema if it contains an object or an array of objects.
-fn normalize_schema<'a>(
-    api: &'a OpenAPI,
-    schema: &'a Schema,
+fn normalize_schema(
+    api: &Spec,
+    schema: ObjectSchema,
     path: Vec<String>,
     access: ParameterAccess,
 ) -> Option<Vec<ParameterNormalization>> {
-    match &schema.kind {
-        SchemaKind::Type(openapiv3::Type::Object(o)) => {
-            Some(normalize_object_type(api, o, path, access))
-        }
-        SchemaKind::Type(openapiv3::Type::Array(a)) => {
-            let inner_schema = a.items.as_ref()?.resolve(api);
-            match inner_schema.kind {
-                SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-                    Some(normalize_object_type(api, o, path, access))
+    // SchemaKind::AllOf { all_of } if all_of.len() == 1 => {
+    //     // If only a single property is in this AllOf, return an example from it.
+    //     normalize_schema(api, all_of[0].resolve(api).ok(), path, access)
+    // }
+    // SchemaKind::Any(_) => {
+    //     // Normalizing example parameters for the "Any" schema is not supported, it's too flexible.
+    //     None
+    // }
+    // SchemaKind::AnyOf { any_of } if any_of.len() == 1 => {
+    //     normalize_schema(api, any_of[0].resolve(api), path, access)
+    // }
+    // SchemaKind::Not { not: _ } => {
+    //     // Normalizing example parameters for negated schemas is not supported, it is unclear what to generate.
+    //     // See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not
+    //     None
+    // }
+    let result;
+    if schema.all_of.len() == 1 {
+        // Normalize the single schema in this all_of.
+        result = normalize_schema(
+            api,
+            schema.all_of[0]
+                .resolve(api)
+                .expect("Could not resolve schema reference."),
+            path,
+            access,
+        )
+    } else if schema.one_of.len() == 1 {
+        // Normalize the single schema in this one_of.
+        result = normalize_schema(
+            api,
+            schema.one_of[0]
+                .resolve(api)
+                .expect("Could not resolve schema reference."),
+            path,
+            access,
+        )
+    } else {
+        result = match &schema.schema_type {
+            Some(type_set) => match type_set {
+                oas3::spec::SchemaTypeSet::Single(schema_type) => match schema_type {
+                    oas3::spec::SchemaType::Array => {
+                        // let inner_schema = a.items.as_ref()?.resolve(api);
+                        let inner_schema = schema.items;
+                        // SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
+                        //     Some(normalize_object_type(api, o, path, access))
+                        // }
+                        // No support for nested arrays - semantic meaning not obvious
+                        // _ => None,
+                        match inner_schema {
+                            Some(inner_schema) => match *inner_schema {
+                                oas3::spec::Schema::Boolean(_boolean_schema) => todo!(
+                                    "Boolean type items for interaction with prefixItems are not yet implemented."
+                                ),
+                                oas3::spec::Schema::Object(object_or_reference) => {
+                                    let object_schema = object_or_reference
+                                        .resolve(api)
+                                        .expect("Could not resolve schema reference.");
+                                    Some(normalize_object_type(
+                                        api,
+                                        &object_schema.properties,
+                                        path,
+                                        access,
+                                    ))
+                                }
+                            },
+                            None => None,
+                        }
+                    }
+                    oas3::spec::SchemaType::Object => {
+                        Some(normalize_object_type(api, &schema.properties, path, access))
+                    }
+                    // Other types do not have a name, return an empty vec so their key in the
+                    // enclosing object/array is still included.
+                    _ => Some(vec![]),
+                    // oas3::spec::SchemaType::Boolean => todo!(),
+                    // oas3::spec::SchemaType::Integer => todo!(),
+                    // oas3::spec::SchemaType::Number => todo!(),
+                    // oas3::spec::SchemaType::String => todo!(),
+                    // oas3::spec::SchemaType::Null => todo!(),
+                },
+                oas3::spec::SchemaTypeSet::Multiple(_schema_types) => {
+                    todo!("Sets of multiple schemas are not yet supported.")
                 }
-                // No support for nested arrays - semantic meaning not obvious
-                _ => None,
-            }
-        }
-        SchemaKind::Type(_) => {
-            // Other types do not have a name, return an empty vec so their key in the
-            // enclosing object/array is still included.
-            Some(vec![])
-        }
-        openapiv3::SchemaKind::AllOf { all_of } if all_of.len() == 1 => {
-            // If only a single property is in this AllOf, return an example from it.
-            normalize_schema(api, all_of[0].resolve(api), path, access)
-        }
-        openapiv3::SchemaKind::Any(_) => {
-            // Normalizing example parameters for the "Any" schema is not supported, it's too flexible.
-            None
-        }
-        SchemaKind::AnyOf { any_of } if any_of.len() == 1 => {
-            normalize_schema(api, any_of[0].resolve(api), path, access)
-        }
-        openapiv3::SchemaKind::Not { not: _ } => {
-            // Normalizing example parameters for negated schemas is not supported, it is unclear what to generate.
-            // See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not
-            None
-        }
-        _ => None,
+            },
+            None => None,
+        };
     }
+    result
 }
 
 /// MediaType is the internal type used for objects, both input (POST) and
 /// output (GET). This function normalizes the field names.
 fn normalize_media_type<'a>(
-    api: &'a OpenAPI,
+    api: &'a Spec,
     media_type: &'a MediaType,
     path: Vec<String>,
     req_or_resp: ReqResp,
 ) -> Option<Vec<ParameterNormalization>> {
-    let schema = media_type.schema.as_ref()?.resolve(api);
+    let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
     let access = match req_or_resp {
         ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
         ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
@@ -318,13 +376,12 @@ fn normalize_media_type<'a>(
 
 /// Returns ParameterNormalizations for all fields in the object.
 fn normalize_object_type<'a>(
-    api: &'a OpenAPI,
-    object_type: &'a ObjectType,
+    api: &'a Spec,
+    object_properties: &'a BTreeMap<String, ObjectOrReference<ObjectSchema>>,
     path: Vec<String>,
     parameter_access: ParameterAccess,
 ) -> Vec<ParameterNormalization> {
-    object_type
-        .properties
+    object_properties
         .keys()
         .flat_map(|key| {
             let new_parameter_access =
@@ -333,7 +390,9 @@ fn normalize_object_type<'a>(
                 new_parameter_access.clone(),
                 path.clone(),
             )];
-            let nested_schema = object_type.properties[key].resolve(api);
+            let nested_schema = object_properties[key]
+                .resolve(api)
+                .unwrap_or_else(|_| panic!("Could not resolve nested schema {}", key));
             let nested_params =
                 normalize_schema(api, nested_schema, path.clone(), new_parameter_access)
                     .unwrap_or_default();
