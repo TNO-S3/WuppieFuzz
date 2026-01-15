@@ -67,10 +67,10 @@ cfg-if 1.0.4
 chrono 0.4.42
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.53
+clap 4.5.54
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.53
+clap_builder 4.5.54
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.6
@@ -211,7 +211,7 @@ futures-task 0.3.31
 futures-util 0.3.31
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-getrandom 0.2.16
+getrandom 0.2.17
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
 getrandom 0.3.3
@@ -589,7 +589,7 @@ serde_urlencoded 0.7.1
 serde_yaml 0.9.34+deprecated
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-serial_test 3.2.0
+serial_test 3.3.1
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
 simd-adler32 0.3.8
@@ -652,7 +652,7 @@ tinyvec 1.10.0
 tinyvec_macros 0.1.1
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Soveu <marx.tomasz@gmail.com>
-tokio 1.48.0
+tokio 1.49.0
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
 tokio-native-tls 0.3.1
@@ -661,7 +661,7 @@ tokio-native-tls 0.3.1
 tokio-rustls 0.26.4
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-tokio-util 0.7.17
+tokio-util 0.7.18
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
 tower 0.5.2

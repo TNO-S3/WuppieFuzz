@@ -72,7 +72,7 @@ porter-stemmer = "0.1.2"
 rand = "0.9.2"
 rand_regex = "0.18.1"
 regex = "1.12.2"
-reqwest = { version = "0.13.1", features = ["blocking", "cookies", "form", "json"] }
+reqwest = { version = "0.12.28", features = ["blocking", "cookies", "json"] }
 reqwest_cookie_store = "0.9.0"
 rusqlite = { version = "0.37.0", features = ["bundled"] }
 serde = { version = "1.0", default-features = false, features = [
