@@ -4,12 +4,24 @@
 
 ## Features
 
+## Fixes
+
+# v1.4.0 (2026-01-15)
+
+## Highlights
+
+Major refactor enabling support for OpenAPI v3.1 and v3.2.
+
+## Features
+
+- Support for OpenAPI v3.1 and OpenAPI v3.2 implemented in [#217](htps://github.com/TNO-S3/WuppieFuzz/pull/217)
 - Improve corpus reference abstraction, making sure references to earlier requests' responses are expressed and understood correctly. Also improves the corpus file format, making it less verbose, in [#122](https://github.com/TNO-S3/WuppieFuzz/pull/122)
 - Improve crash criteria granularity in [#162](https://github.com/TNO-S3/WuppieFuzz/pull/162)
 
 ## Fixes
 
 - Fix vague error that would occur if timeout expires during corpus minimization, by not counting that phase against the timeout in [#199](https://github.com/TNO-S3/WuppieFuzz/pull/199)
+- Remove duplicate coverage maps in [#205](https://github.com/TNO-S3/WuppieFuzz/pull/205)
 
 # v1.3.0 (2025-09-24)
 
