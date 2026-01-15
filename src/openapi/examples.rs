@@ -873,10 +873,9 @@ fn interesting_params_from_string_type(
             return result;
         }
     };
-    log::warn!(
-        "Generating interesting strings did not have usable inputs (enumeration, pattern or format). Not returning anything."
-    );
-    vec![]
+
+    // Return generic string examples
+    vec!["".into(), "A".into(), "🎵".into()]
 }
 
 fn interesting_params_from_number_type(
