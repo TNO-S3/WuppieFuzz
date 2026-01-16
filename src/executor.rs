@@ -10,6 +10,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
+
 use libafl::{
     events::{Event, EventFirer, EventRestarter, EventWithStats, ExecStats, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
@@ -227,10 +228,22 @@ where
                     self.reporter
                         .report_response_error(&transport_error.to_string(), reporter_request_id);
                     log::error!("{transport_error}");
-                    exit_kind = ExitKind::Timeout;
-                    break;
+                    if transport_error.is_timeout() {
+                        log::error!("Timeout error");
+                        exit_kind = ExitKind::Timeout;
+                        break;
+                    } else if transport_error.is_connect() {
+                        log::error!("Connection error");
+                    } else if transport_error.is_decode() {
+                        log::error!("Failed to decode response");
+                    }
+                    log::info!(
+                        "Requesting shutdown after transport error, is the API (still) running?"
+                    );
+                    log::debug!("Transport error: {:?}", transport_error);
+                    state.request_stop()
                 }
-            }
+            };
         }
         (exit_kind, performed_requests)
     }
