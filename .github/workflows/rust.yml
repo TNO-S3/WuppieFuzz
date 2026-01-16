@@ -17,7 +17,7 @@ permissions: {}
 jobs:
   build-and-test:
     name: Build, Test, and Coverage
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     strategy:
       matrix:
         rust: [stable, nightly]
@@ -101,7 +101,7 @@ jobs:
 
   coverage:
     name: Code Coverage (Tarpaulin)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: read
     steps:
