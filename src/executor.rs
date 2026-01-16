@@ -228,9 +228,10 @@ where
                     self.reporter
                         .report_response_error(&transport_error.to_string(), reporter_request_id);
                     log::error!("{transport_error}");
+                    // We set exit_kind to timeout even if some other transport error occurs as that is the most fitting one within LibAFL
+                    exit_kind = ExitKind::Timeout;
                     if transport_error.is_timeout() {
                         log::error!("Timeout error");
-                        exit_kind = ExitKind::Timeout;
                         break;
                     } else if transport_error.is_connect() {
                         log::error!("Connection error");
