@@ -10,9 +10,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-
 use libafl::{
-    Error,
     events::{Event, EventFirer, EventRestarter, EventWithStats, ExecStats, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
@@ -242,14 +240,14 @@ where
         state: &mut FuzzerState,
         _input: &OpenApiInput,
         event_manager: &mut EM,
-    ) -> Result<(), Error>
+    ) -> Result<(), libafl::Error>
     where
         EM: EventFirer<OpenApiInput, FuzzerState> + SendExiting,
     {
         if state.stop_requested() {
             state.discard_stop_request();
             event_manager.on_shutdown()?;
-            return Err(Error::shutting_down());
+            return Err(libafl::Error::shutting_down());
         }
         Ok(())
     }
@@ -362,8 +360,8 @@ where
         event_manager: &mut EM,
         input: &OpenApiInput,
     ) -> Result<ExitKind, libafl::Error> {
-        if let Err(Error::ShuttingDown) = self.pre_exec(state, input, event_manager) {
-            return Err(Error::ShuttingDown);
+        if let Err(libafl::Error::ShuttingDown) = self.pre_exec(state, input, event_manager) {
+            return Err(libafl::Error::ShuttingDown);
         }
 
         let (ret, performed_requests) = self.harness(input, state);
