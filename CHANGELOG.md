@@ -4,6 +4,8 @@
 
 ## Features
 
+- Stop fuzzer when non-timeout transport error occurs in [#230](https://github.com/TNO-S3/WuppieFuzz/pull/230)
+
 ## Fixes
 
 # v1.4.0 (2026-01-15)
