@@ -242,7 +242,8 @@ where
                         "Requesting shutdown after transport error, is the API (still) running?"
                     );
                     log::debug!("Transport error: {:?}", transport_error);
-                    state.request_stop()
+                    state.request_stop();
+                    break;
                 }
             };
         }
