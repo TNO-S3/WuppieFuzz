@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Hotfix for parsing bug introduced in `oas3` in [#229](https://github.com/TNO-S3/WuppieFuzz/issues/229)
+
 # v1.4.0 (2026-01-15)
 
 ## Highlights
