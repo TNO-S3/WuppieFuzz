@@ -12,7 +12,6 @@ use std::{
 };
 
 use libafl::{
-    Error,
     events::{Event, EventFirer, EventRestarter, EventWithStats, ExecStats, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
@@ -228,11 +227,37 @@ where
                 Err(transport_error) => {
                     self.reporter
                         .report_response_error(&transport_error.to_string(), reporter_request_id);
-                    log::error!("{transport_error}");
+                    // We set exit_kind to timeout even if some other transport error occurs as that is the most fitting one within LibAFL
                     exit_kind = ExitKind::Timeout;
+                    if transport_error.is_timeout() {
+                        log::error!(
+                            "Time-out occurred during communication with the API under test: {transport_error}"
+                        );
+                        break;
+                    } else if transport_error.is_connect() {
+                        log::error!(
+                            "Connection error occurred during communication with the API under test: {transport_error}"
+                        );
+                    } else if transport_error.is_decode() {
+                        log::error!(
+                            "Failed to decode response during communication with the API under test: {transport_error}"
+                        );
+                    } else {
+                        log::error!(
+                            "Unknown transport error occurred during communication with the API under test: {transport_error}"
+                        );
+                    }
+                    log::info!(
+                        "Requesting shutdown after transport error, is the API (still) running?"
+                    );
+                    log::debug!(
+                        "Transport error:\n{}",
+                        format_args!("{:#?}", transport_error)
+                    );
+                    state.request_stop();
                     break;
                 }
-            }
+            };
         }
         (exit_kind, performed_requests)
     }
@@ -242,14 +267,14 @@ where
         state: &mut FuzzerState,
         _input: &OpenApiInput,
         event_manager: &mut EM,
-    ) -> Result<(), Error>
+    ) -> Result<(), libafl::Error>
     where
         EM: EventFirer<OpenApiInput, FuzzerState> + SendExiting,
     {
         if state.stop_requested() {
             state.discard_stop_request();
             event_manager.on_shutdown()?;
-            return Err(Error::shutting_down());
+            return Err(libafl::Error::shutting_down());
         }
         Ok(())
     }
@@ -362,8 +387,8 @@ where
         event_manager: &mut EM,
         input: &OpenApiInput,
     ) -> Result<ExitKind, libafl::Error> {
-        if let Err(Error::ShuttingDown) = self.pre_exec(state, input, event_manager) {
-            return Err(Error::ShuttingDown);
+        if let Err(libafl::Error::ShuttingDown) = self.pre_exec(state, input, event_manager) {
+            return Err(libafl::Error::ShuttingDown);
         }
 
         let (ret, performed_requests) = self.harness(input, state);

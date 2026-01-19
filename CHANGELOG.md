@@ -4,6 +4,8 @@
 
 ## Features
 
+- Stop fuzzer when non-timeout transport error occurs in [#230](https://github.com/TNO-S3/WuppieFuzz/pull/230)
+
 ## Fixes
 
 - Hotfix for parsing bug introduced in `oas3` in [#229](https://github.com/TNO-S3/WuppieFuzz/issues/229)
@@ -16,7 +18,7 @@ Major refactor enabling support for OpenAPI v3.1 and v3.2.
 
 ## Features
 
-- Support for OpenAPI v3.1 and OpenAPI v3.2 implemented in [#217](htps://github.com/TNO-S3/WuppieFuzz/pull/217)
+- Support for OpenAPI v3.1 and OpenAPI v3.2 implemented in [#217](https://github.com/TNO-S3/WuppieFuzz/pull/217)
 - Improve corpus reference abstraction, making sure references to earlier requests' responses are expressed and understood correctly. Also improves the corpus file format, making it less verbose, in [#122](https://github.com/TNO-S3/WuppieFuzz/pull/122)
 - Improve crash criteria granularity in [#162](https://github.com/TNO-S3/WuppieFuzz/pull/162)
 
