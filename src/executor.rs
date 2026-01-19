@@ -230,19 +230,30 @@ where
                     // We set exit_kind to timeout even if some other transport error occurs as that is the most fitting one within LibAFL
                     exit_kind = ExitKind::Timeout;
                     if transport_error.is_timeout() {
-                        log::error!("Time-out occurred during communication with the API under test: {transport_error}");
+                        log::error!(
+                            "Time-out occurred during communication with the API under test: {transport_error}"
+                        );
                         break;
                     } else if transport_error.is_connect() {
-                        log::error!("Connection error occurred during communication with the API under test: {transport_error}");
+                        log::error!(
+                            "Connection error occurred during communication with the API under test: {transport_error}"
+                        );
                     } else if transport_error.is_decode() {
-                        log::error!("Failed to decode response during communication with the API under test: {transport_error}");
+                        log::error!(
+                            "Failed to decode response during communication with the API under test: {transport_error}"
+                        );
                     } else {
-                        log::error!("Unknown transport error occurred during communication with the API under test: {transport_error}");
+                        log::error!(
+                            "Unknown transport error occurred during communication with the API under test: {transport_error}"
+                        );
                     }
                     log::info!(
                         "Requesting shutdown after transport error, is the API (still) running?"
                     );
-                    log::debug!("Transport error:\n{}", format_args!("{:#?}", transport_error));
+                    log::debug!(
+                        "Transport error:\n{}",
+                        format_args!("{:#?}", transport_error)
+                    );
                     state.request_stop();
                     break;
                 }
