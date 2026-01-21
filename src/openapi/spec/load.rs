@@ -34,6 +34,16 @@ pub fn openapi_from_yaml_file(filename: &Path) -> Result<Spec> {
     let file_contents = std::fs::read_to_string(filename)?;
     let mut errors = Vec::new();
 
+    match oas3::from_yaml(&file_contents).context("Failed to parse as YAML OpenAPI v3.1") {
+        Ok(spec) => return Ok(spec.into()),
+        Err(err) => errors.push(err),
+    };
+
+    match oas3::from_json(&file_contents).context("Failed to parse as JSON OpenAPI v3.1") {
+        Ok(spec) => return Ok(spec.into()),
+        Err(err) => errors.push(err),
+    };
+
     match serde_yaml::from_str::<VersionedOpenAPI>(&file_contents)
         .context("Failed to parse as YAML OpenAPI v2/v3.0")
     {
@@ -45,16 +55,6 @@ pub fn openapi_from_yaml_file(filename: &Path) -> Result<Spec> {
         .context("Failed to parse as JSON OpenAPI v2/v3.0")
     {
         Ok(spec) => return Ok(spec.upgrade().into()),
-        Err(err) => errors.push(err),
-    };
-
-    match oas3::from_yaml(&file_contents).context("Failed to parse as YAML OpenAPI v3.1") {
-        Ok(spec) => return Ok(spec.into()),
-        Err(err) => errors.push(err),
-    };
-
-    match oas3::from_json(&file_contents).context("Failed to parse as JSON OpenAPI v3.1") {
-        Ok(spec) => return Ok(spec.into()),
         Err(err) => errors.push(err),
     };
     Err(AttemptsFailed { errors }.into())
