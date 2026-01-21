@@ -383,6 +383,8 @@ fn normalize_object_type<'a>(
 ) -> Vec<ParameterNormalization> {
     object_properties
         .keys()
+        // Filter out any field in the existing stack of fields, to prevent infinite recursion
+        .filter(|key| !parameter_access.contains(key))
         .flat_map(|key| {
             let new_parameter_access =
                 parameter_access.with_new_element(ParameterAccessElement::Name(key.clone()));
