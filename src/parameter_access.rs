@@ -292,31 +292,6 @@ impl ParameterAccess {
             }
         }
     }
-
-    pub fn contains(&self, field: &str) -> bool {
-        match self {
-            ParameterAccess::Request(request_parameter_access) => {
-                if let RequestParameterAccess::Body(access_elements) = request_parameter_access {
-                    access_elements.0.iter().any(|element| match element {
-                        ParameterAccessElement::Name(s) => s == field,
-                        ParameterAccessElement::Offset(_) => false,
-                    })
-                } else {
-                    false
-                }
-            }
-            ParameterAccess::Response(response_parameter_access) => {
-                if let ResponseParameterAccess::Body(access_elements) = response_parameter_access {
-                    access_elements.0.iter().any(|element| match element {
-                        ParameterAccessElement::Name(s) => s == field,
-                        ParameterAccessElement::Offset(_) => false,
-                    })
-                } else {
-                    false
-                }
-            }
-        }
-    }
 }
 
 impl Display for ParameterAccess {
