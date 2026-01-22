@@ -1,6 +1,6 @@
 [package]
 name = "wuppiefuzz"
-version = "1.4.0"
+version = "1.4.1"
 authors = [
     "TNO Software and System Security"
 ]

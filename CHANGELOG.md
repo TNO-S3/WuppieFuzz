@@ -4,10 +4,19 @@
 
 ## Features
 
-- Stop fuzzer when non-timeout transport error occurs in [#230](https://github.com/TNO-S3/WuppieFuzz/pull/230)
+## Fixes
+
+# v1.4.1 (2026-01-20)
+
+## Highlights
+
+Recursion bugfix for [#229](https://github.com/TNO-S3/WuppieFuzz/issues/229).
+
+## Features
 
 ## Fixes
 
+- Stop fuzzer when non-timeout transport error occurs in [#230](https://github.com/TNO-S3/WuppieFuzz/pull/230)
 - Avoid infinite recursion (by circular (including self-)references in schemas) in [#235](https://github.com/TNO-S3/WuppieFuzz/pull/235)
 
 # v1.4.0 (2026-01-15)
