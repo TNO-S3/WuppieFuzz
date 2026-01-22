@@ -381,6 +381,14 @@ fn normalize_object_type<'a>(
     path: Vec<String>,
     parameter_access: ParameterAccess,
 ) -> Vec<ParameterNormalization> {
+    // Avoid infinite recursion (by circular (including self-)references in schemas)
+    if parameter_access
+        .get_body_access_elements()
+        .is_ok_and(|elements| elements.0.len() >= 20)
+    {
+        log::warn!("Schema depth exceeds 20, ignoring further nesting.");
+        return vec![];
+    }
     object_properties
         .keys()
         .flat_map(|key| {
