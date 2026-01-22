@@ -10,14 +10,14 @@
 
 ## Highlights
 
-Hotfix for [#229](https://github.com/TNO-S3/WuppieFuzz/issues/229).
+Recursion bugfix for [#229](https://github.com/TNO-S3/WuppieFuzz/issues/229).
 
 ## Features
 
 ## Fixes
 
-- Hotfix for parsing bug introduced in `oas3` in [#229](https://github.com/TNO-S3/WuppieFuzz/issues/229)
 - Stop fuzzer when non-timeout transport error occurs in [#230](https://github.com/TNO-S3/WuppieFuzz/pull/230)
+- Avoid infinite recursion (by circular (including self-)references in schemas) in [#235](https://github.com/TNO-S3/WuppieFuzz/pull/235)
 
 # v1.4.0 (2026-01-15)
 
