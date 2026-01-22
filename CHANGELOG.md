@@ -8,7 +8,7 @@
 
 ## Fixes
 
-- Hotfix for parsing bug introduced in `oas3` in [#229](https://github.com/TNO-S3/WuppieFuzz/issues/229)
+- Avoid infinite recursion (by circular (including self-)references in schemas) in [#235](https://github.com/TNO-S3/WuppieFuzz/pull/235)
 
 # v1.4.0 (2026-01-15)
 
