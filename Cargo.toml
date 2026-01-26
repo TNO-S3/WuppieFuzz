@@ -74,7 +74,7 @@ rand_regex = "0.18.1"
 regex = "1.12.2"
 reqwest = { version = "0.13.1", features = ["blocking", "cookies", "form", "json"] }
 reqwest_cookie_store = "0.10.0"
-rusqlite = { version = "0.37.0", features = ["bundled"] }
+rusqlite = { version = "0.38.0", features = ["bundled"] }
 serde = { version = "1.0", default-features = false, features = [
     "alloc",
     "derive",
