@@ -298,11 +298,7 @@ impl CoverageClient for Arc<Mutex<EndpointCoverageClient>> {
     fn max_coverage_ratio(&mut self) -> (u32, u32) {
         let mut guard = self.lock().unwrap();
         guard.max_ratio = (
-            guard
-                .cov_map_total
-                .iter()
-                .map(|b| b.count_ones())
-                .sum(),
+            guard.cov_map_total.iter().map(|b| b.count_ones()).sum(),
             guard.len as u32,
         );
         guard.max_ratio

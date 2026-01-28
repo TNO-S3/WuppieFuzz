@@ -119,11 +119,7 @@ impl CoverageClient for CoverbandCoverageClient {
     }
 
     fn max_coverage_ratio(&mut self) -> (u32, u32) {
-        let count = self
-            .cov_map
-            .iter()
-            .map(|byte: &u8| byte.count_ones())
-            .sum();
+        let count = self.cov_map.iter().map(|byte: &u8| byte.count_ones()).sum();
         let total = self.first_unused_idx as u32;
 
         // update the max coverage ratio
