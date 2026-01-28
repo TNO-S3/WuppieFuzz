@@ -18,6 +18,7 @@ COPY . .
 RUN cargo build --release
 
 FROM debian:bookworm-slim AS wuppiefuzz
+RUN useradd -ms /bin/bash fuzzer
 USER fuzzer
 WORKDIR /app
 COPY --from=builder /app/target/release/wuppiefuzz /app/wuppiefuzz
