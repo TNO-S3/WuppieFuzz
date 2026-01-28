@@ -52,8 +52,8 @@ enum Block<T> {
 pub struct JacocoCoverageClient<'a> {
     cov_map: [u8; MAP_SIZE],
     cov_map_total: [u8; MAP_SIZE],
-    bit_idx_mapping: HashMap<u64, usize>,
-    first_unused_idx: usize,
+    bit_idx_mapping: HashMap<u64, u32>,
+    first_unused_idx: u32,
 
     stream: TeeStream,
     max_ratio: (u32, u32),
@@ -282,7 +282,7 @@ impl<'a> JacocoCoverageClient<'a> {
         (ones_count, total_bits)
     }
 
-    fn get_map_index(&mut self, segment: &JacocoCoverageSegment) -> Result<usize, libafl::Error> {
+    fn get_map_index(&mut self, segment: &JacocoCoverageSegment) -> Result<u32, libafl::Error> {
         match self.bit_idx_mapping.entry(segment.id) {
             Entry::Occupied(entry) => Ok(*entry.get()),
             Entry::Vacant(entry) => {

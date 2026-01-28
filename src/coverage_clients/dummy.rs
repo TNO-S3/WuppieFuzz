@@ -36,7 +36,7 @@ impl CoverageClient for DummyCoverageClient {
     }
 
     /// Retrieve the length of the array pointed to by `get_coverage_pointer`
-    fn get_coverage_len(&self) -> usize {
+    fn get_coverage_len(&self) -> u32 {
         self.buf.len()
     }
 

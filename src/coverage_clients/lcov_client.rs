@@ -51,8 +51,8 @@ enum Block<T> {
 pub struct LcovCoverageClient {
     cov_map: [u8; MAP_SIZE],
     cov_map_total: [u8; MAP_SIZE],
-    bit_idx_mapping: HashMap<SourceFileAndLineNum, usize>,
-    first_unused_idx: usize,
+    bit_idx_mapping: HashMap<SourceFileAndLineNum, u32>,
+    first_unused_idx: u32,
 
     stream: TeeStream,
     max_ratio: (u32, u32),
@@ -205,7 +205,7 @@ impl LcovCoverageClient {
             file: path.to_path_buf(),
             linenum: line,
         };
-        let bit_idx: usize = match self.bit_idx_mapping.get(&bit_idx_key) {
+        let bit_idx = match self.bit_idx_mapping.get(&bit_idx_key) {
             Some(existing_idx) => *existing_idx,
             None => {
                 let new_idx = self.first_unused_idx;
@@ -363,7 +363,7 @@ impl CoverageClient for LcovCoverageClient {
             .cov_map_total
             .iter()
             .fold(0u32, |sum, val| sum + val.count_ones());
-        let total = self.first_unused_idx as u32 * 8;
+        let total = self.first_unused_idx * 8;
         // update the max coverage ratio
         self.max_ratio.0 = std::cmp::max(self.max_ratio.0, count);
         self.max_ratio.1 = std::cmp::max(self.max_ratio.1, total);

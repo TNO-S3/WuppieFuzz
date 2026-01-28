@@ -78,7 +78,7 @@ impl EndpointCoverageClient {
             .map(|key| (key, Coverage::ExpectedNotFound))
             .collect();
 
-        let len = coverage_index_map.len();
+        let len = coverage_index_map.len() as u32;
         assert!(
             len <= MAP_SIZE,
             "Number of responses in API specification is larger than coverage MAP_SIZE"
@@ -89,7 +89,7 @@ impl EndpointCoverageClient {
             cov_map: [0; MAP_SIZE],
             cov_map_total: [0; MAP_SIZE],
             len,
-            max_ratio: (0, len as u32),
+            max_ratio: (0, len),
         }
     }
 

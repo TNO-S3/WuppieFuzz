@@ -31,9 +31,9 @@ pub struct CoverbandCoverageClient {
     /// new one, this allows us to see whether there is new coverage.
     cov_map_baseline: [u32; 32 * MAP_SIZE],
     /// Mapping from filename to spot in the coverage maps
-    bit_idx_mapping: HashMap<String, usize>,
+    bit_idx_mapping: HashMap<String, u32>,
     /// First unused index in the coverage maps
-    first_unused_idx: usize,
+    first_unused_idx: u32,
 
     url: Url,
     client: Client,
@@ -57,7 +57,7 @@ impl CoverbandCoverageClient {
         }
     }
 
-    fn get_map_index(&mut self, file: String, length: usize) -> Result<usize, libafl::Error> {
+    fn get_map_index(&mut self, file: String, length: u32) -> Result<u32, libafl::Error> {
         match self.bit_idx_mapping.entry(file) {
             Entry::Occupied(entry) => Ok(*entry.get()),
             Entry::Vacant(entry) => {
@@ -120,7 +120,7 @@ impl CoverageClient for CoverbandCoverageClient {
 
     fn max_coverage_ratio(&mut self) -> (u32, u32) {
         let count = self.cov_map.iter().map(|byte: &u8| byte.count_ones()).sum();
-        let total = self.first_unused_idx as u32;
+        let total = self.first_unused_idx;
 
         // update the max coverage ratio
         self.max_ratio.0 = std::cmp::max(self.max_ratio.0, count);
