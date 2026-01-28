@@ -87,7 +87,7 @@ pub trait CoverageClient {
     }
 
     /// Retrieve the coverage ratio: nodes hit and total number of nodes.
-    fn max_coverage_ratio(&mut self) -> (u64, u64);
+    fn max_coverage_ratio(&mut self) -> (u32, u32);
 
     /// Write a format-dependent report to disk
     fn generate_coverage_report(&self, report_path: &Path);

@@ -71,8 +71,8 @@ where
     inputs_tested: usize,
     performed_requests: u64,
     last_window_time: Instant,
-    last_covered: u64,
-    last_endpoint_covered: u64,
+    last_covered: u32,
+    last_endpoint_covered: u32,
 }
 
 pub(crate) fn process_response(
@@ -300,7 +300,7 @@ where
                 state,
                 event_manager,
                 "wuppiefuzz_code_coverage",
-                UserStatsValue::Ratio(covered, total),
+                UserStatsValue::Ratio(covered as u64, total as u64),
             );
         }
 
@@ -311,7 +311,7 @@ where
                 state,
                 event_manager,
                 "wuppiefuzz_endpoint_coverage",
-                UserStatsValue::Ratio(e_covered, e_total),
+                UserStatsValue::Ratio(e_covered as u64, e_total as u64),
             );
         }
 

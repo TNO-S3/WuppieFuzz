@@ -46,7 +46,7 @@ pub struct EndpointCoverageClient {
     cov_map: [u8; MAP_SIZE],
     cov_map_total: [u8; MAP_SIZE],
     len: usize,
-    max_ratio: (u64, u64),
+    max_ratio: (u32, u32),
 }
 
 #[derive(Debug, Clone)]
@@ -89,7 +89,7 @@ impl EndpointCoverageClient {
             cov_map: [0; MAP_SIZE],
             cov_map_total: [0; MAP_SIZE],
             len,
-            max_ratio: (0, len as u64),
+            max_ratio: (0, len as u32),
         }
     }
 
@@ -295,15 +295,15 @@ impl CoverageClient for Arc<Mutex<EndpointCoverageClient>> {
     }
 
     /// Retrieve the coverage ratio: nodes hit and total number of nodes.
-    fn max_coverage_ratio(&mut self) -> (u64, u64) {
+    fn max_coverage_ratio(&mut self) -> (u32, u32) {
         let mut guard = self.lock().unwrap();
         guard.max_ratio = (
             guard
                 .cov_map_total
                 .iter()
-                .map(|b| b.count_ones() as u64)
+                .map(|b| b.count_ones())
                 .sum(),
-            guard.len as u64,
+            guard.len as u32,
         );
         guard.max_ratio
     }

@@ -55,7 +55,7 @@ pub struct LcovCoverageClient {
     first_unused_idx: usize,
 
     stream: TeeStream,
-    max_ratio: (u64, u64),
+    max_ratio: (u32, u32),
     done: bool,
     latest_coverage_information: Vec<u8>,
     lcov_dump_dir: Option<PathBuf>,
@@ -358,12 +358,12 @@ impl CoverageClient for LcovCoverageClient {
         self.cov_map.as_mut_ptr()
     }
 
-    fn max_coverage_ratio(&mut self) -> (u64, u64) {
+    fn max_coverage_ratio(&mut self) -> (u32, u32) {
         let count = self
             .cov_map_total
             .iter()
-            .fold(0u64, |sum, val| sum + u64::from(val.count_ones()));
-        let total = self.first_unused_idx as u64 * 8;
+            .fold(0u32, |sum, val| sum + val.count_ones());
+        let total = self.first_unused_idx as u32 * 8;
         // update the max coverage ratio
         self.max_ratio.0 = std::cmp::max(self.max_ratio.0, count);
         self.max_ratio.1 = std::cmp::max(self.max_ratio.1, total);

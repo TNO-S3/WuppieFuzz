@@ -241,9 +241,9 @@ hashbrown 0.15.5
 hashbrown 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-hashlink 0.10.0
+hashlink 0.11.0
 	licensed under "Apache-2.0 OR MIT"
-	by kyren <kerriganw@gmail.com>
+	by unspecified authors
 hostname 0.4.2
 	licensed under "MIT"
 	by unspecified authors
@@ -358,7 +358,7 @@ libafl_bolts 0.15.4
 libm 0.2.15
 	licensed under "MIT"
 	by Jorge Aparicio <jorge@japaric.io>
-libsqlite3-sys 0.35.0
+libsqlite3-sys 0.36.0
 	licensed under "MIT"
 	by The rusqlite developers
 linux-raw-sys 0.11.0
@@ -541,7 +541,10 @@ reqwest_cookie_store 0.10.0
 ring 0.17.14
 	licensed under "Apache-2.0 AND ISC"
 	by unspecified authors
-rusqlite 0.37.0
+rsqlite-vfs 0.1.0
+	licensed under "MIT"
+	by unspecified authors
+rusqlite 0.38.0
 	licensed under "MIT"
 	by The rusqlite developers
 rustc-demangle 0.1.27
@@ -628,6 +631,9 @@ smallvec 1.15.1
 socket2 0.6.1
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>
+sqlite-wasm-rs 0.5.2
+	licensed under "MIT"
+	by Spxg <unsafe@outlook.es>
 stable_deref_trait 1.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by Robert Grosse <n210241048576@gmail.com>

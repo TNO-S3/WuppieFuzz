@@ -37,7 +37,7 @@ pub struct CoverbandCoverageClient {
 
     url: Url,
     client: Client,
-    max_ratio: (u64, u64),
+    max_ratio: (u32, u32),
     latest_coverage_information: Vec<u8>,
 }
 
@@ -118,13 +118,13 @@ impl CoverageClient for CoverbandCoverageClient {
         self.cov_map.as_mut_ptr()
     }
 
-    fn max_coverage_ratio(&mut self) -> (u64, u64) {
+    fn max_coverage_ratio(&mut self) -> (u32, u32) {
         let count = self
             .cov_map
             .iter()
-            .map(|byte: &u8| byte.count_ones() as u64)
+            .map(|byte: &u8| byte.count_ones())
             .sum();
-        let total = self.first_unused_idx as u64;
+        let total = self.first_unused_idx as u32;
 
         // update the max coverage ratio
         self.max_ratio.0 = std::cmp::max(self.max_ratio.0, count);

@@ -41,7 +41,7 @@ impl CoverageClient for DummyCoverageClient {
     }
 
     /// Retrieve the coverage ratio: nodes hit and total number of nodes.
-    fn max_coverage_ratio(&mut self) -> (u64, u64) {
+    fn max_coverage_ratio(&mut self) -> (u32, u32) {
         (0, 1)
     }
 

@@ -124,7 +124,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
             ":data": curl.to_string(),
             ":url": curl.url(),
             ":body": curl.body().map(String::from_utf8_lossy),
-            ":inputid": input_id,
+            ":inputid": input_id as u32,
             ":runid": self.run_id,
         };
         insert_stmt
@@ -166,10 +166,10 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
 
     fn report_coverage(
         &self,
-        line_coverage: u64,
-        line_coverage_total: u64,
-        endpoint_coverage: u64,
-        endpoint_coverage_total: u64,
+        line_coverage: u32,
+        line_coverage_total: u32,
+        endpoint_coverage: u32,
+        endpoint_coverage_total: u32,
     ) {
         let mut insert_stmt = self
             .conn
