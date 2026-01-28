@@ -16,7 +16,7 @@ use crate::configuration::{self, Configuration};
 /// (or each endpoint, if using endpoint coverage as the guidance). The fuzzer will crash if
 /// it is too small, so we choose a rather large value. Might need tweaking if your target
 /// is larger or your memory is not large enough.
-pub const MAP_SIZE: usize = 4 * 8192;
+pub const MAP_SIZE: u32 = 4 * 8192;
 
 pub mod read_utilities;
 
@@ -82,12 +82,12 @@ pub trait CoverageClient {
     fn get_coverage_ptr(&mut self) -> *mut u8;
 
     /// Retrieve the length of the array pointed to by `get_coverage_pointer`
-    fn get_coverage_len(&self) -> usize {
+    fn get_coverage_len(&self) -> u32 {
         MAP_SIZE
     }
 
     /// Retrieve the coverage ratio: nodes hit and total number of nodes.
-    fn max_coverage_ratio(&mut self) -> (u64, u64);
+    fn max_coverage_ratio(&mut self) -> (u32, u32);
 
     /// Write a format-dependent report to disk
     fn generate_coverage_report(&self, report_path: &Path);

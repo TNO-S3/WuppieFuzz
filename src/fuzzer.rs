@@ -181,11 +181,11 @@ fn construct_observer<'a>(
         vec![
             OwnedMutSlice::from_raw_parts_mut(
                 endpoint_coverage_client.get_coverage_ptr(),
-                endpoint_coverage_client.get_coverage_len(),
+                endpoint_coverage_client.get_coverage_len() as usize,
             ),
             OwnedMutSlice::from_raw_parts_mut(
                 code_coverage_client.get_coverage_ptr(),
-                code_coverage_client.get_coverage_len(),
+                code_coverage_client.get_coverage_len() as usize,
             ),
         ]
     })

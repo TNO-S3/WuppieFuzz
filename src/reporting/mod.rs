@@ -44,10 +44,10 @@ pub trait Reporting<T, S> {
     /// Report a response error linked to the corresponding request
     fn report_coverage(
         &self,
-        line_coverage: u64,
-        line_coverage_total: u64,
-        endpoint_coverage: u64,
-        endpoint_coverage_total: u64,
+        line_coverage: u32,
+        line_coverage_total: u32,
+        endpoint_coverage: u32,
+        endpoint_coverage_total: u32,
     );
 }
 
@@ -83,10 +83,10 @@ where
 
     fn report_coverage(
         &self,
-        line_coverage: u64,
-        line_coverage_total: u64,
-        endpoint_coverage: u64,
-        endpoint_coverage_total: u64,
+        line_coverage: u32,
+        line_coverage_total: u32,
+        endpoint_coverage: u32,
+        endpoint_coverage_total: u32,
     ) {
         if let Some(reporter) = self.as_ref() {
             reporter.report_coverage(
