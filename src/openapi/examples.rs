@@ -69,6 +69,7 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
                     ParameterContents::from(example_from_schema(
                         api,
                         &ref_or_schema.resolve(api).ok()?,
+                        0,
                     )?),
                 ))
             })
@@ -91,7 +92,7 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
                     }
                 }
                 oas3::spec::Schema::Object(object_or_reference) => Some(ParameterContents::from(
-                    example_from_schema(api, &object_or_reference.resolve(api).ok()?)?,
+                    example_from_schema(api, &object_or_reference.resolve(api).ok()?, 0)?,
                 )),
             },
             None => None,
@@ -130,7 +131,7 @@ fn example_plain_body(operation: &Operation, api: &Spec) -> Option<ParameterCont
         .as_ref()
         .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
         .and_then(|body| body.content.get_json_content().cloned())
-        .and_then(|media_type| example_from_media_type(api, &media_type))
+        .and_then(|media_type| example_from_media_type(api, &media_type, 0))
         .map(ParameterContents::from)
 }
 
@@ -143,12 +144,16 @@ fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, Strin
         // media types, examples, schemas and references. We put in some effort
         // to extract any useful value that may exist.
         if let Some(schema) = param.schema.as_ref() {
-            example_from_schema(api, &schema.resolve(api).expect("Could not resolve schema"))
-                .ok_or("Could not create example from schema".to_owned())
+            example_from_schema(
+                api,
+                &schema.resolve(api).expect("Could not resolve schema"),
+                0,
+            )
+            .ok_or("Could not create example from schema".to_owned())
         } else if let Some(content) = param.content.as_ref() {
             content
                 .get_json_content()
-                .and_then(|media_type| example_from_media_type(api, media_type))
+                .and_then(|media_type| example_from_media_type(api, media_type, 0))
                 .ok_or("Could not create example from content".to_owned())
         } else {
             Err(format!(
@@ -270,7 +275,11 @@ fn all_interesting_parameters(
 }
 
 /// Produces one example (or none) based on the given MediaType
-fn example_from_media_type(api: &Spec, contents: &MediaType) -> Option<Value> {
+fn example_from_media_type(
+    api: &Spec,
+    contents: &MediaType,
+    recursion_limit: usize,
+) -> Option<Value> {
     contents
         .examples
         .as_ref()
@@ -283,7 +292,7 @@ fn example_from_media_type(api: &Spec, contents: &MediaType) -> Option<Value> {
         })
         .or_else(|| {
             contents.schema.as_ref().and_then(|ref_or_schema| {
-                example_from_schema(api, &ref_or_schema.resolve(api).ok()?)
+                example_from_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_limit + 1)
             })
         })
 }
@@ -316,8 +325,19 @@ fn log_schema_debug(schema: &ObjectSchema) {
     log::debug!("{schema:?}");
 }
 
+fn example_recursion_limit_exceeded(recursion_depth: usize) -> bool {
+    if recursion_depth >= 20 {
+        log::warn!(
+            "Example resolution exceeds {recursion_depth} steps, this will result in bad examples. Please provide manual examples or avoid circular/deep references."
+        );
+        true
+    } else {
+        false
+    }
+}
+
 // Attempts to build a value that matches the given schema using default values
-fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
+fn example_from_schema(api: &Spec, schema: &ObjectSchema, recursion_depth: usize) -> Option<Value> {
     // TODO: Probably remove this read_only check.
     // Returning None below is likely because we misinterpreted read_only as pertaining to a type, rather than a schema.
     // The documentation of schema explains readOnly as meaning:
@@ -328,6 +348,9 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
     // and refers to the json-schema definition. By contrast, readOnly on types means they should only be used in responses
     // as defined here: https://swagger.io/docs/specification/v3_0/data-models/data-types/
     // (hence returning None here, since we generate examples for requests only)
+    if example_recursion_limit_exceeded(recursion_depth) {
+        return None;
+    }
     if Some(true) == schema.read_only {
         return None;
     }
@@ -337,10 +360,19 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
     if schema.example.is_some() {
         return schema.example.clone();
     }
+    if !schema.examples.is_empty() {
+        return Some(schema.examples[0].clone());
+    }
     // Return an example from all_of if it has exactly one entry
     match schema.all_of.len() {
         0 => (),
-        1 => return example_from_schema(api, &schema.all_of[0].resolve(api).ok()?),
+        1 => {
+            return example_from_schema(
+                api,
+                &schema.all_of[0].resolve(api).ok()?,
+                recursion_depth + 1,
+            );
+        }
         _ => {
             log::warn!(concat!(
                 "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
@@ -354,7 +386,9 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
     let one_of_example = schema
         .one_of
         .iter()
-        .filter_map(|ref_or_schema| example_from_schema(api, &ref_or_schema.resolve(api).ok()?))
+        .filter_map(|ref_or_schema| {
+            example_from_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_depth + 1)
+        })
         .next();
     if one_of_example.is_some() {
         if schema.one_of.len() > 1 {
@@ -367,7 +401,9 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
     let any_of_example = schema
         .any_of
         .iter()
-        .filter_map(|ref_or_schema| example_from_schema(api, &ref_or_schema.resolve(api).ok()?))
+        .filter_map(|ref_or_schema| {
+            example_from_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_depth + 1)
+        })
         .next();
     if any_of_example.is_some() {
         return any_of_example;
@@ -376,11 +412,11 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema) -> Option<Value> {
     if let Some(type_set) = &schema.schema_type {
         match type_set {
             oas3::spec::SchemaTypeSet::Single(single_type) => {
-                return example_from_type(api, single_type, schema);
+                return example_from_type(api, single_type, schema, recursion_depth + 1);
             }
             oas3::spec::SchemaTypeSet::Multiple(multiple_types) => {
                 if let Some(first_type) = multiple_types.first() {
-                    return example_from_type(api, first_type, schema);
+                    return example_from_type(api, first_type, schema, recursion_depth + 1);
                 }
             }
         }
@@ -631,7 +667,14 @@ fn enforce_length_bounds(
 /// Generate parameters based on the type specified. The values returned
 /// should adhere to any constraints from the spec, any deviations to
 /// test robustness of the server should be introduced by fuzzing.
-fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value> {
+fn interesting_params_from_type(
+    api: &Spec,
+    schema: &ObjectSchema,
+    recursion_depth: usize,
+) -> Vec<Value> {
+    if example_recursion_limit_exceeded(recursion_depth) {
+        return vec![];
+    }
     // For numeric types, take exclusive_minimum and -maximum bools into account.
     schema.schema_type.clone().map_or(vec![], |type_set| {
         {
@@ -667,6 +710,7 @@ fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value>
                                         example_from_schema(
                                             api,
                                             &v.resolve(api).expect("Could not resolve schema."),
+                                            recursion_depth + 1,
                                         )?,
                                     ))
                                 })
@@ -676,6 +720,14 @@ fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value>
                             // The 'items' specification is required according to the spec, but
                             // we still get an Option and a possibly broken reference and what not.
                             // Extract any usable specification of an item, and make an example.
+
+                            // If examples are provided in the API, take the easy way out and use those.
+                            if let Some(provided_example) = &schema.example {
+                                return vec![provided_example.clone()];
+                            } else if !schema.examples.is_empty() {
+                                return schema.examples.clone();
+                            }
+
                             let items_schema = *schema
                                 .items
                                 .clone()
@@ -693,6 +745,7 @@ fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value>
                                         &object_or_reference
                                             .resolve(api)
                                             .expect("Could not resolve schema."),
+                                        recursion_depth + 1,
                                     )
                                     .unwrap_or_default()
                                 }
@@ -715,7 +768,15 @@ fn interesting_params_from_type(api: &Spec, schema: &ObjectSchema) -> Vec<Value>
 }
 
 // We supply the schema_type separately since the schema can have a TypeSet with one or multiple schemas.
-fn example_from_type(api: &Spec, schema_type: &SchemaType, schema: &ObjectSchema) -> Option<Value> {
+fn example_from_type(
+    api: &Spec,
+    schema_type: &SchemaType,
+    schema: &ObjectSchema,
+    recursion_depth: usize,
+) -> Option<Value> {
+    if example_recursion_limit_exceeded(recursion_depth) {
+        return None;
+    }
     match schema_type {
         SchemaType::String => interesting_params_from_string_type(
             &schema.enum_values,
@@ -795,6 +856,7 @@ fn example_from_type(api: &Spec, schema_type: &SchemaType, schema: &ObjectSchema
                         example_from_schema(
                             api,
                             &v.resolve(api).expect("Could not resolve schema."),
+                            recursion_depth + 1,
                         )?,
                     ))
                 })
@@ -804,7 +866,9 @@ fn example_from_type(api: &Spec, schema_type: &SchemaType, schema: &ObjectSchema
             // The 'items' specification is required according to the spec, but
             // we still get an Option and a possibly broken reference and what not.
             // Extract any usable specification of an item, and make an example.
-            interesting_params_from_type(api, schema).first().cloned()
+            interesting_params_from_type(api, schema, recursion_depth + 1)
+                .first()
+                .cloned()
         }
         SchemaType::Boolean => Some(Value::Bool(true)),
         SchemaType::Null => Some(Value::Null),
