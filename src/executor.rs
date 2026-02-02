@@ -334,10 +334,10 @@ where
         }
 
         self.reporter.report_coverage(
-            covered.try_into().unwrap(),
-            total.try_into().unwrap(),
-            e_covered.try_into().unwrap(),
-            e_total.try_into().unwrap(),
+            covered.try_into().unwrap_or(u32::MAX),
+            total.try_into().unwrap_or(u32::MAX),
+            e_covered.try_into().unwrap_or(u32::MAX),
+            e_total.try_into().unwrap_or(u32::MAX),
         );
 
         // If we interrupt using ctrl+c or the timeout is over, request stop!
