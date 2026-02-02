@@ -194,7 +194,7 @@ where
                 &request,
                 &curl_request,
                 state,
-                self.inputs_tested.try_into().unwrap(),
+                self.inputs_tested.try_into().unwrap_or(u32::MAX),
             );
             let curl_request = curl_request.to_string();
             match self.http_client.execute(request_built) {
