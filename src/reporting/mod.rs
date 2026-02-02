@@ -32,7 +32,7 @@ pub trait Reporting<T, S> {
         request: &OpenApiRequest,
         curl: &CurlRequest,
         state: &S,
-        input_id: usize,
+        input_id: u32,
     ) -> T;
 
     /// Report a valid response link to the corresponding request
@@ -44,10 +44,10 @@ pub trait Reporting<T, S> {
     /// Report a response error linked to the corresponding request
     fn report_coverage(
         &self,
-        line_coverage: u64,
-        line_coverage_total: u64,
-        endpoint_coverage: u64,
-        endpoint_coverage_total: u64,
+        line_coverage: u32,
+        line_coverage_total: u32,
+        endpoint_coverage: u32,
+        endpoint_coverage_total: u32,
     );
 }
 
@@ -61,7 +61,7 @@ where
         request: &OpenApiRequest,
         curl: &CurlRequest,
         state: &S,
-        input_id: usize,
+        input_id: u32,
     ) -> T {
         match self.as_ref() {
             Some(reporter) => reporter.report_request(request, curl, state, input_id),
@@ -83,10 +83,10 @@ where
 
     fn report_coverage(
         &self,
-        line_coverage: u64,
-        line_coverage_total: u64,
-        endpoint_coverage: u64,
-        endpoint_coverage_total: u64,
+        line_coverage: u32,
+        line_coverage_total: u32,
+        endpoint_coverage: u32,
+        endpoint_coverage_total: u32,
     ) {
         if let Some(reporter) = self.as_ref() {
             reporter.report_coverage(

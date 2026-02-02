@@ -108,7 +108,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
         request: &OpenApiRequest,
         curl: &CurlRequest,
         state: &OpenApiFuzzerStateType,
-        input_id: usize,
+        input_id: u32,
     ) -> i64 {
         let path = &request.path;
         let method = request.method.to_string();
@@ -166,10 +166,10 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
 
     fn report_coverage(
         &self,
-        line_coverage: u64,
-        line_coverage_total: u64,
-        endpoint_coverage: u64,
-        endpoint_coverage_total: u64,
+        line_coverage: u32,
+        line_coverage_total: u32,
+        endpoint_coverage: u32,
+        endpoint_coverage_total: u32,
     ) {
         let mut insert_stmt = self
             .conn
