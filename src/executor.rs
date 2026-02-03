@@ -190,9 +190,12 @@ where
             };
 
             let curl_request = CurlRequest(&request_built, &self.authentication);
-            let reporter_request_id =
-                self.reporter
-                    .report_request(&request, &curl_request, state, self.inputs_tested);
+            let reporter_request_id = self.reporter.report_request(
+                &request,
+                &curl_request,
+                state,
+                self.inputs_tested.try_into().unwrap_or(u32::MAX),
+            );
             let curl_request = curl_request.to_string();
             match self.http_client.execute(request_built) {
                 Ok(response) => {
@@ -330,8 +333,12 @@ where
             );
         }
 
-        self.reporter
-            .report_coverage(covered, total, e_covered, e_total);
+        self.reporter.report_coverage(
+            covered.try_into().unwrap_or(u32::MAX),
+            total.try_into().unwrap_or(u32::MAX),
+            e_covered.try_into().unwrap_or(u32::MAX),
+            e_total.try_into().unwrap_or(u32::MAX),
+        );
 
         // If we interrupt using ctrl+c or the timeout is over, request stop!
         if self.manual_interrupt.load(Ordering::Relaxed)
