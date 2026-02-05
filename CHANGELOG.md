@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Implement recursion limit to deal with recursive/cyclic component definitions in [#243](https://github.com/TNO-S3/WuppieFuzz/pull/243)
+
 # v1.4.1 (2026-01-22)
 
 ## Highlights
