@@ -9,6 +9,7 @@
 use std::{collections::BTreeMap, default::Default};
 
 use indexmap::IndexMap;
+use oas3::spec::{ObjectOrReference, Operation};
 use serde_json::Number;
 
 pub mod load;
@@ -37,7 +38,7 @@ impl std::ops::DerefMut for Spec {
 impl From<oas3::Spec> for Spec {
     /// A v3.1 API specification can be used as-is.
     fn from(value: oas3::Spec) -> Self {
-        Self(value)
+        Self(simplify(value))
     }
 }
 
@@ -46,7 +47,7 @@ impl From<openapiv3::OpenAPI> for Spec {
     /// The conversion is lossy, as lots of possible fields are never used by the
     /// fuzzer, and we don't bother converting them.
     fn from(value: openapiv3::OpenAPI) -> Self {
-        Self(oas3::Spec {
+        Self(simplify(oas3::Spec {
             openapi: String::from("3.1.0"),
             info: convert_info(value.info),
             servers: convert_servers(value.servers),
@@ -57,7 +58,73 @@ impl From<openapiv3::OpenAPI> for Spec {
             webhooks: Default::default(),
             external_docs: Default::default(),
             extensions: Default::default(),
-        })
+        }))
+    }
+}
+
+/// Simplifies the spec structure. Currently
+/// - Moves PathItem parameters into its sub-Operations
+fn simplify(mut api: oas3::Spec) -> oas3::Spec {
+    let mut paths = api.paths.take();
+    for (_, path_item) in paths.iter_mut().flatten() {
+        let oas3::spec::PathItem {
+            get,
+            put,
+            post,
+            delete,
+            options,
+            head,
+            patch,
+            trace,
+            parameters,
+            ..
+        } = path_item;
+        if let Some(operation) = get {
+            add_path_params_to_operation(&api, parameters, operation);
+        }
+        if let Some(operation) = put {
+            add_path_params_to_operation(&api, parameters, operation);
+        }
+        if let Some(operation) = post {
+            add_path_params_to_operation(&api, parameters, operation);
+        }
+        if let Some(operation) = delete {
+            add_path_params_to_operation(&api, parameters, operation);
+        }
+        if let Some(operation) = options {
+            add_path_params_to_operation(&api, parameters, operation);
+        }
+        if let Some(operation) = head {
+            add_path_params_to_operation(&api, parameters, operation);
+        }
+        if let Some(operation) = patch {
+            add_path_params_to_operation(&api, parameters, operation);
+        }
+        if let Some(operation) = trace {
+            add_path_params_to_operation(&api, parameters, operation);
+        }
+    }
+    api.paths = paths;
+    api
+}
+
+fn add_path_params_to_operation(
+    api: &oas3::Spec,
+    parameters: &[ObjectOrReference<oas3::spec::Parameter>],
+    operation: &mut Operation,
+) {
+    let existing_parameter_names: Vec<String> = operation
+        .parameters
+        .iter()
+        .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
+        .map(|param| param.name)
+        .collect();
+    for ref_or_param in parameters.iter() {
+        if let Ok(actual_parameter) = ref_or_param.resolve(api)
+            && !existing_parameter_names.contains(&actual_parameter.name)
+        {
+            operation.parameters.push(ref_or_param.clone())
+        }
     }
 }
 
