@@ -79,30 +79,14 @@ fn simplify(mut api: oas3::Spec) -> oas3::Spec {
             parameters,
             ..
         } = path_item;
-        if let Some(operation) = get {
-            add_path_params_to_operation(&api, parameters, operation);
-        }
-        if let Some(operation) = put {
-            add_path_params_to_operation(&api, parameters, operation);
-        }
-        if let Some(operation) = post {
-            add_path_params_to_operation(&api, parameters, operation);
-        }
-        if let Some(operation) = delete {
-            add_path_params_to_operation(&api, parameters, operation);
-        }
-        if let Some(operation) = options {
-            add_path_params_to_operation(&api, parameters, operation);
-        }
-        if let Some(operation) = head {
-            add_path_params_to_operation(&api, parameters, operation);
-        }
-        if let Some(operation) = patch {
-            add_path_params_to_operation(&api, parameters, operation);
-        }
-        if let Some(operation) = trace {
-            add_path_params_to_operation(&api, parameters, operation);
-        }
+        add_path_params_to_operation(&api, parameters, get);
+        add_path_params_to_operation(&api, parameters, put);
+        add_path_params_to_operation(&api, parameters, post);
+        add_path_params_to_operation(&api, parameters, delete);
+        add_path_params_to_operation(&api, parameters, options);
+        add_path_params_to_operation(&api, parameters, head);
+        add_path_params_to_operation(&api, parameters, patch);
+        add_path_params_to_operation(&api, parameters, trace);
     }
     api.paths = paths;
     api
@@ -111,8 +95,11 @@ fn simplify(mut api: oas3::Spec) -> oas3::Spec {
 fn add_path_params_to_operation(
     api: &oas3::Spec,
     parameters: &[ObjectOrReference<oas3::spec::Parameter>],
-    operation: &mut Operation,
+    operation: &mut Option<Operation>,
 ) {
+    let Some(operation) = operation.as_mut() else {
+        return;
+    };
     let existing_parameter_names: Vec<String> = operation
         .parameters
         .iter()
