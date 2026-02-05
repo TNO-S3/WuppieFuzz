@@ -667,10 +667,10 @@ thiserror-impl 1.0.69
 thiserror-impl 2.0.18
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-time 0.3.46
+time 0.3.47
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
-time-macros 0.2.26
+time-macros 0.2.27
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
 tinystr 0.8.2
