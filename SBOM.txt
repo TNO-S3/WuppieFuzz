@@ -55,7 +55,7 @@ build_html 2.7.0
 bumpalo 3.19.1
 	licensed under "Apache-2.0 OR MIT"
 	by Nick Fitzgerald <fitzgen@gmail.com>
-bytemuck 1.24.0
+bytemuck 1.25.0
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Lokathor <zefria@gmail.com>
 byteorder 1.5.0
@@ -73,10 +73,10 @@ cfg-if 1.0.4
 chrono 0.4.43
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.54
+clap 4.5.56
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.54
+clap_builder 4.5.56
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.7
@@ -268,7 +268,7 @@ hyper-rustls 0.27.7
 hyper-util 0.1.19
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-iana-time-zone 0.1.64
+iana-time-zone 0.1.65
 	licensed under "Apache-2.0 OR MIT"
 	by Andrew Straw <strawman@astraw.com>|René Kijewski <rene.kijewski@fu-berlin.de>|Ryan Lopopolo <rjl@hyperbo.la>
 iana-time-zone-haiku 0.1.2
@@ -472,10 +472,10 @@ pin-project-lite 0.2.16
 pin-utils 0.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Josef Brandl <mail@josefbrandl.de>
-portable-atomic 1.13.0
+portable-atomic 1.13.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-portable-atomic-util 0.2.4
+portable-atomic-util 0.2.5
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 porter-stemmer 0.1.2
@@ -622,10 +622,10 @@ serial_test 3.3.1
 simd-adler32 0.3.8
 	licensed under "MIT"
 	by Marvin Countryman <me@maar.vin>
-siphasher 1.0.1
+siphasher 1.0.2
 	licensed under "Apache-2.0 OR MIT"
 	by Frank Denis <github@pureftpd.org>
-slab 0.4.11
+slab 0.4.12
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>
 smallvec 1.15.1
