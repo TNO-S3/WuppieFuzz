@@ -138,7 +138,7 @@ fn example_plain_body(operation: &Operation, api: &Spec) -> Option<ParameterCont
 fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, String> {
     let example = param.example.clone();
     if example.is_some() {
-        example.ok_or("".to_owned())
+        example.ok_or("WuppieFuzz".to_owned())
     } else {
         // The specification allows for a theoretically infinite tower of
         // media types, examples, schemas and references. We put in some effort
@@ -643,7 +643,7 @@ fn strings_from_format(str_format: &str) -> &[&str] {
         // Extra, "non-defined" formats:
         "base64" => &["V3VwcGllRnV6elROTyE=="],
         // If not matching any of the formats above:
-        _ => &["", "A", "🎵"],
+        _ => &["WuppieFuzz", "", "🎵"],
     }
 }
 
@@ -939,7 +939,7 @@ fn interesting_params_from_string_type(
     };
 
     // Return generic string examples
-    vec!["".into(), "A".into(), "🎵".into()]
+    vec!["WuppieFuzz".into(), "".into(), "🎵".into()]
 }
 
 fn interesting_params_from_number_type(
