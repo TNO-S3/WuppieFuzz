@@ -63,7 +63,7 @@ impl From<openapiv3::OpenAPI> for Spec {
 }
 
 /// Simplifies the spec structure. Currently
-/// - Moves PathItem parameters into its sub-Operations
+/// - Copies PathItem parameters into its sub-Operations
 fn simplify(mut api: oas3::Spec) -> oas3::Spec {
     let mut paths = api.paths.take();
     for (_, path_item) in paths.iter_mut().flatten() {
