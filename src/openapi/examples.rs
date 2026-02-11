@@ -136,9 +136,8 @@ fn example_plain_body(operation: &Operation, api: &Spec) -> Option<ParameterCont
 }
 
 fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, String> {
-    let example = param.example.clone();
-    if example.is_some() {
-        example.ok_or("WuppieFuzz".to_owned())
+    if let Some(example_value) = &param.example {
+        Ok(example_value.clone())
     } else {
         // The specification allows for a theoretically infinite tower of
         // media types, examples, schemas and references. We put in some effort
