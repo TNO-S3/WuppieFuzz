@@ -67,26 +67,21 @@ impl From<openapiv3::OpenAPI> for Spec {
 fn simplify(mut api: oas3::Spec) -> oas3::Spec {
     let mut paths = api.paths.take();
     for (_, path_item) in paths.iter_mut().flatten() {
-        let oas3::spec::PathItem {
-            get,
-            put,
-            post,
-            delete,
-            options,
-            head,
-            patch,
-            trace,
-            parameters,
-            ..
-        } = path_item;
-        add_path_params_to_operation(&api, parameters, get);
-        add_path_params_to_operation(&api, parameters, put);
-        add_path_params_to_operation(&api, parameters, post);
-        add_path_params_to_operation(&api, parameters, delete);
-        add_path_params_to_operation(&api, parameters, options);
-        add_path_params_to_operation(&api, parameters, head);
-        add_path_params_to_operation(&api, parameters, patch);
-        add_path_params_to_operation(&api, parameters, trace);
+        for operation in [
+            &mut path_item.get,
+            &mut path_item.put,
+            &mut path_item.post,
+            &mut path_item.delete,
+            &mut path_item.options,
+            &mut path_item.head,
+            &mut path_item.patch,
+            &mut path_item.trace,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            add_path_params_to_operation(&api, &path_item.parameters, operation);
+        }
     }
     api.paths = paths;
     api
@@ -95,11 +90,8 @@ fn simplify(mut api: oas3::Spec) -> oas3::Spec {
 fn add_path_params_to_operation(
     api: &oas3::Spec,
     parameters: &[ObjectOrReference<oas3::spec::Parameter>],
-    operation: &mut Option<Operation>,
+    operation: &mut Operation,
 ) {
-    let Some(operation) = operation.as_mut() else {
-        return;
-    };
     let existing_parameter_names: Vec<String> = operation
         .parameters
         .iter()
