@@ -20,7 +20,7 @@ use build_html::{Container, ContainerType, Html, HtmlContainer, HtmlPage, escape
 use indexmap::{IndexMap, map::Entry};
 
 use super::{CoverageClient, MAP_SIZE};
-use crate::{input::Method, openapi::spec::Spec};
+use crate::{input::Method, openapi::{spec::Spec, validate_response::ValidationError}};
 
 const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";
 const MISS_SYMBOL: &str = "&#x274c;";
@@ -55,9 +55,11 @@ enum Coverage {
     /// This status code occurs in the specification, but was not seen
     ExpectedNotFound,
     /// This status code occurs in the specification, and was seen
+    /// (request, response)
     ExpectedFound(String, String),
     /// This status code was seen but does not occur in the specification
-    UnexpectedFound(String, String),
+    /// (request, response, validation error)
+    UnexpectedFound(String, String, String),
 }
 
 impl EndpointCoverageClient {
@@ -103,13 +105,14 @@ impl EndpointCoverageClient {
         status: reqwest::StatusCode,
         input: String,
         output: String,
+        validation_error: Option<ValidationError>
     ) {
         // Get the coverage entry for the method-path-status combination.
         // The entry may be Vacant or Occupied, see below for what this means.
         let entry = self
             .endpoint_cov_map
-            // TODO: check that status.to_string does what we want
-            .entry((method, path, status.to_string()));
+            // Use as_str to ensure "200" instead of "200 OK"
+            .entry((method, path, status.as_str().to_string()));
         // Must get the index before entry.insert below, which needs ownership of the entry
         let index = entry.index();
 
@@ -117,7 +120,7 @@ impl EndpointCoverageClient {
         match entry {
             // No pre-existing entry for the method-path-status combination, we found an unspecified response!
             Entry::Vacant(entry) => {
-                entry.insert(Coverage::UnexpectedFound(input, output));
+                entry.insert(Coverage::UnexpectedFound(input, output, validation_error.map_or("Validation error required!".to_string(), |val| val.to_string())));
             }
             // Occupied entry, either already found (expected or unexpected) or expected but not yet found
             Entry::Occupied(mut entry) => {
@@ -153,7 +156,7 @@ impl EndpointCoverageClient {
                 .or_default()
                 .entry(*method)
                 .or_default()
-                .insert(status.to_string(), cov_entry);
+                .insert(status.as_str().to_string(), cov_entry);
         }
         operation_tree.sort_keys();
 
@@ -183,13 +186,14 @@ impl EndpointCoverageClient {
                                         ("class", "input-link c-hit"),
                                     ],
                                 ),
-                                Coverage::UnexpectedFound(request, response) => list
+                                Coverage::UnexpectedFound(request, response, validation_error) => list
                                     .with_link_attr(
                                         "#",
                                         format!("{} {}", SUPERFLUOUS_SYMBOL, item.0),
                                         [
                                             ("data-input", escape_html(request).as_str()),
                                             ("data-output", escape_html(response).as_str()),
+                                            ("validation-error", escape_html(validation_error).as_str()),
                                             ("class", "input-link c-extra"),
                                         ],
                                     ),
@@ -370,11 +374,17 @@ $(function() {
         $(this).css("background-color", "#FFFF00FF"); 
         let http_result = $(this).html();
         let hit_miss_unspecified = http_result.substring(0, 2);
-        let http_status = http_result.substring(2);
         let http_method = $(this).closest('div')[0].firstChild.nodeValue;
+        let http_status = http_result.substring(2);
+        let maybe_validation_error = $(this).attr("validation-error");
+        if (maybe_validation_error === undefined) {
+            maybe_validation_error = "";
+        } else {
+            maybe_validation_error = " - " + maybe_validation_error;
+        }
         let endpoint = $(this).closest('.endpoint_path')[0].firstChild.nodeValue;
         $("#title-header").html(endpoint);
-        $("#title-pane").html([hit_miss_unspecified, http_method, http_status].join(" "));
+        $("#title-pane").html([hit_miss_unspecified, http_method, http_status].join(" ") + maybe_validation_error);
     });
     $("input").click(update_hidden);
     $("label").click(update_hidden);

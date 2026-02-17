@@ -45,8 +45,8 @@ impl Response {
     pub fn json<'de, T: serde::Deserialize<'de>>(&'de self) -> Result<T, serde_json::Error> {
         serde_json::from_slice(&self.body)
     }
-    pub fn cookies(&mut self) -> impl Iterator<Item = (String, String)> + '_ {
-        self.cookies.drain(..)
+    pub fn cookies(&self) -> Vec<(String, String)> {
+        self.cookies.clone()
     }
 }
 

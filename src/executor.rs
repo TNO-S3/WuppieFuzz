@@ -32,7 +32,7 @@ use crate::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
         spec::Spec,
-        validate_response::{Response, ValidationErrorDiscriminants, validate_response},
+        validate_response::{Response, ValidationError, ValidationErrorDiscriminants, validate_response},
     },
     parameter_feedback::ParameterFeedback,
     reporting::{Reporting, sqlite::MySqLite},
@@ -78,32 +78,34 @@ where
 pub(crate) fn process_response(
     request_index: usize,
     request: &OpenApiRequest,
-    response: Response,
+    response: &Response,
     api: &Spec,
     crash_criteria: &[ValidationErrorDiscriminants],
     exit_kind: &mut ExitKind,
     parameter_feedback: &mut ParameterFeedback,
-) {
+) -> Option<ValidationError> {
     if response.status() == 429 {
         log::warn!("HTTP status 429 'Too Many Requests' encountered!");
         log::warn!("Rate limiting is likely active on the program under test.");
         log::warn!("This hinders fuzz testing. Consider disabling it.");
     }
-
+    let mut maybe_validation_error = None;
     if response.status().is_server_error() {
         *exit_kind = ExitKind::Crash;
         log::debug!(
             "OpenAPI-input resulted in server error response, ignoring rest of request chain."
         );
-    } else if let Err(validation_err) = validate_response(api, request, &response)
+    } else if let Err(validation_err) = validate_response(api, request, response)
         && crash_criteria.contains(&validation_err.discriminant())
     {
         log::debug!(
             "OpenAPI-input resulted in validation error: {validation_err}, ignoring rest of request chain."
         );
         *exit_kind = ExitKind::Crash;
+        maybe_validation_error = Some(validation_err);
     }
     parameter_feedback.process_response(request_index, response);
+    maybe_validation_error
 }
 
 impl<OT> SequenceExecutor<OT>
@@ -201,7 +203,18 @@ where
                 Ok(response) => {
                     performed_requests += 1;
                     let response: Response = response.into();
-
+                    self.reporter
+                        .report_response(&response, reporter_request_id);
+                    log::trace!("Got response {}", response.status());
+                    let validation_error = process_response(
+                        request_index,
+                        &request,
+                        &response,
+                        self.api,
+                        &self.config.crash_criteria,
+                        &mut exit_kind,
+                        &mut parameter_feedback,
+                    );
                     self.endpoint_client.lock().unwrap().cover(
                         request.method,
                         request.path.clone(),
@@ -210,18 +223,7 @@ where
                         response.text().unwrap_or_else(|_| {
                             String::from("Unable to decode the response to UTF-8")
                         }),
-                    );
-                    self.reporter
-                        .report_response(&response, reporter_request_id);
-                    log::trace!("Got response {}", response.status());
-                    process_response(
-                        request_index,
-                        &request,
-                        response,
-                        self.api,
-                        &self.config.crash_criteria,
-                        &mut exit_kind,
-                        &mut parameter_feedback,
+                        validation_error
                     );
                     if exit_kind == ExitKind::Crash {
                         break 'chain;
