@@ -654,3 +654,113 @@ impl HasMinMax for openapiv3::IntegerType {
         Some(self.exclusive_maximum)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use oas3::spec::{Info, ObjectOrReference, Operation, Parameter, PathItem};
+    use reqwest::Method;
+
+    // Test whether a common parameter is added to the parameters of specific operations during simplification:
+    // - Common parameter is added to operation-specific parameters
+    // - Common parameter is added correctly to operation with empty parameters
+    // - Common parameter is not added to an operation that is not specified
+    #[test]
+    fn test_simplify() {
+        let mut test_paths = BTreeMap::new();
+        test_paths.insert(
+            "test_path".to_string(),
+            PathItem {
+                get: Some(Operation {
+                    parameters: vec![ObjectOrReference::Object(Parameter {
+                        name: "parameter_in_get".to_string(),
+                        location: oas3::spec::ParameterIn::Path,
+                        description: Default::default(),
+                        required: Default::default(),
+                        deprecated: Default::default(),
+                        allow_empty_value: Default::default(),
+                        style: Default::default(),
+                        explode: Default::default(),
+                        allow_reserved: Default::default(),
+                        schema: Default::default(),
+                        example: Default::default(),
+                        examples: Default::default(),
+                        content: Default::default(),
+                        extensions: Default::default(),
+                    })],
+                    ..Default::default()
+                }),
+                put: Some(Operation {
+                    parameters: vec![],
+                    ..Default::default()
+                }),
+                parameters: vec![ObjectOrReference::Object(Parameter {
+                    name: "parameter_common".to_string(),
+                    location: oas3::spec::ParameterIn::Path,
+                    description: Default::default(),
+                    required: Default::default(),
+                    deprecated: Default::default(),
+                    allow_empty_value: Default::default(),
+                    style: Default::default(),
+                    explode: Default::default(),
+                    allow_reserved: Default::default(),
+                    schema: Default::default(),
+                    example: Default::default(),
+                    examples: Default::default(),
+                    content: Default::default(),
+                    extensions: Default::default(),
+                })],
+                ..Default::default()
+            },
+        );
+        let complicated_spec = oas3::Spec {
+            openapi: String::from("3.1.0"),
+            info: Info {
+                title: Default::default(),
+                summary: Default::default(),
+                description: Default::default(),
+                terms_of_service: Default::default(),
+                version: Default::default(),
+                contact: Default::default(),
+                license: Default::default(),
+                extensions: Default::default(),
+            },
+            servers: Default::default(),
+            paths: Some(test_paths),
+            components: Default::default(),
+            security: Default::default(),
+            tags: Default::default(),
+            webhooks: Default::default(),
+            external_docs: Default::default(),
+            extensions: Default::default(),
+        };
+        let simplified_spec = super::simplify(complicated_spec.clone());
+        // Added to an operation's existing parameters?
+        let get_operation = simplified_spec
+            .operation(&Method::GET, "test_path")
+            .unwrap();
+        assert!(get_operation.parameters.len() == 2);
+        for obj_or_ref in get_operation.parameters.iter() {
+            if let ObjectOrReference::Object(obj) = obj_or_ref {
+                assert!(obj.name == "parameter_common" || obj.name == "parameter_in_get");
+            } else {
+                assert!(false);
+            }
+        }
+        // Added to a specified operation's empty parameters?
+        let put_operation = simplified_spec
+            .operation(&Method::PUT, "test_path")
+            .unwrap();
+        assert!(put_operation.parameters.len() == 1);
+        for obj_or_ref in put_operation.parameters.iter() {
+            if let ObjectOrReference::Object(obj) = obj_or_ref {
+                assert!(obj.name == "parameter_common");
+            } else {
+                assert!(false);
+            }
+        }
+        // Not added to an unspecified operation?
+        assert!(simplified_spec.operation(&Method::POST, "test_path") == None);
+    }
+}
