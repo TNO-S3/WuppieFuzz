@@ -25,7 +25,7 @@ anstyle-query 1.1.5
 anstyle-wincon 3.0.11
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-anyhow 1.0.100
+anyhow 1.0.101
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 atomic-waker 1.1.2
@@ -55,7 +55,7 @@ build_html 2.7.0
 bumpalo 3.19.1
 	licensed under "Apache-2.0 OR MIT"
 	by Nick Fitzgerald <fitzgen@gmail.com>
-bytemuck 1.24.0
+bytemuck 1.25.0
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Lokathor <zefria@gmail.com>
 byteorder 1.5.0
@@ -73,10 +73,10 @@ cfg-if 1.0.4
 chrono 0.4.43
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.54
+clap 4.5.57
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.54
+clap_builder 4.5.57
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 0.7.7
@@ -265,10 +265,10 @@ hyper 1.8.1
 hyper-rustls 0.27.7
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
-hyper-util 0.1.19
+hyper-util 0.1.20
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-iana-time-zone 0.1.64
+iana-time-zone 0.1.65
 	licensed under "Apache-2.0 OR MIT"
 	by Andrew Straw <strawman@astraw.com>|René Kijewski <rene.kijewski@fu-berlin.de>|Ryan Lopopolo <rjl@hyperbo.la>
 iana-time-zone-haiku 0.1.2
@@ -322,10 +322,10 @@ iter-read 1.1.0
 itoa 1.0.17
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-jiff 0.2.18
+jiff 0.2.20
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-jiff-static 0.2.18
+jiff-static 0.2.20
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
 jni 0.21.1
@@ -379,7 +379,7 @@ lru-slab 0.1.2
 mach2 0.5.0
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
-memchr 2.7.6
+memchr 2.8.0
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>|bluss
 meminterval 0.4.2
@@ -472,10 +472,10 @@ pin-project-lite 0.2.16
 pin-utils 0.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Josef Brandl <mail@josefbrandl.de>
-portable-atomic 1.13.0
+portable-atomic 1.13.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-portable-atomic-util 0.2.4
+portable-atomic-util 0.2.5
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 porter-stemmer 0.1.2
@@ -526,16 +526,16 @@ rand_regex 0.18.1
 redox_syscall 0.5.18
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
-regex 1.12.2
+regex 1.12.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-automata 0.4.13
+regex-automata 0.4.14
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-syntax 0.8.8
+regex-syntax 0.8.9
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-reqwest 0.13.1
+reqwest 0.13.2
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 reqwest_cookie_store 0.10.0
@@ -577,7 +577,7 @@ rustls-platform-verifier-android 0.1.1
 rustls-webpki 0.103.9
 	licensed under "ISC"
 	by unspecified authors
-ryu 1.0.22
+ryu 1.0.23
 	licensed under "Apache-2.0 OR BSL-1.0"
 	by David Tolnay <dtolnay@gmail.com>
 safe_arch 0.7.4
@@ -622,10 +622,10 @@ serial_test 3.3.1
 simd-adler32 0.3.8
 	licensed under "MIT"
 	by Marvin Countryman <me@maar.vin>
-siphasher 1.0.1
+siphasher 1.0.2
 	licensed under "Apache-2.0 OR MIT"
 	by Frank Denis <github@pureftpd.org>
-slab 0.4.11
+slab 0.4.12
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>
 smallvec 1.15.1
@@ -652,7 +652,7 @@ subtle 2.6.1
 sync_wrapper 1.0.2
 	licensed under "Apache-2.0"
 	by Actyx AG <developer@actyx.io>
-system-configuration 0.6.1
+system-configuration 0.7.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
 system-configuration-sys 0.6.0
@@ -667,10 +667,10 @@ thiserror-impl 1.0.69
 thiserror-impl 2.0.18
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-time 0.3.46
+time 0.3.47
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
-time-macros 0.2.26
+time-macros 0.2.27
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
 tinystr 0.8.2
@@ -730,7 +730,7 @@ typewit 1.14.2
 uds 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
-unicode-ident 1.0.22
+unicode-ident 1.0.24
 	licensed under "(Apache-2.0 OR MIT) AND Unicode-3.0"
 	by David Tolnay <dtolnay@gmail.com>
 unicode-segmentation 1.12.0
@@ -805,10 +805,10 @@ web-sys 0.3.85
 web-time 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-webpki-root-certs 1.0.5
+webpki-root-certs 1.0.6
 	licensed under "CDLA-Permissive-2.0"
 	by unspecified authors
-webpki-roots 1.0.5
+webpki-roots 1.0.6
 	licensed under "CDLA-Permissive-2.0"
 	by unspecified authors
 wide 0.7.33
@@ -973,10 +973,10 @@ z3 0.19.7
 z3-sys 0.10.4
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.37
+zerocopy 0.8.39
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
-zerocopy-derive 0.8.37
+zerocopy-derive 0.8.39
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
 zerofrom 0.1.6
@@ -997,6 +997,6 @@ zerovec 0.11.5
 zerovec-derive 0.11.2
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-zmij 1.0.19
+zmij 1.0.21
 	licensed under "MIT"
 	by David Tolnay <dtolnay@gmail.com>

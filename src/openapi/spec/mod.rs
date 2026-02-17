@@ -745,7 +745,7 @@ mod tests {
             if let ObjectOrReference::Object(obj) = obj_or_ref {
                 assert!(obj.name == "parameter_common" || obj.name == "parameter_in_get");
             } else {
-                assert!(false);
+                panic!("Object expected, not reference.");
             }
         }
         // Added to a specified operation's empty parameters?
@@ -757,10 +757,14 @@ mod tests {
             if let ObjectOrReference::Object(obj) = obj_or_ref {
                 assert!(obj.name == "parameter_common");
             } else {
-                assert!(false);
+                panic!("Object expected, not reference.");
             }
         }
         // Not added to an unspecified operation?
-        assert!(simplified_spec.operation(&Method::POST, "test_path") == None);
+        assert!(
+            simplified_spec
+                .operation(&Method::POST, "test_path")
+                .is_none()
+        );
     }
 }

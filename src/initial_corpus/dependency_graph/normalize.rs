@@ -236,6 +236,7 @@ pub fn normalize_response<'a>(
         response.content.get("application/json")?,
         path,
         ReqResp::Resp,
+        0,
     )
 }
 
@@ -256,7 +257,19 @@ pub fn normalize_request_body<'a>(
         body.content.get("application/json")?,
         path,
         ReqResp::Req,
+        0,
     )
+}
+
+fn normalization_recursion_limit_exceeded(recursion_depth: usize) -> bool {
+    if recursion_depth >= 20 {
+        log::warn!(
+            "Schema resolution exceeds {recursion_depth} steps, this parameter will not be handled properly. Try to avoid circular/deep schema references."
+        );
+        true
+    } else {
+        false
+    }
 }
 
 /// Schema describes contents of objects and arrays. This function normalizes field
@@ -266,6 +279,7 @@ fn normalize_schema(
     schema: ObjectSchema,
     path: Vec<String>,
     access: ParameterAccess,
+    recursion_depth: usize,
 ) -> Option<Vec<ParameterNormalization>> {
     // SchemaKind::AllOf { all_of } if all_of.len() == 1 => {
     //     // If only a single property is in this AllOf, return an example from it.
@@ -283,6 +297,9 @@ fn normalize_schema(
     //     // See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#not
     //     None
     // }
+    if normalization_recursion_limit_exceeded(recursion_depth) {
+        return None;
+    }
     let result;
     if schema.all_of.len() == 1 {
         // Normalize the single schema in this all_of.
@@ -293,6 +310,7 @@ fn normalize_schema(
                 .expect("Could not resolve schema reference."),
             path,
             access,
+            recursion_depth + 1,
         )
     } else if schema.one_of.len() == 1 {
         // Normalize the single schema in this one_of.
@@ -303,6 +321,7 @@ fn normalize_schema(
                 .expect("Could not resolve schema reference."),
             path,
             access,
+            recursion_depth + 1,
         )
     } else {
         result = match &schema.schema_type {
@@ -330,15 +349,20 @@ fn normalize_schema(
                                         &object_schema.properties,
                                         path,
                                         access,
+                                        recursion_depth + 1,
                                     ))
                                 }
                             },
                             None => None,
                         }
                     }
-                    oas3::spec::SchemaType::Object => {
-                        Some(normalize_object_type(api, &schema.properties, path, access))
-                    }
+                    oas3::spec::SchemaType::Object => Some(normalize_object_type(
+                        api,
+                        &schema.properties,
+                        path,
+                        access,
+                        recursion_depth + 1,
+                    )),
                     // Other types do not have a name, return an empty vec so their key in the
                     // enclosing object/array is still included.
                     _ => Some(vec![]),
@@ -365,13 +389,17 @@ fn normalize_media_type<'a>(
     media_type: &'a MediaType,
     path: Vec<String>,
     req_or_resp: ReqResp,
+    recursion_depth: usize,
 ) -> Option<Vec<ParameterNormalization>> {
+    if normalization_recursion_limit_exceeded(recursion_depth) {
+        return None;
+    }
     let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
     let access = match req_or_resp {
         ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
         ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
     };
-    normalize_schema(api, schema, path, access)
+    normalize_schema(api, schema, path, access, recursion_depth + 1)
 }
 
 /// Returns ParameterNormalizations for all fields in the object.
@@ -380,7 +408,11 @@ fn normalize_object_type<'a>(
     object_properties: &'a BTreeMap<String, ObjectOrReference<ObjectSchema>>,
     path: Vec<String>,
     parameter_access: ParameterAccess,
+    recursion_depth: usize,
 ) -> Vec<ParameterNormalization> {
+    if normalization_recursion_limit_exceeded(recursion_depth) {
+        return vec![];
+    }
     // Avoid infinite recursion (by circular (including self-)references in schemas)
     if parameter_access
         .get_body_access_elements()
@@ -401,9 +433,14 @@ fn normalize_object_type<'a>(
             let nested_schema = object_properties[key]
                 .resolve(api)
                 .unwrap_or_else(|_| panic!("Could not resolve nested schema {}", key));
-            let nested_params =
-                normalize_schema(api, nested_schema, path.clone(), new_parameter_access)
-                    .unwrap_or_default();
+            let nested_params = normalize_schema(
+                api,
+                nested_schema,
+                path.clone(),
+                new_parameter_access,
+                recursion_depth + 1,
+            )
+            .unwrap_or_default();
             normalized_params.extend(nested_params);
             normalized_params
         })
