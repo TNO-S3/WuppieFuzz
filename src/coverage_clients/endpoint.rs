@@ -20,7 +20,10 @@ use build_html::{Container, ContainerType, Html, HtmlContainer, HtmlPage, escape
 use indexmap::{IndexMap, map::Entry};
 
 use super::{CoverageClient, MAP_SIZE};
-use crate::{input::Method, openapi::{spec::Spec, validate_response::ValidationError}};
+use crate::{
+    input::Method,
+    openapi::{spec::Spec, validate_response::ValidationError},
+};
 
 const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";
 const MISS_SYMBOL: &str = "&#x274c;";
@@ -105,7 +108,7 @@ impl EndpointCoverageClient {
         status: reqwest::StatusCode,
         input: String,
         output: String,
-        validation_error: Option<ValidationError>
+        validation_error: Option<ValidationError>,
     ) {
         // Get the coverage entry for the method-path-status combination.
         // The entry may be Vacant or Occupied, see below for what this means.
@@ -120,7 +123,13 @@ impl EndpointCoverageClient {
         match entry {
             // No pre-existing entry for the method-path-status combination, we found an unspecified response!
             Entry::Vacant(entry) => {
-                entry.insert(Coverage::UnexpectedFound(input, output, validation_error.map_or("Validation error required!".to_string(), |val| val.to_string())));
+                entry.insert(Coverage::UnexpectedFound(
+                    input,
+                    output,
+                    validation_error.map_or("Validation error required!".to_string(), |val| {
+                        val.to_string()
+                    }),
+                ));
             }
             // Occupied entry, either already found (expected or unexpected) or expected but not yet found
             Entry::Occupied(mut entry) => {
@@ -186,17 +195,21 @@ impl EndpointCoverageClient {
                                         ("class", "input-link c-hit"),
                                     ],
                                 ),
-                                Coverage::UnexpectedFound(request, response, validation_error) => list
-                                    .with_link_attr(
+                                Coverage::UnexpectedFound(request, response, validation_error) => {
+                                    list.with_link_attr(
                                         "#",
                                         format!("{} {}", SUPERFLUOUS_SYMBOL, item.0),
                                         [
                                             ("data-input", escape_html(request).as_str()),
                                             ("data-output", escape_html(response).as_str()),
-                                            ("validation-error", escape_html(validation_error).as_str()),
+                                            (
+                                                "validation-error",
+                                                escape_html(validation_error).as_str(),
+                                            ),
                                             ("class", "input-link c-extra"),
                                         ],
-                                    ),
+                                    )
+                                }
                                 Coverage::ExpectedNotFound => list.with_raw(format!(
                                     "<a class=\"c-miss\">{} {}</a>",
                                     MISS_SYMBOL, item.0

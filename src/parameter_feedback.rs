@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     input::ParameterContents,
-    openapi::validate_response::{Response},
+    openapi::validate_response::Response,
     parameter_access::{
         ParameterAccess, ParameterAccessElements, ParameterAddressing, RequestParameterAccess,
         ResponseParameterAccess,

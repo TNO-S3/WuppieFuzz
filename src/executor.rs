@@ -32,7 +32,9 @@ use crate::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
         spec::Spec,
-        validate_response::{Response, ValidationError, ValidationErrorDiscriminants, validate_response},
+        validate_response::{
+            Response, ValidationError, ValidationErrorDiscriminants, validate_response,
+        },
     },
     parameter_feedback::ParameterFeedback,
     reporting::{Reporting, sqlite::MySqLite},
@@ -223,7 +225,7 @@ where
                         response.text().unwrap_or_else(|_| {
                             String::from("Unable to decode the response to UTF-8")
                         }),
-                        validation_error
+                        validation_error,
                     );
                     if exit_kind == ExitKind::Crash {
                         break 'chain;
