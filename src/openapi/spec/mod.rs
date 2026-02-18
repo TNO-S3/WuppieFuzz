@@ -9,6 +9,7 @@
 use std::{collections::BTreeMap, default::Default};
 
 use indexmap::IndexMap;
+use oas3::spec::{ObjectOrReference, Operation};
 use serde_json::Number;
 
 pub mod load;
@@ -37,7 +38,7 @@ impl std::ops::DerefMut for Spec {
 impl From<oas3::Spec> for Spec {
     /// A v3.1 API specification can be used as-is.
     fn from(value: oas3::Spec) -> Self {
-        Self(value)
+        Self(simplify(value))
     }
 }
 
@@ -46,7 +47,7 @@ impl From<openapiv3::OpenAPI> for Spec {
     /// The conversion is lossy, as lots of possible fields are never used by the
     /// fuzzer, and we don't bother converting them.
     fn from(value: openapiv3::OpenAPI) -> Self {
-        Self(oas3::Spec {
+        Self(simplify(oas3::Spec {
             openapi: String::from("3.1.0"),
             info: convert_info(value.info),
             servers: convert_servers(value.servers),
@@ -57,7 +58,52 @@ impl From<openapiv3::OpenAPI> for Spec {
             webhooks: Default::default(),
             external_docs: Default::default(),
             extensions: Default::default(),
-        })
+        }))
+    }
+}
+
+/// Simplifies the spec structure. Currently
+/// - Copies PathItem parameters into its sub-Operations
+fn simplify(mut api: oas3::Spec) -> oas3::Spec {
+    let mut paths = api.paths.take();
+    for (_, path_item) in paths.iter_mut().flatten() {
+        for operation in [
+            &mut path_item.get,
+            &mut path_item.put,
+            &mut path_item.post,
+            &mut path_item.delete,
+            &mut path_item.options,
+            &mut path_item.head,
+            &mut path_item.patch,
+            &mut path_item.trace,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            add_path_params_to_operation(&api, &path_item.parameters, operation);
+        }
+    }
+    api.paths = paths;
+    api
+}
+
+fn add_path_params_to_operation(
+    api: &oas3::Spec,
+    parameters: &[ObjectOrReference<oas3::spec::Parameter>],
+    operation: &mut Operation,
+) {
+    let existing_parameter_names: Vec<String> = operation
+        .parameters
+        .iter()
+        .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
+        .map(|param| param.name)
+        .collect();
+    for ref_or_param in parameters.iter() {
+        if let Ok(actual_parameter) = ref_or_param.resolve(api)
+            && !existing_parameter_names.contains(&actual_parameter.name)
+        {
+            operation.parameters.push(ref_or_param.clone())
+        }
     }
 }
 
@@ -606,5 +652,119 @@ impl HasMinMax for openapiv3::IntegerType {
     }
     fn exclusive_maximum(&self) -> Option<bool> {
         Some(self.exclusive_maximum)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use oas3::spec::{Info, ObjectOrReference, Operation, Parameter, PathItem};
+    use reqwest::Method;
+
+    // Test whether a common parameter is added to the parameters of specific operations during simplification:
+    // - Common parameter is added to operation-specific parameters
+    // - Common parameter is added correctly to operation with empty parameters
+    // - Common parameter is not added to an operation that is not specified
+    #[test]
+    fn test_simplify() {
+        let mut test_paths = BTreeMap::new();
+        test_paths.insert(
+            "test_path".to_string(),
+            PathItem {
+                get: Some(Operation {
+                    parameters: vec![ObjectOrReference::Object(Parameter {
+                        name: "parameter_in_get".to_string(),
+                        location: oas3::spec::ParameterIn::Path,
+                        description: Default::default(),
+                        required: Default::default(),
+                        deprecated: Default::default(),
+                        allow_empty_value: Default::default(),
+                        style: Default::default(),
+                        explode: Default::default(),
+                        allow_reserved: Default::default(),
+                        schema: Default::default(),
+                        example: Default::default(),
+                        examples: Default::default(),
+                        content: Default::default(),
+                        extensions: Default::default(),
+                    })],
+                    ..Default::default()
+                }),
+                put: Some(Operation {
+                    parameters: vec![],
+                    ..Default::default()
+                }),
+                parameters: vec![ObjectOrReference::Object(Parameter {
+                    name: "parameter_common".to_string(),
+                    location: oas3::spec::ParameterIn::Path,
+                    description: Default::default(),
+                    required: Default::default(),
+                    deprecated: Default::default(),
+                    allow_empty_value: Default::default(),
+                    style: Default::default(),
+                    explode: Default::default(),
+                    allow_reserved: Default::default(),
+                    schema: Default::default(),
+                    example: Default::default(),
+                    examples: Default::default(),
+                    content: Default::default(),
+                    extensions: Default::default(),
+                })],
+                ..Default::default()
+            },
+        );
+        let complicated_spec = oas3::Spec {
+            openapi: String::from("3.1.0"),
+            info: Info {
+                title: Default::default(),
+                summary: Default::default(),
+                description: Default::default(),
+                terms_of_service: Default::default(),
+                version: Default::default(),
+                contact: Default::default(),
+                license: Default::default(),
+                extensions: Default::default(),
+            },
+            servers: Default::default(),
+            paths: Some(test_paths),
+            components: Default::default(),
+            security: Default::default(),
+            tags: Default::default(),
+            webhooks: Default::default(),
+            external_docs: Default::default(),
+            extensions: Default::default(),
+        };
+        let simplified_spec = super::simplify(complicated_spec.clone());
+        // Added to an operation's existing parameters?
+        let get_operation = simplified_spec
+            .operation(&Method::GET, "test_path")
+            .unwrap();
+        assert!(get_operation.parameters.len() == 2);
+        for obj_or_ref in get_operation.parameters.iter() {
+            if let ObjectOrReference::Object(obj) = obj_or_ref {
+                assert!(obj.name == "parameter_common" || obj.name == "parameter_in_get");
+            } else {
+                panic!("Object expected, not reference.");
+            }
+        }
+        // Added to a specified operation's empty parameters?
+        let put_operation = simplified_spec
+            .operation(&Method::PUT, "test_path")
+            .unwrap();
+        assert!(put_operation.parameters.len() == 1);
+        for obj_or_ref in put_operation.parameters.iter() {
+            if let ObjectOrReference::Object(obj) = obj_or_ref {
+                assert!(obj.name == "parameter_common");
+            } else {
+                panic!("Object expected, not reference.");
+            }
+        }
+        // Not added to an unspecified operation?
+        assert!(
+            simplified_spec
+                .operation(&Method::POST, "test_path")
+                .is_none()
+        );
     }
 }
