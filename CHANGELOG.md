@@ -8,6 +8,8 @@
 
 - Implement recursion limit to deal with recursive/cyclic component definitions in [#243](https://github.com/TNO-S3/WuppieFuzz/pull/243)
 - Reorder string examples so empty strings occur less often in [#252](https://github.com/TNO-S3/WuppieFuzz/pull/252)
+- Take into account parameters specified at the path level in [#247](https://github.com/TNO-S3/WuppieFuzz/pull/247)
+- Fix status code categorization in response validation in [#254](https://github.com/TNO-S3/WuppieFuzz/pull/254)
 
 # v1.4.1 (2026-01-22)
 
