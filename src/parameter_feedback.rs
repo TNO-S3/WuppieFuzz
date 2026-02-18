@@ -125,7 +125,7 @@ impl ParameterFeedback {
     /// The body is parsed as a json object or an array of objects, and if successful,
     /// the fields are saved as parameter values. Cookies set as a `Set-Cookie` header
     /// are saved in their `param=value` form.
-    pub fn process_response(&mut self, request_index: usize, mut response: Response) {
+    pub fn process_response(&mut self, request_index: usize, response: &Response) {
         // We take any returned json values and save key-value parameters we find
         // (e.g. id = 37) for use as parameters in later requests.
         match response.json::<serde_json::Value>() {
