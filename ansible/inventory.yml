@@ -1,0 +1,7 @@
+---
+runners:
+  hosts:
+    s3-github-runner-01:
+    s3-github-runner-02:
+    s3-github-runner-03:
+    s3-github-runner-04:
