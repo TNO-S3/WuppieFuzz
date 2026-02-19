@@ -1,0 +1,43 @@
+- name: Ensure runner user/group exist
+  ansible.builtin.user:
+    name: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    create_home: false
+    system: true
+  register: runner_user_result
+  failed_when: false
+
+- name: Ensure runner group exists (if user task didn't create it)
+  ansible.builtin.group:
+    name: "{{ github_runner_group }}"
+    system: true
+
+- name: Add user to sudo group
+  ansible.builtin.user:
+    name: "{{ github_runner_user }}"
+    groups: sudo
+    append: yes
+  when: runner_is_sudo | default(false) | bool
+
+- name: Allow passwordless sudo
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/runner
+    content: "{{ github_runner_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  when: runner_is_sudo | default(false) | bool
+
+- name: Add current user to the runners group
+  ansible.builtin.user:
+    name: "{{ runner_install_user }}"
+    groups: "{{ github_runner_group }}"
+    append: yes
+
+- name: Ensure runner user exists (ensure state)
+  ansible.builtin.user:
+    name: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    create_home: false
+    system: true
