@@ -1,0 +1,78 @@
+---
+- name: Validate runner target URL is set
+  ansible.builtin.assert:
+    that:
+      - (github_runner_repo_url | length > 0) or (github_runner_org_url | length > 0)
+      - not ((github_runner_repo_url | length > 0) and (github_runner_org_url | length > 0))
+    fail_msg: >-
+      Set exactly one of github_runner_repo_url or github_runner_org_url.
+
+- name: Validate runner target ORG is set
+  ansible.builtin.assert:
+    that:
+      - github_org | length > 0
+
+    fail_msg: >-
+      Set github_org variable
+
+- name: Validate github token is provided
+  ansible.builtin.assert:
+    that:
+      - github_token | length > 0
+    fail_msg: >-
+      github_token is required. Pass via --extra-vars or Ansible Vault.
+
+- name: Ensure required packages are installed (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - tar
+    state: present
+    update_cache: true
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure required packages are installed (RHEL/Fedora)
+  ansible.builtin.dnf:
+    name:
+      - ca-certificates
+      - curl
+      - tar
+    state: present
+  when: ansible_facts.os_family == "RedHat"
+
+- import_tasks: remove.yml
+
+- import_tasks: user.yml
+
+- name: Ensure cache directory exists
+  ansible.builtin.file:
+    path: "{{ github_runner_archive_path | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Download runner archive (idempotent)
+  ansible.builtin.get_url:
+    url: "{{ github_runner_download_url | trim }}"
+    dest: "{{ github_runner_archive_path }}"
+    mode: "0644"
+    force: false
+
+- name: Ensure base directory exists
+  ansible.builtin.file:
+    path: "{{ github_runner_base_dir }}"
+    state: directory
+    owner: "{{ runner_install_user }}"
+    group: "{{ runner_install_group }}"
+    mode: "0775"
+
+- name: Extract runner if not already extracted (idempotent by creates)
+  ansible.builtin.unarchive:
+    src: "{{ github_runner_archive_path }}"
+    dest: "{{ github_runner_base_dir }}"
+    remote_src: true
+    owner: "{{ runner_install_user }}"
+    group: "{{ runner_install_group }}"
+    creates: "{{ github_runner_base_dir }}/config.sh"
+
+- import_tasks: install.yml

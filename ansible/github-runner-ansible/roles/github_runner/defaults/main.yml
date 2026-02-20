@@ -1,0 +1,54 @@
+---
+# GitHub runner version (pin for reproducibility)
+github_runner_version: "2.331.0"
+
+# Base install directory
+github_runner_base_dir: "/opt/actions-runner"
+github_runner_config_dir: "/opt/config/actions-runner"
+
+# OS/arch mapping (override if needed)
+github_runner_os: "linux"
+github_runner_arch: "x64"
+
+# URL template for downloads
+github_runner_download_url: >-
+  https://github.com/actions/runner/releases/download/v{{ github_runner_version }}/actions-runner-{{ github_runner_os }}-{{ github_runner_arch }}-{{ github_runner_version }}.tar.gz
+
+# Where to cache the tarball on the host
+github_runner_archive_path: "/var/cache/actions-runner/actions-runner-{{ github_runner_version }}.tar.gz"
+
+# User/group to run as
+github_runner_user: "github-runner"
+github_runner_group: "github-runner"
+
+runner_install_user: "runneradmin"
+runner_install_group: "runneradmin"
+
+runner_is_sudo: false
+
+# Runners to create on this host
+# name: directory name + systemd unit suffix
+# labels: optional list
+# workdir: optional relative work dir inside runner folder
+github_runners:
+  name: "runner-1"
+  labels: ["self-hosted", "linux"]
+  workdir: "{{github_runner_base_dir}}/_work"
+
+# Registration target:
+# Use ONE of:
+# - github_runner_repo_url: "https://github.com/ORG/REPO"
+# - github_runner_org_url:  "https://github.com/ORG"
+github_runner_repo_url: ""
+github_runner_org_url: ""
+github_org: ""
+
+# Token: pass via --extra-vars, vault, or env lookup.
+# Example: -e "github_token=XXXX"
+github_token: ""
+
+# Runner group (optional, enterprise/org features)
+github_runner_group_name: ""
+
+# Replace existing runner with same name if needed (non-interactive)
+github_runner_replace_existing: true
