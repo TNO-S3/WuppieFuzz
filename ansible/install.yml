@@ -1,0 +1,38 @@
+---
+- name: Install GitHub runner including dependencies for TNO-S3 WuppieFuzz
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install dependencies
+      apt:
+        name:
+          - screen
+          - build-essential
+          - cmake
+          - git
+          - pkg-config
+          - libssl-dev
+          - clang
+        state: present
+        update_cache: yes
+      when: ansible_facts.os_family == 'Debian'
+
+  roles:
+    - role: ./github-runner-ansible/roles/github_runner
+      vars:
+        # Pin version for reproducibility
+        github_runner_version: "2.331.0"
+
+        github_runner_org_url: "https://github.com/TNO-S3"
+        github_org: "TNO-S3"
+
+        # Strongly recommended: pass at runtime via --extra-vars or vault
+        github_runner_token: "{{ github_runner_token }}"
+        # github_runner_token: "{{ lookup('ansible.builtin.env', 'GITHUB_RUNNER_TOKEN') }}"
+
+        runner_is_sudo: true
+
+        github_runners:
+          name: "{{ inventory_hostname }}"
+          labels: ["self-hosted", "linux", "x64"]
+          # workdir: "_work"

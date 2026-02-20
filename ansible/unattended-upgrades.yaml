@@ -1,0 +1,33 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: "Install unattended-upgrades"
+      apt:
+        pkg: "unattended-upgrades"
+        state: "present"
+
+    - name: "Create apt file for auto-upgrades"
+      file:
+        path: "/etc/apt/apt.conf.d/20auto-upgrades"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+        state: "touch"
+
+    - name: "Populate 20auto-upgrades apt file"
+      blockinfile:
+        path: "/etc/apt/apt.conf.d/20auto-upgrades"
+        block: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+          APT::Periodic::Download-Upgradeable-Packages "1";
+          APT::Periodic::AutocleanInterval "7";
+        create: yes
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - AUTO UPGRADES"
+
+    - name: "Allow for updates in /etc/apt/apt.conf.d/50unattended-upgrades"
+      lineinfile:
+        path: "/etc/apt/apt.conf.d/50unattended-upgrades"
+        line: '\t"${distro_id}:${distro_codename}-updates";'
+        insertafter: '"\${distro_id}ESM:\${distro_codename}-infra-security";'
+        state: present
