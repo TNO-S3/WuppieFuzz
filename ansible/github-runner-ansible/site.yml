@@ -1,0 +1,6 @@
+---
+- name: Install and configure GitHub Actions self-hosted runners
+  hosts: runners
+  become: true
+  roles:
+    - role: github_runner

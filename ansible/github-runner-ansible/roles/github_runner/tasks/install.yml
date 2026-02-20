@@ -1,0 +1,78 @@
+- name: Check if runner is already configured
+  ansible.builtin.stat:
+    path: "{{ github_runner_base_dir }}/.runner"
+  register: runner_config_state
+
+- name: Validate token is provided
+  ansible.builtin.assert:
+    that:
+      - not runner_config_state.stat.exists
+    fail_msg: >-
+      The runner install should not be present.
+
+- name: Request GitHub runner registration token
+  ansible.builtin.uri:
+    url: "https://api.github.com/orgs/{{ github_org }}/actions/runners/registration-token"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ github_token }}"
+      Accept: "application/vnd.github+json"
+      X-GitHub-Api-Version: "2022-11-28"
+    status_code: 201
+    return_content: true
+  register: github_runner_auto_token
+  no_log: true
+
+# NOTE: GitHub runner configuration requires executing config.sh.
+# We use ansible.builtin.command (NOT shell) and make it idempotent via the .runner file.
+- name: Configure runners (only if not configured)
+  # remote_user: "{{ github_runner_user }}"
+  ansible.builtin.command:
+    chdir: "{{ github_runner_base_dir }}"
+    cmd: >-
+      {{ github_runner_base_dir }}/config.sh
+      --unattended
+      --url {{ (github_runner_repo_url | length > 0) | ternary(github_runner_repo_url, github_runner_org_url) }}
+      --token {{ github_runner_auto_token.json.token }}
+      --name {{ github_runners.name }}
+      {% if github_runner_group_name | length > 0 %} --runnergroup {{ github_runner_group_name }} {% endif %}
+      {% if github_runners.labels is defined and (github_runners.labels | length > 0) %} --labels {{ github_runners.labels | join(',') }} {% endif %}
+      {% if github_runners.workdir is defined and (github_runners.workdir | length > 0) %} --work {{ github_runners.workdir }} {% endif %}
+      {% if github_runner_replace_existing %} --replace {% endif %}
+  when: not runner_config_state.stat.exists
+  changed_when: true
+  become: false
+
+- name: Ensure runner directories are owned correctly
+  ansible.builtin.file:
+    path: "{{ github_runner_base_dir }}"
+    state: directory
+    recurse: true
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+
+- name: Check if a runner has already created a service
+  ansible.builtin.stat:
+    path: "{{ github_runner_base_dir }}/.service"
+  register: runner_service_state
+
+- name: Install runner service as runner user
+  # remote_user: "{{ github_runner_user }}"
+  ansible.builtin.command:
+    chdir: "{{ github_runner_base_dir }}"
+    cmd: >-
+      {{ github_runner_base_dir }}/svc.sh
+      install
+      {{github_runner_user}}
+  when: not runner_service_state.stat.exists
+  become: true
+
+- name: Start runner service as runner user
+  # remote_user: "{{ github_runner_user }}"
+  ansible.builtin.command:
+    chdir: "{{ github_runner_base_dir }}"
+    cmd: >-
+      {{ github_runner_base_dir }}/svc.sh
+      start
+  when: not runner_service_state.stat.exists
+  become: true

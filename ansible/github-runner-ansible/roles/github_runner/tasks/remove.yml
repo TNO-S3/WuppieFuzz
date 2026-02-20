@@ -1,0 +1,61 @@
+- name: Check if a runner has already created a service
+  ansible.builtin.stat:
+    path: "{{ github_runner_base_dir }}/.service"
+  register: stop
+
+- name: Stop runner service
+  ansible.builtin.command:
+    chdir: "{{ github_runner_base_dir }}"
+    cmd: >-
+      {{ github_runner_base_dir }}/svc.sh
+      stop
+  become: true
+  when: stop.stat.exists
+
+- name: Uninstall runner service
+  ansible.builtin.command:
+    chdir: "{{ github_runner_base_dir }}"
+    cmd: >-
+      {{ github_runner_base_dir }}/svc.sh
+      uninstall
+  become: true
+  when: stop.stat.exists
+
+- name: Check if runner is already configured
+  ansible.builtin.stat:
+    path: "{{ github_runner_base_dir }}/.runner"
+  register: uninstall
+
+- name: Get GitHub runner remove token
+  ansible.builtin.uri:
+    url: "https://api.github.com/orgs/{{ github_org }}/actions/runners/remove-token"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ github_token }}"
+      Accept: "application/vnd.github+json"
+    status_code: 201
+  register: github_remove_token
+  # no_log: true
+  when: uninstall.stat.exists
+
+- name: Ensure base directory exists
+  ansible.builtin.file:
+    path: "{{ github_runner_base_dir }}"
+    state: directory
+    owner: "{{ runner_install_user }}"
+    group: "{{ runner_install_group }}"
+    mode: "0775"
+
+- name: Remove GitHub self-hosted runner
+  become: false
+  ansible.builtin.command:
+    cmd: "./config.sh remove --token {{ github_remove_token.json.token }}"
+    chdir: /opt/actions-runner
+  # no_log: true
+  when: uninstall.stat.exists
+
+- name: Ensure base directory is removed
+  ansible.builtin.file:
+    path: "{{ github_runner_base_dir }}"
+    state: absent
+  when: uninstall.stat.exists
