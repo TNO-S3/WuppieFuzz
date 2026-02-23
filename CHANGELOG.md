@@ -11,6 +11,7 @@
 - Take into account parameters specified at the path level in [#247](https://github.com/TNO-S3/WuppieFuzz/pull/247)
 - Fix status code categorization in response validation in [#254](https://github.com/TNO-S3/WuppieFuzz/pull/254)
 - Fix double URL-encoding bug [#256](https://github.com/TNO-S3/WuppieFuzz/pull/256)
+- Use more common examples when generating corpus [#257](https://github.com/TNO-S3/WuppieFuzz/pull/257)
 
 # v1.4.1 (2026-01-22)
 
