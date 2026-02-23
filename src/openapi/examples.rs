@@ -867,8 +867,8 @@ fn example_from_type(
             // we still get an Option and a possibly broken reference and what not.
             // Extract any usable specification of an item, and make an example.
             interesting_params_from_type(api, schema, recursion_depth + 1)
-                .first()
-                .cloned()
+                .into_iter()
+                .next()
         }
         SchemaType::Boolean => Some(Value::Bool(true)),
         SchemaType::Null => Some(Value::Null),
