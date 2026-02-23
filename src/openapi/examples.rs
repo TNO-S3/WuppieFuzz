@@ -784,8 +784,8 @@ fn example_from_type(
             schema.min_length,
             schema.max_length,
         )
-        .first()
-        .cloned(),
+        .into_iter()
+        .next(),
         SchemaType::Number => {
             // Try to interpret all JSON numbers as f64 and then create an example based on the results.
             let (min, max, base) = match (
