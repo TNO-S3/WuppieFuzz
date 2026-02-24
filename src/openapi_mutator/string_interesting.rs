@@ -14,7 +14,20 @@ use libafl_bolts::{Named, rands::Rand};
 
 /// Interesting values to randomly insert into string parameter values.
 /// These are designed to catch parser errors and SQL injections.
-pub const INTERESTING_STR: [&[u8]; 6] = [b"'", b"\"", b"' OR 1=1", b"\" OR 1=1", b"'--", b"\"--"];
+pub const INTERESTING_STR: [&[u8]; 12] = [
+    b"'",
+    b"\"",
+    b"' OR 1=1",
+    b"\" OR 1=1",
+    b"'--",
+    b"\"--",
+    b"' AND 1=1--",                          // content-based inference SQLi
+    b"' AND 1=2--",                          // content-based inference SQLi
+    b"'; WAITFOR DELAY '0:0:59'--", // context-based, time-based inference SQLi for MS SQL Server (timeout)
+    b"' AND IF(1=1, SLEEP(59), 0)--", // context-based, time-based inference SQLi for MySQL (timeout)
+    b"' AND (SELECT 1 FROM pg_sleep(59))--", // context-based, time-based inference SQLi for PostgreSQL (timeout)
+    b"' AND (SELECT 1/0 WHERE 1=1)--", // context-based, error-based inference SQLi (divide by 0)
+];
 
 /// The mutator that inserts strings from INTERESTING_STR into values.
 pub struct StringInterestingMutator;
