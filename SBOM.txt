@@ -25,16 +25,13 @@ anstyle-query 1.1.5
 anstyle-wincon 3.0.11
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-anyhow 1.0.101
-	licensed under "Apache-2.0 OR MIT"
-	by David Tolnay <dtolnay@gmail.com>
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
 aws-lc-rs 1.15.4
 	licensed under "(Apache-2.0 OR ISC) AND ISC"
 	by AWS-LibCrypto
-aws-lc-sys 0.37.0
+aws-lc-sys 0.37.1
 	licensed under "(Apache-2.0 OR ISC) AND ISC AND OpenSSL"
 	by AWS-LC
 backtrace 0.3.76
@@ -43,7 +40,7 @@ backtrace 0.3.76
 base64 0.22.1
 	licensed under "Apache-2.0 OR MIT"
 	by Marshall Pierce <marshall@mpierce.org>
-bitflags 2.10.0
+bitflags 2.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 block2 0.6.2
@@ -73,13 +70,13 @@ cfg-if 1.0.4
 chrono 0.4.43
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.5.57
+clap 4.5.58
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.5.57
+clap_builder 4.5.58
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_lex 0.7.7
+clap_lex 1.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 cobs 0.3.0
@@ -121,10 +118,10 @@ ctor 0.6.3
 ctor-proc-macro 0.0.7
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
-ctrlc 3.5.1
+ctrlc 3.5.2
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
-deranged 0.5.5
+deranged 0.5.8
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
 derive_more 2.1.1
@@ -160,7 +157,7 @@ encode_unicode 1.0.0
 encoding_rs 0.8.35
 	licensed under "(Apache-2.0 OR MIT) AND BSD-3-Clause"
 	by Henri Sivonen <hsivonen@hsivonen.fi>
-env_filter 0.1.4
+env_filter 1.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 equivalent 1.0.2
@@ -208,25 +205,28 @@ fs2 0.4.3
 futures-channel 0.3.31
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-core 0.3.31
+futures-core 0.3.32
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-io 0.3.31
+futures-io 0.3.32
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-sink 0.3.31
+futures-sink 0.3.32
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-task 0.3.31
+futures-task 0.3.32
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-util 0.3.31
+futures-util 0.3.32
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 getrandom 0.2.17
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
 getrandom 0.3.4
+	licensed under "Apache-2.0 OR MIT"
+	by The Rand Project Developers
+getrandom 0.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
 gimli 0.32.3
@@ -295,6 +295,9 @@ icu_properties_data 2.1.2
 icu_provider 2.1.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
+id-arena 2.3.0
+	licensed under "Apache-2.0 OR MIT"
+	by Nick Fitzgerald <fitzgen@gmail.com>|Aleksey Kladov <aleksey.kladov@gmail.com>
 idna 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
@@ -304,7 +307,7 @@ idna_adapter 1.2.1
 indexmap 2.13.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-indicatif 0.18.3
+indicatif 0.18.4
 	licensed under "MIT"
 	by unspecified authors
 ipnet 2.11.0
@@ -349,6 +352,9 @@ lazy_static 1.5.0
 lcov 0.8.1
 	licensed under "Apache-2.0 OR MIT"
 	by gifnksm <makoto.nksm+github@gmail.com>
+leb128fmt 0.1.0
+	licensed under "Apache-2.0 OR MIT"
+	by Bryant Luk <code@bryantluk.com>
 libafl 0.15.4
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
@@ -398,6 +404,9 @@ mio 1.1.1
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>|Tokio Contributors <team@tokio.rs>
 nix 0.30.1
+	licensed under "MIT"
+	by The nix-rust Project Developers
+nix 0.31.1
 	licensed under "MIT"
 	by The nix-rust Project Developers
 num-bigint 0.4.6
@@ -601,7 +610,7 @@ sdd 3.0.10
 security-framework 3.5.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>
-security-framework-sys 2.15.0
+security-framework-sys 2.17.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>
 semver 1.0.27
@@ -658,7 +667,7 @@ system-configuration 0.7.0
 system-configuration-sys 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
-tempfile 3.24.0
+tempfile 3.25.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
 thiserror-impl 1.0.69
@@ -766,7 +775,7 @@ utf8_iter 1.0.4
 utf8parse 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Joe Wilm <joe@jwilm.com>|Christian Duerr <contact@christianduerr.com>
-uuid 1.20.0
+uuid 1.21.0
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
 value-bag 1.12.0
@@ -787,6 +796,9 @@ wasi 0.11.1+wasi-snapshot-preview1
 wasip2 1.0.2+wasi-0.2.9
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by unspecified authors
+wasip3 0.4.0+wasi-0.3.0-rc-2026-01-06
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by unspecified authors
 wasm-bindgen 0.2.108
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
@@ -799,6 +811,15 @@ wasm-bindgen-macro 0.2.108
 wasm-bindgen-shared 0.2.108
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
+wasm-encoder 0.244.0
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by Nick Fitzgerald <fitzgen@gmail.com>
+wasm-metadata 0.244.0
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by unspecified authors
+wasmparser 0.244.0
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by Yury Delendik <ydelendik@mozilla.com>
 web-sys 0.3.85
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
@@ -955,6 +976,15 @@ windows_x86_64_msvc 0.53.1
 wit-bindgen 0.51.0
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
+wit-bindgen-rust-macro 0.51.0
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by Alex Crichton <alex@alexcrichton.com>
+wit-component 0.244.0
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by Peter Huene <peter@huene.dev>
+wit-parser 0.244.0
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by Alex Crichton <alex@alexcrichton.com>
 writeable 0.6.2
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
@@ -967,10 +997,10 @@ yoke 0.8.1
 yoke-derive 0.8.1
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-z3 0.19.7
+z3 0.19.8
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-z3-sys 0.10.4
+z3-sys 0.10.6
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
 zerocopy 0.8.39
