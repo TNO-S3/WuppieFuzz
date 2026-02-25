@@ -31,7 +31,9 @@ pub fn build_request_from_input(
     let mut cookie_params = Vec::new();
     for ((name, kind), value) in input.parameters.iter() {
         match kind {
-            ParameterKind::Query => query_params.push((name, value.to_url_encoding())),
+            ParameterKind::Query => {
+                query_params.push((name, value.to_url_string()));
+            }
             ParameterKind::Header => {
                 if let Ok(header_name) = HeaderName::from_bytes(name.to_string().as_bytes()) {
                     header_params.insert(header_name, value.to_header_value());
@@ -40,10 +42,7 @@ pub fn build_request_from_input(
             ParameterKind::Path => {
                 let search_term = format!("{{{name}}}");
                 if let Some(offset) = path.find(&search_term) {
-                    path.replace_range(
-                        offset..(offset + search_term.len()),
-                        &value.to_url_encoding(),
-                    )
+                    path.replace_range(offset..(offset + search_term.len()), &value.to_url_string())
                 }
             }
             ParameterKind::Cookie => {

@@ -211,13 +211,11 @@ impl ParameterContents {
     }
 
     /// Returns the parameter value for use in a URL.
-    pub fn to_url_encoding(&self) -> Cow<'_, str> {
+    pub fn to_url_string(&self) -> Cow<'_, str> {
         match self {
             ParameterContents::Bytes(bytes) => urlencoding::encode_binary(bytes),
-            ParameterContents::LeafValue(SimpleValue::String(string)) => {
-                urlencoding::encode(string)
-            }
-            _ => urlencoding::encode(&self.to_string()).into_owned().into(),
+            ParameterContents::LeafValue(SimpleValue::String(string)) => string.into(),
+            _ => self.to_string().into(),
         }
     }
 
