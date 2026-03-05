@@ -42,7 +42,10 @@ pub fn build_request_from_input(
             ParameterKind::Path => {
                 let search_term = format!("{{{name}}}");
                 if let Some(offset) = path.find(&search_term) {
-                    path.replace_range(offset..(offset + search_term.len()), &value.to_url_string())
+                    path.replace_range(
+                        offset..(offset + search_term.len()),
+                        &urlencoding::encode(&value.to_url_string()),
+                    );
                 }
             }
             ParameterKind::Cookie => {
