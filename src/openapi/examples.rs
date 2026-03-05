@@ -10,7 +10,7 @@ use std::{
 
 use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, SchemaType};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
-use rand::{Rng, prelude::Distribution};
+use rand::{RngExt, prelude::Distribution};
 use regex::Regex;
 use serde_json::{Number, Value, json};
 use unicode_truncate::UnicodeTruncateStr;
@@ -231,8 +231,8 @@ fn all_interesting_parameters(
                 interesting_combinations.extend(
                     parameter
                         .examples
-                        .iter()
-                        .filter_map(|(_, ref_or)| ref_or.resolve(api).ok())
+                        .values()
+                        .filter_map(|ref_or| ref_or.resolve(api).ok())
                         .filter_map(|ex| ex.value),
                 );
                 if let Ok(value) = example_parameter_value(api, &parameter) {
@@ -285,8 +285,8 @@ fn example_from_media_type(
         .and_then(|examples| {
             examples
                 .resolve_all(api)
-                .into_iter()
-                .filter_map(|(_, val)| val.value)
+                .into_values()
+                .filter_map(|val| val.value)
                 .next()
         })
         .or_else(|| {
@@ -303,8 +303,8 @@ fn interesting_params_from_media_type(api: &Spec, contents: &MediaType) -> Vec<V
         result.extend(
             examples
                 .resolve_all(api)
-                .into_iter()
-                .filter_map(|(_, ex)| ex.value),
+                .into_values()
+                .filter_map(|ex| ex.value),
         );
     };
     if let Some(more_examples) = contents
@@ -784,7 +784,8 @@ fn example_from_type(
             schema.min_length,
             schema.max_length,
         )
-        .pop(),
+        .into_iter()
+        .next(),
         SchemaType::Number => {
             // Try to interpret all JSON numbers as f64 and then create an example based on the results.
             let (min, max, base) = match (
@@ -866,8 +867,8 @@ fn example_from_type(
             // we still get an Option and a possibly broken reference and what not.
             // Extract any usable specification of an item, and make an example.
             interesting_params_from_type(api, schema, recursion_depth + 1)
-                .first()
-                .cloned()
+                .into_iter()
+                .next()
         }
         SchemaType::Boolean => Some(Value::Bool(true)),
         SchemaType::Null => Some(Value::Null),
