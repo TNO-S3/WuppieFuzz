@@ -251,11 +251,10 @@ impl LcovCoverageClient {
                     line,
                     count,
                     checksum: _,
-                } => {
-                    if count != 0 {
+                }
+                    if count != 0 => {
                         self.set_cov_bit(&source_path, line, 1);
                     }
-                }
                 _ => (),
             }
         }

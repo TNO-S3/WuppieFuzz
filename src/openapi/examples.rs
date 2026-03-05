@@ -230,9 +230,7 @@ fn all_interesting_parameters(
                 };
                 interesting_combinations.extend(
                     parameter
-                        .examples
-                        .iter()
-                        .filter_map(|(_, ref_or)| ref_or.resolve(api).ok())
+                        .examples.values().filter_map(|ref_or| ref_or.resolve(api).ok())
                         .filter_map(|ex| ex.value),
                 );
                 if let Ok(value) = example_parameter_value(api, &parameter) {
@@ -284,9 +282,7 @@ fn example_from_media_type(
         .as_ref()
         .and_then(|examples| {
             examples
-                .resolve_all(api)
-                .into_iter()
-                .filter_map(|(_, val)| val.value)
+                .resolve_all(api).into_values().filter_map(|val| val.value)
                 .next()
         })
         .or_else(|| {
@@ -302,9 +298,7 @@ fn interesting_params_from_media_type(api: &Spec, contents: &MediaType) -> Vec<V
     if let Some(examples) = &contents.examples {
         result.extend(
             examples
-                .resolve_all(api)
-                .into_iter()
-                .filter_map(|(_, ex)| ex.value),
+                .resolve_all(api).into_values().filter_map(|ex| ex.value),
         );
     };
     if let Some(more_examples) = contents
