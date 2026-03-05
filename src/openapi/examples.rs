@@ -10,7 +10,7 @@ use std::{
 
 use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, SchemaType};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
-use rand::{Rng, prelude::Distribution};
+use rand::{RngExt, prelude::Distribution};
 use regex::Regex;
 use serde_json::{Number, Value, json};
 use unicode_truncate::UnicodeTruncateStr;
