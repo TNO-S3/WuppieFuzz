@@ -10,7 +10,7 @@
 - Reorder string examples so empty strings occur less often in [#252](https://github.com/TNO-S3/WuppieFuzz/pull/252)
 - Take into account parameters specified at the path level in [#247](https://github.com/TNO-S3/WuppieFuzz/pull/247)
 - Fix status code categorization in response validation in [#254](https://github.com/TNO-S3/WuppieFuzz/pull/254)
-- Fix double URL-encoding bug for query parameters in [#256](https://github.com/TNO-S3/WuppieFuzz/pull/256)
+- Fix double URL-encoding bug for query parameters in [#256](https://github.com/TNO-S3/WuppieFuzz/pull/256) and [#261](https://github.com/TNO-S3/WuppieFuzz/pull/261)
 - Use more common examples when generating corpus in [#257](https://github.com/TNO-S3/WuppieFuzz/pull/257)
 - Extend interesting strings with more complicated SQLi in [#259](https://github.com/TNO-S3/WuppieFuzz/pull/259)
 
