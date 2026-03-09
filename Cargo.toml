@@ -93,8 +93,8 @@ oas3 = { version = "0.20.1", features = ["yaml-spec"] }
 
 # Config for 'dist'
 [workspace.metadata.dist]
-# "upload" runs the full build and makes artifacts available in the PR summary
-pr-run-mode = "upload"
+# Which actions to run on pull requests
+pr-run-mode = "plan"
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.31.0"
 # CI backends to support
