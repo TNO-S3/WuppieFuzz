@@ -6,6 +6,14 @@
 
 ## Fixes
 
+# v1.4.2 (2026-03-09)
+
+## Highlights
+
+## Features
+
+## Fixes
+
 - Implement recursion limit to deal with recursive/cyclic component definitions in [#243](https://github.com/TNO-S3/WuppieFuzz/pull/243)
 - Reorder string examples so empty strings occur less often in [#252](https://github.com/TNO-S3/WuppieFuzz/pull/252)
 - Take into account parameters specified at the path level in [#247](https://github.com/TNO-S3/WuppieFuzz/pull/247)
