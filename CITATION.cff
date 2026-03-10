@@ -1,0 +1,79 @@
+cff-version: 1.2.0
+version: "v1.4.2"
+date-released: "2026-03-09"
+type: software
+repository-artifact: "https://github.com/TNO-S3/WuppieFuzz/releases/tag/v1.4.2"
+message: "Please cite this software using the metadata from 'preferred-citation'."
+title: "WuppieFuzz: Coverage-Guided, Stateful REST API Fuzzing"
+keywords:
+  - "Fuzzing"
+  - "REST"
+  - "Test Generation"
+  - "Web API"
+  - "Secure Development"
+license: Apache-2.0
+repository-code: "https://github.com/TNO-S3/WuppieFuzz"
+contact:
+  - name: "Department Cyber Security Technologies, The Netherlands Organisation for Applied Scientific Research (TNO)"
+    alias: "TNO"
+  - affiliation: "The Netherlands Organisation for Applied Scientific Research (TNO)"
+    email: thomas.rooijakkers@tno.nl
+    family-names: Rooijakkers
+    given-names: Thomas
+authors:
+  - family-names: Rooijakkers
+    given-names: Thomas
+    orcid: https://orcid.org/0000-0001-6930-0421
+  - family-names: Weitenberg
+    given-names: Erieke
+    orcid: https://orcid.org/0000-0001-7175-5791
+  - family-names: Nauta
+    given-names: Jelle
+preferred-citation:
+  type: conference-paper
+  title: "WuppieFuzz: Coverage-Guided, Stateful REST API Fuzzing"
+  date-published: "2026-03-06"
+  department: "Cyber Security Technologies"
+  institution:
+    name: "The Netherlands Organisation for Applied Scientific Research (TNO)"
+  contact:
+  - affiliation: "The Netherlands Organisation for Applied Scientific Research (TNO)"
+    email: thomas.rooijakkers@tno.nl
+    family-names: Rooijakkers
+    given-names: Thomas
+  authors:
+    - family-names: Rooijakkers
+      given-names: Thomas
+      orcid: https://orcid.org/0000-0001-6930-0421
+    - family-names: Nijsten
+      given-names: Anne
+      orcid: https://orcid.org/0009-0004-5513-2948
+    - family-names: Daniele
+      given-names: Cristian
+      orcid: https://orcid.org/0000-0001-7435-4176
+    - family-names: Weitenberg
+      given-names: Erieke
+      orcid: https://orcid.org/0000-0001-7175-5791
+    - family-names: Groenewegen
+      given-names: Ringo
+      orcid: https://orcid.org/0009-0005-1837-1808
+    - family-names: Melissen
+      given-names: Arthur
+  abstract: "Many business processes currently depend on web services, often using REST APIs for communication. REST APIs expose web service functionality through endpoints, allowing easy client interaction over the Internet. To reduce the security risk resulting from exposed endpoints, thorough testing is desired. Due to the generally vast number of endpoints, automated testing techniques, like fuzzing, are of interest. This paper introduces WuppieFuzz, an open-source REST API fuzzer built on LibAFL, supporting white-box, grey-box and blac-box fuzzing. Using an OpenAPI specification, it can generate an initial input corpus consisting of sequences of requests. These are mutated with REST-specific and LibAFL-provided mutators to explore different code paths in the software under test. Guided by the measured coverage, WuppieFuzz then selects which request sequences to send next to reach complex states in the software under test. In this process, it automates harness creation to reduce manual efforts often required in fuzzing. Different kinds of reporting are provided by the fuzzer to help fixing bugs. We evaluated our tool on the Petstore API to assess the robustness of the white-box approach and the effectiveness of different power schedules. We further monitored endpoint and code coverage over time to measure the efficacy of the approach."
+  conference:
+    name: "12th International Conference on Information Systems Security and Privacy (ICISSP)"
+    alias: ICISSP
+    date-end: "2026-03-04"
+    date-start: "2026-03-06"
+  collection-title: "Proceedings of the 12th International Conference on Information Systems Security and Privacy - Volume 2: ICISSP"
+  publisher:
+    name: SciTePress
+  pages: "221-231"
+  doi: 10.5220/0000217100004061
+  isbn: "978-989-758-800-6"
+  issn: "2184-4356"
+  year: 2026
+  volume: "2"
+  license: Apache-2.0
+  repository-code: "https://github.com/TNO-S3/WuppieFuzz"
+  year-original: 2024

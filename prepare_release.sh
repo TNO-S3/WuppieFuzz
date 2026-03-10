@@ -7,6 +7,7 @@
 #  - Cargo.toml:   [package] version = "<NEW_VERSION>"
 #  - CHANGELOG.md: reset 'in progress' template and insert '# v<NEW_VERSION> (<DATE>)'
 #  - README.md:    replace '# WuppieFuzz v<OLD_VERSION>' with '# WuppieFuzz v<NEW_VERSION>'
+#  - LICENSE:      ensure '2021-<RELEASE_YEAR>' exists (update if needed)
 #  - Run `cargo generate-lockfile` to refresh Cargo.lock
 #
 # Rules from '# v1.x (in progress)':
@@ -54,11 +55,12 @@ CITATION_FILE="CITATION.cff"
 CARGO_FILE="Cargo.toml"
 CHANGELOG_FILE="CHANGELOG.md"
 README_FILE="README.md"
+LICENSE_FILE="LICENSE"
 
 [ -f "$CITATION_FILE" ]  || { echo "Missing $CITATION_FILE" >&2; exit 1; }
 [ -f "$CARGO_FILE" ]     || { echo "Missing $CARGO_FILE" >&2; exit 1; }
 [ -f "$CHANGELOG_FILE" ] || { echo "Missing $CHANGELOG_FILE" >&2; exit 1; }
-# README.md is optional; will update if present.
+[ -f "$LICENSE_FILE" ]   || { echo "Missing $LICENSE_FILE" >&2; exit 1; }  # required to ensure the year range
 
 # Choose date (default today, strictly YYYY-MM-DD)
 if [ -n "$DATE_OVERRIDE" ]; then
@@ -70,6 +72,7 @@ case "$RELEASE_DATE" in
   ????-??-??) : ;;
   *) echo "RELEASE_DATE must be YYYY-MM-DD" >&2; exit 1 ;;
 esac
+RELEASE_YEAR="$(printf '%s' "$RELEASE_DATE" | cut -d- -f1)"
 
 ts() { date +%Y%m%d%H%M%S; }
 
@@ -224,6 +227,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   else
     echo " - (no README.md present)"
   fi
+  echo " - $LICENSE_FILE"
   echo " - Cargo.lock (via cargo generate-lockfile)"
   echo
   echo "Commands that WOULD run:"
@@ -242,6 +246,7 @@ cp "$CHANGELOG_FILE" "${CHANGELOG_FILE}.bak.$(ts)"
 if [ -f "$README_FILE" ]; then
   cp "$README_FILE" "${README_FILE}.bak.$(ts)"
 fi
+cp "$LICENSE_FILE" "${LICENSE_FILE}.bak.$(ts)"
 
 # --------------------------------------------------------------------
 # Update CITATION.cff: version and date-released
@@ -354,6 +359,27 @@ if [ -f "$README_FILE" ]; then
 fi
 
 # --------------------------------------------------------------------
+# Update LICENSE:
+#   Ensure a '2021-<YYYY>' year range ends with the new release year.
+#   We update any '2021-####' match to '2021-<RELEASE_YEAR>'.
+# --------------------------------------------------------------------
+# Verify pattern exists first (to fail clearly if structure changes)
+if ! grep -Eq '2021-[0-9][0-9][0-9][0-9]' "$LICENSE_FILE"; then
+  echo "LICENSE: expected a '2021-YYYY' year range, but none found" >&2
+  exit 1
+fi
+
+# Perform replacement (all occurrences of 2021-YYYY)
+awk -v y="$RELEASE_YEAR" '
+{ gsub(/2021-[0-9][0-9][0-9][0-9]/, "2021-" y); print }
+' "$LICENSE_FILE" > "${LICENSE_FILE}.tmp"
+mv "${LICENSE_FILE}.tmp" "$LICENSE_FILE"
+
+# Post-verify LICENSE now contains the intended year
+grep -Fq "2021-${RELEASE_YEAR}" "$LICENSE_FILE" \
+  || { echo "LICENSE: did not update to '2021-${RELEASE_YEAR}' as expected" >&2; exit 1; }
+
+# --------------------------------------------------------------------
 # Post-change sanity checks
 # --------------------------------------------------------------------
 grep -q "^version:[[:space:]]*\"v${NEW_VERSION}\"" "$CITATION_FILE" \
@@ -374,6 +400,10 @@ if [ -f "$README_FILE" ]; then
     || { echo "README.md: header not updated to '# WuppieFuzz v${NEW_VERSION}'" >&2; exit 1; }
 fi
 
+# Ensure LICENSE has final year = RELEASE_YEAR
+grep -Fq "2021-${RELEASE_YEAR}" "$LICENSE_FILE" \
+  || { echo "LICENSE: final year is not '${RELEASE_YEAR}'" >&2; exit 1; }
+
 # --------------------------------------------------------------------
 # Generate or refresh Cargo.lock
 # --------------------------------------------------------------------
@@ -388,5 +418,8 @@ if ! cargo generate-lockfile; then
   exit 1
 fi
 
-printf '✅ Release prepared.\n- Bump: %s\n- Version: %s → %s\n- Date: %s\n- Files updated: CITATION.cff, Cargo.toml, CHANGELOG.md%s, Cargo.lock\n' \
-  "$BUMP_KIND" "$CURRENT_VERSION" "$NEW_VERSION" "$RELEASE_DATE" "$( [ -f "$README_FILE" ] && printf ", README.md" || printf "" )"
+printf '✅ Release prepared.\n- Bump: %s\n- Version: %s → %s\n- Date: %s\n- Files updated: CITATION.cff, Cargo.toml, CHANGELOG.md%s, %s, Cargo.lock\n' \
+  "$BUMP_KIND" "$CURRENT_VERSION" "$NEW_VERSION" "$RELEASE_DATE" \
+  "$( [ -f "$README_FILE" ] && printf ", README.md" || printf "" )" \
+  "$LICENSE_FILE"
+``
