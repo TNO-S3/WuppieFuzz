@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # prepare_release.sh
 #
 # Decide next version from CHANGELOG.md or override via --version,
@@ -23,7 +23,12 @@
 #  - Default DATE = today (local) if --date is not provided.
 #  - Requires: awk, grep, cut, date, cargo (unless --dry-run).
 
+# Safe defaults
 set -eu
+# Enable pipefail where supported (bash/ksh/zsh); skip on pure POSIX sh (dash)
+if (set -o 2>/dev/null | grep -q 'pipefail'); then
+  set -o pipefail
+fi
 
 DATE_OVERRIDE=""
 VERSION_OVERRIDE=""
