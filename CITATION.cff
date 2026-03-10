@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it using the metadata below."
+title: "WuppieFuzz: Coverage-Guided, Stateful REST API Fuzzing"
+authors:
+  - family-names: Rooijakkers
+    given-names: Thomas
+  - family-names: Nijsten
+    given-names: Anne
+  - family-names: Daniele
+    given-names: Cristian
+  - family-names: Weitenberg
+    given-names: Erieke
+  - family-names: Groenewegen
+    given-names: Ringo
+  - family-names: Melissen
+    given-names: Arthur
+doi: 10.5220/0000217100004061
+identifiers:
+  - type: doi
+    value: 10.5220/0000217100004061
+date-released: 2026
+preferred-citation:
+  type: conference-paper
+  title: "WuppieFuzz: Coverage-Guided, Stateful REST API Fuzzing"
+  authors:
+    - family-names: Rooijakkers
+      given-names: Thomas
+    - family-names: Nijsten
+      given-names: Anne
+    - family-names: Daniele
+      given-names: Cristian
+    - family-names: Weitenberg
+      given-names: Erieke
+    - family-names: Groenewegen
+      given-names: Ringo
+    - family-names: Melissen
+      given-names: Arthur
+  conference:
+    name: "12th International Conference on Information Systems Security and Privacy (ICISSP)"
+    acronym: ICISSP
+  collection-title: "Proceedings of the 12th International Conference on Information Systems Security and Privacy - Volume 2: ICISSP"
+  publisher:
+    name: SciTePress
+  pages: "221-231"
+  doi: 10.5220/0000217100004061
+  isbn: "978-989-758-800-6"
+  issn: "2184-4356"
+  year: 2026
+  volume: "2"
