@@ -106,6 +106,18 @@ pub fn main() -> Result<()> {
         }
         Commands::Reproduce { crash_file, .. } => reproducer::reproduce(crash_file),
         Commands::Fuzz { .. } => fuzzer::fuzz(),
+        Commands::MinimizeCrashes {
+            crash_dir,
+            output_dir,
+            ..
+        } => {
+            let config = &Configuration::get().map_err(anyhow::Error::msg)?;
+            setup_logging(config);
+            let api = parse_api_spec(config)?;
+            initial_corpus::crash_minimization::minimize_crash_corpus(
+                crash_dir, output_dir, &api, config,
+            )
+        }
     }
 }
 

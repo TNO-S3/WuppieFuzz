@@ -1,5 +1,6 @@
 //! Helper functions for loading a corpus from disk. See module documentation of
 //! the `input` submodule for information on serialization.
+pub mod crash_minimization;
 pub mod dependency_graph;
 
 use std::{

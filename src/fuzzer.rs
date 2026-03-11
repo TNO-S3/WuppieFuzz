@@ -151,6 +151,19 @@ pub fn fuzz() -> Result<()> {
     // Coverage reporting
     executor.generate_coverage_report_if_path(report_path.as_deref());
 
+    // Crash corpus minimization
+    if config.minimize_crashes {
+        let crash_dir = std::path::Path::new("./crashes");
+        let out_dir = std::path::Path::new("./crashes_minimized");
+        if let Err(e) =
+            crate::initial_corpus::crash_minimization::minimize_crash_corpus(
+                crash_dir, out_dir, api, config,
+            )
+        {
+            log::error!("Crash corpus minimization failed: {e}");
+        }
+    }
+
     Ok(())
 }
 

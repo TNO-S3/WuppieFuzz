@@ -69,7 +69,7 @@ impl From<reqwest::blocking::Response> for Response {
 /// ValidationError is returned by `validate_response` if a given response should
 /// not have been given by the API under test.
 #[derive(Debug, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumString, VariantArray, Deserialize))]
+#[strum_discriminants(derive(EnumString, VariantArray, Deserialize, Hash))]
 pub enum ValidationError {
     /// The operation does not exist in the spec, which incidentally means it should
     /// not have been executed by the fuzzer to begin with.

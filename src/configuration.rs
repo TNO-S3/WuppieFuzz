@@ -248,6 +248,55 @@ pub enum Commands {
         /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
         #[arg(value_parser, long)]
         jacoco_class_prefix: Option<String>,
+
+        /// If present, minimize the crash corpus after the fuzzing campaign completes.
+        /// This replays all crashes, groups them by their error signature
+        /// (method + path + status code + error type), and selects the smallest subset
+        /// that covers all observed signatures. Results are written to ./crashes_minimized.
+        #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
+        minimize_crashes: Option<bool>,
+    },
+    /// Minimize a crash corpus by replaying crashes and selecting the smallest subset
+    /// that covers all unique error signatures (method + path + status code + error type).
+    /// Original crash files are preserved; the minimized set is written to the output directory.
+    MinimizeCrashes {
+        /// The path to a configuration file. If present, the configuration file is used
+        /// to configure the fuzzer. Arguments given on the command line take precedence
+        /// over the configuration file.
+        #[arg(long, value_parser, value_name = "CONFIG_FILE.YAML")]
+        config: Option<PathBuf>,
+        /// The OpenAPI specification of the program under test
+        #[arg(long, value_name = "OPENAPI_SPEC.YAML")]
+        openapi_spec: Option<PathBuf>,
+        /// The URL of the server to fuzz. This is usually specified in the OpenAPI specification,
+        /// but you can use this option to override it.
+        #[arg(value_parser=verify_url, long)]
+        target: Option<Url>,
+        /// How to log in to the API server. The value should be the name of a YAML file
+        /// that contains the login configuration. See login.md for information on how
+        /// to build one.
+        #[arg(long, value_parser, value_name = "AUTH.YAML")]
+        authentication: Option<PathBuf>,
+        /// Custom (static) headers that should be added to each request. These header
+        /// parameters will not be mutated, contrary to the usual header parameters
+        /// passed through an API specification.
+        #[arg(long, value_parser, value_name = "STATIC_HEADERS.YAML")]
+        header: Option<PathBuf>,
+        /// Directory containing crash files to minimize. Defaults to ./crashes.
+        #[arg(long, value_parser, value_name = "CRASH_DIR", default_value = "./crashes")]
+        crash_dir: PathBuf,
+        /// Directory to write the minimized crash corpus to. Defaults to ./crashes_minimized.
+        #[arg(long, value_parser, value_name = "OUTPUT_DIR", default_value = "./crashes_minimized")]
+        output_dir: PathBuf,
+        /// Which errors the fuzzer considers a bug during replay.
+        #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
+        crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
+        /// Per-request time-out in milliseconds. Defaults to 30000 milliseconds.
+        #[arg(value_parser, long)]
+        request_timeout: Option<u64>,
+        /// Log level to output. This flag takes precedence over the environment variable. [possible values: off, error, warn, debug, info, trace]
+        #[arg(value_parser = clap::value_parser!(log::LevelFilter), long, value_enum, env = "LOG_LEVEL", ignore_case = true)]
+        log_level: Option<log::LevelFilter>,
     },
 }
 
@@ -256,7 +305,8 @@ impl Commands {
         match self {
             Commands::VerifyAuth { config, .. }
             | Commands::Reproduce { config, .. }
-            | Commands::Fuzz { config, .. } => config.as_ref(),
+            | Commands::Fuzz { config, .. }
+            | Commands::MinimizeCrashes { config, .. } => config.as_ref(),
             _ => None,
         }
     }
@@ -312,6 +362,7 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                minimize_crashes,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -332,6 +383,7 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                minimize_crashes,
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,
@@ -340,6 +392,25 @@ impl Commands {
                 log_level,
             } => Ok(PartialConfiguration {
                 openapi_spec: Some(openapi_spec),
+                log_level,
+                ..Default::default()
+            }),
+            Commands::MinimizeCrashes {
+                openapi_spec,
+                target,
+                authentication,
+                header,
+                crash_criteria,
+                request_timeout,
+                log_level,
+                ..
+            } => Ok(PartialConfiguration {
+                openapi_spec,
+                target,
+                authentication,
+                header,
+                crash_criteria,
+                request_timeout,
                 log_level,
                 ..Default::default()
             }),
@@ -455,6 +526,10 @@ struct PartialConfiguration {
     /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
     #[clap(value_parser, long)]
     pub jacoco_class_prefix: Option<String>,
+
+    /// If present, minimize the crash corpus after a fuzzing campaign.
+    #[clap(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
+    pub minimize_crashes: Option<bool>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -550,6 +625,9 @@ pub struct Configuration {
 
     /// Log level to output. This flag takes precedence over the environment variable.
     pub log_level: log::LevelFilter,
+
+    /// If true, minimize the crash corpus after the fuzzing campaign completes.
+    pub minimize_crashes: bool,
 }
 
 /// CoverageConfiguration holds all the coverage-agent-specific configuration.
@@ -653,6 +731,7 @@ impl TryFrom<PartialConfiguration> for Configuration {
             authentication: value.authentication,
             header: value.header,
             log_level: value.log_level.unwrap_or(DEFAULT_LOG_LEVEL),
+            minimize_crashes: value.minimize_crashes.unwrap_or(false),
         })
     }
 }
@@ -707,6 +786,7 @@ impl PartialConfiguration {
             jacoco_class_prefix: other
                 .jacoco_class_prefix
                 .or_else(|| self.jacoco_class_prefix.take()),
+            minimize_crashes: other.minimize_crashes.or(self.minimize_crashes.take()),
         };
     }
 }
