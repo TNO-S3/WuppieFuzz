@@ -79,16 +79,11 @@ fn replay_crash(
             break;
         }
 
-        let request_builder = match build_request_from_input(
-            client,
-            authentication,
-            cookie_store,
-            api,
-            &request,
-        ) {
-            Err(_) => continue,
-            Ok(r) => r.timeout(Duration::from_millis(config.request_timeout)),
-        };
+        let request_builder =
+            match build_request_from_input(client, authentication, cookie_store, api, &request) {
+                Err(_) => continue,
+                Ok(r) => r.timeout(Duration::from_millis(config.request_timeout)),
+            };
 
         let request_built = match request_builder.build() {
             Ok(r) => r,
@@ -163,7 +158,14 @@ pub fn minimize_crash_corpus(
 
     let mut entries: Vec<CrashEntry> = Vec::new();
     for (path, input) in crash_files.iter() {
-        let signature = replay_crash(input, api, config, &client, &mut authentication, &cookie_store);
+        let signature = replay_crash(
+            input,
+            api,
+            config,
+            &client,
+            &mut authentication,
+            &cookie_store,
+        );
         if signature.is_empty() {
             log::debug!("Crash file {path:?} did not reproduce, skipping");
             continue;

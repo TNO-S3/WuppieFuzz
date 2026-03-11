@@ -283,10 +283,20 @@ pub enum Commands {
         #[arg(long, value_parser, value_name = "STATIC_HEADERS.YAML")]
         header: Option<PathBuf>,
         /// Directory containing crash files to minimize. Defaults to ./crashes.
-        #[arg(long, value_parser, value_name = "CRASH_DIR", default_value = "./crashes")]
+        #[arg(
+            long,
+            value_parser,
+            value_name = "CRASH_DIR",
+            default_value = "./crashes"
+        )]
         crash_dir: PathBuf,
         /// Directory to write the minimized crash corpus to. Defaults to ./crashes_minimized.
-        #[arg(long, value_parser, value_name = "OUTPUT_DIR", default_value = "./crashes_minimized")]
+        #[arg(
+            long,
+            value_parser,
+            value_name = "OUTPUT_DIR",
+            default_value = "./crashes_minimized"
+        )]
         output_dir: PathBuf,
         /// Which errors the fuzzer considers a bug during replay.
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
