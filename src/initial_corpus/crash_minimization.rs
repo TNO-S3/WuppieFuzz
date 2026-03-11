@@ -5,8 +5,8 @@
 //! of crashes that still covers all unique crash signatures.
 //!
 //! A crash signature is a tuple of (HTTP method, path, status code, validation error type).
-//! The minimizer uses a greedy set cover algorithm, preferring crashes with fewer requests
-//! and smaller request payloads (i.e. simpler reproducers).
+//! The minimizer uses a greedy set cover algorithm, preferring crashes that are simpler
+//! to reproduce and understand: fewer requests, fewer parameters, and fewer back-references.
 
 use std::{
     collections::HashSet,
@@ -23,7 +23,7 @@ use crate::{
     authentication::build_http_client,
     configuration::Configuration,
     executor::process_response,
-    input::{Method, OpenApiInput},
+    input::{Body, Method, OpenApiInput, OpenApiRequest, parameter::ParameterContents},
     openapi::{
         build_request::build_request_from_input,
         spec::Spec,
@@ -43,22 +43,86 @@ struct CrashSignatureEntry {
 
 /// Computes a score for a crash input. Lower score means a simpler reproducer.
 ///
-/// This uses the average request size within the sequence multiplied by the number
-/// of requests, as suggested in <https://github.com/TNO-S3/WuppieFuzz/issues/156>.
+/// The score is a composite of dimensions relevant to REST API crash reproducibility:
+/// - **effective_length**: only requests up to and including the crashing one matter.
+///   A crash at request 0 is simpler than one at request 4.
+/// - **parameter_count**: more parameters = harder to isolate the triggering value.
+/// - **back_reference_count**: references to earlier responses add inter-request
+///   dependencies, making manual reproduction harder.
+/// - **avg_body_complexity**: average serialized body size across effective requests,
+///   a proxy for payload complexity and nesting depth.
+///
 /// This avoids relying on byte-level fuzzing metrics (like `LenTimeMulTestcasePenalty`)
 /// which are not meaningful for REST API request sequences.
-fn crash_score(input: &OpenApiInput) -> f64 {
-    let num_requests = input.0.len().max(1) as f64;
-    let total_size: usize = input
-        .0
+/// See <https://github.com/TNO-S3/WuppieFuzz/issues/156>.
+fn crash_score(effective_requests: &[OpenApiRequest]) -> f64 {
+    let effective_length = effective_requests.len().max(1) as f64;
+
+    let total_params: usize = effective_requests
         .iter()
-        .map(|req| serde_yaml::to_string(req).map(|s| s.len()).unwrap_or(0))
+        .map(|req| req.parameters.len())
         .sum();
-    let avg_size = total_size as f64 / num_requests;
-    num_requests * avg_size
+
+    let back_refs: usize = effective_requests
+        .iter()
+        .map(count_references)
+        .sum();
+
+    let total_body_size: usize = effective_requests
+        .iter()
+        .map(|req| body_serialized_size(&req.body))
+        .sum();
+    let avg_body = total_body_size as f64 / effective_length;
+
+    // Multiplicative composite: each dimension independently penalizes complexity.
+    // +1 offsets prevent zeroing out the score when a dimension is 0.
+    effective_length * (1.0 + total_params as f64) * (1.0 + back_refs as f64) * (1.0 + avg_body)
 }
 
-/// Replays a crash input against the API and returns the set of crash signatures it triggers.
+/// Counts the number of back-references (OReference / IReference) in a request's
+/// parameters and body.
+fn count_references(request: &OpenApiRequest) -> usize {
+    let param_refs = request
+        .parameters
+        .values()
+        .filter(|p| p.is_reference())
+        .count();
+    let body_refs = match &request.body {
+        Body::Empty => 0,
+        Body::TextPlain(p) | Body::ApplicationJson(p) | Body::XWwwFormUrlencoded(p) => {
+            count_refs_in_contents(p)
+        }
+    };
+    param_refs + body_refs
+}
+
+/// Recursively counts references inside a `ParameterContents` tree.
+fn count_refs_in_contents(contents: &ParameterContents) -> usize {
+    match contents {
+        ParameterContents::OReference(_) | ParameterContents::IReference(_) => 1,
+        ParameterContents::Object(map) => map.values().map(count_refs_in_contents).sum(),
+        ParameterContents::Array(arr) => arr.iter().map(count_refs_in_contents).sum(),
+        ParameterContents::LeafValue(_) | ParameterContents::Bytes(_) => 0,
+    }
+}
+
+/// Returns the serialized size of a request body (0 for empty bodies).
+fn body_serialized_size(body: &Body) -> usize {
+    match body {
+        Body::Empty => 0,
+        _ => serde_yaml::to_string(body).map(|s| s.len()).unwrap_or(0),
+    }
+}
+
+/// Result from replaying a crash: the set of crash signatures and the effective
+/// length (index of crashing request + 1).
+struct ReplayResult {
+    signatures: HashSet<CrashSignatureEntry>,
+    effective_length: usize,
+}
+
+/// Replays a crash input against the API and returns the set of crash signatures it triggers,
+/// along with the effective length (number of requests up to and including the crash).
 fn replay_crash(
     input: &OpenApiInput,
     api: &Spec,
@@ -66,9 +130,10 @@ fn replay_crash(
     client: &reqwest::blocking::Client,
     authentication: &mut crate::authentication::Authentication,
     cookie_store: &std::sync::Arc<reqwest_cookie_store::CookieStoreMutex>,
-) -> HashSet<CrashSignatureEntry> {
+) -> ReplayResult {
     let mut signatures = HashSet::new();
     let mut parameter_feedback = ParameterFeedback::new(input.0.len());
+    let mut effective_length = input.0.len();
 
     for (request_index, request) in input.0.iter().enumerate() {
         let mut request = request.clone();
@@ -76,6 +141,7 @@ fn replay_crash(
             .resolve_parameter_references(&parameter_feedback)
             .is_err()
         {
+            effective_length = request_index;
             break;
         }
 
@@ -87,7 +153,10 @@ fn replay_crash(
 
         let request_built = match request_builder.build() {
             Ok(r) => r,
-            Err(_) => break,
+            Err(_) => {
+                effective_length = request_index;
+                break;
+            }
         };
 
         match client.execute(request_built) {
@@ -112,14 +181,21 @@ fn replay_crash(
                         status,
                         error: validation_error.map(|e| e.discriminant()),
                     });
+                    effective_length = request_index + 1;
                     break;
                 }
             }
-            Err(_) => break,
+            Err(_) => {
+                effective_length = request_index;
+                break;
+            }
         }
     }
 
-    signatures
+    ReplayResult {
+        signatures,
+        effective_length,
+    }
 }
 
 /// A crash file with its parsed input, replay signature, and score.
@@ -127,6 +203,7 @@ struct CrashEntry {
     path: PathBuf,
     input: OpenApiInput,
     signature: HashSet<CrashSignatureEntry>,
+    /// Lower score = simpler reproducer, preferred during selection.
     score: f64,
 }
 
@@ -158,7 +235,7 @@ pub fn minimize_crash_corpus(
 
     let mut entries: Vec<CrashEntry> = Vec::new();
     for (path, input) in crash_files.iter() {
-        let signature = replay_crash(
+        let replay = replay_crash(
             input,
             api,
             config,
@@ -166,15 +243,17 @@ pub fn minimize_crash_corpus(
             &mut authentication,
             &cookie_store,
         );
-        if signature.is_empty() {
+        if replay.signatures.is_empty() {
             log::debug!("Crash file {path:?} did not reproduce, skipping");
             continue;
         }
-        let score = crash_score(input);
+        // Score only the effective prefix (requests up to and including the crash)
+        let effective_requests = &input.0[..replay.effective_length.min(input.0.len())];
+        let score = crash_score(effective_requests);
         entries.push(CrashEntry {
             path: path.clone(),
             input: input.clone(),
-            signature,
+            signature: replay.signatures,
             score,
         });
     }
@@ -288,7 +367,13 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
-    use crate::input::{Body, OpenApiRequest};
+    use crate::{
+        input::{
+            Body, OpenApiRequest,
+            parameter::{OReference, ParameterContents, ParameterKind},
+        },
+        parameter_access::{ParameterAccess, ParameterAccessElements},
+    };
 
     fn dummy_request() -> OpenApiRequest {
         OpenApiRequest {
@@ -299,17 +384,82 @@ mod tests {
         }
     }
 
+    fn request_with_params(n: usize) -> OpenApiRequest {
+        let mut params = BTreeMap::new();
+        for i in 0..n {
+            params.insert(
+                (format!("param{i}"), ParameterKind::Query),
+                ParameterContents::LeafValue(crate::input::parameter::SimpleValue::String(
+                    "val".to_string(),
+                )),
+            );
+        }
+        OpenApiRequest {
+            method: Method::Post,
+            path: "/test".to_string(),
+            body: Body::Empty,
+            parameters: params,
+        }
+    }
+
+    fn request_with_reference() -> OpenApiRequest {
+        let mut params = BTreeMap::new();
+        params.insert(
+            ("ref_param".to_string(), ParameterKind::Query),
+            ParameterContents::OReference(OReference {
+                request_index: 0,
+                parameter_access: ParameterAccess::response_body(ParameterAccessElements(vec![])),
+            }),
+        );
+        OpenApiRequest {
+            method: Method::Get,
+            path: "/test/{id}".to_string(),
+            body: Body::Empty,
+            parameters: params,
+        }
+    }
+
     #[test]
     fn test_crash_score_prefers_shorter_sequences() {
-        let short = OpenApiInput(vec![dummy_request()]);
-        let long = OpenApiInput(vec![dummy_request(), dummy_request()]);
+        let short = [dummy_request()];
+        let long = [dummy_request(), dummy_request()];
         assert!(crash_score(&short) <= crash_score(&long));
     }
 
     #[test]
     fn test_empty_input_score() {
-        let empty = OpenApiInput(vec![]);
+        let empty: [OpenApiRequest; 0] = [];
         let score = crash_score(&empty);
         assert!(score.is_finite());
+    }
+
+    #[test]
+    fn test_score_penalizes_more_parameters() {
+        let few = [request_with_params(1)];
+        let many = [request_with_params(10)];
+        assert!(
+            crash_score(&few) < crash_score(&many),
+            "More parameters should produce a higher (worse) score"
+        );
+    }
+
+    #[test]
+    fn test_score_penalizes_back_references() {
+        let no_refs = [dummy_request(), dummy_request()];
+        let with_refs = [dummy_request(), request_with_reference()];
+        assert!(
+            crash_score(&no_refs) < crash_score(&with_refs),
+            "Back-references should produce a higher (worse) score"
+        );
+    }
+
+    #[test]
+    fn test_count_references_empty() {
+        assert_eq!(count_references(&dummy_request()), 0);
+    }
+
+    #[test]
+    fn test_count_references_with_ref() {
+        assert_eq!(count_references(&request_with_reference()), 1);
     }
 }
