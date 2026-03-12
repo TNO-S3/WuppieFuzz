@@ -63,10 +63,7 @@ fn crash_score(effective_requests: &[OpenApiRequest]) -> f64 {
         .map(|req| req.parameters.len())
         .sum();
 
-    let back_refs: usize = effective_requests
-        .iter()
-        .map(count_references)
-        .sum();
+    let back_refs: usize = effective_requests.iter().map(count_references).sum();
 
     let total_body_size: usize = effective_requests
         .iter()
