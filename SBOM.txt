@@ -655,7 +655,7 @@ slab 0.4.12
 smallvec 1.15.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
-socket2 0.6.2
+socket2 0.6.3
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>
 sqlite-wasm-rs 0.5.2
@@ -790,7 +790,7 @@ utf8_iter 1.0.4
 utf8parse 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Joe Wilm <joe@jwilm.com>|Christian Duerr <contact@christianduerr.com>
-uuid 1.21.0
+uuid 1.22.0
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
 value-bag 1.12.0
@@ -901,9 +901,6 @@ windows-sys 0.45.0
 windows-sys 0.52.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-sys 0.60.2
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows-sys 0.61.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -913,9 +910,6 @@ windows-targets 0.42.2
 windows-targets 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-targets 0.53.5
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 windows-threading 0.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -925,69 +919,45 @@ windows_aarch64_gnullvm 0.42.2
 windows_aarch64_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_aarch64_gnullvm 0.53.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 windows_aarch64_msvc 0.42.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_aarch64_msvc 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_aarch64_msvc 0.53.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 windows_i686_gnu 0.42.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_i686_gnu 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_i686_gnu 0.53.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 windows_i686_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_i686_gnullvm 0.53.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 windows_i686_msvc 0.42.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_i686_msvc 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_i686_msvc 0.53.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 windows_x86_64_gnu 0.42.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_x86_64_gnu 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_x86_64_gnu 0.53.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 windows_x86_64_gnullvm 0.42.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_x86_64_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_x86_64_gnullvm 0.53.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 windows_x86_64_msvc 0.42.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows_x86_64_msvc 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_x86_64_msvc 0.53.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 wit-bindgen 0.51.0
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
@@ -1018,10 +988,10 @@ z3 0.19.13
 z3-sys 0.10.8
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.40
+zerocopy 0.8.42
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
-zerocopy-derive 0.8.40
+zerocopy-derive 0.8.42
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
 zerofrom 0.1.6
