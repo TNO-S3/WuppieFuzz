@@ -6,6 +6,14 @@
 
 ## Fixes
 
+# v1.4.3 (2026-03-16)
+
+## Highlights
+
+## Features
+
+## Fixes
+
 - Implement support for unvendored/unbundled installation in [#270](https://github.com/TNO-S3/WuppieFuzz/pull/270)
 
 # v1.4.2 (2026-03-09)
