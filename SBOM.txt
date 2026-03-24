@@ -604,7 +604,7 @@ rustls-platform-verifier 0.6.2
 rustls-platform-verifier-android 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-webpki 0.103.9
+rustls-webpki 0.103.10
 	licensed under "ISC"
 	by unspecified authors
 ryu 1.0.23
