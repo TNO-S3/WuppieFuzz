@@ -13,13 +13,7 @@ aho-corasick 1.1.4
 android_system_properties 0.1.5
 	licensed under "Apache-2.0 OR MIT"
 	by Nicolas Silva <nical@fastmail.com>
-anstream 0.6.21
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 anstream 1.0.0
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
-anstyle-parse 0.2.7
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 anstyle-parse 1.0.0
@@ -34,11 +28,11 @@ anstyle-wincon 3.0.11
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
-aws-lc-rs 1.16.1
+aws-lc-rs 1.16.2
 	licensed under "(Apache-2.0 OR ISC) AND ISC"
 	by AWS-LibCrypto
-aws-lc-sys 0.38.0
-	licensed under "(Apache-2.0 OR ISC) AND ISC AND OpenSSL"
+aws-lc-sys 0.39.0
+	licensed under "(Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) AND (Apache-2.0 OR ISC) AND Apache-2.0 AND BSD-3-Clause AND ISC AND MIT"
 	by AWS-LC
 backtrace 0.3.76
 	licensed under "Apache-2.0 OR MIT"
@@ -169,7 +163,7 @@ encode_unicode 1.0.0
 encoding_rs 0.8.35
 	licensed under "(Apache-2.0 OR MIT) AND BSD-3-Clause"
 	by Henri Sivonen <hsivonen@hsivonen.fi>
-env_filter 1.0.0
+env_filter 1.0.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 equivalent 1.0.2
@@ -325,7 +319,7 @@ indicatif 0.18.4
 ipnet 2.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by Kris Price <kris@krisprice.nz>
-iri-string 0.7.10
+iri-string 0.7.11
 	licensed under "Apache-2.0 OR MIT"
 	by YOSHIOKA Takuma <nop_thread@nops.red>
 is_terminal_polyfill 1.70.2
@@ -334,7 +328,7 @@ is_terminal_polyfill 1.70.2
 iter-read 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Georg Brandl <georg@python.org>
-itoa 1.0.17
+itoa 1.0.18
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 jiff 0.2.23
@@ -346,9 +340,15 @@ jiff-static 0.2.23
 jni 0.21.1
 	licensed under "Apache-2.0 OR MIT"
 	by Josh Chase <josh@prevoty.com>
-jni-sys 0.3.0
+jni-sys 0.3.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>
+jni-sys 0.4.1
+	licensed under "Apache-2.0 OR MIT"
+	by Steven Fackler <sfackler@gmail.com>|Robert Bragg <robert@sixbynine.org>
+jni-sys-macros 0.4.1
+	licensed under "Apache-2.0 OR MIT"
+	by Robert Bragg <robert@sixbynine.org>
 js-sys 0.3.91
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
@@ -361,7 +361,7 @@ kv-log-macro 1.0.7
 lazy_static 1.5.0
 	licensed under "Apache-2.0 OR MIT"
 	by Marvin Löbel <loebel.marvin@gmail.com>
-lcov 0.8.1
+lcov 0.8.2
 	licensed under "Apache-2.0 OR MIT"
 	by gifnksm <makoto.nksm+github@gmail.com>
 leb128fmt 0.1.0
@@ -763,7 +763,7 @@ uds 0.4.2
 unicode-ident 1.0.24
 	licensed under "(Apache-2.0 OR MIT) AND Unicode-3.0"
 	by David Tolnay <dtolnay@gmail.com>
-unicode-segmentation 1.12.0
+unicode-segmentation 1.13.2
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
 unicode-truncate 2.0.1
@@ -1018,16 +1018,16 @@ yoke 0.8.1
 yoke-derive 0.8.1
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-z3 0.19.14
+z3 0.19.15
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
 z3-sys 0.10.9
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.42
+zerocopy 0.8.47
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
-zerocopy-derive 0.8.42
+zerocopy-derive 0.8.47
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
 zerofrom 0.1.6
