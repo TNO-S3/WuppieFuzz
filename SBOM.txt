@@ -31,7 +31,7 @@ atomic-waker 1.1.2
 aws-lc-rs 1.16.2
 	licensed under "(Apache-2.0 OR ISC) AND ISC"
 	by AWS-LibCrypto
-aws-lc-sys 0.39.0
+aws-lc-sys 0.39.1
 	licensed under "(Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) AND (Apache-2.0 OR ISC) AND Apache-2.0 AND BSD-3-Clause AND ISC AND MIT"
 	by AWS-LC
 backtrace 0.3.76
@@ -319,7 +319,7 @@ indicatif 0.18.4
 ipnet 2.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by Kris Price <kris@krisprice.nz>
-iri-string 0.7.11
+iri-string 0.7.12
 	licensed under "Apache-2.0 OR MIT"
 	by YOSHIOKA Takuma <nop_thread@nops.red>
 is_terminal_polyfill 1.70.2
@@ -379,6 +379,9 @@ libm 0.2.16
 libsqlite3-sys 0.37.0
 	licensed under "MIT"
 	by The rusqlite developers
+libyaml-rs 0.3.0
+	licensed under "MIT"
+	by David Tolnay <dtolnay@gmail.com>|YAML Organization <noreply@yaml.org>
 linux-raw-sys 0.12.1
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>
@@ -412,7 +415,7 @@ mime 0.3.17
 miniz_oxide 0.8.9
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Frommi <daniil.liferenko@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>|Rich Geldreich richgel99@gmail.com
-mio 1.1.1
+mio 1.2.0
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>|Tokio Contributors <team@tokio.rs>
 nix 0.30.1
@@ -442,7 +445,7 @@ num-rational 0.4.2
 num_enum 0.7.6
 	licensed under "Apache-2.0 OR BSD-3-Clause OR MIT"
 	by Daniel Wagner-Hall <dawagner@gmail.com>|Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>|Vincent Esche <regexident@gmail.com>
-oas3 0.20.1
+oas3 0.21.0
 	licensed under "MIT"
 	by softprops <d.tangren@gmail.com>|Rob Ede <robjtede@icloud.com>
 objc2 0.6.4
@@ -583,7 +586,7 @@ rusqlite 0.39.0
 rustc-demangle 0.1.27
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-rustc-hash 2.1.1
+rustc-hash 2.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 rustix 1.1.4
@@ -649,7 +652,7 @@ serde_yaml 0.9.34+deprecated
 serial_test 3.4.0
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
-simd-adler32 0.3.8
+simd-adler32 0.3.9
 	licensed under "MIT"
 	by Marvin Countryman <me@maar.vin>
 siphasher 1.0.2
@@ -796,7 +799,7 @@ utf8_iter 1.0.4
 utf8parse 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Joe Wilm <joe@jwilm.com>|Christian Duerr <contact@christianduerr.com>
-uuid 1.22.0
+uuid 1.23.0
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
 value-bag 1.12.0
@@ -1012,6 +1015,9 @@ writeable 0.6.2
 xxhash-rust 0.8.15
 	licensed under "BSL-1.0"
 	by Douman <douman@gmx.se>
+yaml_serde 0.10.4
+	licensed under "Apache-2.0 OR MIT"
+	by YAML Organization <noreply@yaml.org>
 yoke 0.8.1
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
@@ -1024,10 +1030,10 @@ z3 0.19.15
 z3-sys 0.10.9
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.47
+zerocopy 0.8.48
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
-zerocopy-derive 0.8.47
+zerocopy-derive 0.8.48
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
 zerofrom 0.1.6
