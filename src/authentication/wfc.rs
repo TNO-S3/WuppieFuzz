@@ -28,7 +28,7 @@ pub struct AuthenticationInfo {
     #[serde(default)]
     pub fixed_headers: Option<Vec<Header>>,
     #[serde(default)]
-    pub login_endpoint_auth: Option<LoginEndpoint>,
+    pub login_endpoint_auth: Option<PartialLoginEndpoint>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -37,19 +37,78 @@ pub struct Header {
     pub value: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+/// A `LoginEndpoint` where all fields are optional so that partial entries can
+/// be deserialized and then merged with the `authTemplate` before use.
+/// Call [`PartialLoginEndpoint::merge`] to combine an entry with a template, and
+/// [`PartialLoginEndpoint::resolve`] to obtain a fully-populated [`LoginEndpoint`].
+#[derive(Debug, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct LoginEndpoint {
+pub struct PartialLoginEndpoint {
     pub endpoint: Option<String>,
     pub external_endpoint_url: Option<String>,
     pub payload_raw: Option<String>,
     pub payload_user_pwd: Option<PayloadUsernamePassword>,
     #[serde(default)]
     pub headers: Option<Vec<Header>>,
-    pub verb: HttpVerb,
+    pub verb: Option<HttpVerb>,
     pub content_type: Option<String>,
     pub token: Option<TokenHandling>,
     #[serde(default)]
+    pub expect_cookies: Option<bool>,
+}
+
+impl PartialLoginEndpoint {
+    /// Merge `self` (entry) with `template`, with `self` taking precedence for
+    /// every field that is `Some`.
+    fn merge(self, template: PartialLoginEndpoint) -> PartialLoginEndpoint {
+        PartialLoginEndpoint {
+            endpoint: self.endpoint.or(template.endpoint),
+            external_endpoint_url: self
+                .external_endpoint_url
+                .or(template.external_endpoint_url),
+            payload_raw: self.payload_raw.or(template.payload_raw),
+            payload_user_pwd: self.payload_user_pwd.or(template.payload_user_pwd),
+            headers: self.headers.or(template.headers),
+            verb: self.verb.or(template.verb),
+            content_type: self.content_type.or(template.content_type),
+            token: self.token.or(template.token),
+            expect_cookies: self.expect_cookies.or(template.expect_cookies),
+        }
+    }
+
+    /// Resolve into a [`LoginEndpoint`], returning an error if any required
+    /// fields are still missing after merging.
+    fn resolve(self, entry_name: &str) -> Result<LoginEndpoint> {
+        Ok(LoginEndpoint {
+            endpoint: self.endpoint,
+            external_endpoint_url: self.external_endpoint_url,
+            payload_raw: self.payload_raw,
+            payload_user_pwd: self.payload_user_pwd,
+            headers: self.headers,
+            verb: self.verb.ok_or_else(|| {
+                anyhow!(
+                    "WFC authentication entry '{entry_name}' loginEndpointAuth is missing \
+                     required field 'verb' (not set in entry or authTemplate)"
+                )
+            })?,
+            content_type: self.content_type,
+            token: self.token,
+            expect_cookies: self.expect_cookies,
+        })
+    }
+}
+
+/// A fully resolved login endpoint, ready to use for making a login request.
+/// Obtain this via [`PartialLoginEndpoint::resolve`].
+pub struct LoginEndpoint {
+    pub endpoint: Option<String>,
+    pub external_endpoint_url: Option<String>,
+    pub payload_raw: Option<String>,
+    pub payload_user_pwd: Option<PayloadUsernamePassword>,
+    pub headers: Option<Vec<Header>>,
+    pub verb: HttpVerb,
+    pub content_type: Option<String>,
+    pub token: Option<TokenHandling>,
     pub expect_cookies: Option<bool>,
 }
 
@@ -139,22 +198,31 @@ impl WfcAuth {
         let fixed_headers = entry
             .fixed_headers
             .or_else(|| template.as_ref().and_then(|t| t.fixed_headers.clone()));
-        let login_endpoint = entry.login_endpoint_auth.or_else(|| {
-            template
-                .as_ref()
-                .and_then(|t| t.login_endpoint_auth.clone())
-        });
 
-        match (fixed_headers, login_endpoint) {
-            // Static fixed headers — look for Authorization header and map to the right variant
+        let partial_login_endpoint = {
+            let entry_partial = entry.login_endpoint_auth.unwrap_or_default();
+            let template_partial = template
+                .and_then(|t| t.login_endpoint_auth)
+                .unwrap_or_default();
+            entry_partial.merge(template_partial)
+        };
+
+        // Check whether there is any login endpoint configuration at all
+        let has_login_endpoint = partial_login_endpoint.verb.is_some()
+            || partial_login_endpoint.endpoint.is_some()
+            || partial_login_endpoint.external_endpoint_url.is_some();
+
+        match (fixed_headers, has_login_endpoint) {
+            // Static fixed headers take precedence — look for Authorization header
             (Some(headers), _) => {
                 let auth_header = headers
                     .iter()
                     .find(|h| h.name.eq_ignore_ascii_case("Authorization"))
                     .ok_or_else(|| {
                         anyhow!(
-                            "WFC authentication entry '{}' has fixedHeaders but no 'Authorization' header. \
-                             Only Authorization header authentication is currently supported for fixedHeaders.",
+                            "WFC authentication entry '{}' has fixedHeaders but no \
+                             'Authorization' header. Only Authorization header authentication \
+                             is currently supported for fixedHeaders.",
                             entry.name
                         )
                     })?;
@@ -169,9 +237,12 @@ impl WfcAuth {
             }
 
             // Login endpoint — perform a login request and extract the token/cookie
-            (None, Some(endpoint)) => login_with_endpoint(&entry.name, endpoint),
+            (None, true) => {
+                let endpoint = partial_login_endpoint.resolve(&entry.name)?;
+                login_with_endpoint(&entry.name, endpoint)
+            }
 
-            (None, None) => Ok(Authentication::None),
+            (None, false) => Ok(Authentication::None),
         }
     }
 }
