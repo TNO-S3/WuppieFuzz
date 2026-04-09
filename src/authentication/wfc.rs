@@ -24,7 +24,7 @@ pub struct WfcAuth {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationInfo {
-    pub name: String,
+    pub name: Option<String>,
     #[serde(default)]
     pub fixed_headers: Option<Vec<Header>>,
     #[serde(default)]
@@ -223,7 +223,7 @@ impl WfcAuth {
                             "WFC authentication entry '{}' has fixedHeaders but no \
                              'Authorization' header. Only Authorization header authentication \
                              is currently supported for fixedHeaders.",
-                            entry.name
+                            entry.name.unwrap_or_else(|| "<unnamed>".to_string())
                         )
                     })?;
                 let value = &auth_header.value;
@@ -238,8 +238,15 @@ impl WfcAuth {
 
             // Login endpoint — perform a login request and extract the token/cookie
             (None, true) => {
-                let endpoint = partial_login_endpoint.resolve(&entry.name)?;
-                login_with_endpoint(&entry.name, endpoint)
+                if let Some(name) = &entry.name {
+                    let endpoint = partial_login_endpoint.resolve(name)?;
+                    login_with_endpoint(name, endpoint)
+                } else {
+                    Err(anyhow!(
+                        "WFC authentication entry with loginEndpointAuth is missing \
+                        'name' field, which is required to perform the login request"
+                    ))
+                }
             }
 
             (None, false) => Ok(Authentication::None),
@@ -546,24 +553,24 @@ authTemplate:
     fn spring_actuator_has_one_auth_entry() {
         let wfc = parse(SPRING_ACTUATOR_DEMO_AUTH);
         assert_eq!(wfc.auth.len(), 1);
-        assert_eq!(wfc.auth[0].name, "admin");
+        assert_eq!(wfc.auth[0].name, Some(String::from("admin")));
     }
 
     #[test]
     fn scout_api_has_three_auth_entries() {
         let wfc = parse(SCOUT_API_AUTH);
         assert_eq!(wfc.auth.len(), 3);
-        assert_eq!(wfc.auth[0].name, "user");
-        assert_eq!(wfc.auth[1].name, "moderator");
-        assert_eq!(wfc.auth[2].name, "administrator");
+        assert_eq!(wfc.auth[0].name, Some(String::from("user")));
+        assert_eq!(wfc.auth[1].name, Some(String::from("moderator")));
+        assert_eq!(wfc.auth[2].name, Some(String::from("administrator")));
     }
 
     #[test]
     fn blogapi_has_two_entries_and_template() {
         let wfc = parse(BLOGAPI_AUTH_TEMPLATE);
         assert_eq!(wfc.auth.len(), 2);
-        assert_eq!(wfc.auth[0].name, "admin");
-        assert_eq!(wfc.auth[1].name, "user");
+        assert_eq!(wfc.auth[0].name, Some(String::from("admin")));
+        assert_eq!(wfc.auth[1].name, Some(String::from("user")));
         assert!(wfc.auth_template.is_some());
 
         let template = wfc.auth_template.unwrap();
@@ -581,7 +588,7 @@ authTemplate:
     fn tracking_system_has_three_entries_and_template() {
         let wfc = parse(TRACKING_SYSTEM_AUTH_TEMPLATE);
         assert_eq!(wfc.auth.len(), 3);
-        assert_eq!(wfc.auth[0].name, "ROLE_ADMIN");
+        assert_eq!(wfc.auth[0].name, Some(String::from("ROLE_ADMIN")));
         assert!(wfc.auth_template.is_some());
 
         let template = wfc.auth_template.unwrap();
@@ -680,7 +687,7 @@ authTemplate:
         mock.assert();
         assert!(result.is_err());
         assert!(
-            result.unwrap_err().to_string().contains("/accessToken"),
+            format!("{:?}", result.unwrap_err()).contains("/accessToken"),
             "Error should mention the missing JSON pointer"
         );
     }
