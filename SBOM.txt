@@ -640,7 +640,7 @@ security-framework 3.7.0
 security-framework-sys 2.17.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Kornel <kornel@geekhood.net>
-semver 1.0.27
+semver 1.0.28
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 serde_core 1.0.228

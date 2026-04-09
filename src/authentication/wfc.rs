@@ -3,14 +3,20 @@
 
 use anyhow::{Context, Result, anyhow, bail};
 use reqwest_cookie_store::RawCookie;
+use semver::Version;
 use serde::Deserialize;
 
 use super::Authentication;
+
+/// The WFC schema version this implementation was written against.
+const SUPPORTED_VERSION: Version = Version::new(0, 2, 0);
 
 /// Top-level WFC authentication document
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WfcAuth {
+    #[serde(default)]
+    pub schema_version: Option<String>,
     pub auth: Vec<AuthenticationInfo>,
     #[serde(default)]
     pub auth_template: Option<AuthenticationInfo>,
@@ -182,11 +188,48 @@ pub struct PayloadUsernamePassword {
 }
 
 impl WfcAuth {
+    /// Check `schemaVersion` against [`SUPPORTED_VERSION`] and emit a warning
+    /// via [`log::warn`] if the file declares a newer version or an unparseable
+    /// version string. Parsing continues regardless.
+    fn check_schema_version(&self) {
+        match &self.schema_version {
+            None => {}
+            Some(raw) => {
+                // Strip a leading 'v' so both "0.2.0" and "v0.2.0" are accepted
+                match Version::parse(raw.trim_start_matches('v')) {
+                    Err(_) => {
+                        log::warn!(
+                            "WFC authentication file specifies an unrecognized \
+                             schemaVersion '{raw}'. Expected a semver string \
+                             (e.g. '0.2.0'). Attempting to parse anyway."
+                        );
+                    }
+                    Ok(file_version) => {
+                        // Warn if the file is from a newer minor/major than we know
+                        if file_version.major > SUPPORTED_VERSION.major
+                            || (file_version.major == SUPPORTED_VERSION.major
+                                && file_version.minor > SUPPORTED_VERSION.minor)
+                        {
+                            log::warn!(
+                                "WFC authentication file specifies schemaVersion '{raw}', \
+                                 which is newer than the supported version {SUPPORTED_VERSION}. \
+                                 Some fields may not be handled correctly. \
+                                 Attempting to parse anyway."
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Convert a WFC auth config into an `Authentication`.
     ///
     /// Uses the first entry in the `auth` list, merging in the `authTemplate`
     /// for any fields that are not set on the entry itself.
     pub fn into_authentication(self) -> Result<Authentication> {
+        self.check_schema_version();
+
         let template = self.auth_template;
         let entry = self
             .auth
