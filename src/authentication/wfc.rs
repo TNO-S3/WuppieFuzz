@@ -356,3 +356,261 @@ fn extract_token(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -------------------------------------------------------------------------
+    // spring-actuator-demo-auth.yaml
+    // Fixed Authorization header with a Basic token.
+    // -------------------------------------------------------------------------
+    const SPRING_ACTUATOR_DEMO_AUTH: &str = r#"
+auth:
+  - name: admin
+    fixedHeaders:
+      - name: Authorization
+        value: Basic YWN0dWF0b3I6YWN0dWF0b3I=
+"#;
+
+    // -------------------------------------------------------------------------
+    // scout-api-auth.yaml
+    // Fixed Authorization header with a custom ApiKey scheme (maps to Raw).
+    // Only the first entry is used.
+    // -------------------------------------------------------------------------
+    const SCOUT_API_AUTH: &str = r#"
+auth:
+  - name: user
+    fixedHeaders:
+      - name: Authorization
+        value: ApiKey user
+  - name: moderator
+    fixedHeaders:
+      - name: Authorization
+        value: ApiKey moderator
+  - name: administrator
+    fixedHeaders:
+      - name: Authorization
+        value: ApiKey administrator
+"#;
+
+    // -------------------------------------------------------------------------
+    // blogapi-auth.yaml
+    // Login endpoint (POST /api/auth/signin), token extracted from JSON body,
+    // sent as Bearer in Authorization header.
+    // -------------------------------------------------------------------------
+    const BLOGAPI_AUTH_TEMPLATE: &str = r#"
+auth:
+  - name: admin
+    loginEndpointAuth:
+      payloadRaw: "{\"usernameOrEmail\": \"admin\", \"password\": \"bar123\"}"
+  - name: user
+    loginEndpointAuth:
+      payloadRaw: "{\"usernameOrEmail\": \"user\", \"password\": \"bar123\"}"
+
+authTemplate:
+    loginEndpointAuth:
+        endpoint: /api/auth/signin
+        verb: POST
+        contentType: application/json
+        token:
+            extractFrom: body
+            extractSelector: /accessToken
+            sendName: Authorization
+            sendIn: header
+            sendTemplate: "Bearer {token}"
+"#;
+
+    // -------------------------------------------------------------------------
+    // tracking-system-auth.yaml
+    // Login endpoint (POST /app/login), expects cookies in response.
+    // -------------------------------------------------------------------------
+    const TRACKING_SYSTEM_AUTH_TEMPLATE: &str = r#"
+auth:
+  - name: ROLE_ADMIN
+    loginEndpointAuth:
+      payloadRaw: "username=admin&password=test"
+  - name: ROLE_EMP
+    loginEndpointAuth:
+      payloadRaw: "username=selimhorri&password=test"
+  - name: ROLE_MGR
+    loginEndpointAuth:
+      payloadRaw: "username=soumayahajjem&password=test"
+
+authTemplate:
+  loginEndpointAuth:
+    endpoint: /app/login
+    verb: POST
+    contentType: application/x-www-form-urlencoded
+    expectCookies: true
+"#;
+
+    fn parse(yaml: &str) -> WfcAuth {
+        serde_yaml::from_str(yaml).expect("Failed to parse WFC YAML")
+    }
+
+    // --- Parsing tests (no HTTP) ---------------------------------------------
+
+    #[test]
+    fn spring_actuator_parses_to_basic() {
+        let auth = parse(SPRING_ACTUATOR_DEMO_AUTH)
+            .into_authentication()
+            .unwrap();
+        assert!(
+            matches!(auth, Authentication::Basic(ref s) if s == "YWN0dWF0b3I6YWN0dWF0b3I="),
+            "Expected Basic(...), got {auth:?}"
+        );
+    }
+
+    #[test]
+    fn scout_api_parses_to_raw_first_entry() {
+        let auth = parse(SCOUT_API_AUTH).into_authentication().unwrap();
+        assert!(
+            matches!(auth, Authentication::Raw(ref s) if s == "ApiKey user"),
+            "Expected Raw(\"ApiKey user\"), got {auth:?}"
+        );
+    }
+
+    #[test]
+    fn spring_actuator_has_one_auth_entry() {
+        let wfc = parse(SPRING_ACTUATOR_DEMO_AUTH);
+        assert_eq!(wfc.auth.len(), 1);
+        assert_eq!(wfc.auth[0].name, "admin");
+    }
+
+    #[test]
+    fn scout_api_has_three_auth_entries() {
+        let wfc = parse(SCOUT_API_AUTH);
+        assert_eq!(wfc.auth.len(), 3);
+        assert_eq!(wfc.auth[0].name, "user");
+        assert_eq!(wfc.auth[1].name, "moderator");
+        assert_eq!(wfc.auth[2].name, "administrator");
+    }
+
+    #[test]
+    fn blogapi_has_two_entries_and_template() {
+        let wfc = parse(BLOGAPI_AUTH_TEMPLATE);
+        assert_eq!(wfc.auth.len(), 2);
+        assert_eq!(wfc.auth[0].name, "admin");
+        assert_eq!(wfc.auth[1].name, "user");
+        assert!(wfc.auth_template.is_some());
+
+        let template = wfc.auth_template.unwrap();
+        let endpoint = template.login_endpoint_auth.unwrap();
+        assert_eq!(endpoint.endpoint.as_deref(), Some("/api/auth/signin"));
+        let token = endpoint.token.unwrap();
+        assert_eq!(token.extract_selector, "/accessToken");
+        assert_eq!(token.send_name, "Authorization");
+        assert_eq!(token.send_template, "Bearer {token}");
+        assert_eq!(token.send_in, SendIn::Header);
+        assert_eq!(token.extract_from, ExtractFrom::Body);
+    }
+
+    #[test]
+    fn tracking_system_has_three_entries_and_template() {
+        let wfc = parse(TRACKING_SYSTEM_AUTH_TEMPLATE);
+        assert_eq!(wfc.auth.len(), 3);
+        assert_eq!(wfc.auth[0].name, "ROLE_ADMIN");
+        assert!(wfc.auth_template.is_some());
+
+        let template = wfc.auth_template.unwrap();
+        let endpoint = template.login_endpoint_auth.unwrap();
+        assert_eq!(endpoint.endpoint.as_deref(), Some("/app/login"));
+        assert_eq!(endpoint.expect_cookies, Some(true));
+    }
+
+    // --- Integration tests (mock HTTP server) --------------------------------
+
+    #[test]
+    fn blogapi_login_endpoint_produces_bearer() {
+        let mut server = mockito::Server::new();
+        let mock = server
+            .mock("POST", "/api/auth/signin")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"accessToken":"my-secret-token"}"#)
+            .create();
+
+        // Patch the endpoint URL to point at the mock server
+        let yaml = BLOGAPI_AUTH_TEMPLATE.replace(
+            "endpoint: /api/auth/signin",
+            &format!("endpoint: {}/api/auth/signin", server.url()),
+        );
+
+        let auth = parse(&yaml).into_authentication().unwrap();
+        mock.assert();
+        assert!(
+            matches!(auth, Authentication::Bearer(ref t) if t == "my-secret-token"),
+            "Expected Bearer(\"my-secret-token\"), got {auth:?}"
+        );
+    }
+
+    #[test]
+    fn tracking_system_login_endpoint_produces_cookies() {
+        let mut server = mockito::Server::new();
+        let mock = server
+            .mock("POST", "/app/login")
+            .with_status(200)
+            .with_header("Set-Cookie", "JSESSIONID=abc123; Path=/; HttpOnly")
+            .with_body("")
+            .create();
+
+        let yaml = TRACKING_SYSTEM_AUTH_TEMPLATE.replace(
+            "endpoint: /app/login",
+            &format!("endpoint: {}/app/login", server.url()),
+        );
+
+        let auth = parse(&yaml).into_authentication().unwrap();
+        mock.assert();
+        assert!(
+            matches!(auth, Authentication::Cookie(ref cookies) if
+                cookies.iter().any(|c| c.name() == "JSESSIONID" && c.value() == "abc123")
+            ),
+            "Expected Cookie with JSESSIONID=abc123, got {auth:?}"
+        );
+    }
+
+    #[test]
+    fn login_endpoint_returns_error_on_non_success_status() {
+        let mut server = mockito::Server::new();
+        let mock = server
+            .mock("POST", "/api/auth/signin")
+            .with_status(401)
+            .with_body("Unauthorized")
+            .create();
+
+        let yaml = BLOGAPI_AUTH_TEMPLATE.replace(
+            "endpoint: /api/auth/signin",
+            &format!("endpoint: {}/api/auth/signin", server.url()),
+        );
+
+        let result = parse(&yaml).into_authentication();
+        mock.assert();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("401"));
+    }
+
+    #[test]
+    fn login_endpoint_returns_error_when_json_pointer_missing() {
+        let mut server = mockito::Server::new();
+        let mock = server
+            .mock("POST", "/api/auth/signin")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"someOtherField":"value"}"#)
+            .create();
+
+        let yaml = BLOGAPI_AUTH_TEMPLATE.replace(
+            "endpoint: /api/auth/signin",
+            &format!("endpoint: {}/api/auth/signin", server.url()),
+        );
+
+        let result = parse(&yaml).into_authentication();
+        mock.assert();
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("/accessToken"),
+            "Error should mention the missing JSON pointer"
+        );
+    }
+}
