@@ -553,24 +553,24 @@ authTemplate:
     fn spring_actuator_has_one_auth_entry() {
         let wfc = parse(SPRING_ACTUATOR_DEMO_AUTH);
         assert_eq!(wfc.auth.len(), 1);
-        assert_eq!(wfc.auth[0].name, Some(String::from("admin")));
+        assert_eq!(wfc.auth[0].name.as_deref(), Some("admin"));
     }
 
     #[test]
     fn scout_api_has_three_auth_entries() {
         let wfc = parse(SCOUT_API_AUTH);
         assert_eq!(wfc.auth.len(), 3);
-        assert_eq!(wfc.auth[0].name, Some(String::from("user")));
-        assert_eq!(wfc.auth[1].name, Some(String::from("moderator")));
-        assert_eq!(wfc.auth[2].name, Some(String::from("administrator")));
+        assert_eq!(wfc.auth[0].name.as_deref(), Some("user"));
+        assert_eq!(wfc.auth[1].name.as_deref(), Some("moderator"));
+        assert_eq!(wfc.auth[2].name.as_deref(), Some("administrator"));
     }
 
     #[test]
     fn blogapi_has_two_entries_and_template() {
         let wfc = parse(BLOGAPI_AUTH_TEMPLATE);
         assert_eq!(wfc.auth.len(), 2);
-        assert_eq!(wfc.auth[0].name, Some(String::from("admin")));
-        assert_eq!(wfc.auth[1].name, Some(String::from("user")));
+        assert_eq!(wfc.auth[0].name.as_deref(), Some("admin"));
+        assert_eq!(wfc.auth[1].name.as_deref(), Some("user"));
         assert!(wfc.auth_template.is_some());
 
         let template = wfc.auth_template.unwrap();
