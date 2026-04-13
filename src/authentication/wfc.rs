@@ -484,7 +484,7 @@ mod tests {
     use super::*;
 
     // -------------------------------------------------------------------------
-    // spring-actuator-demo-auth.yaml
+    // https://github.com/WebFuzzing/Dataset/blob/204da4c7aa7b4ca845aaec42aedf425c32230917/auth/spring-actuator-demo-auth.yaml
     // Fixed Authorization header with a Basic token.
     // -------------------------------------------------------------------------
     const SPRING_ACTUATOR_DEMO_AUTH: &str = r#"
@@ -496,7 +496,7 @@ auth:
 "#;
 
     // -------------------------------------------------------------------------
-    // scout-api-auth.yaml
+    // https://github.com/WebFuzzing/Dataset/blob/204da4c7aa7b4ca845aaec42aedf425c32230917/auth/scout-api-auth.yaml
     // Fixed Authorization header with a custom ApiKey scheme (maps to Raw).
     // Only the first entry is used.
     // -------------------------------------------------------------------------
@@ -517,7 +517,7 @@ auth:
 "#;
 
     // -------------------------------------------------------------------------
-    // blogapi-auth.yaml
+    // https://github.com/WebFuzzing/Dataset/blob/204da4c7aa7b4ca845aaec42aedf425c32230917/auth/blogapi-auth.yaml
     // Login endpoint (POST /api/auth/signin), token extracted from JSON body,
     // sent as Bearer in Authorization header.
     // -------------------------------------------------------------------------
@@ -544,7 +544,7 @@ authTemplate:
 "#;
 
     // -------------------------------------------------------------------------
-    // tracking-system-auth.yaml
+    // https://github.com/WebFuzzing/Dataset/blob/204da4c7aa7b4ca845aaec42aedf425c32230917/auth/tracking-system-auth.yaml
     // Login endpoint (POST /app/login), expects cookies in response.
     // -------------------------------------------------------------------------
     const TRACKING_SYSTEM_AUTH_TEMPLATE: &str = r#"
