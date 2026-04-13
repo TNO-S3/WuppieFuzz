@@ -54,7 +54,7 @@ chrono = "0.4.43"
 clap = { version = "4.5.60", features = ["cargo", "derive", "env"] }
 ctrlc = "3.5.2"
 env_logger = "0.11.9"
-indexmap = { version = "2.13.0", features = ["serde"] }
+indexmap = { version = "2.13.1", features = ["serde"] }
 indicatif = "0.18.4"
 iter-read = "1.1.0"
 itertools = "0.14.0"
