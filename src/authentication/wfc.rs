@@ -25,8 +25,6 @@ pub struct WfcAuth {
 /// AuthenticationInfo represents a single authentication entry in the WFC auth file.
 /// It can specify either fixed headers (e.g. a static Authorization header) or a
 /// login endpoint to obtain a token/cookie.
-/// AuthenticationInfo should not contain both fixed_headers and login_endpoint_auth;
-/// if both are present, fixed_headers takes precedence.
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticationInfo {
@@ -227,6 +225,9 @@ impl WfcAuth {
     ///
     /// Uses the first entry in the `auth` list, merging in the `authTemplate`
     /// for any fields that are not set on the entry itself.
+    ///
+    /// AuthenticationInfo should not contain both fixed_headers and login_endpoint_auth;
+    /// if both are present, fixed_headers takes precedence.
     pub fn into_authentication(self) -> Result<Authentication> {
         self.check_schema_version();
 
