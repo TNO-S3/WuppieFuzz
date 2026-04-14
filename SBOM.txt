@@ -538,7 +538,7 @@ r-efi 6.0.0
 rand 0.9.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers
-rand 0.10.0
+rand 0.10.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers
 rand_chacha 0.9.0
