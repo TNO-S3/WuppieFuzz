@@ -94,7 +94,7 @@ pub fn main() -> Result<()> {
             corpus_directory,
             openapi_spec,
             report_path,
-            log_level: _,
+            ..
         } => {
             let config = &Configuration::get().map_err(anyhow::Error::msg)?;
             setup_logging(config);

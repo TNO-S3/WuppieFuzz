@@ -27,7 +27,8 @@ use libafl_bolts::{AsIter, Named, current_time};
 
 use self::dependency_graph::DependencyGraph;
 use crate::{
-    initial_corpus::dependency_graph::initial_corpus_from_api,
+    configuration::Configuration,
+    initial_corpus::dependency_graph::{PathGenerationConfig, initial_corpus_from_api},
     input::{OpenApiInput, OpenApiRequest},
     openapi::spec::Spec,
     types::{EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType},
@@ -110,7 +111,16 @@ where
 /// as the initial corpus) used to generate the initial corpus is then written
 /// to the `report_path`.
 pub fn generate_corpus_to_files(spec: &Spec, corpus_dir: &Path, report_path: Option<&Path>) {
-    let inputs = initial_corpus_from_api(spec);
+    let config = Configuration::must_get();
+    let inputs = initial_corpus_from_api(
+        spec,
+        config.corpus_sequence_mode,
+        PathGenerationConfig {
+            min_path_length: config.min_request_chain_length,
+            max_revisits: config.max_revisits,
+            max_paths: config.max_corpus_entries,
+        },
+    );
     log::debug!("Writing corpus to file...");
     if let Err(e) = write_corpus_to_files(&inputs, corpus_dir) {
         log::warn!("Error writing corpus to file: {e}");
@@ -252,7 +262,16 @@ fn fill_corpus_from_api(
     api: &Spec,
     report_path: &Option<&Path>,
 ) {
-    let inputs = initial_corpus_from_api(api);
+    let config = Configuration::must_get();
+    let inputs = initial_corpus_from_api(
+        api,
+        config.corpus_sequence_mode,
+        PathGenerationConfig {
+            min_path_length: config.min_request_chain_length,
+            max_revisits: config.max_revisits,
+            max_paths: config.max_corpus_entries,
+        },
+    );
     if let Some(report_path) = report_path {
         // The dependency graph was already generated while creating it from the API
         // but it is cheap to build, so we can afford to do it again for reporting.

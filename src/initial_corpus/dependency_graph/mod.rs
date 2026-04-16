@@ -29,6 +29,7 @@ use self::{
     toposort::{Cycle, toposort},
 };
 use crate::{
+    configuration::CorpusSequenceMode,
     input::{
         Method, OpenApiInput, ParameterContents,
         parameter::{IReference, OReference},
@@ -44,36 +45,62 @@ use crate::{
 /// Returns OpenApiInputs generated from a dependency graph derived from the OpenAPI
 /// specification. If rigorously generating parameter combinations would result in
 /// too many inputs, it just generates a single example.
-pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
+pub fn initial_corpus_from_api(
+    api: &Spec,
+    corpus_sequence_mode: CorpusSequenceMode,
+    full_path_config: PathGenerationConfig,
+) -> Vec<OpenApiInput> {
     let dependency_graph = DependencyGraph::new(api);
 
-    // Turn all subgraphs into sorted lists of node indices
-    dependency_graph
-        .connected_components()
-        .iter()
-        .map(|nodes| dependency_graph.subgraph(nodes))
-        .map(|subgraph| {
-            ops_from_subgraph(&subgraph).map(|(ops, idxs)| {
-                // TODO: pass subgraph into openapi_inputs_from_ops to prevent generation of parameter values
-                // that will be replaced by references below anyway. The current implementation often
-                // massively overgenerates all the different combinations, most of which then get
-                // mapped back to the same OpenApiInput since all concrete parameter values get
-                // overwritten with references to the same parameter in an earlier response.
-                let inputs =
-                    openapi_inputs_from_ops(api, ops.clone().into_iter(), &subgraph, &idxs)
-                        .inspect_err(|err| {
-                            log::warn!("{err} - falling back to single example generation.");
-                        })
-                        .unwrap_or(vec![openapi_example_input_from_ops(api, ops.into_iter())]);
+    match corpus_sequence_mode {
+        CorpusSequenceMode::Crud => {
+            // Turn all subgraphs into sorted lists of node indices
+            dependency_graph
+                .connected_components()
+                .iter()
+                .map(|nodes| dependency_graph.subgraph(nodes))
+                .map(|subgraph| {
+                    ops_from_subgraph(&subgraph).map(|(ops, idxs)| {
+                        // TODO: pass subgraph into openapi_inputs_from_ops to prevent generation of parameter values
+                        // that will be replaced by references below anyway. The current implementation often
+                        // massively overgenerates all the different combinations, most of which then get
+                        // mapped back to the same OpenApiInput since all concrete parameter values get
+                        // overwritten with references to the same parameter in an earlier response.
+                        let inputs =
+                            openapi_inputs_from_ops(api, ops.clone().into_iter(), &subgraph, &idxs)
+                                .inspect_err(|err| {
+                                    log::warn!(
+                                        "{err} - falling back to single example generation."
+                                    );
+                                })
+                                .unwrap_or(vec![openapi_example_input_from_ops(
+                                    api,
+                                    ops.into_iter(),
+                                )]);
 
-                inputs.into_iter().flat_map(move |input| {
-                    add_references_to_openapi_input(&subgraph, &idxs, &input)
+                        inputs.into_iter().flat_map(move |input| {
+                            add_references_to_openapi_input(&subgraph, &idxs, &input)
+                        })
+                    })
                 })
+                .filter_map(|result| result.ok())
+                .flatten()
+                .collect()
+        }
+        CorpusSequenceMode::Full => dependency_graph
+            .connected_components()
+            .iter()
+            .map(|nodes| dependency_graph.subgraph(nodes))
+            .flat_map(|subgraph| {
+                openapi_inputs_for_first_n_subgraph_paths(
+                    api,
+                    &subgraph,
+                    full_path_config.max_paths,
+                    full_path_config,
+                )
             })
-        })
-        .filter_map(|result| result.ok())
-        .flatten()
-        .collect()
+            .collect(),
+    }
 }
 
 /// Creates a vector of topologically sorted QualifiedOperations (path, method, etc.)

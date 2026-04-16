@@ -16,6 +16,10 @@ use crate::openapi::validate_response::ValidationErrorDiscriminants;
 
 const DEFAULT_REQUEST_TIMEOUT: u64 = 30000;
 const DEFAULT_METHOD_MUTATION_STRATEGY: MethodMutationStrategy = MethodMutationStrategy::FollowSpec;
+const DEFAULT_CORPUS_SEQUENCE_MODE: CorpusSequenceMode = CorpusSequenceMode::Full;
+const DEFAULT_MAX_CORPUS_ENTRIES: usize = 1000;
+const DEFAULT_MAX_REVISITS: usize = 0;
+const DEFAULT_MIN_REQUEST_CHAIN_LENGTH: usize = 1;
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
 lazy_static! {
@@ -84,6 +88,34 @@ pub enum Commands {
         /// inferred relationships between the endpoints and their parameters
         #[arg(long, value_parser, value_name = "REPORTS/")]
         report_path: Option<PathBuf>,
+        /// How to generate request chains from api operations.
+        /// Must be one of {'crud', 'full'}. Default: full.
+        #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
+        corpus_sequence_mode: Option<CorpusSequenceMode>,
+        /// Maximum number of corpus entries to generate per connected component when using `full` mode. Default: 1000.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        max_corpus_entries: Option<usize>,
+        /// Maximum number of revisits per node when using `full` mode. Default: 0.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        max_revisits: Option<usize>,
+        /// Minimum request-chain length when using `full` mode. Default: 1.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        min_request_chain_length: Option<usize>,
         // Manually added possible values below, since automatically showing possible values of an external (remote) enum
         // such as log::LevelFilter is not well supported.
         // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
@@ -248,6 +280,35 @@ pub enum Commands {
         /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
         #[arg(value_parser, long)]
         jacoco_class_prefix: Option<String>,
+
+        /// How to generate request chains from api operations.
+        /// Must be one of {'crud', 'full'}. Default: full.
+        #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
+        corpus_sequence_mode: Option<CorpusSequenceMode>,
+        /// Maximum number of corpus entries to generate per connected component when using `full` mode. Default: 1000.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        max_corpus_entries: Option<usize>,
+        /// Maximum number of revisits per node when using `full` mode. Default: 0.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        max_revisits: Option<usize>,
+        /// Minimum request-chain length when using `full` mode. Default: 1.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        min_request_chain_length: Option<usize>,
     },
 }
 
@@ -312,6 +373,10 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                corpus_sequence_mode,
+                max_corpus_entries,
+                max_revisits,
+                min_request_chain_length,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -332,14 +397,26 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                corpus_sequence_mode,
+                max_corpus_entries,
+                max_revisits,
+                min_request_chain_length,
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,
                 openapi_spec,
                 report_path: _,
+                corpus_sequence_mode,
+                max_corpus_entries,
+                max_revisits,
+                min_request_chain_length,
                 log_level,
             } => Ok(PartialConfiguration {
                 openapi_spec: Some(openapi_spec),
+                corpus_sequence_mode,
+                max_corpus_entries,
+                max_revisits,
+                min_request_chain_length,
                 log_level,
                 ..Default::default()
             }),
@@ -455,6 +532,23 @@ struct PartialConfiguration {
     /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
     #[clap(value_parser, long)]
     pub jacoco_class_prefix: Option<String>,
+
+    /// How to generate request chains from api operations.
+    /// Must be one of {'crud', 'full'}.
+    #[clap(value_parser, long, value_enum, required = false, ignore_case = true)]
+    pub corpus_sequence_mode: Option<CorpusSequenceMode>,
+
+    /// Maximum number of corpus entries to generate per connected component when using `full` mode.
+    #[clap(value_parser, long)]
+    pub max_corpus_entries: Option<usize>,
+
+    /// Maximum number of revisits per node when using `full` mode.
+    #[clap(value_parser, long)]
+    pub max_revisits: Option<usize>,
+
+    /// Minimum request-chain length when using `full` mode.
+    #[clap(value_parser, long)]
+    pub min_request_chain_length: Option<usize>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -487,6 +581,14 @@ pub enum MethodMutationStrategy {
     Common5,
     #[serde(alias = "common-7", alias = "common_7", alias = "common7")]
     Common7,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
+pub enum CorpusSequenceMode {
+    #[serde(alias = "crud")]
+    Crud,
+    #[serde(alias = "full")]
+    Full,
 }
 
 /// The main configuration object.
@@ -534,6 +636,18 @@ pub struct Configuration {
     /// If present, determine with which HTTP methods to mutate.
     /// If omitted, only mutate with methods from api specification.
     pub method_mutation_strategy: MethodMutationStrategy,
+
+    /// Strategy for generating request chains from api operations.
+    pub corpus_sequence_mode: CorpusSequenceMode,
+
+    /// Maximum number of corpus entries to generate per connected component when using `full` mode.
+    pub max_corpus_entries: usize,
+
+    /// Maximum number of revisits per node when using `full` mode.
+    pub max_revisits: usize,
+
+    /// Minimum request-chain length when using `full` mode.
+    pub min_request_chain_length: usize,
 
     /// Output to stdout can be formatted in human readable format or json.
     pub output_format: OutputFormat,
@@ -620,6 +734,14 @@ impl TryFrom<PartialConfiguration> for Configuration {
             bail!("No OpenAPI specification file given");
         }
 
+        if value.max_corpus_entries == Some(0) {
+            bail!("max_corpus_entries must be at least 1");
+        }
+
+        if value.min_request_chain_length == Some(0) {
+            bail!("min_request_chain_length must be at least 1");
+        }
+
         Ok(Self {
             openapi_spec: value.openapi_spec,
             initial_corpus: value.initial_corpus,
@@ -649,6 +771,16 @@ impl TryFrom<PartialConfiguration> for Configuration {
             method_mutation_strategy: value
                 .method_mutation_strategy
                 .unwrap_or(DEFAULT_METHOD_MUTATION_STRATEGY),
+            corpus_sequence_mode: value
+                .corpus_sequence_mode
+                .unwrap_or(DEFAULT_CORPUS_SEQUENCE_MODE),
+            max_corpus_entries: value
+                .max_corpus_entries
+                .unwrap_or(DEFAULT_MAX_CORPUS_ENTRIES),
+            max_revisits: value.max_revisits.unwrap_or(DEFAULT_MAX_REVISITS),
+            min_request_chain_length: value
+                .min_request_chain_length
+                .unwrap_or(DEFAULT_MIN_REQUEST_CHAIN_LENGTH),
             output_format: value.output_format.unwrap_or(OutputFormat::HumanReadable),
             authentication: value.authentication,
             header: value.header,
@@ -707,6 +839,14 @@ impl PartialConfiguration {
             jacoco_class_prefix: other
                 .jacoco_class_prefix
                 .or_else(|| self.jacoco_class_prefix.take()),
+            corpus_sequence_mode: other
+                .corpus_sequence_mode
+                .or(self.corpus_sequence_mode.take()),
+            max_corpus_entries: other.max_corpus_entries.or(self.max_corpus_entries.take()),
+            max_revisits: other.max_revisits.or(self.max_revisits.take()),
+            min_request_chain_length: other
+                .min_request_chain_length
+                .or(self.min_request_chain_length.take()),
         };
     }
 }
@@ -748,8 +888,8 @@ mod tests {
     use std::{convert::TryInto, num::NonZeroU64};
 
     use super::{
-        Configuration, CoverageConfiguration, CoverageFormat, DEFAULT_REQUEST_TIMEOUT,
-        OutputFormat, PartialConfiguration, parse_socket_addr,
+        Configuration, CorpusSequenceMode, CoverageConfiguration, CoverageFormat,
+        DEFAULT_REQUEST_TIMEOUT, OutputFormat, PartialConfiguration, parse_socket_addr,
     };
 
     #[test]
@@ -779,6 +919,10 @@ mod tests {
 
         assert_eq!(tried_config.request_timeout, DEFAULT_REQUEST_TIMEOUT);
         assert_eq!(tried_config.log_level, log::LevelFilter::Info);
+        assert_eq!(tried_config.corpus_sequence_mode, CorpusSequenceMode::Full);
+        assert_eq!(tried_config.max_corpus_entries, 1000);
+        assert_eq!(tried_config.max_revisits, 0);
+        assert_eq!(tried_config.min_request_chain_length, 1);
         assert_eq!(tried_config.coverage_configuration, coverage_config)
     }
 
