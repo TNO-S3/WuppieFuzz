@@ -7,7 +7,7 @@ mod toposort;
 /// the same meaning (edges). The dependency graph module attempts to build such a graph.
 use std::{
     cmp::Ordering,
-    collections::{HashMap, hash_map::DefaultHasher},
+    collections::{HashMap, VecDeque, hash_map::DefaultHasher},
     fmt::Display,
     fs::{File, create_dir_all},
     hash::{Hash, Hasher},
@@ -240,6 +240,182 @@ fn add_references_to_openapi_input(
 }
 
 type DepGraph<'a> = DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx>;
+
+/// Configuration for path enumeration in dependency subgraphs.
+#[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
+pub struct PathGenerationConfig {
+    /// Minimum number of operations (nodes) a path should contain.
+    pub min_path_length: usize,
+    /// Maximum number of revisits per node. For example, `0` means each node can occur at most once.
+    pub max_revisits: usize,
+    /// Hard cap on the number of paths to generate to avoid path-space explosion.
+    pub max_paths: usize,
+}
+
+impl Default for PathGenerationConfig {
+    fn default() -> Self {
+        Self {
+            min_path_length: 1,
+            max_revisits: 0,
+            max_paths: 1000,
+        }
+    }
+}
+
+/// Returns the first `n` paths from a connected subgraph in breadth-first order.
+///
+/// Assumes `subgraph` is connected. If this is not the case, the function logs an error and returns
+/// an empty vector.
+#[allow(dead_code)]
+pub fn first_n_path_indices_from_subgraph(
+    subgraph: &DepGraph<'_>,
+    n: usize,
+    mut config: PathGenerationConfig,
+) -> Vec<Vec<NodeIndex>> {
+    if n == 0 {
+        return Vec::new();
+    }
+    config.max_paths = config.max_paths.min(n);
+    enumerate_paths_breadth_first(subgraph, config)
+}
+
+/// Returns the path identified by `index` in breadth-first order.
+///
+/// Assumes `subgraph` is connected. If this is not the case, the function logs an error and returns
+/// `None`.
+#[allow(dead_code)]
+pub fn nth_path_indices_from_subgraph(
+    subgraph: &DepGraph<'_>,
+    index: u64,
+    config: PathGenerationConfig,
+) -> Option<Vec<NodeIndex>> {
+    let Ok(n) = usize::try_from(index.saturating_add(1)) else {
+        log::error!("Path index {index} does not fit in usize on this platform.");
+        return None;
+    };
+    first_n_path_indices_from_subgraph(subgraph, n, config)
+        .into_iter()
+        .nth(index as usize)
+}
+
+/// Returns all OpenApiInputs for the first `n` enumerated paths in `subgraph`.
+///
+/// Each path is converted to an example input and then references are added based on edges in the
+/// same subgraph.
+#[allow(dead_code)]
+pub fn openapi_inputs_for_first_n_subgraph_paths(
+    api: &Spec,
+    subgraph: &DepGraph<'_>,
+    n: usize,
+    config: PathGenerationConfig,
+) -> Vec<OpenApiInput> {
+    first_n_path_indices_from_subgraph(subgraph, n, config)
+        .into_iter()
+        .flat_map(|path| {
+            let ops = path.iter().map(|idx| subgraph[*idx].clone());
+            let input = openapi_example_input_from_ops(api, ops);
+            add_references_to_openapi_input(subgraph, &path, &input)
+        })
+        .collect()
+}
+
+/// Returns all OpenApiInputs corresponding to the enumerated path identified by `index`.
+#[allow(dead_code)]
+pub fn openapi_inputs_for_subgraph_path_index(
+    api: &Spec,
+    subgraph: &DepGraph<'_>,
+    index: u64,
+    config: PathGenerationConfig,
+) -> Option<Vec<OpenApiInput>> {
+    let path = nth_path_indices_from_subgraph(subgraph, index, config)?;
+    let ops = path.iter().map(|idx| subgraph[*idx].clone());
+    let input = openapi_example_input_from_ops(api, ops);
+    Some(add_references_to_openapi_input(subgraph, &path, &input))
+}
+
+fn connected_component_count<N, E>(graph: &DiGraph<N, E, DefaultIx>) -> usize {
+    if graph.node_count() == 0 {
+        return 0;
+    }
+    let mut vertex_sets = UnionFind::new(graph.node_bound());
+    for edge in graph.edge_references() {
+        vertex_sets.union(edge.source(), edge.target());
+    }
+    let mut representatives = std::collections::HashSet::new();
+    for node in graph.node_indices() {
+        representatives.insert(vertex_sets.find_mut(node));
+    }
+    representatives.len()
+}
+
+fn enumerate_paths_breadth_first<N, E>(
+    graph: &DiGraph<N, E, DefaultIx>,
+    config: PathGenerationConfig,
+) -> Vec<Vec<NodeIndex>> {
+    if graph.node_count() == 0 || config.max_paths == 0 {
+        return Vec::new();
+    }
+
+    let components = connected_component_count(graph);
+    if components != 1 {
+        log::error!(
+            "Path generation requires a connected subgraph; received {components} connected components."
+        );
+        return Vec::new();
+    }
+
+    let max_possible_path_length = graph
+        .node_count()
+        .saturating_mul(1usize.saturating_add(config.max_revisits));
+    if config.min_path_length > max_possible_path_length {
+        log::error!(
+            "No paths generated: min_path_length={} is too large for subgraph size={} with max_revisits={}",
+            config.min_path_length,
+            graph.node_count(),
+            config.max_revisits
+        );
+        return Vec::new();
+    }
+
+    let mut queue: VecDeque<Vec<NodeIndex>> = graph.node_indices().map(|n| vec![n]).collect();
+    let mut result = Vec::new();
+    while let Some(path) = queue.pop_front() {
+        if path.len() >= config.min_path_length {
+            result.push(path.clone());
+            if result.len() >= config.max_paths {
+                log::error!(
+                    "Path generation reached max_paths={} limit; truncating enumeration.",
+                    config.max_paths
+                );
+                break;
+            }
+        }
+
+        let Some(last) = path.last().copied() else {
+            continue;
+        };
+        for neighbor in graph.neighbors(last) {
+            let occurrences = path.iter().filter(|&&node| node == neighbor).count();
+            if occurrences < 1 + config.max_revisits {
+                let mut extended = path.clone();
+                extended.push(neighbor);
+                queue.push_back(extended);
+            }
+        }
+    }
+
+    if result.is_empty() {
+        log::error!(
+            "No paths generated: min_path_length={} is too large for subgraph size={} with max_revisits={}",
+            config.min_path_length,
+            graph.node_count(),
+            config.max_revisits
+        );
+    }
+
+    result
+}
 
 /// A dependency graph defined on the operations of an API. The edges of the graph
 /// denote parameter dependencies: `O1 -> O2` means O1 returns a parameter that is
@@ -527,4 +703,90 @@ fn inout_params<'a>(
     input_fields.extend(request_body_fields);
 
     (input_fields, response_output_fields, request_output_fields)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PathGenerationConfig, enumerate_paths_breadth_first};
+    use petgraph::prelude::DiGraph;
+
+    #[test]
+    fn enumerate_paths_orders_by_breadth_first_length() {
+        let mut graph = DiGraph::<(), (), _>::new();
+        let n0 = graph.add_node(());
+        let n1 = graph.add_node(());
+        graph.add_edge(n0, n1, ());
+        graph.add_edge(n1, n0, ());
+
+        let paths = enumerate_paths_breadth_first(
+            &graph,
+            PathGenerationConfig {
+                min_path_length: 1,
+                max_revisits: 1,
+                max_paths: 10,
+            },
+        );
+
+        // With BFS, path lengths should never decrease.
+        let lengths: Vec<usize> = paths.iter().map(Vec::len).collect();
+        assert!(lengths.windows(2).all(|w| w[0] <= w[1]));
+
+        // The first layer should contain all single-node paths.
+        assert_eq!(paths[0].len(), 1);
+        assert_eq!(paths[1].len(), 1);
+    }
+
+    #[test]
+    fn enumerate_paths_returns_empty_for_disconnected_graph() {
+        let mut graph = DiGraph::<(), (), _>::new();
+        graph.add_node(());
+        graph.add_node(());
+        let paths = enumerate_paths_breadth_first(
+            &graph,
+            PathGenerationConfig {
+                min_path_length: 1,
+                max_revisits: 0,
+                max_paths: 10,
+            },
+        );
+
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn enumerate_paths_returns_empty_when_min_path_length_is_infeasible() {
+        let mut graph = DiGraph::<(), (), _>::new();
+        let n0 = graph.add_node(());
+        let n1 = graph.add_node(());
+        graph.add_edge(n0, n1, ());
+        let paths = enumerate_paths_breadth_first(
+            &graph,
+            PathGenerationConfig {
+                min_path_length: 3,
+                max_revisits: 0,
+                max_paths: 10,
+            },
+        );
+
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn enumerate_paths_respects_max_paths_limit() {
+        let mut graph = DiGraph::<(), (), _>::new();
+        let n0 = graph.add_node(());
+        let n1 = graph.add_node(());
+        graph.add_edge(n0, n1, ());
+        graph.add_edge(n1, n0, ());
+        let paths = enumerate_paths_breadth_first(
+            &graph,
+            PathGenerationConfig {
+                min_path_length: 1,
+                max_revisits: 3,
+                max_paths: 3,
+            },
+        );
+
+        assert_eq!(paths.len(), 3);
+    }
 }
