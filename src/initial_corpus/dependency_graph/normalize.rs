@@ -315,6 +315,29 @@ fn normalize_schema(
             access,
             recursion_depth + 1,
         )
+    } else if schema.all_of.len() > 1 {
+        // Collect normalizations from all sub-schemas and merge them.
+        // This is the common OpenAPI inheritance pattern:
+        //   allOf: [BaseObject, {properties: {id: integer}}]
+        // Previously this fell through to schema_type matching, which returns None when
+        // the wrapping allOf schema has no explicit type, making all its fields invisible
+        // to the dependency graph.
+        let merged: Vec<ParameterNormalization> = schema
+            .all_of
+            .iter()
+            .filter_map(|sub| sub.resolve(api).ok())
+            .flat_map(|sub_schema| {
+                normalize_schema(
+                    api,
+                    sub_schema,
+                    path.clone(),
+                    access.clone(),
+                    recursion_depth + 1,
+                )
+                .unwrap_or_default()
+            })
+            .collect();
+        result = if merged.is_empty() { None } else { Some(merged) }
     } else if schema.one_of.len() == 1 {
         // Normalize the single schema in this one_of.
         result = normalize_schema(
