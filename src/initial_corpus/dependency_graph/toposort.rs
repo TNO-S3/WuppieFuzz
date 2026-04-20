@@ -49,6 +49,10 @@ pub fn toposort<'a>(
                         }
                         if !dfs.discovered.is_visited(succ) {
                             dfs.stack.push(*succ);
+                        } else if !finished.is_visited(succ) {
+                            // Back edge: *succ is discovered but not yet finished,
+                            // meaning it is still on the DFS stack. This is a cycle.
+                            return Err(Cycle(*succ));
                         }
                     }
                 } else {
