@@ -30,7 +30,10 @@ fn deduplicate_context_from_name(name: &str, context: Option<&str>) -> String {
     // If the name ends in a magic string, consider that the name, and the part before it the context.
     if let Some(context_str) = context {
         let last = name.len() - 1;
-        let no_context_name = if let Some(i) = name.find(['-', '_'])
+        // Use rfind to find the last separator so names like "my_user_id" with context
+        // "user" correctly strip the "my_user_" prefix and reduce to "id", instead of
+        // splitting at the first separator ("my") and failing to match.
+        let no_context_name = if let Some(i) = name.rfind(['-', '_'])
             && (i != 0 && i != last && stem(context_str) == stem(&name[..i]))
         {
             &name[i + 1..]
