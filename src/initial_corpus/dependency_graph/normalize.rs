@@ -343,7 +343,11 @@ fn normalize_schema(
                 .unwrap_or_default()
             })
             .collect();
-        result = if merged.is_empty() { None } else { Some(merged) }
+        result = if merged.is_empty() {
+            None
+        } else {
+            Some(merged)
+        }
     } else if schema.one_of.len() == 1 {
         // Normalize the single schema in this one_of.
         result = normalize_schema(
@@ -585,12 +589,8 @@ mod tests {
         let context = Some("user_cat".into());
         assert_eq!(
             "user_cat|id",
-            ParameterNormalization::new(
-                "user_cat_id".into(),
-                context,
-                parameter_access.clone()
-            )
-            .normalized
+            ParameterNormalization::new("user_cat_id".into(), context, parameter_access.clone())
+                .normalized
         );
     }
 }
