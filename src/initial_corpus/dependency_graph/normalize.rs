@@ -30,13 +30,19 @@ fn deduplicate_context_from_name(name: &str, context: Option<&str>) -> String {
     // If the name ends in a magic string, consider that the name, and the part before it the context.
     if let Some(context_str) = context {
         let last = name.len() - 1;
-        // Use rfind to find the last separator so names like "my_user_id" with context
-        // "user" correctly strip the "my_user_" prefix and reduce to "id", instead of
-        // splitting at the first separator ("my") and failing to match.
-        let no_context_name = if let Some(i) = name.rfind(['-', '_'])
-            && (i != 0 && i != last && stem(context_str) == stem(&name[..i]))
-        {
-            &name[i + 1..]
+        // Search all separator positions left-to-right and use the first prefix that
+        // stem-matches the context. This correctly handles:
+        //   "cat_names"    context "cat"      → "names"    (first prefix matches)
+        //   "cat_name_id"  context "cat"      → "name_id"  (first prefix matches, full remainder kept)
+        //   "user_cat_id"  context "user_cat" → "id"       (first prefix "user" doesn't match,
+        //                                                    second prefix "user_cat" does)
+        // Using rfind or plain find alone cannot handle all three cases correctly.
+        let separator_stripped = name
+            .match_indices(['-', '_'])
+            .find(|&(i, _)| i != 0 && i != last && stem(context_str) == stem(&name[..i]))
+            .map(|(i, _)| &name[i + 1..]);
+        let no_context_name = if let Some(stripped) = separator_stripped {
+            stripped
         } else if ["id", "Id", "ID"].iter().any(|id| name.ends_with(id))
             && stem(context_str) == stem(&name[..name.len() - 2])
         {
@@ -558,6 +564,33 @@ mod tests {
                 parameter_access: parameter_access.clone()
             },
             ParameterNormalization::new("PetID".into(), context, parameter_access.clone())
+        );
+
+        // Multi-separator: first prefix matches context, full remainder is kept.
+        // "cat_name_id" with context "cat" should strip "cat_" and keep "name_id",
+        // not strip "cat_name_" leaving only "id" (rfind) or fail to strip at all.
+        let context = Some("cat".into());
+        assert_eq!(
+            "cat|name_id",
+            ParameterNormalization::new(
+                "cat_name_id".into(),
+                context.clone(),
+                parameter_access.clone()
+            )
+            .normalized
+        );
+
+        // Multi-separator: first prefix does NOT match; a later one does.
+        // "user_cat_id" with context "user_cat" should strip "user_cat_" → "id".
+        let context = Some("user_cat".into());
+        assert_eq!(
+            "user_cat|id",
+            ParameterNormalization::new(
+                "user_cat_id".into(),
+                context,
+                parameter_access.clone()
+            )
+            .normalized
         );
     }
 }
