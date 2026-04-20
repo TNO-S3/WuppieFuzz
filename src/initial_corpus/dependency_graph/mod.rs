@@ -7,7 +7,7 @@ mod toposort;
 /// the same meaning (edges). The dependency graph module attempts to build such a graph.
 use std::{
     cmp::Ordering,
-    collections::{HashMap, hash_map::DefaultHasher},
+    collections::{HashMap, HashSet, hash_map::DefaultHasher},
     fmt::Display,
     fs::{File, create_dir_all},
     hash::{Hash, Hasher},
@@ -38,7 +38,7 @@ use crate::{
         examples::{example_from_qualified_operation, openapi_inputs_from_ops},
         spec::Spec,
     },
-    parameter_access::{ParameterAddressing, ParameterMatching},
+    parameter_access::{ParameterAccess, ParameterAddressing, ParameterMatching},
 };
 
 /// Returns OpenApiInputs generated from a dependency graph derived from the OpenAPI
@@ -151,8 +151,10 @@ fn add_references_to_openapi_input(
         HashMap::new();
     for (target_index, _request) in openapi_input.0.iter().enumerate() {
         let target_node_index = sorted_nodes[target_index];
-        // let edges = subgraph.edges_directed(target_node_index, petgraph::Direction::Incoming);
-        let mut request_reference_added = false;
+        // Track which input parameters have already been assigned a Request-type source.
+        // Using a set keyed by input_access so that each distinct input parameter gets
+        // its earliest matching source, rather than only the very first parameter found.
+        let mut request_references_added: HashSet<ParameterAccess> = HashSet::new();
         // Consider the requests that come before the target to possibly add a reference to
         for (source_index, source_node_index) in sorted_nodes.iter().enumerate().take(target_index)
         {
@@ -164,8 +166,10 @@ fn add_references_to_openapi_input(
                             input_access,
                             ..
                         } => {
-                            if !request_reference_added {
-                                request_reference_added = true;
+                            // Only add a reference to the earliest matching source per
+                            // input parameter (the edges are likely transitive).
+                            if !request_references_added.contains(input_access) {
+                                request_references_added.insert(input_access.clone());
                                 target_to_sources
                                     .entry((target_index, input_access.clone()).into())
                                     .or_default()
