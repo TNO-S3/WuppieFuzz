@@ -1,10 +1,67 @@
+//! Dependency-graph–based generation of an initial fuzzing corpus.
+//!
+//! # Overview
+//!
+//! A REST API is most effectively fuzzed when requests are issued in an order
+//! that makes semantic sense: you would typically `POST /artists` to create a
+//! resource before you `GET /artists/{id}` to read it.  This module infers
+//! those orderings automatically from the OpenAPI specification, without any
+//! manual configuration, by building a *dependency graph* over the set of
+//! operations (endpoints × HTTP methods) and using it to produce a set of
+//! seed [`OpenApiInput`]s that the fuzzer can then mutate.
+//!
+//! # Algorithm
+//!
+//! The entry point is [`initial_corpus_from_api`].  It performs the following
+//! steps:
+//!
+//! 1. **Build the dependency graph** ([`DependencyGraph::new`]).  Every
+//!    operation becomes a *node*.  Two nodes are connected by a directed *edge*
+//!    `A → B` whenever a parameter produced by `A` matches a parameter
+//!    consumed by `B` (matched by [normalized name](normalize)).  There are
+//!    two kinds of edge, distinguished by [`ParameterMatching`]:
+//!    - **Response edge** (`ParameterMatching::Response`): `A`'s *response*
+//!      body contains a field whose normalized name matches an input parameter
+//!      of `B`.  The fuzzer will substitute a back-reference at runtime, once
+//!      `A` has actually been executed and has returned a value.
+//!    - **Request edge** (`ParameterMatching::Request`): `A`'s *request*
+//!      contains or accepts a parameter with the same normalized name as an
+//!      input of `B`.  This links two requests that share a client-chosen
+//!      value (e.g. a user-supplied ID), so the fuzzer keeps them in sync.
+//!
+//! 2. **Find connected components** ([`DependencyGraph::connected_components`]).
+//!    Operations that share no parameters at all have no ordering constraints
+//!    between them.  Splitting them into independent components and processing
+//!    each separately keeps the combinatorics manageable.
+//!
+//! 3. **Topological sort** ([`ops_from_subgraph`]).  Within each component the
+//!    edges define a partial order (producers before consumers).  A topological
+//!    sort ([`toposort`]) linearises this into a request sequence, with ties
+//!    broken by CRUD method order (POST < GET < PUT < PATCH < DELETE).
+//!
+//! 4. **Generate concrete examples** ([`openapi_inputs_from_ops`] /
+//!    [`openapi_example_input_from_ops`]).  For each topologically-sorted
+//!    sequence of operations, generate one or more [`OpenApiInput`]s populated
+//!    with concrete parameter values taken from the spec (examples, defaults,
+//!    or synthesised values).
+//!
+//! 5. **Wire up references** ([`add_references_to_openapi_input`]).  Replace
+//!    concrete parameter values with [`IReference`] / [`OReference`] pointers
+//!    wherever an edge says the value should come from an earlier request in
+//!    the same sequence.  Multiple wiring choices (when a parameter could be
+//!    satisfied by more than one earlier operation) are each emitted as a
+//!    separate [`OpenApiInput`].
+//!
+//! # Sub-modules
+//!
+//! - [`normalize`](self::normalize) — Derives a *normalized name* for each
+//!   parameter so that semantically equivalent names such as `artistId`,
+//!   `artist_id`, and the path parameter `id` under `/artists/` all map to the
+//!   same key `artist|id`.  See that module for the full normalization rules.
+//! - [`toposort`](self::toposort) — A custom depth-first topological sort that
+//!   breaks ties between nodes at the same graph depth using CRUD method order.
 mod normalize;
 mod toposort;
-
-/// The fuzzer wants to use outputs of previous requests (POST artist -> artistid)
-/// as input to other requests (GET artist?id=1). To know which outputs to use for which inputs,
-/// you need a graph that connects possible requests/operations (nodes) by parameters that carry
-/// the same meaning (edges). The dependency graph module attempts to build such a graph.
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet, hash_map::DefaultHasher},
@@ -41,9 +98,14 @@ use crate::{
     parameter_access::{ParameterAccess, ParameterAddressing, ParameterMatching},
 };
 
-/// Returns OpenApiInputs generated from a dependency graph derived from the OpenAPI
-/// specification. If rigorously generating parameter combinations would result in
-/// too many inputs, it just generates a single example.
+/// Generates seed [`OpenApiInput`]s for the fuzzer from the given API specification.
+///
+/// This is the top-level entry point for dependency-graph–based corpus generation.
+/// See the [module documentation](self) for a description of the full algorithm.
+///
+/// When the number of interesting parameter combinations for a subgraph is too
+/// large, the function falls back to generating a single representative example
+/// per operation sequence rather than enumerating all combinations.
 pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
     let dependency_graph = DependencyGraph::new(api);
 
@@ -76,9 +138,15 @@ pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
         .collect()
 }
 
-/// Creates a vector of topologically sorted QualifiedOperations (path, method, etc.)
-/// from the subgraph. To let the caller keep track of the sorting, this function also
-/// returns a Vec of the NodeIndex items corresponding to the QualifiedOperations.
+/// Returns the operations in the subgraph sorted in topological (dependency) order.
+///
+/// The returned tuple contains:
+/// - A `Vec<QualifiedOperation>` in execution order (producers before consumers).
+/// - A parallel `Vec<NodeIndex>` mapping each position back to the node in the
+///   subgraph, which callers need to resolve graph edges later.
+///
+/// Returns `Err(Cycle)` if the subgraph contains a cyclic dependency; such a
+/// subgraph is skipped during corpus generation.
 fn ops_from_subgraph<'a>(
     subgraph: &DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx>,
 ) -> Result<(Vec<QualifiedOperation<'a>>, Vec<NodeIndex>), Cycle<NodeIndex>> {
@@ -103,7 +171,12 @@ fn ops_from_subgraph<'a>(
     ))
 }
 
-/// Creates an example OpenApiInput from the sequence of QualifiedOperations given by ops_iter for the given api.
+/// Creates a single-example [`OpenApiInput`] from a sequence of operations.
+///
+/// Each operation is populated with one representative parameter value (from
+/// the spec's `example`/`default`, or a synthesised value).  This is the
+/// fallback path used when full combination generation would produce too many
+/// seeds.
 fn openapi_example_input_from_ops<'a>(
     api: &Spec,
     ops_iter: impl Iterator<Item = QualifiedOperation<'a>>,
@@ -115,30 +188,39 @@ fn openapi_example_input_from_ops<'a>(
     )
 }
 
-/// Replace parameter Values of requests in the openapi_input with References.
-/// The parameter Values for which this is done are defined by the edges in the subgraph,
-/// where the source and target of each edge index into sorted_nodes to get the position
-/// of the request in the openapi_input.
+/// Rewires concrete parameter values inside `openapi_input` to back-references
+/// wherever the subgraph has an edge saying the value can come from an earlier
+/// request.
 ///
-/// Note that each Value may reference one of multiple Values in previous responses.
-/// For this reason we create multiple OpenApiInputs; one for each choice of reference.
-/// To avoid a combinatorial explosion, we do not take the cartesian product of these
-/// reference choices but combine them more simply: say we have these target parameters
-/// with their source parameters:
+/// `sorted_nodes[i]` is the graph node corresponding to `openapi_input.0[i]`.
 ///
-/// A -> A1, A2
-/// B -> B1, B2, B3
+/// # Multiple wiring choices
 ///
-/// In that case we will only create these combinations of references:
+/// A single input parameter may be satisfiable by more than one earlier
+/// operation (multiple incoming edges).  Rather than returning the cartesian
+/// product of all possible wirings (which would be exponential), this function
+/// zips the alternatives column-by-column and returns one [`OpenApiInput`] per
+/// column.  For example, if parameter A can be wired from A1 or A2, and
+/// parameter B from B1, B2, or B3, the function produces:
 ///
-/// 1. A -> A1, B -> B1
-/// 2. A -> A2, B -> B2
-/// 3. B -> B3
+/// | Output | A wired from | B wired from |
+/// |--------|-------------|-------------|
+/// | 1 (unwired baseline) | — | — |
+/// | 2      | A1           | B1           |
+/// | 3      | A2           | B2           |
+/// | 4      | —            | B3           |
 ///
-/// For ParameterMatching::Request variants the edges are (likely) transitive (they refer to
-/// earlier Values that may *also* be replaced with References based on names or
-/// normalized names being equal). Therefore we only add a single Reference, to the
-/// earliest matching request in the chain.
+/// # Request vs. Response edges
+///
+/// - **Response edge** (`ParameterMatching::Response`): the value must be read
+///   from the runtime response of an earlier request, so an [`OReference`] is
+///   inserted.  All incoming response edges for a parameter are collected as
+///   alternatives (see above).
+/// - **Request edge** (`ParameterMatching::Request`): the value should mirror
+///   a parameter in an earlier request, so an [`IReference`] is inserted.
+///   Because request edges are typically transitive (the referenced parameter
+///   may itself be referenced from an even earlier request), only the
+///   *earliest* matching source is recorded per input parameter.
 fn add_references_to_openapi_input(
     subgraph: &DiGraph<QualifiedOperation, ParameterMatching, DefaultIx>,
     sorted_nodes: &[NodeIndex],
@@ -243,18 +325,45 @@ fn add_references_to_openapi_input(
     inputs_with_references
 }
 
+/// The directed graph type used throughout this module.
+///
+/// - **Nodes** are [`QualifiedOperation`]s (an API path + HTTP method + the
+///   `oas3` operation struct).
+/// - **Edges** carry a [`ParameterMatching`] value that records *which*
+///   parameters were matched and *how* (response output → request input, or
+///   two requests sharing the same client-supplied value).
 type DepGraph<'a> = DiGraph<QualifiedOperation<'a>, ParameterMatching, DefaultIx>;
 
-/// A dependency graph defined on the operations of an API. The edges of the graph
-/// denote parameter dependencies: `O1 -> O2` means O1 returns a parameter that is
-/// needed to perform O2. The edges have associated strings that contain the stem
-/// (normalized form) of the parameter name.
+/// A dependency graph over all operations in an OpenAPI specification.
+///
+/// **Nodes** represent individual API operations (a path + HTTP method pair).
+/// **Directed edges** `A → B` mean that operation `A` produces a parameter
+/// that operation `B` needs as input.  See [`DepGraph`] for the concrete graph
+/// type and [`ParameterMatching`] for the two kinds of edge.
+///
+/// Use [`DependencyGraph::new`] to build the graph from a spec, then
+/// [`DependencyGraph::connected_components`] to partition it, and
+/// [`DependencyGraph::subgraph`] to extract each component for further
+/// processing.
 pub struct DependencyGraph<'a> {
-    /// The API that the dependency graph is about.
     graph: DepGraph<'a>,
 }
 
 impl<'a> DependencyGraph<'a> {
+    /// Builds a dependency graph from the given API specification.
+    ///
+    /// The construction proceeds in three passes:
+    ///
+    /// 1. **Add nodes**: one node per `(path, method)` pair.
+    /// 2. **Collect I/O parameters**: for every node, derive the normalized
+    ///    names of its inputs, its response-output fields, and its
+    ///    request-output fields (see [`inout_params`]).
+    /// 3. **Add edges**: for every ordered pair of distinct nodes `(A, B)`,
+    ///    call [`find_links`] to find parameters that `A` produces and `B`
+    ///    consumes.  A CRUD-order guard (`A.method ≤ B.method`) prevents
+    ///    trivially circular edges between same-resource operations (e.g.
+    ///    it avoids adding a GET→POST edge when the POST already implies a
+    ///    later GET).
     pub fn new(api: &'a Spec) -> Self {
         let mut graph = DiGraph::new();
 
@@ -293,8 +402,18 @@ impl<'a> DependencyGraph<'a> {
         Self { graph }
     }
 
-    /// Returns a Vec of all connected components of the graph. The nodes are
-    /// referred to by NodeIndex, which is unstable under updates of the graph.
+    /// Partitions the graph into connected components.
+    ///
+    /// Returns one `Vec<NodeIndex>` per component, with node indices sorted
+    /// in ascending order within each component.  The order of components in
+    /// the outer `Vec` is unspecified.
+    ///
+    /// Operations that share no parameter links end up in separate components
+    /// and can be processed independently.  This avoids cross-contamination of
+    /// unrelated request sequences and keeps the combinatorics bounded.
+    ///
+    /// **Note**: `NodeIndex` values are only stable as long as the graph is not
+    /// modified.  Retain this constraint when using the returned indices.
     pub fn connected_components(&self) -> Vec<Vec<NodeIndex>> {
         let mut vertex_sets = self.union_find();
 
@@ -319,6 +438,16 @@ impl<'a> DependencyGraph<'a> {
             .collect()
     }
 
+    /// Writes a human-readable Mermaid diagram of the dependency graph.
+    ///
+    /// Creates `<report_path>/corpus/mermaid_graph.md`, which contains a
+    /// Mermaid `graph LR` block showing every operation as a node and every
+    /// parameter dependency as a labelled edge.  Connected components are
+    /// wrapped in Mermaid `subgraph` blocks.
+    ///
+    /// The file can be viewed with any Mermaid-capable Markdown renderer (e.g.
+    /// the VS Code Mermaid extension, GitHub's Markdown preview, or
+    /// <https://mermaid.live>).
     pub fn write_report(&self, report_path: &Path) -> std::io::Result<()> {
         let corpus_path = report_path.join("corpus");
         create_dir_all(&corpus_path)?;
@@ -386,8 +515,11 @@ impl<'a> DependencyGraph<'a> {
         Ok(())
     }
 
-    /// Given the graph and a subset of nodes, returns a new graph containing only nodes and
-    /// edges that exist in the given subset of nodes.
+    /// Extracts a subgraph containing only the given nodes (and their mutual edges).
+    ///
+    /// `nodes` must be sorted in ascending order (as returned by
+    /// [`connected_components`](Self::connected_components)) because the
+    /// implementation uses binary search to filter nodes.
     pub fn subgraph(
         &self,
         nodes: &[NodeIndex],
@@ -397,8 +529,12 @@ impl<'a> DependencyGraph<'a> {
         subgraph
     }
 
-    /// Return the subgraphs as a UnionFind (an efficient subset finding data
-    /// structure).
+    /// Builds a [`UnionFind`] structure that groups nodes into connected components.
+    ///
+    /// Each edge `A → B` in the graph causes `A` and `B` to be placed in the
+    /// same set.  After processing all edges, nodes in the same set belong to
+    /// the same connected component.  [`connected_components`](Self::connected_components)
+    /// uses this to efficiently enumerate those sets.
     fn union_find(&self) -> UnionFind<NodeIndex> {
         let mut vertex_sets = UnionFind::new(self.graph.node_bound());
         for edge in self.graph.edge_references() {
@@ -434,10 +570,21 @@ impl Display for DependencyGraph<'_> {
     }
 }
 
-/// Checks if two operations are linked: an output parameter of operation 1 occurs
-/// as an input parameter of operation 2. If they are linked, return the link in the
-/// form of a ParameterMatching. Note that a parameter can be linked to another operation
-/// twice: once to a parameter in the request and once to a parameter in the response.
+/// Finds all dependency edges from operation 1 to operation 2.
+///
+/// An edge exists whenever an output parameter of op 1 has the same
+/// [normalized name](normalize) as an input parameter of op 2.  There are two
+/// independent output sets to check against (see [`inout_params`]):
+///
+/// - **Response outputs** (fields returned in the HTTP response body of op 1):
+///   produce a [`ParameterMatching::Response`] edge.  The actual value is only
+///   available at runtime after op 1 has been executed.
+/// - **Request outputs** (parameters sent *in* the request for op 1, or its
+///   POST body): produce a [`ParameterMatching::Request`] edge.  This links
+///   two requests that should carry the same client-chosen value.
+///
+/// A single input parameter may generate one edge of each kind if both output
+/// sets happen to contain a matching name.
 fn find_links<'a>(
     inputs_to_2: &'a [ParameterNormalization],
     response_outputs_from_1: &'a [ParameterNormalization],

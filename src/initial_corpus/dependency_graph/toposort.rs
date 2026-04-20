@@ -1,5 +1,20 @@
-//! Custom implementation of toposort from `petgraph` that sorts equivalent
-//! nodes in CRUD order.
+//! Topological sort with CRUD-order tie-breaking.
+//!
+//! `petgraph` provides a generic topological sort, but it does not give any
+//! guarantee about the relative order of nodes that have no ordering constraint
+//! between them (i.e. nodes at the same "depth" in the DAG).
+//!
+//! For the dependency graph we want a deterministic, semantically meaningful
+//! tiebreaker: among operations that are not mutually constrained, a `POST`
+//! (create) should come before a `GET` (read), which should come before a
+//! `PUT`/`PATCH` (update), which should come before a `DELETE`.  This matches
+//! the natural lifecycle of a REST resource and produces more realistic request
+//! sequences for the fuzzer to start from.
+//!
+//! The implementation is a depth-first post-order traversal (the standard
+//! approach for topological sorting) with one modification: when a node is
+//! first visited its neighbors are sorted by CRUD method order before being
+//! pushed onto the DFS stack.
 
 use petgraph::{
     prelude::*,
@@ -86,7 +101,11 @@ impl<N> Cycle<N> {
 
 type DfsSpaceType<G> = DfsSpace<<G as GraphBase>::NodeId, <G as Visitable>::Map>;
 
-/// Create a Dfs if it's needed
+/// Borrows or creates a [`Dfs`] traversal object, then calls `f` with it.
+///
+/// If `space` is `Some`, the existing `Dfs` inside the [`DfsSpace`] is reused
+/// (avoiding an allocation).  Otherwise a fresh empty `Dfs` is created on the
+/// stack.  This mirrors the pattern used by `petgraph`'s own toposort helper.
 fn with_dfs<G, F, R>(g: G, space: Option<&mut DfsSpaceType<G>>, f: F) -> R
 where
     G: GraphRef + Visitable,

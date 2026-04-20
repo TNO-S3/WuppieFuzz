@@ -1,5 +1,14 @@
-//! Helper functions for loading a corpus from disk. See module documentation of
-//! the `input` submodule for information on serialization.
+//! Loading and constructing the initial fuzzing corpus.
+//!
+//! Two sources of seeds are supported:
+//!
+//! - **Disk corpus** ([`load_starting_corpus`]): YAML-serialised
+//!   [`OpenApiInput`]s written to a directory by a previous run or crafted by
+//!   hand.  See the `input` module for the serialization format.
+//! - **Spec-derived corpus** ([`dependency_graph::initial_corpus_from_api`]):
+//!   seeds synthesised automatically from the OpenAPI specification by
+//!   analysing parameter dependencies between operations.  See the
+//!   [`dependency_graph`] sub-module for details.
 pub mod dependency_graph;
 
 use std::{

@@ -1,13 +1,53 @@
-//! When making a dependency graph, it's common (unfortunately) to come across field names
-//! and parameters that have the same meaning but not the same name. The normalization
-//! module attempts to deal with this by deriving a normalized variant for each parameter's
-//! name.
+//! Parameter name normalization for dependency-graph edge construction.
 //!
-//! When doing so, we incorporate the context into the normalized name. For instance, a
-//! parameter 'id' in a request to a path ending in 'artist/' suggests that this is the ID
-//! of an artist, and so the normalization is something like 'artist|id'. When an album
-//! later refers to an 'artist_id', there is an opportunity to match it to the 'id' found
-//! earlier.
+//! # Purpose
+//!
+//! To detect that two operations share a parameter — and therefore that one
+//! should precede the other — we need a canonical form for parameter names
+//! that abstracts over superficial naming differences.  This module derives
+//! that canonical form, called the **normalized name**, for each parameter in
+//! a request or response.
+//!
+//! # Normalized name format
+//!
+//! A normalized name is either just a stemmed word (e.g. `"widget"` from
+//! `"widgets"`) or a `context|name` pair (e.g. `"artist|id"`) when a context
+//! can be inferred.  Context provides the "namespace" that disambiguates bare
+//! `"id"` fields: an `id` returned by `GET /artists` and an `id` returned by
+//! `GET /albums` are different things, even though both fields are named `id`.
+//!
+//! Both the context and the name are **stemmed** with a Porter stemmer so that
+//! plurals, British/American spellings, and common suffixes do not prevent
+//! matching.
+//!
+//! # How context is determined
+//!
+//! The context rules differ by where the parameter lives:
+//!
+//! | Parameter kind | Name source | Context source |
+//! |---|---|---|
+//! | Path (`/artists/{id}`) | `id` | last non-templated path segment (`artists`) |
+//! | Query / Header / Cookie | parameter name | last URL path segment |
+//! | Body (JSON object field) — depth 1 | field name | last URL path segment |
+//! | Body (JSON object field) — depth ≥ 2 | leaf field name | parent field name |
+//!
+//! # Context deduplication
+//!
+//! When the parameter name already encodes the context (e.g. `artist_id` under
+//! the `/artists/` path, or `artistId`), the context prefix is stripped before
+//! forming the normalized name.  See [`deduplicate_context_from_name`] for the
+//! exact rules.
+//!
+//! # Entry points
+//!
+//! - [`normalize_parameters`] — normalizes all URL parameters for a request.
+//! - [`normalize_request_body`] — normalizes all fields in a POST/PUT body.
+//! - [`normalize_response`] — normalizes all fields in a response body.
+//!
+//! All three functions return a [`Vec<ParameterNormalization>`]; each entry
+//! holds both the raw name (for display) and the normalized name (for
+//! matching), together with a [`ParameterAccess`] that identifies the field's
+//! exact location so a back-reference can be inserted later.
 
 use std::collections::BTreeMap;
 
@@ -20,12 +60,39 @@ use crate::{
     parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
 };
 
+/// Marker for whether a parameter belongs to a request or a response.
+///
+/// Used to determine the correct [`ParameterAccess`] variant when
+/// constructing normalizations from a body schema.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ReqResp {
     Req,
     Resp,
 }
 
+/// Strips a context prefix already embedded in `name`, if one is present.
+///
+/// When the parameter name duplicates its context (e.g. the field `artist_id`
+/// under the `/artists/` path, where the context is already `artist`), we
+/// reduce the name to just the meaningful suffix (`id`) before forming the
+/// normalized name.  This ensures `artist_id` and the path parameter `id`
+/// from `/artists/{id}` both normalize to `artist|id`.
+///
+/// # Strategy
+///
+/// Separator characters (`_` and `-`) are scanned **left-to-right**; the first
+/// one whose left-hand prefix stem-matches the context is used as the split
+/// point, and the remainder is returned.  For example:
+///
+/// - `"cat_names"` with context `"cat"` → `"names"` (first prefix matches)
+/// - `"cat_name_id"` with context `"cat"` → `"name_id"` (first prefix matches; full remainder kept)
+/// - `"user_cat_id"` with context `"user_cat"` → `"id"` (first prefix `"user"` doesn't match;
+///   second prefix `"user_cat"` does)
+///
+/// If no separator-based match is found, the function also checks whether
+/// `name` ends in the literal strings `"id"`, `"Id"`, or `"ID"` and whether
+/// stripping those two characters leaves a stem that matches the context.
+/// This handles the camelCase pattern `"PetID"` → `"id"` (context `"pet"`).
 fn deduplicate_context_from_name(name: &str, context: Option<&str>) -> String {
     // If the name ends in a magic string, consider that the name, and the part before it the context.
     if let Some(context_str) = context {
@@ -99,8 +166,9 @@ impl ParameterNormalization {
     }
 
     fn query_header_cookie(access: ParameterAccess, path: Vec<&str>) -> Self {
-        // Query, Header and Cookie are all treated the same for normalization;
-        // the context is the last element of the URL-path, if present.
+        // Query, Header and Cookie parameters all use the last URL path segment
+        // as context.  E.g. the query parameter `limit` on `GET /artists/` gets
+        // context `"artists"`, normalizing to `"artist|limit"`.
         let access_name = access.get_non_body_access_element().unwrap();
         let context = path
             .last()
@@ -109,8 +177,10 @@ impl ParameterNormalization {
     }
 
     fn path(access: ParameterAccess, path: Vec<&str>) -> Result<Self, String> {
-        // For a (templated) path parameter, the context is the last part of the
-        // path before the parameter: /shop/pet/{name} => context = pet
+        // For path parameters like `/shop/pet/{name}`, the context is the last
+        // non-templated segment immediately before the `{…}` placeholder, i.e.
+        // `"pet"` in this example.  This means `{name}` normalizes to `"pet|name"`
+        // and can match a `pet_name` response field.
         let access_name = access.get_non_body_access_element().unwrap();
         // Use the last part of the path before the templated parameter as context
         let context = {
@@ -131,9 +201,12 @@ impl ParameterNormalization {
     }
 
     fn body(access: ParameterAccess, path: Vec<String>) -> Self {
-        // Context for a body parameter is either the named field in the body,
-        // one level higher than the parameter itself, or if this is not suitable,
-        // the last element of the path.
+        // For body (JSON) parameters the context depends on nesting depth:
+        //   - depth 0 (the body root itself): no name; use path as fallback.
+        //   - depth 1 (top-level field): use the last URL path segment as context
+        //     so `{"id": …}` in a POST to `/pets/` gets context `"pets"`.
+        //   - depth ≥ 2 (nested field): use the immediate parent field name as
+        //     context so `owner.id` normalizes to `"owner|id"`.
         let access_elements = access.get_body_access_elements().unwrap();
         // Discard offsets for name- and context-determination
         let named_access_elements: Vec<_> = access_elements
@@ -176,8 +249,12 @@ impl ParameterNormalization {
     }
 }
 
-/// Finds all request parameters used in an operation and returns their normalized name.
-/// See `normalize_parameter` for treatment of parameters named 'id'.
+/// Normalizes all URL (query, path, header, cookie) parameters for an operation.
+///
+/// Iterates over the parameter list in the OpenAPI spec, resolves any `$ref`
+/// pointers, and returns one [`ParameterNormalization`] per successfully
+/// resolved parameter.  Parameters that fail to resolve or cannot be
+/// normalized are logged and skipped.
 pub fn normalize_parameters<'a>(
     api: &'a Spec,
     path: &str,
@@ -198,10 +275,12 @@ pub fn normalize_parameters<'a>(
         .collect()
 }
 
-/// Normalizes a request parameter name.
+/// Normalizes a single request parameter (non-body).
 ///
-/// If the parameter is in the path but the path does not contain a templated
-/// parameter with that name, an error is returned.
+/// Routes to [`ParameterNormalization::query_header_cookie`] or
+/// [`ParameterNormalization::path`] depending on the parameter location.  Path
+/// parameters must appear as a `{name}` template in the path string; an error
+/// is returned if they do not.
 fn normalize_parameter(
     path: &str,
     parameter: &Parameter,
@@ -228,13 +307,15 @@ fn normalize_parameter(
     }
 }
 
-/// Normalizes response parameters.
+/// Normalizes the JSON fields of an HTTP response body.
 ///
-/// For the given response, any application/json content is extracted, and
-/// the field names of any top-level object are returned in stemmed form.
-/// The URL is used to add context to parameters named "id": those are prepended
-/// with the stem of the last non-parameter component of the URL. For example,
-/// an "id" parameter returned from `PATCH /tank/{id}` is renamed to "tankid".
+/// Extracts the `application/json` [`MediaType`] from the response (if
+/// present), resolves its schema, and returns normalized names for all fields
+/// using [`normalize_schema`].  Returns `None` if the response has no JSON
+/// content or the schema cannot be resolved.
+///
+/// `path` should be the URL path split by `/`, used to supply context for
+/// top-level fields named `"id"`.
 pub fn normalize_response<'a>(
     api: &'a Spec,
     response: &'a Response,
@@ -249,13 +330,15 @@ pub fn normalize_response<'a>(
     )
 }
 
-/// Normalizes request body parameters.
+/// Normalizes the JSON fields of an HTTP request body.
 ///
-/// For the given body, any application/json content is extracted, and
-/// the field names of any top-level object are returned in stemmed form.
-/// The URL is used to add context to parameters named "id": those are prepended
-/// with the stem of the last non-parameter component of the URL. For example,
-/// an "id" parameter sent to `POST /tank` is renamed to "tankid".
+/// Mirrors [`normalize_response`] for request bodies: extracts
+/// `application/json` content, resolves the schema, and returns normalized
+/// names for all fields.  Returns `None` if no JSON body is present.
+///
+/// `path` is used as context for top-level body fields; for a `POST /pets`
+/// endpoint, a top-level field `id` gets context `"pets"` and normalizes to
+/// `"pet|id"`.
 pub fn normalize_request_body<'a>(
     api: &'a Spec,
     body: &'a RequestBody,
@@ -281,8 +364,24 @@ fn normalization_recursion_limit_exceeded(recursion_depth: usize) -> bool {
     }
 }
 
-/// Schema describes contents of objects and arrays. This function normalizes field
-/// names in a schema if it contains an object or an array of objects.
+/// Normalizes all fields in a JSON schema, recursively.
+///
+/// Returns one [`ParameterNormalization`] per named field reachable from the
+/// schema root, or `None` if the schema type is not an object or array-of-objects
+/// (e.g. a bare string or integer has no meaningful field name).
+///
+/// Handles the following schema structures:
+/// - `allOf` with one entry: delegates directly to that sub-schema.
+/// - `allOf` with multiple entries (OpenAPI inheritance): collects and merges
+///   normalizations from **all** sub-schemas.
+/// - `oneOf` with one entry: delegates directly.
+/// - `type: object`: normalizes each property via [`normalize_object_type`].
+/// - `type: array` with an object item type: normalizes the item's properties.
+/// - Any other scalar type: returns an empty `Vec` (the key in the enclosing
+///   object is still registered by the parent call).
+///
+/// `access` tracks the [`ParameterAccess`] path from the schema root to the
+/// current node; `recursion_depth` guards against circular schema references.
 fn normalize_schema(
     api: &Spec,
     schema: ObjectSchema,
@@ -418,8 +517,11 @@ fn normalize_schema(
     result
 }
 
-/// MediaType is the internal type used for objects, both input (POST) and
-/// output (GET). This function normalizes the field names.
+/// Entry point that resolves a [`MediaType`] schema and normalizes its fields.
+///
+/// `req_or_resp` determines whether the resulting [`ParameterAccess`] values
+/// use the `Request` or `Response` variant of the enum, which affects how
+/// back-references are later inserted.
 fn normalize_media_type<'a>(
     api: &'a Spec,
     media_type: &'a MediaType,
@@ -438,7 +540,19 @@ fn normalize_media_type<'a>(
     normalize_schema(api, schema, path, access, recursion_depth + 1)
 }
 
-/// Returns ParameterNormalizations for all fields in the object.
+/// Normalizes every property of a JSON object schema.
+///
+/// For each key in `object_properties`, constructs a [`ParameterNormalization`]
+/// for the key itself (via [`ParameterNormalization::body`]) and then recurses
+/// into the property's schema to pick up any nested fields.  The recursion
+/// handles nested objects and arrays.
+///
+/// Two depth guards prevent runaway recursion:
+/// - `recursion_depth` is incremented on every recursive call and checked
+///   against the limit in [`normalization_recursion_limit_exceeded`].
+/// - The length of `parameter_access` (the body access path) is capped at 20
+///   elements to handle circular `$ref` chains that the recursion counter alone
+///   cannot catch.
 fn normalize_object_type<'a>(
     api: &'a Spec,
     object_properties: &'a BTreeMap<String, ObjectOrReference<ObjectSchema>>,
@@ -483,6 +597,10 @@ fn normalize_object_type<'a>(
         .collect()
 }
 
+/// Reduces an English word to its grammatical stem using the Porter algorithm.
+///
+/// Used to make matching insensitive to plurals and common suffixes:
+/// `"artists"` and `"artist"` both stem to `"artist"`.
 fn stem(name: &str) -> String {
     porter_stemmer::stem(name).to_lowercase()
 }
