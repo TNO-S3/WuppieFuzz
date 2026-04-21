@@ -593,7 +593,7 @@ fn interesting_values_for_schema(
             log::warn!("Schema has more than one_of schema: conflicting examples may be generated.")
         }
         result.extend(
-            [schema.one_of, schema.any_of]
+            [&schema.one_of, &schema.any_of]
                 .iter()
                 .flat_map(|schema_vec| {
                     schema_vec
