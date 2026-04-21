@@ -36,8 +36,9 @@
 //!
 //! 3. **Topological sort** ([`ops_from_subgraph`]).  Within each component the
 //!    edges define a partial order (producers before consumers).  A topological
-//!    sort ([`toposort`]) linearises this into a request sequence, with ties
-//!    broken by CRUD method order (POST < GET < PUT < PATCH < DELETE).
+//!    sort ([`toposort`](mod@self::toposort)) linearises this into a request
+//!    sequence, with ties broken by CRUD method order (POST < GET < PUT < PATCH
+//!    < DELETE).
 //!
 //! 4. **Generate concrete examples** ([`openapi_inputs_from_ops`] /
 //!    [`openapi_example_input_from_ops`]).  For each topologically-sorted
@@ -58,8 +59,9 @@
 //!   parameter so that semantically equivalent names such as `artistId`,
 //!   `artist_id`, and the path parameter `id` under `/artists/` all map to the
 //!   same key `artist|id`.  See that module for the full normalization rules.
-//! - [`toposort`](self::toposort) — A custom depth-first topological sort that
-//!   breaks ties between nodes at the same graph depth using CRUD method order.
+//! - [`toposort`](mod@self::toposort) — A custom depth-first topological sort
+//!   that breaks ties between nodes at the same graph depth using CRUD method
+//!   order.
 mod normalize;
 mod toposort;
 use std::{

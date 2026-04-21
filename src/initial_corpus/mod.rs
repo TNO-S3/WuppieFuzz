@@ -4,11 +4,11 @@
 //!
 //! - **Disk corpus** ([`load_starting_corpus`]): YAML-serialised
 //!   [`OpenApiInput`]s written to a directory by a previous run or crafted by
-//!   hand.  See the `input` module for the serialization format.
+//!   hand.  See the [`input`](crate::input) module for the serialization format.
 //! - **Spec-derived corpus** ([`dependency_graph::initial_corpus_from_api`]):
 //!   seeds synthesised automatically from the OpenAPI specification by
 //!   analysing parameter dependencies between operations.  See the
-//!   [`dependency_graph`] sub-module for details.
+//!   [`dependency_graph`](crate::initial_corpus::dependency_graph) sub-module for details.
 pub mod dependency_graph;
 
 use std::{
