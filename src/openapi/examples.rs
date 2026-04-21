@@ -505,6 +505,8 @@ fn interesting_params_from_schema(
         );
     }
     if result.is_empty() {
+        // No suitable defaults or examples found; fall back to generating
+        // ones based on the type information embedded in the schema
         result.extend(interesting_params_from_type(api, &schema, 0));
     }
     result
