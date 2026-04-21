@@ -1,6 +1,40 @@
-//! The functions in this file are used to generate http requests which are sent to the
-//! fuzzing target during normal fuzzing operation. These functions need an OpenAPI struct
-//! to generate realistic requests for the given target.
+//! Generates example and "interesting" values for HTTP requests sent to the fuzzing target.
+//!
+//! # Naming convention
+//!
+//! Functions follow two patterns based on how many values they produce:
+//!
+//! - **`example_*`** – Returns a *single* example value (`Option<Value>` or similar). It
+//!   prefers values declared in the spec (defaults, inline examples) and falls back to a
+//!   sensible type-derived default.  Used to seed a single request quickly.
+//!
+//! - **`interesting_*`** – Returns *all* plausible values (`Vec<Value>`). Collects every
+//!   example and default from the spec and, when none are available, generates a small
+//!   set of type-derived edge-case values.  Used when building the initial corpus so the
+//!   fuzzer can start from a diverse set of inputs.
+//!
+//! # Layered resolution
+//!
+//! Both families resolve values at multiple levels of the OpenAPI object model:
+//!
+//! ```text
+//! QualifiedOperation (path + method)
+//!   └── Operation
+//!         ├── Parameters  ──► example_value_for_parameter
+//!         │                   interesting_values_for_parameters
+//!         └── RequestBody
+//!               └── MediaType  ──► example_value_for_media_type
+//!                                  interesting_values_for_media_type
+//!                     └── Schema  ──► example_value_for_schema
+//!                                     interesting_values_for_schema
+//!                           └── SchemaType  ──► example_value_for_type
+//!                                              interesting_values_for_type
+//! ```
+//!
+//! # Public API
+//!
+//! - [`example_request_for_operation`] – build one example [`OpenApiRequest`]
+//! - [`all_interesting_inputs_for_operations`] – build the full initial corpus
 
 use std::{
     borrow::Cow,
@@ -22,29 +56,33 @@ use crate::{
     parameter_access::ParameterMatching,
 };
 
-/// Takes a (path, method, operation) tuple and produces an OpenApiRequest
-/// filled with example values from the API specification, and default values
-/// for parameters with no explicit examples.
-pub fn example_from_qualified_operation(
-    api: &Spec,
-    operation: QualifiedOperation,
-) -> OpenApiRequest {
+/// Builds a single [`OpenApiRequest`] for the given operation.
+///
+/// Parameters and the request body are filled with the first usable example
+/// found in the spec (inline `example`, `examples`, `default`), falling back
+/// to a type-derived default when nothing is explicitly declared.
+/// Delegates to [`example_body_for_operation`] and [`example_values_for_parameters`].
+pub fn example_request_for_operation(api: &Spec, operation: QualifiedOperation) -> OpenApiRequest {
     OpenApiRequest {
         method: operation.method,
         path: operation.path.to_owned(),
         body: Body::build(
             api,
             operation.operation,
-            example_body_contents(api, operation.operation),
+            example_body_for_operation(api, operation.operation),
         ),
-        parameters: example_parameters(api, operation.operation),
+        parameters: example_values_for_parameters(api, operation.operation),
     }
 }
 
-/// Generates body parameter values for the given operation if the operation has a supported
-/// body type, otherwise None. Examples can be based on various sources, such as being
-/// provided directly in the OpenAPI-spec or as defaults based on their type.
-fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterContents> {
+/// Returns a single example body value for the operation, or `None` if no body is
+/// applicable.
+///
+/// Only `application/json` and `application/x-www-form-urlencoded` content types are
+/// supported.  For object schemas every property is resolved via
+/// [`example_value_for_schema`]; for array schemas the item schema is used.  Returns
+/// `None` and logs a warning for any other body shape.
+fn example_body_for_operation(api: &Spec, operation: &Operation) -> Option<ParameterContents> {
     let body = operation.request_body.as_ref()?.resolve(api).ok()?;
 
     // Get either application/json or form content, if neither is present return None.
@@ -66,7 +104,7 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
             .filter_map(|(param, ref_or_schema)| {
                 Some((
                     param.clone(),
-                    ParameterContents::from(example_from_schema(
+                    ParameterContents::from(example_value_for_schema(
                         api,
                         &ref_or_schema.resolve(api).ok()?,
                         0,
@@ -92,7 +130,7 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
                     }
                 }
                 oas3::spec::Schema::Object(object_or_reference) => Some(ParameterContents::from(
-                    example_from_schema(api, &object_or_reference.resolve(api).ok()?, 0)?,
+                    example_value_for_schema(api, &object_or_reference.resolve(api).ok()?, 0)?,
                 )),
             },
             None => None,
@@ -103,8 +141,13 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
     None
 }
 
-/// Generates all interesting body contents
-fn all_interesting_body_contents(
+/// Returns all interesting body values for the operation as a list, or `None` if no
+/// body is applicable or no values could be generated.
+///
+/// Like [`example_body_for_operation`] but collects *every* example/default declared
+/// for the media type (via [`interesting_values_for_media_type`]) so that the fuzzer
+/// can seed the corpus with a diverse set of request bodies.
+fn interesting_bodies_for_operation(
     api: &Spec,
     operation: &Operation,
 ) -> Option<Vec<ParameterContents>> {
@@ -115,27 +158,41 @@ fn all_interesting_body_contents(
         .or_else(|| body.content.get_json_content())
         .or_else(|| body.content.get_www_form_content())?;
 
-    let values = interesting_params_from_media_type(api, media_type);
+    let values = interesting_values_for_media_type(api, media_type);
     if values.is_empty() {
         return None;
     }
     Some(values.into_iter().map(ParameterContents::from).collect())
 }
 
-/// Create an example body from an operation. This function is meant for requests that do
-/// not have a structured body object, but a simple value.
+/// Returns a single example body for operations whose body is a plain (non-object) JSON
+/// value rather than a structured object.
+///
+/// Resolves the `application/json` media type of the request body and delegates to
+/// [`example_value_for_media_type`].  Currently unused but kept for completeness.
 #[allow(unused)]
-fn example_plain_body(operation: &Operation, api: &Spec) -> Option<ParameterContents> {
+fn example_plain_body_for_operation(
+    operation: &Operation,
+    api: &Spec,
+) -> Option<ParameterContents> {
     operation
         .request_body
         .as_ref()
         .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
         .and_then(|body| body.content.get_json_content().cloned())
-        .and_then(|media_type| example_from_media_type(api, &media_type, 0))
+        .and_then(|media_type| example_value_for_media_type(api, &media_type, 0))
         .map(ParameterContents::from)
 }
 
-fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, String> {
+/// Returns a single example value for one parameter.
+///
+/// Resolution order:
+/// 1. The parameter's inline `example` field.
+/// 2. The parameter's `schema`, resolved via [`example_value_for_schema`].
+/// 3. The parameter's `content` map (JSON), resolved via [`example_value_for_media_type`].
+///
+/// Returns `Err` if no value could be derived.
+fn example_value_for_parameter(api: &Spec, param: &Parameter) -> Result<Value, String> {
     if let Some(example_value) = &param.example {
         Ok(example_value.clone())
     } else {
@@ -143,7 +200,7 @@ fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, Strin
         // media types, examples, schemas and references. We put in some effort
         // to extract any useful value that may exist.
         if let Some(schema) = param.schema.as_ref() {
-            example_from_schema(
+            example_value_for_schema(
                 api,
                 &schema.resolve(api).expect("Could not resolve schema"),
                 0,
@@ -152,7 +209,7 @@ fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, Strin
         } else if let Some(content) = param.content.as_ref() {
             content
                 .get_json_content()
-                .and_then(|media_type| example_from_media_type(api, media_type, 0))
+                .and_then(|media_type| example_value_for_media_type(api, media_type, 0))
                 .ok_or("Could not create example from content".to_owned())
         } else {
             Err(format!(
@@ -163,7 +220,12 @@ fn example_parameter_value(api: &Spec, param: &Parameter) -> Result<Value, Strin
     }
 }
 
-fn example_parameters(
+/// Returns a map from `(name, kind)` to a single example value for every parameter
+/// declared in the operation.
+///
+/// Parameters that cannot be resolved or that produce no example are silently dropped.
+/// Delegates per-parameter resolution to [`example_value_for_parameter`].
+fn example_values_for_parameters(
     api: &Spec,
     operation: &Operation,
 ) -> BTreeMap<(String, ParameterKind), ParameterContents> {
@@ -172,7 +234,7 @@ fn example_parameters(
         .iter()
         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
         .filter_map(|parameter| {
-            example_parameter_value(api, &parameter)
+            example_value_for_parameter(api, &parameter)
                 .map(|value| {
                     (
                         (parameter.name.clone(), parameter.into()),
@@ -184,12 +246,17 @@ fn example_parameters(
         .collect()
 }
 
-/// Returns all combinations of interesting values for parameters
-/// for this operation, as well as the examples that may be provided by the spec.
-/// Parameters that should only get a single value may be specified in
-/// `single_valued`, which we use to avoid generating multiple values that
-/// would be replaced by references later.
-fn all_interesting_parameters(
+/// Returns all combinations of interesting parameter values for the operation.
+///
+/// For each parameter, collects every `example`, `examples` entry, and a
+/// type-derived fallback (via [`example_value_for_parameter`]).  Then builds the
+/// *cartesian product* of all per-parameter value lists, capped at roughly 100
+/// total combinations to avoid combinatorial explosion.
+///
+/// Parameters listed in `single_valued` are limited to one value each; this is
+/// used for parameters that will later be replaced by cross-request references, to
+/// avoid generating redundant duplicate requests.
+fn interesting_values_for_parameters(
     operation: &Operation,
     api: &Spec,
     single_valued: &[Parameter],
@@ -211,7 +278,7 @@ fn all_interesting_parameters(
                 {
                     interesting_combinations.push(value)
                 } else {
-                    match example_parameter_value(api, &parameter) {
+                    match example_value_for_parameter(api, &parameter) {
                         Ok(value) => interesting_combinations.push(value),
                         Err(err) => {
                             log::warn!(
@@ -235,7 +302,7 @@ fn all_interesting_parameters(
                         .filter_map(|ref_or| ref_or.resolve(api).ok())
                         .filter_map(|ex| ex.value),
                 );
-                if let Ok(value) = example_parameter_value(api, &parameter) {
+                if let Ok(value) = example_value_for_parameter(api, &parameter) {
                     interesting_combinations.push(value);
                 }
             }
@@ -273,8 +340,11 @@ fn all_interesting_parameters(
     maps
 }
 
-/// Produces one example (or none) based on the given MediaType
-fn example_from_media_type(
+/// Returns one example `Value` from a `MediaType` definition, or `None`.
+///
+/// Tries the `examples` map first (takes the first entry); falls back to deriving
+/// a value from the `schema` via [`example_value_for_schema`].
+fn example_value_for_media_type(
     api: &Spec,
     contents: &MediaType,
     recursion_limit: usize,
@@ -291,13 +361,20 @@ fn example_from_media_type(
         })
         .or_else(|| {
             contents.schema.as_ref().and_then(|ref_or_schema| {
-                example_from_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_limit + 1)
+                example_value_for_schema(
+                    api,
+                    &ref_or_schema.resolve(api).ok()?,
+                    recursion_limit + 1,
+                )
             })
         })
 }
 
-/// Produces all examples for the given MediaType
-fn interesting_params_from_media_type(api: &Spec, contents: &MediaType) -> Vec<Value> {
+/// Returns all interesting `Value`s from a `MediaType` definition.
+///
+/// Collects every entry from the `examples` map, then appends values derived
+/// from the `schema` via [`interesting_values_for_schema`].
+fn interesting_values_for_media_type(api: &Spec, contents: &MediaType) -> Vec<Value> {
     let mut result = vec![];
     if let Some(examples) = &contents.examples {
         result.extend(
@@ -310,13 +387,14 @@ fn interesting_params_from_media_type(api: &Spec, contents: &MediaType) -> Vec<V
     if let Some(more_examples) = contents
         .schema
         .as_ref()
-        .map(|ref_or_schema| interesting_params_from_schema(api, ref_or_schema, &[]))
+        .map(|ref_or_schema| interesting_values_for_schema(api, ref_or_schema, &[]))
     {
         result.extend(more_examples);
     }
     result
 }
 
+/// Logs the schema at DEBUG level, and warns if debug logging is not enabled.
 fn log_schema_debug(schema: &ObjectSchema) {
     if !log::log_enabled!(log::Level::Debug) {
         log::warn!("To output the schema, run with --log-level=debug.");
@@ -324,6 +402,9 @@ fn log_schema_debug(schema: &ObjectSchema) {
     log::debug!("{schema:?}");
 }
 
+/// Returns `true` and emits a warning when the recursion depth has reached the
+/// limit (20).  Both `example_value_for_schema` and `interesting_values_for_schema`
+/// call this guard at their entry points.
 fn example_recursion_limit_exceeded(recursion_depth: usize) -> bool {
     if recursion_depth >= 20 {
         log::warn!(
@@ -335,8 +416,22 @@ fn example_recursion_limit_exceeded(recursion_depth: usize) -> bool {
     }
 }
 
-// Attempts to build a value that matches the given schema using default values
-fn example_from_schema(api: &Spec, schema: &ObjectSchema, recursion_depth: usize) -> Option<Value> {
+/// Returns a single example `Value` that satisfies the given schema, or `None`.
+///
+/// Resolution order:
+/// 1. `read_only` fields are skipped (they must not appear in requests).
+/// 2. `default` value.
+/// 3. Inline `example` / `examples[0]`.
+/// 4. `allOf` with exactly one entry (recursed into).
+/// 5. First variant of `oneOf` / `anyOf` that produces a value.
+/// 6. Type-specific generation via [`example_value_for_type`].
+///
+/// Respects a recursion depth limit via [`example_recursion_limit_exceeded`].
+fn example_value_for_schema(
+    api: &Spec,
+    schema: &ObjectSchema,
+    recursion_depth: usize,
+) -> Option<Value> {
     // TODO: Probably remove this read_only check.
     // Returning None below is likely because we misinterpreted read_only as pertaining to a type, rather than a schema.
     // The documentation of schema explains readOnly as meaning:
@@ -366,7 +461,7 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema, recursion_depth: usize
     match schema.all_of.len() {
         0 => (),
         1 => {
-            return example_from_schema(
+            return example_value_for_schema(
                 api,
                 &schema.all_of[0].resolve(api).ok()?,
                 recursion_depth + 1,
@@ -386,7 +481,7 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema, recursion_depth: usize
         .one_of
         .iter()
         .filter_map(|ref_or_schema| {
-            example_from_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_depth + 1)
+            example_value_for_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_depth + 1)
         })
         .next();
     if one_of_example.is_some() {
@@ -401,7 +496,7 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema, recursion_depth: usize
         .any_of
         .iter()
         .filter_map(|ref_or_schema| {
-            example_from_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_depth + 1)
+            example_value_for_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_depth + 1)
         })
         .next();
     if any_of_example.is_some() {
@@ -411,11 +506,11 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema, recursion_depth: usize
     if let Some(type_set) = &schema.schema_type {
         match type_set {
             oas3::spec::SchemaTypeSet::Single(single_type) => {
-                return example_from_type(api, single_type, schema, recursion_depth + 1);
+                return example_value_for_type(api, single_type, schema, recursion_depth + 1);
             }
             oas3::spec::SchemaTypeSet::Multiple(multiple_types) => {
                 if let Some(first_type) = multiple_types.first() {
-                    return example_from_type(api, first_type, schema, recursion_depth + 1);
+                    return example_value_for_type(api, first_type, schema, recursion_depth + 1);
                 }
             }
         }
@@ -423,11 +518,21 @@ fn example_from_schema(api: &Spec, schema: &ObjectSchema, recursion_depth: usize
     None
 }
 
-// Returns all interesting (default, example) values for the given schema.
-// ignore_reference may specify a reference that is not followed, this is used
-// when resolving discriminator variants, which may refer back to their parent object
-// circularly.
-fn interesting_params_from_schema(
+/// Returns all interesting `Value`s for the given schema.
+///
+/// Collection order:
+/// 1. `default` value and every `example` / `examples` entry declared on the schema.
+/// 2. If a `discriminator` is present, all variants are expanded by
+///    [`interesting_values_for_discriminator`].
+/// 3. Otherwise, `allOf` variants are merged via a cartesian product;
+///    `oneOf` / `anyOf` variants are appended individually.
+/// 4. If nothing was found in steps 1–3, falls back to type-derived values via
+///    [`interesting_values_for_type`].
+///
+/// `ignore_reference_names` lists `$ref` paths that must not be followed again;
+/// this prevents infinite recursion when a discriminator variant refers back to
+/// its parent schema.
+fn interesting_values_for_schema(
     api: &Spec,
     schema: &ObjectOrReference<ObjectSchema>,
     ignore_reference_names: &[&str],
@@ -451,7 +556,11 @@ fn interesting_params_from_schema(
     }
     result.extend(schema.examples.clone());
     if schema.discriminator.is_some() {
-        result.extend(all_discriminator_variants(api, &schema, &ignore_references));
+        result.extend(interesting_values_for_discriminator(
+            api,
+            &schema,
+            &ignore_references,
+        ));
     } else {
         // INTERESTING ALL_OF VALUES
         // Creates the union of fields of all interesting values we find for each schema,
@@ -465,7 +574,7 @@ fn interesting_params_from_schema(
                 {
                     None
                 }
-                _ => Some(interesting_params_from_schema(
+                _ => Some(interesting_values_for_schema(
                     api,
                     ref_or_schema,
                     &ignore_references,
@@ -495,7 +604,7 @@ fn interesting_params_from_schema(
                             {
                                 Vec::new()
                             }
-                            _ => interesting_params_from_schema(
+                            _ => interesting_values_for_schema(
                                 api,
                                 ref_or_schema,
                                 &ignore_references,
@@ -503,6 +612,11 @@ fn interesting_params_from_schema(
                         })
                 }),
         );
+    }
+    if result.is_empty() {
+        // No suitable defaults or examples found; fall back to generating
+        // ones based on the type information embedded in the schema
+        result.extend(interesting_values_for_type(api, &schema, 0));
     }
     result
 }
@@ -534,20 +648,19 @@ fn cartesian_product_values(xs: Vec<Value>, ys: Vec<Value>) -> Vec<Value> {
         .collect()
 }
 
-/// Generates all variants of a discrminator-based schema; i.e. one that has a
-/// Discrminator in the schema_data.
-/// Supports both OAPI3.0 style discriminators, which have `OneOf`/`AnyOf` as the
-/// SchemaType and combine it with mappings to select the correct one (sometimes),
+/// Returns one example object per discriminator variant of `schema`.
 ///
-/// * https://swagger.io/docs/specification/data-models/inheritance-and-polymorphism/
+/// Supports both the OpenAPI 3.0 style (discriminator combined with `oneOf`/`anyOf`)
+/// and the OpenAPI 3.1 style (discriminator combined with an explicit `mapping`):
 ///
-/// and also OAPI3.1 style discriminators, which have `Type` and combine it with
-/// mappings to select the correct one (always), but then may refer back to the
-/// parent schema in a cirular way so each variant contains the common mandatory
-/// discriminator parameter.
+/// - <https://swagger.io/docs/specification/data-models/inheritance-and-polymorphism/>
+/// - <https://swagger.io/specification/#discriminator-object>
 ///
-/// * https://swagger.io/specification/#discriminator-object
-fn all_discriminator_variants(
+/// For each variant the discriminator property is injected with the variant name,
+/// then the variant's own interesting values (from [`interesting_values_for_schema`])
+/// are merged in.  References listed in `ignore_names` are not followed, preventing
+/// circular resolution when a variant schema refers back to its parent.
+fn interesting_values_for_discriminator(
     api: &Spec,
     schema: &ObjectSchema,
     ignore_names: &[&str],
@@ -591,7 +704,7 @@ fn all_discriminator_variants(
         );
         // Take the example values and add the property name field
         all_examples.extend(
-            interesting_params_from_schema(
+            interesting_values_for_schema(
                 api,
                 &ObjectOrReference::Ref {
                     ref_path: path,
@@ -609,11 +722,13 @@ fn all_discriminator_variants(
     all_examples
 }
 
-/// Gives a slice of example string references based on the StringFormat given.
-/// String formats are essentially free-form, but there are some values that
-/// "SHOULD" be implemented according to https://json-schema.org/draft/2020-12/json-schema-validation#section-7.2
-/// See section 7.3 on that page for defined formats, which are implemented below.
-fn strings_from_format(str_format: &str) -> &[&str] {
+/// Returns a small slice of literal example strings for the given string format.
+///
+/// Covers the formats that JSON Schema validation "SHOULD" support
+/// (<https://json-schema.org/draft/2020-12/json-schema-validation#section-7.3>)
+/// as well as the extra `base64` format.  Falls back to `["WuppieFuzz", "", "🎵"]`
+/// for unknown formats.
+fn example_strings_for_format(str_format: &str) -> &[&str] {
     match str_format {
         "date" => &["1981-09-05", "0000-01-01", "9999999-12-31"],
         "date-time" => &[
@@ -663,10 +778,16 @@ fn enforce_length_bounds(
     result
 }
 
-/// Generate parameters based on the type specified. The values returned
-/// should adhere to any constraints from the spec, any deviations to
-/// test robustness of the server should be introduced by fuzzing.
-fn interesting_params_from_type(
+/// Returns a set of interesting `Value`s generated purely from the schema's type
+/// information and constraints (e.g. `minimum`, `maximum`, `enum`, `pattern`).
+///
+/// Called as a last resort by [`interesting_values_for_schema`] when no explicit
+/// examples or defaults exist.  The returned values are spec-compliant; edge-case
+/// deviations for robustness testing are introduced later by the fuzzer's mutators.
+///
+/// Delegates to [`interesting_values_for_string_type`] and
+/// [`interesting_values_for_number_type`] for the respective primitive types.
+fn interesting_values_for_type(
     api: &Spec,
     schema: &ObjectSchema,
     recursion_depth: usize,
@@ -685,7 +806,7 @@ fn interesting_params_from_type(
                 .iter()
                 .flat_map(|schema_type| {
                     match schema_type {
-                        SchemaType::String => interesting_params_from_string_type(
+                        SchemaType::String => interesting_values_for_string_type(
                             &schema.enum_values,
                             &schema.pattern,
                             &schema.format,
@@ -693,7 +814,7 @@ fn interesting_params_from_type(
                             schema.max_length,
                         ),
                         SchemaType::Number | SchemaType::Integer => {
-                            interesting_params_from_number_type(
+                            interesting_values_for_number_type(
                                 &schema.minimum,
                                 &schema.maximum,
                                 &schema.multiple_of,
@@ -706,7 +827,7 @@ fn interesting_params_from_type(
                                 .filter_map(|(k, v)| {
                                     Some((
                                         k.clone(),
-                                        example_from_schema(
+                                        example_value_for_schema(
                                             api,
                                             &v.resolve(api).expect("Could not resolve schema."),
                                             recursion_depth + 1,
@@ -739,7 +860,7 @@ fn interesting_params_from_type(
                                     }
                                 }
                                 oas3::spec::Schema::Object(object_or_reference) => {
-                                    example_from_schema(
+                                    example_value_for_schema(
                                         api,
                                         &object_or_reference
                                             .resolve(api)
@@ -766,8 +887,16 @@ fn interesting_params_from_type(
     })
 }
 
-// We supply the schema_type separately since the schema can have a TypeSet with one or multiple schemas.
-fn example_from_type(
+/// Returns a single example `Value` for the given concrete `SchemaType`.
+///
+/// The `schema_type` is passed explicitly because the schema's `schema_type` field
+/// is a `SchemaTypeSet` that may contain multiple types; callers are expected to
+/// iterate over it and invoke this function for each entry.
+///
+/// For string types, delegates to [`interesting_values_for_string_type`] and
+/// returns the first value.  For array types, delegates to
+/// [`interesting_values_for_type`] and returns the first value.
+fn example_value_for_type(
     api: &Spec,
     schema_type: &SchemaType,
     schema: &ObjectSchema,
@@ -777,7 +906,7 @@ fn example_from_type(
         return None;
     }
     match schema_type {
-        SchemaType::String => interesting_params_from_string_type(
+        SchemaType::String => interesting_values_for_string_type(
             &schema.enum_values,
             &schema.pattern,
             &schema.format,
@@ -853,7 +982,7 @@ fn example_from_type(
                 .filter_map(|(k, v)| {
                     Some((
                         k.clone(),
-                        example_from_schema(
+                        example_value_for_schema(
                             api,
                             &v.resolve(api).expect("Could not resolve schema."),
                             recursion_depth + 1,
@@ -866,7 +995,7 @@ fn example_from_type(
             // The 'items' specification is required according to the spec, but
             // we still get an Option and a possibly broken reference and what not.
             // Extract any usable specification of an item, and make an example.
-            interesting_params_from_type(api, schema, recursion_depth + 1)
+            interesting_values_for_type(api, schema, recursion_depth + 1)
                 .into_iter()
                 .next()
         }
@@ -875,9 +1004,16 @@ fn example_from_type(
     }
 }
 
-/// We return all variants if an enumeration is present, try the pattern regex if one is present,
-/// or fall back to some defaults based on the StringFormat. Returns a serde_json::Value::String.
-fn interesting_params_from_string_type(
+/// Returns interesting string values respecting the schema's string-specific constraints.
+///
+/// Resolution order:
+/// 1. If an `enum` is defined, return all enum string values.
+/// 2. If a `pattern` regex is defined, generate a matching string using
+///    `rand_regex` (anchors are stripped if the generator cannot handle them).
+/// 3. If a `format` is defined, return the predefined examples from
+///    [`example_strings_for_format`], adjusted to `minLength`/`maxLength`.
+/// 4. Fall back to `["WuppieFuzz", "", "🎵"]`.
+fn interesting_values_for_string_type(
     enumeration: &[Value],
     pattern: &Option<String>,
     format: &Option<String>,
@@ -925,7 +1061,7 @@ fn interesting_params_from_string_type(
 
     // Attempt to generate a string based on other format hints
     if let Some(format) = format {
-        let result: Vec<Value> = strings_from_format(format)
+        let result: Vec<Value> = example_strings_for_format(format)
             .iter()
             .map(|&example| {
                 serde_json::Value::String(
@@ -942,7 +1078,13 @@ fn interesting_params_from_string_type(
     vec!["WuppieFuzz".into(), "".into(), "🎵".into()]
 }
 
-fn interesting_params_from_number_type(
+/// Returns interesting numeric values respecting `minimum`, `maximum`, and
+/// `multipleOf` constraints.
+///
+/// Produces boundary values and a selection of common values (0, ±1, π) that
+/// fall within the allowed range.  When `multipleOf` is set, all candidates are
+/// rounded to the nearest multiple.
+fn interesting_values_for_number_type(
     minimum: &Option<Number>,
     maximum: &Option<Number>,
     multiple_of: &Option<Number>,
@@ -1047,14 +1189,21 @@ fn interesting_params_from_number_type(
     // For simplicity we unwrap the Number; if this would panic, we will consider this a bug in the code above.
 }
 
-/// Creates a set of OpenApiInputs for the given sequence of QualifiedOperations based on a number of interesting
-/// values for each of the parameters found in the OpenApiInputs. Specifically, it returns the cartesian product
-/// of all these parameter choices, i.e. for a single-request OpenApiInput with parameters A: bool and B: usize
-/// it may for example return (true, 0), (true, 1), (false, 0) and (false, 1).
+/// Builds the full initial corpus of [`OpenApiInput`]s for a sequence of operations.
 ///
-/// This allows the fuzzer to start with all the inputs that we might a priori consider useful, and then
-/// continue with random mutations (picking seeds based on coverage feedback).
-pub fn openapi_inputs_from_ops<'a>(
+/// For each operation, [`interesting_requests_for_operation`] produces a list of
+/// requests covering all interesting parameter/body combinations.  This function
+/// then takes the *cartesian product* across all operations in the sequence to
+/// produce complete request chains.
+///
+/// For example, given a chain of two operations where the first has interesting
+/// parameter values `A ∈ {true, false}` and the second has `B ∈ {0, 1}`, the
+/// result contains four inputs: `(true,0)`, `(true,1)`, `(false,0)`, `(false,1)`.
+///
+/// Returns `Err` if the total number of combinations would exceed 10 000, to
+/// prevent runaway corpus generation.  Callers should fall back to
+/// [`example_request_for_operation`] in that case.
+pub fn all_interesting_inputs_for_operations<'a>(
     api: &Spec,
     ops_iter: impl Iterator<Item = QualifiedOperation<'a>>,
     subgraph: &DiGraph<QualifiedOperation, ParameterMatching, DefaultIx>,
@@ -1078,7 +1227,7 @@ pub fn openapi_inputs_from_ops<'a>(
                         })
                 })
                 .collect();
-            all_interesting_inputs_for_qualified_operation(api, op, &single_valued)
+            interesting_requests_for_operation(api, op, &single_valued)
         })
         .collect();
 
@@ -1133,18 +1282,25 @@ pub fn openapi_inputs_from_ops<'a>(
     Ok(all_chains.into_iter().map(OpenApiInput).collect())
 }
 
-/// Returns a NON-EMPTY vector of interesting requests that can be made for the given operation.
-fn all_interesting_inputs_for_qualified_operation(
+/// Returns a non-empty list of [`OpenApiRequest`]s covering all interesting
+/// parameter/body combinations for one operation.
+///
+/// Builds the cartesian product of interesting parameter values
+/// ([`interesting_values_for_parameters`]) and interesting body values
+/// ([`interesting_bodies_for_operation`]).  Guarantees a non-empty result: if
+/// neither parameters nor a body are present, a bare request with an empty body
+/// is returned.
+fn interesting_requests_for_operation(
     api: &Spec,
     operation: QualifiedOperation,
     single_valued: &[Parameter],
 ) -> Vec<OpenApiRequest> {
     // There may be multiple parameters, create an OpenApiRequest for each combination
     // of interesting values for these parameters.
-    let combinations = all_interesting_parameters(operation.operation, api, single_valued);
+    let combinations = interesting_values_for_parameters(operation.operation, api, single_valued);
     let rv = if combinations.is_empty() {
         // There are no parameters, return the interesting bodies.
-        match all_interesting_body_contents(api, operation.operation) {
+        match interesting_bodies_for_operation(api, operation.operation) {
             Some(bodies) => bodies
                 .into_iter()
                 .map(|body| OpenApiRequest {
@@ -1162,7 +1318,7 @@ fn all_interesting_inputs_for_qualified_operation(
             }],
         }
     } else {
-        match all_interesting_body_contents(api, operation.operation) {
+        match interesting_bodies_for_operation(api, operation.operation) {
             Some(bodies) => bodies
                 .into_iter()
                 .flat_map(|body| std::iter::repeat(body).zip(&combinations))
