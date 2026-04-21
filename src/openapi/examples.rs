@@ -88,7 +88,7 @@ fn example_body_for_operation(api: &Spec, operation: &Operation) -> Option<Param
     // Get either application/json or form content, if neither is present return None.
     let media_type = None
         .or_else(|| body.content.get("application/json"))
-        .or_else(|| body.content.get("application/x-www-form-urlcontent"))?;
+        .or_else(|| body.content.get("application/x-www-form-urlencoded"))?;
 
     // Return None if the schema cannot be resolved
     let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
