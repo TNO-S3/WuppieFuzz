@@ -1,4 +1,5 @@
 mod normalize;
+mod graphml;
 mod toposort;
 
 /// The fuzzer wants to use outputs of previous requests (POST artist -> artistid)
@@ -7,7 +8,7 @@ mod toposort;
 /// the same meaning (edges). The dependency graph module attempts to build such a graph.
 use std::{
     cmp::Ordering,
-    collections::{HashMap, hash_map::DefaultHasher},
+    collections::{BTreeMap, HashMap, hash_map::DefaultHasher},
     fmt::Display,
     fs::{File, create_dir_all},
     hash::{Hash, Hasher},
@@ -21,8 +22,13 @@ use petgraph::{
     unionfind::UnionFind,
     visit::{EdgeRef, IntoNodeReferences, NodeIndexable},
 };
+use anyhow::{Context, bail};
 
 use self::{
+    graphml::{
+        EdgeKind, GraphMlEdge, GraphMlGraph, GraphMlImportPolicy, GraphMlNode, read_graphml,
+        write_graphml,
+    },
     normalize::{
         ParameterNormalization, normalize_parameters, normalize_request_body, normalize_response,
     },
@@ -41,11 +47,11 @@ use crate::{
     parameter_access::{ParameterAddressing, ParameterMatching},
 };
 
-/// Returns OpenApiInputs generated from a dependency graph derived from the OpenAPI
-/// specification. If rigorously generating parameter combinations would result in
-/// too many inputs, it just generates a single example.
-pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
-    let dependency_graph = DependencyGraph::new(api);
+/// Returns OpenApiInputs generated from the provided dependency graph.
+pub fn initial_corpus_from_graph<'a>(
+    api: &'a Spec,
+    dependency_graph: &DependencyGraph<'a>,
+) -> Vec<OpenApiInput> {
 
     // Turn all subgraphs into sorted lists of node indices
     dependency_graph
@@ -74,6 +80,12 @@ pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
         .filter_map(|result| result.ok())
         .flatten()
         .collect()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DependencyGraphImportPolicy {
+    FailFast,
+    SkipInvalid,
 }
 
 /// Creates a vector of topologically sorted QualifiedOperations (path, method, etc.)
@@ -289,6 +301,92 @@ impl<'a> DependencyGraph<'a> {
         Self { graph }
     }
 
+    pub fn from_graphml(
+        api: &'a Spec,
+        graphml_path: &Path,
+        policy: DependencyGraphImportPolicy,
+    ) -> anyhow::Result<Self> {
+        let mut graph = DiGraph::new();
+        let mut op_to_index = BTreeMap::new();
+
+        for (path, method, operation) in api.operations() {
+            let qualified = QualifiedOperation::new(path.clone(), method.clone(), operation);
+            let index = graph.add_node(qualified.clone());
+            op_to_index.insert((qualified.method, qualified.path), index);
+        }
+
+        let parsed_graph = read_graphml(
+            graphml_path,
+            match policy {
+                DependencyGraphImportPolicy::FailFast => GraphMlImportPolicy::FailFast,
+                DependencyGraphImportPolicy::SkipInvalid => GraphMlImportPolicy::SkipInvalid,
+            },
+        )
+        .with_context(|| format!("Could not read GraphML dependency graph at {graphml_path:?}"))?;
+
+        let mut graphml_id_to_index = HashMap::new();
+        for node in parsed_graph.nodes {
+            let key = (node.method, node.path.clone());
+            match op_to_index.get(&key) {
+                Some(index) => {
+                    graphml_id_to_index.insert(node.id, *index);
+                }
+                None => {
+                    let message = format!(
+                        "GraphML node {} {} does not map to any operation in the current OpenAPI spec",
+                        node.method, node.path
+                    );
+                    if policy == DependencyGraphImportPolicy::FailFast {
+                        bail!(message);
+                    }
+                    log::warn!("{message}");
+                }
+            }
+        }
+
+        for edge in parsed_graph.edges {
+            let edge_result = (|| -> anyhow::Result<()> {
+                let source = graphml_id_to_index.get(&edge.source).copied().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "GraphML edge references unknown source node id '{}'",
+                        edge.source
+                    )
+                })?;
+                let target = graphml_id_to_index.get(&edge.target).copied().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "GraphML edge references unknown target node id '{}'",
+                        edge.target
+                    )
+                })?;
+
+                let matching = match edge.kind {
+                    EdgeKind::Request => ParameterMatching::Request {
+                        output_access: edge.output_access,
+                        input_access: edge.input_access,
+                        input_name_normalized: edge.input_name_normalized,
+                    },
+                    EdgeKind::Response => ParameterMatching::Response {
+                        output_access: edge.output_access,
+                        input_access: edge.input_access,
+                        input_name_normalized: edge.input_name_normalized,
+                    },
+                };
+
+                graph.add_edge(source, target, matching);
+                Ok(())
+            })();
+
+            if let Err(error) = edge_result {
+                if policy == DependencyGraphImportPolicy::FailFast {
+                    return Err(error);
+                }
+                log::warn!("Skipping invalid GraphML edge during import: {error}");
+            }
+        }
+
+        Ok(Self { graph })
+    }
+
     /// Returns a Vec of all connected components of the graph. The nodes are
     /// referred to by NodeIndex, which is unstable under updates of the graph.
     pub fn connected_components(&self) -> Vec<Vec<NodeIndex>> {
@@ -380,6 +478,69 @@ impl<'a> DependencyGraph<'a> {
         writeln!(file, "```")?;
 
         Ok(())
+    }
+
+    pub fn write_graphml_report(&self, report_path: &Path) -> anyhow::Result<()> {
+        let corpus_path = report_path.join("corpus");
+        create_dir_all(&corpus_path)?;
+        let graphml_file = corpus_path.join("dependency_graph.graphml");
+
+        let mut node_indices: Vec<_> = self.graph.node_indices().collect();
+        node_indices.sort_by_key(|index| {
+            let operation = &self.graph[*index];
+            (operation.path.clone(), operation.method.as_str().to_string())
+        });
+
+        let nodes: Vec<_> = node_indices
+            .iter()
+            .enumerate()
+            .map(|(idx, node_index)| {
+                let op = &self.graph[*node_index];
+                GraphMlNode {
+                    id: format!("n{idx}"),
+                    method: op.method,
+                    path: op.path.clone(),
+                }
+            })
+            .collect();
+
+        let node_id_map: HashMap<_, _> = node_indices
+            .into_iter()
+            .enumerate()
+            .map(|(idx, node_index)| (node_index, format!("n{idx}")))
+            .collect();
+
+        let mut edges = self
+            .graph
+            .edge_references()
+            .map(|edge| {
+                let kind = match edge.weight() {
+                    ParameterMatching::Request { .. } => EdgeKind::Request,
+                    ParameterMatching::Response { .. } => EdgeKind::Response,
+                };
+                GraphMlEdge {
+                    source: node_id_map[&edge.source()].clone(),
+                    target: node_id_map[&edge.target()].clone(),
+                    kind,
+                    output_access: edge.weight().output_access().clone(),
+                    input_access: edge.weight().input_access().clone(),
+                    input_name_normalized: edge.weight().input_name_normalized().to_string(),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        edges.sort_by_key(|edge| {
+            (
+                edge.source.clone(),
+                edge.target.clone(),
+                edge.kind.as_str().to_string(),
+                edge.output_access.to_graphml_string(),
+                edge.input_access.to_graphml_string(),
+                edge.input_name_normalized.clone(),
+            )
+        });
+
+        write_graphml(&graphml_file, &GraphMlGraph { nodes, edges })
     }
 
     /// Given the graph and a subset of nodes, returns a new graph containing only nodes and
@@ -527,4 +688,106 @@ fn inout_params<'a>(
     input_fields.extend(request_body_fields);
 
     (input_fields, response_output_fields, request_output_fields)
+}
+
+#[cfg(test)]
+mod tests {
+        use std::{fs, path::PathBuf};
+
+        use super::{DependencyGraph, DependencyGraphImportPolicy};
+        use crate::openapi::spec::load::get_api_spec;
+
+        fn tutorial_spec_path() -> PathBuf {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tutorial/openapi.json")
+        }
+
+        #[test]
+        fn graphml_export_import_roundtrip_preserves_counts() {
+                let spec = get_api_spec(&tutorial_spec_path()).unwrap();
+                let graph = DependencyGraph::new(&spec);
+
+                let temp = tempfile::tempdir().unwrap();
+                graph.write_graphml_report(temp.path()).unwrap();
+
+                let graphml_path = temp.path().join("corpus/dependency_graph.graphml");
+                let imported =
+                        DependencyGraph::from_graphml(&spec, &graphml_path, DependencyGraphImportPolicy::FailFast)
+                                .unwrap();
+
+                assert_eq!(graph.graph.node_count(), imported.graph.node_count());
+                assert_eq!(graph.graph.edge_count(), imported.graph.edge_count());
+        }
+
+        #[test]
+        fn graphml_import_fails_fast_on_unknown_node() {
+                let spec = get_api_spec(&tutorial_spec_path()).unwrap();
+                let temp = tempfile::tempdir().unwrap();
+                let graphml_path = temp.path().join("invalid.graphml");
+
+                fs::write(
+                        &graphml_path,
+                        r#"<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+    <key id="node_method" for="node" attr.name="method" attr.type="string"/>
+    <key id="node_path" for="node" attr.name="path" attr.type="string"/>
+    <key id="edge_kind" for="edge" attr.name="kind" attr.type="string"/>
+    <key id="edge_output_access" for="edge" attr.name="output_access" attr.type="string"/>
+    <key id="edge_input_access" for="edge" attr.name="input_access" attr.type="string"/>
+    <key id="edge_input_name_normalized" for="edge" attr.name="input_name_normalized" attr.type="string"/>
+    <key id="graph_schema_version" for="graph" attr.name="schema_version" attr.type="string"/>
+    <graph id="dependency_graph" edgedefault="directed">
+        <data key="graph_schema_version">1</data>
+        <node id="n0">
+            <data key="node_method">GET</data>
+            <data key="node_path">/unknown-path</data>
+        </node>
+    </graph>
+</graphml>
+"#,
+                )
+                .unwrap();
+
+                let imported =
+                        DependencyGraph::from_graphml(&spec, &graphml_path, DependencyGraphImportPolicy::FailFast);
+                assert!(imported.is_err());
+        }
+
+        #[test]
+        fn graphml_import_skip_invalid_node_entries() {
+                let spec = get_api_spec(&tutorial_spec_path()).unwrap();
+                let temp = tempfile::tempdir().unwrap();
+                let graphml_path = temp.path().join("invalid.graphml");
+
+                fs::write(
+                        &graphml_path,
+                        r#"<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+    <key id="node_method" for="node" attr.name="method" attr.type="string"/>
+    <key id="node_path" for="node" attr.name="path" attr.type="string"/>
+    <key id="edge_kind" for="edge" attr.name="kind" attr.type="string"/>
+    <key id="edge_output_access" for="edge" attr.name="output_access" attr.type="string"/>
+    <key id="edge_input_access" for="edge" attr.name="input_access" attr.type="string"/>
+    <key id="edge_input_name_normalized" for="edge" attr.name="input_name_normalized" attr.type="string"/>
+    <key id="graph_schema_version" for="graph" attr.name="schema_version" attr.type="string"/>
+    <graph id="dependency_graph" edgedefault="directed">
+        <data key="graph_schema_version">1</data>
+        <node id="n0">
+            <data key="node_method">GET</data>
+            <data key="node_path">/unknown-path</data>
+        </node>
+    </graph>
+</graphml>
+"#,
+                )
+                .unwrap();
+
+                let imported = DependencyGraph::from_graphml(
+                        &spec,
+                        &graphml_path,
+                        DependencyGraphImportPolicy::SkipInvalid,
+                )
+                .unwrap();
+                assert_eq!(imported.graph.edge_count(), 0);
+                assert!(imported.graph.node_count() > 0);
+        }
 }

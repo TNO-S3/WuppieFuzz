@@ -198,6 +198,26 @@ command:
 wuppiefuzz output-corpus --openapi-spec openapi.json corpus_directory
 ```
 
+If you also pass a report directory, WuppieFuzz writes the inferred dependency graph as both
+Mermaid and GraphML:
+
+```sh
+wuppiefuzz output-corpus --openapi-spec openapi.json --report-path reports corpus_directory
+```
+
+You can edit `reports/corpus/dependency_graph.graphml` in external graph tooling and re-run
+corpus generation using that imported graph (instead of heuristic edge generation):
+
+```sh
+wuppiefuzz output-corpus --openapi-spec openapi.json --graphml-dependency-graph reports/corpus/dependency_graph.graphml corpus_directory
+```
+
+By default import is fail-fast. To keep valid edges and skip invalid records, add:
+
+```sh
+--graphml-import-skip-invalid
+```
+
 ## Setting up authentication
 
 The process of setting up authentication is unfortunately not standardised and

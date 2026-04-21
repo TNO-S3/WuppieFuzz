@@ -90,19 +90,35 @@ pub fn main() -> Result<()> {
             }
             authentication::verify_authentication(*api)
         }
-        Commands::OutputCorpus {
-            corpus_directory,
+        Commands::OperationsGraph {
+            output_directory,
             openapi_spec,
-            report_path,
             log_level: _,
         } => {
             let config = &Configuration::get().map_err(anyhow::Error::msg)?;
             setup_logging(config);
-            Ok(initial_corpus::generate_corpus_to_files(
+            let spec = get_api_spec(openapi_spec)?;
+            let graph = initial_corpus::dependency_graph::DependencyGraph::new(&spec);
+            graph.write_report(output_directory).map_err(anyhow::Error::from)?;
+            graph.write_graphml_report(output_directory)
+        }
+        Commands::OutputCorpus {
+            corpus_directory,
+            openapi_spec,
+            report_path,
+            graphml_dependency_graph,
+            graphml_import_skip_invalid,
+            log_level: _,
+        } => {
+            let config = &Configuration::get().map_err(anyhow::Error::msg)?;
+            setup_logging(config);
+            initial_corpus::generate_corpus_to_files(
                 &*get_api_spec(openapi_spec)?,
                 corpus_directory,
                 report_path.as_deref(),
-            ))
+                graphml_dependency_graph.as_deref(),
+                *graphml_import_skip_invalid,
+            )
         }
         Commands::Reproduce { crash_file, .. } => reproducer::reproduce(crash_file),
         Commands::Fuzz { .. } => fuzzer::fuzz(),

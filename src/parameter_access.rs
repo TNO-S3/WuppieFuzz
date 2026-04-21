@@ -182,6 +182,129 @@ pub enum ParameterAccess {
 }
 
 impl ParameterAccess {
+    /// Serializes this access into a strict, lossless GraphML attribute value.
+    pub fn to_graphml_string(&self) -> String {
+        fn encode(value: &str) -> String {
+            urlencoding::encode(value).into_owned()
+        }
+
+        fn encode_body(elements: &ParameterAccessElements) -> String {
+            elements
+                .0
+                .iter()
+                .map(|element| match element {
+                    ParameterAccessElement::Name(name) => format!("n:{}", encode(name)),
+                    ParameterAccessElement::Offset(offset) => format!("i:{offset}"),
+                })
+                .collect::<Vec<_>>()
+                .join("/")
+        }
+
+        match self {
+            ParameterAccess::Request(request_parameter_access) => match request_parameter_access {
+                RequestParameterAccess::Body(elements) => {
+                    format!("REQUEST:BODY:{}", encode_body(elements))
+                }
+                RequestParameterAccess::Query(name) => format!("REQUEST:QUERY:{}", encode(name)),
+                RequestParameterAccess::Path(name) => format!("REQUEST:PATH:{}", encode(name)),
+                RequestParameterAccess::Header(name) => {
+                    format!("REQUEST:HEADER:{}", encode(name))
+                }
+                RequestParameterAccess::Cookie(name) => {
+                    format!("REQUEST:COOKIE:{}", encode(name))
+                }
+            },
+            ParameterAccess::Response(response_parameter_access) => match response_parameter_access {
+                ResponseParameterAccess::Body(elements) => {
+                    format!("RESPONSE:BODY:{}", encode_body(elements))
+                }
+                ResponseParameterAccess::Header(name) => {
+                    format!("RESPONSE:HEADER:{}", encode(name))
+                }
+                ResponseParameterAccess::Cookie(name) => {
+                    format!("RESPONSE:COOKIE:{}", encode(name))
+                }
+            },
+        }
+    }
+
+    /// Parses a strict GraphML access encoding produced by [`to_graphml_string`].
+    pub fn from_graphml_string(value: &str) -> Result<Self, String> {
+        fn decode(value: &str) -> Result<String, String> {
+            urlencoding::decode(value)
+                .map(|decoded| decoded.into_owned())
+                .map_err(|error| format!("Invalid percent encoding in '{value}': {error}"))
+        }
+
+        fn parse_body(value: &str) -> Result<ParameterAccessElements, String> {
+            if value.is_empty() {
+                return Ok(ParameterAccessElements::new());
+            }
+            let mut elements = Vec::new();
+            for segment in value.split('/') {
+                let (kind, raw) = segment
+                    .split_once(':')
+                    .ok_or_else(|| format!("Invalid body segment '{segment}', missing ':'"))?;
+                match kind {
+                    "n" => elements.push(ParameterAccessElement::Name(decode(raw)?)),
+                    "i" => {
+                        let offset = raw.parse::<usize>().map_err(|error| {
+                            format!("Invalid array index '{raw}' in '{segment}': {error}")
+                        })?;
+                        elements.push(ParameterAccessElement::Offset(offset));
+                    }
+                    _ => {
+                        return Err(format!(
+                            "Invalid body segment kind '{kind}' in '{segment}', expected 'n' or 'i'"
+                        ));
+                    }
+                }
+            }
+            Ok(ParameterAccessElements(elements))
+        }
+
+        let mut parts = value.splitn(3, ':');
+        let side = parts
+            .next()
+            .ok_or_else(|| "Missing side in ParameterAccess GraphML value".to_string())?;
+        let location = parts
+            .next()
+            .ok_or_else(|| "Missing location in ParameterAccess GraphML value".to_string())?;
+        let encoded = parts.next().ok_or_else(|| {
+            "Missing value payload in ParameterAccess GraphML value".to_string()
+        })?;
+
+        match (side, location) {
+            ("REQUEST", "BODY") => Ok(Self::Request(RequestParameterAccess::Body(parse_body(
+                encoded,
+            )?))),
+            ("REQUEST", "QUERY") => Ok(Self::Request(RequestParameterAccess::Query(decode(
+                encoded,
+            )?))),
+            ("REQUEST", "PATH") => {
+                Ok(Self::Request(RequestParameterAccess::Path(decode(encoded)?)))
+            }
+            ("REQUEST", "HEADER") => Ok(Self::Request(RequestParameterAccess::Header(
+                decode(encoded)?,
+            ))),
+            ("REQUEST", "COOKIE") => Ok(Self::Request(RequestParameterAccess::Cookie(
+                decode(encoded)?,
+            ))),
+            ("RESPONSE", "BODY") => Ok(Self::Response(ResponseParameterAccess::Body(
+                parse_body(encoded)?,
+            ))),
+            ("RESPONSE", "HEADER") => Ok(Self::Response(ResponseParameterAccess::Header(
+                decode(encoded)?,
+            ))),
+            ("RESPONSE", "COOKIE") => Ok(Self::Response(ResponseParameterAccess::Cookie(
+                decode(encoded)?,
+            ))),
+            _ => Err(format!(
+                "Invalid ParameterAccess GraphML prefix '{side}:{location}'"
+            )),
+        }
+    }
+
     pub fn simple_name(&self) -> &str {
         match self {
             ParameterAccess::Request(request_parameter_access) => match request_parameter_access {
@@ -376,5 +499,54 @@ impl From<(usize, ParameterAccess)> for ParameterAddressing {
             request_index: value.0,
             access: value.1,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ParameterAccess, ParameterAccessElement, ParameterAccessElements, RequestParameterAccess,
+        ResponseParameterAccess,
+    };
+
+    #[test]
+    fn parameter_access_graphml_roundtrip_non_body() {
+        let accesses = vec![
+            ParameterAccess::Request(RequestParameterAccess::Query("query-name".to_string())),
+            ParameterAccess::Request(RequestParameterAccess::Path("user/id".to_string())),
+            ParameterAccess::Request(RequestParameterAccess::Header("x-id:abc".to_string())),
+            ParameterAccess::Request(RequestParameterAccess::Cookie("sid=1".to_string())),
+            ParameterAccess::Response(ResponseParameterAccess::Header("etag".to_string())),
+            ParameterAccess::Response(ResponseParameterAccess::Cookie("session".to_string())),
+        ];
+
+        for access in accesses {
+            let serialized = access.to_graphml_string();
+            let parsed = ParameterAccess::from_graphml_string(&serialized).unwrap();
+            assert_eq!(parsed, access);
+        }
+    }
+
+    #[test]
+    fn parameter_access_graphml_roundtrip_body() {
+        let access = ParameterAccess::Response(ResponseParameterAccess::Body(
+            ParameterAccessElements::from_elements(&[
+                ParameterAccessElement::Name("user profile".to_string()),
+                ParameterAccessElement::Name("nested/field".to_string()),
+                ParameterAccessElement::Offset(3),
+                ParameterAccessElement::Name("id".to_string()),
+            ]),
+        ));
+
+        let serialized = access.to_graphml_string();
+        let parsed = ParameterAccess::from_graphml_string(&serialized).unwrap();
+        assert_eq!(parsed, access);
+    }
+
+    #[test]
+    fn parameter_access_graphml_rejects_invalid_input() {
+        assert!(ParameterAccess::from_graphml_string("REQUEST").is_err());
+        assert!(ParameterAccess::from_graphml_string("REQUEST:BLAH:name").is_err());
+        assert!(ParameterAccess::from_graphml_string("REQUEST:BODY:x:3").is_err());
     }
 }

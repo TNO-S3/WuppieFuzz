@@ -27,7 +27,9 @@ use libafl_bolts::{AsIter, Named, current_time};
 
 use self::dependency_graph::DependencyGraph;
 use crate::{
-    initial_corpus::dependency_graph::initial_corpus_from_api,
+    initial_corpus::dependency_graph::{
+        DependencyGraphImportPolicy, initial_corpus_from_graph,
+    },
     input::{OpenApiInput, OpenApiRequest},
     openapi::spec::Spec,
     types::{EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType},
@@ -109,21 +111,27 @@ where
 /// the dependencies between parameters of the requests in each series generated
 /// as the initial corpus) used to generate the initial corpus is then written
 /// to the `report_path`.
-pub fn generate_corpus_to_files(spec: &Spec, corpus_dir: &Path, report_path: Option<&Path>) {
-    let inputs = initial_corpus_from_api(spec);
+pub fn generate_corpus_to_files(
+    spec: &Spec,
+    corpus_dir: &Path,
+    report_path: Option<&Path>,
+    graphml_import_path: Option<&Path>,
+    graphml_import_skip_invalid: bool,
+) -> Result<(), anyhow::Error> {
+    let dependency_graph = load_dependency_graph(spec, graphml_import_path, graphml_import_skip_invalid)?;
+
+    let inputs = initial_corpus_from_graph(spec, &dependency_graph);
     log::debug!("Writing corpus to file...");
-    if let Err(e) = write_corpus_to_files(&inputs, corpus_dir) {
-        log::warn!("Error writing corpus to file: {e}");
-    } else {
-        log::info!("Wrote generated corpus to {corpus_dir:?}");
-    }
+    write_corpus_to_files(&inputs, corpus_dir)?;
+    log::info!("Wrote generated corpus to {corpus_dir:?}");
+
     if let Some(report_path) = report_path {
-        // The dependency graph was already generated while creating it from the API
-        // but it is cheap to build, so we can afford to do it again for reporting.
-        let dependency_graph = DependencyGraph::new(spec);
-        let _ = dependency_graph.write_report(report_path);
-        let _ = write_corpus_report(&inputs, report_path);
+        dependency_graph.write_report(report_path)?;
+        dependency_graph.write_graphml_report(report_path)?;
+        write_corpus_report(&inputs, report_path)?;
     }
+
+    Ok(())
 }
 
 pub fn write_corpus_to_files(
@@ -155,6 +163,8 @@ pub fn initialize_corpus(
     api: &Spec,
     initial_corpus_path: Option<&Path>,
     report_path: &Option<&Path>,
+    graphml_import_path: Option<&Path>,
+    graphml_import_skip_invalid: bool,
 ) -> InMemoryOnDiskCorpus<OpenApiInput> {
     let mut corpus = InMemoryOnDiskCorpus::new(PathBuf::from("./queue")).unwrap();
     match initial_corpus_path {
@@ -171,7 +181,13 @@ pub fn initialize_corpus(
             log::info!("No corpus supplied, generating one based on the API");
         }
     }
-    fill_corpus_from_api(&mut corpus, api, report_path);
+    fill_corpus_from_api(
+        &mut corpus,
+        api,
+        report_path,
+        graphml_import_path,
+        graphml_import_skip_invalid,
+    );
     corpus
 }
 
@@ -247,17 +263,45 @@ fn fill_corpus_from_file(
     Ok(())
 }
 
+fn load_dependency_graph<'a>(
+    api: &'a Spec,
+    graphml_import_path: Option<&Path>,
+    graphml_import_skip_invalid: bool,
+) -> anyhow::Result<DependencyGraph<'a>> {
+    match graphml_import_path {
+        Some(path) => {
+            let policy = if graphml_import_skip_invalid {
+                DependencyGraphImportPolicy::SkipInvalid
+            } else {
+                DependencyGraphImportPolicy::FailFast
+            };
+            DependencyGraph::from_graphml(api, path, policy)
+        }
+        None => Ok(DependencyGraph::new(api)),
+    }
+}
+
 fn fill_corpus_from_api(
     corpus: &mut InMemoryOnDiskCorpus<OpenApiInput>,
     api: &Spec,
     report_path: &Option<&Path>,
+    graphml_import_path: Option<&Path>,
+    graphml_import_skip_invalid: bool,
 ) {
-    let inputs = initial_corpus_from_api(api);
+    let dependency_graph = match load_dependency_graph(api, graphml_import_path, graphml_import_skip_invalid) {
+        Ok(graph) => graph,
+        Err(error) => {
+            log::error!(
+                "Could not import dependency graph from GraphML, falling back to generated graph: {error}"
+            );
+            DependencyGraph::new(api)
+        }
+    };
+
+    let inputs = initial_corpus_from_graph(api, &dependency_graph);
     if let Some(report_path) = report_path {
-        // The dependency graph was already generated while creating it from the API
-        // but it is cheap to build, so we can afford to do it again for reporting.
-        let dependency_graph = DependencyGraph::new(api);
         let _ = dependency_graph.write_report(report_path);
+        let _ = dependency_graph.write_graphml_report(report_path);
         let _ = write_corpus_report(&inputs, report_path);
     }
     for input in inputs {

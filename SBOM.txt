@@ -520,6 +520,9 @@ psl-types 2.0.11
 publicsuffix 2.3.0
 	licensed under "Apache-2.0 OR MIT"
 	by rushmorem <rushmore@webenchanter.com>
+quick-xml 0.38.4
+	licensed under "MIT"
+	by unspecified authors
 quinn 0.11.9
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors

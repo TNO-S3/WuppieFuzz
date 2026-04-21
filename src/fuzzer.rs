@@ -66,6 +66,8 @@ pub fn fuzz() -> Result<()> {
         api,
         config.initial_corpus.as_deref(),
         &report_path.as_deref(),
+        config.graphml_dependency_graph.as_deref(),
+        config.graphml_import_skip_invalid,
     );
     let mut state_uninit = OpenApiFuzzerState::new_uninit(initial_corpus, *api.clone())?;
 

@@ -72,6 +72,18 @@ pub enum Commands {
         #[arg(value_parser = clap::value_parser!(log::LevelFilter), long, value_enum, env = "LOG_LEVEL", ignore_case = true)]
         log_level: Option<log::LevelFilter>,
     },
+    /// Generate the dependency graph for the OpenAPI operations and write it to a directory, then exit
+    OperationsGraph {
+        /// A directory to write the graph files to
+        #[arg(value_name = "OUTPUT_DIRECTORY")]
+        output_directory: PathBuf,
+        /// OpenAPI specification to generate the graph from
+        #[arg(long, value_parser, value_name = "OPENAPI_SPEC.YAML")]
+        openapi_spec: PathBuf,
+        /// Log level to output. This flag takes precedence over the environment variable. [possible values: off, error, warn, debug, info, trace]
+        #[arg(value_parser = clap::value_parser!(log::LevelFilter), long, value_enum, env = "LOG_LEVEL", ignore_case = true)]
+        log_level: Option<log::LevelFilter>,
+    },
     /// Generate a starting corpus and write it to a directory, then exit
     OutputCorpus {
         /// A directory to output the corpus to
@@ -84,6 +96,12 @@ pub enum Commands {
         /// inferred relationships between the endpoints and their parameters
         #[arg(long, value_parser, value_name = "REPORTS/")]
         report_path: Option<PathBuf>,
+        /// If given, import dependency edges from this GraphML file instead of generating them.
+        #[arg(long, value_parser, value_name = "DEPENDENCY_GRAPH.GRAPHML")]
+        graphml_dependency_graph: Option<PathBuf>,
+        /// If true, invalid GraphML records are skipped with a warning.
+        #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
+        graphml_import_skip_invalid: bool,
         // Manually added possible values below, since automatically showing possible values of an external (remote) enum
         // such as log::LevelFilter is not well supported.
         // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
@@ -248,6 +266,14 @@ pub enum Commands {
         /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
         #[arg(value_parser, long)]
         jacoco_class_prefix: Option<String>,
+
+        /// If given, import dependency edges from this GraphML file instead of generating them.
+        #[arg(long, value_parser, value_name = "DEPENDENCY_GRAPH.GRAPHML")]
+        graphml_dependency_graph: Option<PathBuf>,
+
+        /// If true, invalid GraphML records are skipped with a warning.
+        #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
+        graphml_import_skip_invalid: Option<bool>,
     },
 }
 
@@ -312,6 +338,8 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                graphml_dependency_graph,
+                graphml_import_skip_invalid,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -332,11 +360,26 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                graphml_dependency_graph,
+                graphml_import_skip_invalid,
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,
                 openapi_spec,
                 report_path: _,
+                graphml_dependency_graph,
+                graphml_import_skip_invalid,
+                log_level,
+            } => Ok(PartialConfiguration {
+                openapi_spec: Some(openapi_spec),
+                log_level,
+                graphml_dependency_graph,
+                graphml_import_skip_invalid: Some(graphml_import_skip_invalid),
+                ..Default::default()
+            }),
+            Commands::OperationsGraph {
+                output_directory: _,
+                openapi_spec,
                 log_level,
             } => Ok(PartialConfiguration {
                 openapi_spec: Some(openapi_spec),
@@ -455,6 +498,14 @@ struct PartialConfiguration {
     /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
     #[clap(value_parser, long)]
     pub jacoco_class_prefix: Option<String>,
+
+    /// If given, import dependency edges from this GraphML file instead of generating them.
+    #[clap(value_parser, long)]
+    pub graphml_dependency_graph: Option<PathBuf>,
+
+    /// If true, invalid GraphML records are skipped with a warning.
+    #[clap(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
+    pub graphml_import_skip_invalid: Option<bool>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -550,6 +601,12 @@ pub struct Configuration {
 
     /// Log level to output. This flag takes precedence over the environment variable.
     pub log_level: log::LevelFilter,
+
+    /// If given, import dependency edges from this GraphML file instead of generating them.
+    pub graphml_dependency_graph: Option<PathBuf>,
+
+    /// If true, invalid GraphML records are skipped with a warning.
+    pub graphml_import_skip_invalid: bool,
 }
 
 /// CoverageConfiguration holds all the coverage-agent-specific configuration.
@@ -653,6 +710,8 @@ impl TryFrom<PartialConfiguration> for Configuration {
             authentication: value.authentication,
             header: value.header,
             log_level: value.log_level.unwrap_or(DEFAULT_LOG_LEVEL),
+            graphml_dependency_graph: value.graphml_dependency_graph,
+            graphml_import_skip_invalid: value.graphml_import_skip_invalid.unwrap_or(false),
         })
     }
 }
@@ -707,6 +766,12 @@ impl PartialConfiguration {
             jacoco_class_prefix: other
                 .jacoco_class_prefix
                 .or_else(|| self.jacoco_class_prefix.take()),
+            graphml_dependency_graph: other
+                .graphml_dependency_graph
+                .or_else(|| self.graphml_dependency_graph.take()),
+            graphml_import_skip_invalid: other
+                .graphml_import_skip_invalid
+                .or_else(|| self.graphml_import_skip_invalid.take()),
         };
     }
 }
