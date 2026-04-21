@@ -269,6 +269,9 @@ fn interesting_values_for_parameters(
         .map(|mut parameter| {
             let par_kind: ParameterKind = parameter.clone().into();
             let mut interesting_combinations: Vec<Value> = vec![];
+            // If this parameter is a reference target (it will get replaced with a reference
+            // later), only return a single possible value to avoid generating duplicate
+            // combinations that will collapse to the same OpenApiInput after substitution.
             if single_valued.contains(&parameter) {
                 if let Some(example) = parameter.example {
                     interesting_combinations.push(example.clone());
@@ -290,8 +293,7 @@ fn interesting_values_for_parameters(
                     }
                 }
             } else {
-                // if this parameter is a reference target (it will get replaced with a reference)
-                // only return a single possible value here to avoid duplication down the line.
+                // This parameter is not a reference target; generate all interesting values.
                 if let Some(ref example) = parameter.example {
                     interesting_combinations.push(example.clone());
                 };
