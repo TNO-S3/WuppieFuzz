@@ -50,7 +50,7 @@ fn example_body_contents(api: &Spec, operation: &Operation) -> Option<ParameterC
     // Get either application/json or form content, if neither is present return None.
     let media_type = None
         .or_else(|| body.content.get("application/json"))
-        .or_else(|| body.content.get("application/x-www-form-urlcontent"))?;
+        .or_else(|| body.content.get("application/x-www-form-urlencoded"))?;
 
     // Return None if the schema cannot be resolved
     let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
@@ -484,7 +484,7 @@ fn interesting_params_from_schema(
             log::warn!("Schema has more than one_of schema: conflicting examples may be generated.")
         }
         result.extend(
-            [schema.one_of, schema.any_of]
+            [&schema.one_of, &schema.any_of]
                 .iter()
                 .flat_map(|schema_vec| {
                     schema_vec
@@ -503,6 +503,11 @@ fn interesting_params_from_schema(
                         })
                 }),
         );
+    }
+    if result.is_empty() {
+        // No suitable defaults or examples found; fall back to generating
+        // ones based on the type information embedded in the schema
+        result.extend(interesting_params_from_type(api, &schema, 0));
     }
     result
 }

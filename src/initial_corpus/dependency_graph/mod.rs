@@ -65,7 +65,6 @@ pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
                             log::warn!("{err} - falling back to single example generation.");
                         })
                         .unwrap_or(vec![openapi_example_input_from_ops(api, ops.into_iter())]);
-
                 inputs.into_iter().flat_map(move |input| {
                     add_references_to_openapi_input(&subgraph, &idxs, &input)
                 })
