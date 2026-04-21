@@ -210,17 +210,31 @@ mod tests {
         let request = OpenApiRequest {
             method: Method::Post,
             path: "/widgets/{widget_id}".to_string(),
-            body: Body::ApplicationJson(serde_json::json!({
-                "outer": {
-                    "inner": 37
-                }
-            })
-            .into()),
+            body: Body::ApplicationJson(
+                serde_json::json!({
+                    "outer": {
+                        "inner": 37
+                    }
+                })
+                .into(),
+            ),
             parameters: BTreeMap::from([
-                (("search".to_string(), ParameterKind::Query), "needle".to_string().into()),
-                (("widget_id".to_string(), ParameterKind::Path), "abc123".to_string().into()),
-                (("x-trace".to_string(), ParameterKind::Header), "trace-id".to_string().into()),
-                (("session".to_string(), ParameterKind::Cookie), "cookie-value".to_string().into()),
+                (
+                    ("search".to_string(), ParameterKind::Query),
+                    "needle".to_string().into(),
+                ),
+                (
+                    ("widget_id".to_string(), ParameterKind::Path),
+                    "abc123".to_string().into(),
+                ),
+                (
+                    ("x-trace".to_string(), ParameterKind::Header),
+                    "trace-id".to_string().into(),
+                ),
+                (
+                    ("session".to_string(), ParameterKind::Cookie),
+                    "cookie-value".to_string().into(),
+                ),
             ]),
         };
 
@@ -269,12 +283,14 @@ mod tests {
         let first_request = OpenApiRequest {
             method: Method::Post,
             path: "/widgets".to_string(),
-            body: Body::ApplicationJson(serde_json::json!({
-                "outer": {
-                    "inner": "recorded-value"
-                }
-            })
-            .into()),
+            body: Body::ApplicationJson(
+                serde_json::json!({
+                    "outer": {
+                        "inner": "recorded-value"
+                    }
+                })
+                .into(),
+            ),
             parameters: BTreeMap::from([(
                 ("search".to_string(), ParameterKind::Query),
                 "needle".to_string().into(),
