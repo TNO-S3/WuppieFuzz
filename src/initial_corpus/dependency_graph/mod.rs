@@ -494,10 +494,10 @@ impl<'a> DependencyGraph<'a> {
         let nodes: Vec<_> = node_indices
             .iter()
             .enumerate()
-            .map(|(idx, node_index)| {
+            .map(|(_idx, node_index)| {
                 let op = &self.graph[*node_index];
                 GraphMlNode {
-                    id: format!("n{idx}"),
+                    id: format!("{} {}", op.method, op.path),
                     method: op.method,
                     path: op.path.clone(),
                 }
@@ -507,7 +507,7 @@ impl<'a> DependencyGraph<'a> {
         let node_id_map: HashMap<_, _> = node_indices
             .into_iter()
             .enumerate()
-            .map(|(idx, node_index)| (node_index, format!("n{idx}")))
+            .map(|(_idx, node_index)| { let op = &self.graph[node_index]; (node_index, format!("{} {}", op.method, op.path)) })
             .collect();
 
         let mut edges = self
