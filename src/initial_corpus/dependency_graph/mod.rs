@@ -54,11 +54,6 @@ pub fn initial_corpus_from_api(api: &Spec) -> Vec<OpenApiInput> {
         .map(|nodes| dependency_graph.subgraph(nodes))
         .map(|subgraph| {
             ops_from_subgraph(&subgraph).map(|(ops, idxs)| {
-                // TODO: pass subgraph into openapi_inputs_from_ops to prevent generation of parameter values
-                // that will be replaced by references below anyway. The current implementation often
-                // massively overgenerates all the different combinations, most of which then get
-                // mapped back to the same OpenApiInput since all concrete parameter values get
-                // overwritten with references to the same parameter in an earlier response.
                 let inputs = all_interesting_inputs_for_operations(
                     api,
                     ops.clone().into_iter(),
