@@ -262,9 +262,8 @@ impl ParameterContents {
     /// Returns a nested field of this ParameterContents, as addressed by the parameter_access.
     /// If the addressing does not identify a field (by having bad field names, out-of-bound indexes,
     /// or too many elements), None is returned.
-    pub fn resolve(&self, parameter_access: &ParameterAccess) -> Option<&Self> {
+    pub fn resolve(&self, elements: &ParameterAccessElements) -> Option<&Self> {
         let mut result = self;
-        let elements = parameter_access.get_body_access_elements().unwrap();
         for path_element in &elements.0 {
             match (result, path_element) {
                 (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
