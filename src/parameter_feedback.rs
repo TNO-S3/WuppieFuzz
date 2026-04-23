@@ -75,7 +75,7 @@ impl ParameterFeedback {
                         ParameterAccessElements::new(),
                     ))?;
                     match request_access {
-                        RequestParameterAccess::Body(_) => root_value.resolve(access),
+                        RequestParameterAccess::Body(elements) => root_value.resolve(elements),
                         _ => None,
                     }
                 }
@@ -84,7 +84,7 @@ impl ParameterFeedback {
                         ParameterAccessElements::new(),
                     ))?;
                     match response_access {
-                        ResponseParameterAccess::Body(_) => root_value.resolve(access),
+                        ResponseParameterAccess::Body(elements) => root_value.resolve(elements),
                         _ => None,
                     }
                 }
