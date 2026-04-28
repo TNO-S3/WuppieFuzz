@@ -466,7 +466,7 @@ once_cell_polyfill 1.70.2
 openapiv3-extended 6.0.1
 	licensed under "Apache-2.0 OR MIT"
 	by Kurt Wolf <kurtwolfbuilds@gmail.com>
-openssl 0.10.76
+openssl 0.10.78
 	licensed under "Apache-2.0"
 	by Steven Fackler <sfackler@gmail.com>
 openssl-macros 0.1.1
@@ -475,7 +475,7 @@ openssl-macros 0.1.1
 openssl-probe 0.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-openssl-sys 0.9.112
+openssl-sys 0.9.114
 	licensed under "MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Steven Fackler <sfackler@gmail.com>
 parking_lot 0.12.5
@@ -604,7 +604,7 @@ rustls-platform-verifier 0.6.2
 rustls-platform-verifier-android 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-webpki 0.103.10
+rustls-webpki 0.103.13
 	licensed under "ISC"
 	by unspecified authors
 ryu 1.0.23
