@@ -9,7 +9,7 @@ use serde::Deserialize;
 use super::Authentication;
 
 /// The WFC schema version this implementation was written against.
-const SUPPORTED_VERSION: Version = Version::new(0, 2, 0);
+const SUPPORTED_VERSION: Version = Version::new(0, 4, 0);
 
 /// Top-level WFC authentication document
 #[derive(Debug, Deserialize)]
@@ -83,18 +83,36 @@ impl PartialLoginEndpoint {
     /// Resolve into a [`LoginEndpoint`], returning an error if any required
     /// fields are still missing after merging.
     fn resolve(self, entry_name: &str) -> Result<LoginEndpoint> {
+        // x-required allOf: ["verb"]
+        let verb = self.verb.ok_or_else(|| {
+            anyhow!(
+                "WFC authentication entry '{entry_name}' loginEndpointAuth is missing \
+                 required field 'verb' (not set in entry or authTemplate)"
+            )
+        })?;
+
+        // x-required oneOf: ["endpoint", "externalEndpointURL"]
+        if self.endpoint.is_none() && self.external_endpoint_url.is_none() {
+            bail!(
+                "WFC authentication entry '{entry_name}' loginEndpointAuth must specify \
+                 exactly one of 'endpoint' or 'externalEndpointURL' (neither set in entry \
+                 or authTemplate)"
+            );
+        }
+        if self.endpoint.is_some() && self.external_endpoint_url.is_some() {
+            bail!(
+                "WFC authentication entry '{entry_name}' loginEndpointAuth must specify \
+                 exactly one of 'endpoint' or 'externalEndpointURL', but both are set"
+            );
+        }
+
         Ok(LoginEndpoint {
             endpoint: self.endpoint,
             external_endpoint_url: self.external_endpoint_url,
             payload_raw: self.payload_raw,
             payload_user_pwd: self.payload_user_pwd,
             headers: self.headers,
-            verb: self.verb.ok_or_else(|| {
-                anyhow!(
-                    "WFC authentication entry '{entry_name}' loginEndpointAuth is missing \
-                     required field 'verb' (not set in entry or authTemplate)"
-                )
-            })?,
+            verb,
             content_type: self.content_type,
             token: self.token,
             expect_cookies: self.expect_cookies,
@@ -238,6 +256,19 @@ impl WfcAuth {
             .next()
             .ok_or_else(|| anyhow!("WFC authentication file has an empty 'auth' list"))?;
 
+        // x-required: ["name"] on AuthenticationInfo, validated post-merge
+        let entry_name = entry
+            .name
+            .as_deref()
+            .or_else(|| template.as_ref().and_then(|t| t.name.as_deref()))
+            .ok_or_else(|| {
+                anyhow!(
+                    "A WFC authentication entry is missing the required 'name' field \
+                     (not set in entry or authTemplate)"
+                )
+            })?
+            .to_string();
+
         // Merge template into entry (entry fields take precedence)
         let fixed_headers = entry
             .fixed_headers
@@ -267,7 +298,7 @@ impl WfcAuth {
                             "WFC authentication entry '{}' has fixedHeaders but no \
                              'Authorization' header. Only Authorization header authentication \
                              is currently supported for fixedHeaders.",
-                            entry.name.unwrap_or_else(|| "<unnamed>".to_string())
+                            entry_name
                         )
                     })?;
                 let value = &auth_header.value;
@@ -733,6 +764,114 @@ authTemplate:
         assert!(
             format!("{:?}", result.unwrap_err()).contains("/accessToken"),
             "Error should mention the missing JSON pointer"
+        );
+    }
+
+    // --- x-required post-merge validation tests ------------------------------
+
+    #[test]
+    fn error_when_verb_missing_after_merge() {
+        // Neither entry nor template specifies verb
+        let yaml = r#"
+auth:
+  - name: user
+    loginEndpointAuth:
+      endpoint: /login
+      payloadRaw: "{}"
+authTemplate:
+  loginEndpointAuth:
+    contentType: application/json
+    token:
+      extractFrom: body
+      extractSelector: /token
+      sendIn: header
+      sendName: Authorization
+"#;
+        let result = parse(yaml).into_authentication();
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("verb"), "Error should mention 'verb': {msg}");
+    }
+
+    #[test]
+    fn error_when_neither_endpoint_nor_external_url_set() {
+        let yaml = r#"
+auth:
+  - name: user
+    loginEndpointAuth:
+      payloadRaw: "{}"
+      verb: POST
+      contentType: application/json
+      token:
+        extractFrom: body
+        extractSelector: /token
+        sendIn: header
+        sendName: Authorization
+"#;
+        let result = parse(yaml).into_authentication();
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("endpoint") || msg.contains("externalEndpointURL"),
+            "Error should mention the missing endpoint fields: {msg}"
+        );
+    }
+
+    #[test]
+    fn error_when_both_endpoint_and_external_url_set() {
+        let yaml = r#"
+auth:
+  - name: user
+    loginEndpointAuth:
+      endpoint: /login
+      externalEndpointURL: https://auth.example.com/login
+      verb: POST
+      contentType: application/json
+      token:
+        extractFrom: body
+        extractSelector: /token
+        sendIn: header
+        sendName: Authorization
+"#;
+        let result = parse(yaml).into_authentication();
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("endpoint") || msg.contains("externalEndpointURL"),
+            "Error should mention the conflicting endpoint fields: {msg}"
+        );
+    }
+
+    #[test]
+    fn error_when_name_missing_from_entry_and_template() {
+        // Neither entry nor authTemplate has a name
+        let yaml = r#"
+auth:
+  - fixedHeaders:
+      - name: Authorization
+        value: Basic dXNlcjpwYXNz
+"#;
+        let result = parse(yaml).into_authentication();
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("name"), "Error should mention 'name': {msg}");
+    }
+
+    #[test]
+    fn name_from_template_satisfies_x_required() {
+        // Entry has no name but authTemplate does — should be accepted
+        let yaml = r#"
+auth:
+  - fixedHeaders:
+      - name: Authorization
+        value: Basic dXNlcjpwYXNz
+authTemplate:
+  name: default-user
+"#;
+        let auth = parse(yaml).into_authentication().unwrap();
+        assert!(
+            matches!(auth, Authentication::Basic(_)),
+            "Expected Basic auth when name comes from template: {auth:?}"
         );
     }
 }
