@@ -169,6 +169,7 @@ where
                 );
                 break 'chain;
             };
+            parameter_feedback.process_request(request_index, &request);
             let request_builder = match build_request_from_input(
                 &self.http_client,
                 &mut self.authentication,
