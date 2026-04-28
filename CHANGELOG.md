@@ -6,6 +6,11 @@
 
 ## Fixes
 
+- Use type-based fallback when schema-based example generation does not yield interesting parameters in [#285](https://github.com/TNO-S3/WuppieFuzz/pull/285)
+- Fix typo in x-www-form-urlencoded content type in [#285](https://github.com/TNO-S3/WuppieFuzz/pull/285)
+- Process requests for feedback so that parameter references can resolve in [#289](https://github.com/TNO-S3/WuppieFuzz/pull/289)
+- Add documentation to the examples module and rename functions for consistency in [#291](https://github.com/TNO-S3/WuppieFuzz/pull/291)
+
 # v1.4.3 (2026-03-16)
 
 ## Highlights

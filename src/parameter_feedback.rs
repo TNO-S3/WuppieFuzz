@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    input::ParameterContents,
+    input::{Body, OpenApiRequest, ParameterContents, parameter::ParameterKind},
     openapi::validate_response::Response,
     parameter_access::{
         ParameterAccess, ParameterAccessElements, ParameterAddressing, RequestParameterAccess,
@@ -75,7 +75,7 @@ impl ParameterFeedback {
                         ParameterAccessElements::new(),
                     ))?;
                     match request_access {
-                        RequestParameterAccess::Body(_) => root_value.resolve(access),
+                        RequestParameterAccess::Body(elements) => root_value.resolve(elements),
                         _ => None,
                     }
                 }
@@ -84,7 +84,7 @@ impl ParameterFeedback {
                         ParameterAccessElements::new(),
                     ))?;
                     match response_access {
-                        ResponseParameterAccess::Body(_) => root_value.resolve(access),
+                        ResponseParameterAccess::Body(elements) => root_value.resolve(elements),
                         _ => None,
                     }
                 }
@@ -118,6 +118,40 @@ impl ParameterFeedback {
         field: ParameterContents,
     ) {
         self.set(addressing, field.clone());
+    }
+
+    fn add_request_parameter(&mut self, addressing: ParameterAddressing, field: ParameterContents) {
+        self.set(addressing, field.clone());
+    }
+
+    /// Processes the resolved parameter values in an OpenApiRequest.
+    pub fn process_request(&mut self, request_index: usize, request: &OpenApiRequest) {
+        match &request.body {
+            Body::Empty => {}
+            Body::TextPlain(body)
+            | Body::ApplicationJson(body)
+            | Body::XWwwFormUrlencoded(body) => self.add_request_parameter(
+                ParameterAddressing::new(
+                    request_index,
+                    ParameterAccess::request_body(ParameterAccessElements::new()),
+                ),
+                body.clone(),
+            ),
+        }
+
+        for ((name, kind), value) in &request.parameters {
+            let access = match kind {
+                ParameterKind::Query => ParameterAccess::request_query(name.clone()),
+                ParameterKind::Path => ParameterAccess::request_path(name.clone()),
+                ParameterKind::Header => ParameterAccess::request_header(name.clone()),
+                ParameterKind::Cookie => ParameterAccess::request_cookie(name.clone()),
+                ParameterKind::Body => continue,
+            };
+            self.add_request_parameter(
+                ParameterAddressing::new(request_index, access),
+                value.clone(),
+            );
+        }
     }
 
     /// Processes the values returned in a Response.
@@ -154,5 +188,160 @@ impl ParameterFeedback {
     #[allow(unused)]
     fn reset(&mut self) {
         self.0.clear()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::ParameterFeedback;
+    use crate::{
+        input::{
+            Body, Method, OpenApiRequest, ParameterContents,
+            parameter::{IReference, ParameterKind},
+        },
+        parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
+    };
+
+    #[test]
+    fn process_request_records_request_values() {
+        let mut feedback = ParameterFeedback::new(1);
+        let request = OpenApiRequest {
+            method: Method::Post,
+            path: "/widgets/{widget_id}".to_string(),
+            body: Body::ApplicationJson(
+                serde_json::json!({
+                    "outer": {
+                        "inner": 37
+                    }
+                })
+                .into(),
+            ),
+            parameters: BTreeMap::from([
+                (
+                    ("search".to_string(), ParameterKind::Query),
+                    "needle".to_string().into(),
+                ),
+                (
+                    ("widget_id".to_string(), ParameterKind::Path),
+                    "abc123".to_string().into(),
+                ),
+                (
+                    ("x-trace".to_string(), ParameterKind::Header),
+                    "trace-id".to_string().into(),
+                ),
+                (
+                    ("session".to_string(), ParameterKind::Cookie),
+                    "cookie-value".to_string().into(),
+                ),
+            ]),
+        };
+
+        feedback.process_request(0, &request);
+
+        assert_eq!(
+            feedback
+                .get(0, &ParameterAccess::request_query("search".to_string()))
+                .map(ParameterContents::to_value),
+            Some(serde_json::json!("needle"))
+        );
+        assert_eq!(
+            feedback
+                .get(0, &ParameterAccess::request_path("widget_id".to_string()))
+                .map(ParameterContents::to_value),
+            Some(serde_json::json!("abc123"))
+        );
+        assert_eq!(
+            feedback
+                .get(0, &ParameterAccess::request_header("x-trace".to_string()))
+                .map(ParameterContents::to_value),
+            Some(serde_json::json!("trace-id"))
+        );
+        assert_eq!(
+            feedback
+                .get(0, &ParameterAccess::request_cookie("session".to_string()))
+                .map(ParameterContents::to_value),
+            Some(serde_json::json!("cookie-value"))
+        );
+        assert_eq!(
+            feedback
+                .get(
+                    0,
+                    &ParameterAccess::request_body(ParameterAccessElements::from_elements(&[
+                        ParameterAccessElement::Name("outer".to_string()),
+                        ParameterAccessElement::Name("inner".to_string()),
+                    ])),
+                )
+                .map(ParameterContents::to_value),
+            Some(serde_json::json!(37))
+        );
+    }
+
+    #[test]
+    fn resolve_parameter_references_uses_recorded_request_values() {
+        let first_request = OpenApiRequest {
+            method: Method::Post,
+            path: "/widgets".to_string(),
+            body: Body::ApplicationJson(
+                serde_json::json!({
+                    "outer": {
+                        "inner": "recorded-value"
+                    }
+                })
+                .into(),
+            ),
+            parameters: BTreeMap::from([(
+                ("search".to_string(), ParameterKind::Query),
+                "needle".to_string().into(),
+            )]),
+        };
+        let mut second_request = OpenApiRequest {
+            method: Method::Get,
+            path: "/widgets/{widget_id}".to_string(),
+            body: Body::Empty,
+            parameters: BTreeMap::from([
+                (
+                    ("widget_id".to_string(), ParameterKind::Path),
+                    ParameterContents::IReference(IReference {
+                        request_index: 0,
+                        parameter_access: ParameterAccess::request_body(
+                            ParameterAccessElements::from_elements(&[
+                                ParameterAccessElement::Name("outer".to_string()),
+                                ParameterAccessElement::Name("inner".to_string()),
+                            ]),
+                        ),
+                    }),
+                ),
+                (
+                    ("search_copy".to_string(), ParameterKind::Query),
+                    ParameterContents::IReference(IReference {
+                        request_index: 0,
+                        parameter_access: ParameterAccess::request_query("search".to_string()),
+                    }),
+                ),
+            ]),
+        };
+        let mut feedback = ParameterFeedback::new(2);
+
+        feedback.process_request(0, &first_request);
+        second_request
+            .resolve_parameter_references(&feedback)
+            .expect("request references should resolve from earlier recorded requests");
+
+        assert_eq!(
+            second_request
+                .parameters
+                .get(&("widget_id".to_string(), ParameterKind::Path))
+                .map(ParameterContents::to_value),
+            Some(serde_json::json!("recorded-value"))
+        );
+        assert_eq!(
+            second_request
+                .parameters
+                .get(&("search_copy".to_string(), ParameterKind::Query))
+                .map(ParameterContents::to_value),
+            Some(serde_json::json!("needle"))
+        );
     }
 }
