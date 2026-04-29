@@ -1,0 +1,91 @@
+publiccodeYmlVersion: "0.5"
+
+name: WuppieFuzz
+url: "https://github.com/TNO-S3/WuppieFuzz"
+landingURL: "https://tno.to/wuppiefuzz"
+softwareVersion: "1.4.3"
+releaseDate: "2026-03-16"
+logo: "assets/WuppieFuzz.svg"
+
+platforms:
+  - linux
+  - mac
+  - windows
+
+categories:
+  - it-security
+  - it-development
+  - test-management
+
+developmentStatus: stable
+
+softwareType: "standalone/desktop"
+
+organisation:
+  uri: "https://github.com/TNO-S3"
+  name: "TNO Software & System Security"
+
+intendedAudience:
+  scope:
+    - science-and-technology
+    - security
+    - research
+
+description:
+  en:
+    localisedName: WuppieFuzz
+    shortDescription: >
+      Coverage-guided REST API fuzzer for automatically testing web APIs for robustness and security issues.
+    longDescription: >
+      WuppieFuzz is a coverage-guided fuzzer for REST APIs. It automates generation and mutation of API
+      requests, executes them against a target service, and uses feedback (e.g., coverage and response
+      signals) to explore new behaviours. It helps uncover crashes, unexpected server errors, and
+      security-relevant edge cases in API implementations.
+    documentation: "https://github.com/TNO-S3/WuppieFuzz/tree/main/tutorial"
+    features:
+      - Coverage-guided REST API fuzzing
+      - Request mutation and generation
+      - Automated detection of server errors and crashes
+      - Works with OpenAPI/Swagger-based targets
+    videos:
+      - "https://www.youtube.com/watch?v=-oR4d9aXrqo"
+
+  nl:
+    localisedName: WuppieFuzz
+    shortDescription: >
+      Coverage-gestuurde REST API-fuzzer voor het automatisch testen van web-API’s op robuustheid en beveiligingsproblemen.
+    longDescription: >
+      WuppieFuzz is een coverage-gestuurde fuzzer voor REST API’s. Het automatiseert het genereren en muteren
+      van API-requests, voert deze uit tegen een doelsysteem en gebruikt feedback (zoals coverage en
+      response-signalen) om nieuw gedrag te verkennen. Dit helpt bij het vinden van crashes, onverwachte
+      server errors en security-relevante edge cases in API-implementaties.
+    documentation: "https://github.com/TNO-S3/WuppieFuzz/tree/main/tutorial"
+    features:
+      - Coverage-gestuurde REST API fuzzing
+      - Request-mutatie en -generatie
+      - Automatische detectie van server errors en crashes
+      - Werkt met OpenAPI/Swagger-doelen
+    videos:
+      - "https://www.youtube.com/watch?v=-oR4d9aXrqo"
+
+legal:
+  license: "Apache-2.0"
+  mainCopyrightOwner: "TNO"
+
+maintenance:
+  type: "community"
+  contacts:
+    - name: "Thomas Rooijakkers"
+      email: thomas.rooijakkers@tno.nl
+      affiliation: "TNO"
+
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
+    - nl
+
+dependsOn:
+  open:
+    - name: "Rust"
+      optional: false
