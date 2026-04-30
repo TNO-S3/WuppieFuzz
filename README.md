@@ -124,6 +124,46 @@ Grafana dashboard.
 
 For more information on each of these, see the READMEs in these directories.
 
+## Development build
+
+By default, WuppieFuzz vendors its C dependencies (OpenSSL, SQLite, Z3) so that
+a regular `cargo build` works out of the box. For faster compilation during
+development, you can disable these bundled dependencies and link against
+system-installed libraries instead.
+
+### System dependencies
+
+Install the following libraries on your system:
+
+**Debian/Ubuntu:**
+
+```sh
+sudo apt install libssl-dev libsqlite3-dev libz3-dev
+```
+
+**Fedora/RHEL:**
+
+```sh
+sudo dnf install openssl-devel sqlite-devel z3-devel
+```
+
+**macOS (Homebrew):**
+
+```sh
+brew install openssl sqlite z3
+```
+
+### Cargo aliases
+
+The repository includes cargo aliases in `.cargo/config.toml` that build with
+`--no-default-features`, skipping the vendored/bundled dependencies:
+
+```sh
+cargo dev-build          # build without vendored dependencies
+cargo dev-run -- <args>  # run without vendored dependencies
+cargo dev-test           # test without vendored dependencies
+```
+
 ## Generating documentation
 
 `cargo doc --no-deps` to generate documentation from comments in the source
