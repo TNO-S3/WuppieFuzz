@@ -94,7 +94,7 @@ If you already have a token or API key, you can provide it as a fixed `Authoriza
 
 ```yaml
 # WFC format — static Authorization header
-schemaVersion: "0.2.0"
+schemaVersion: "0.4.0"
 auth:
   - name: admin
     fixedHeaders:
@@ -104,7 +104,7 @@ auth:
 
 ```yaml
 # WFC format — API key
-schemaVersion: "0.2.0"
+schemaVersion: "0.4.0"
 auth:
   - name: user
     fixedHeaders:
@@ -118,7 +118,7 @@ If the server issues a token via a login endpoint, use `loginEndpointAuth`. An `
 
 ```yaml
 # WFC format — POST to a login endpoint, extract Bearer token from JSON response
-schemaVersion: "0.2.0"
+schemaVersion: "0.4.0"
 auth:
   - name: admin
     loginEndpointAuth:
@@ -146,7 +146,7 @@ If the server authenticates via cookies, set `expectCookies: true` instead of pr
 
 ```yaml
 # WFC format — POST to a login endpoint, use cookies from the response
-schemaVersion: "0.2.0"
+schemaVersion: "0.4.0"
 auth:
   - name: admin
     loginEndpointAuth:
@@ -161,5 +161,5 @@ authTemplate:
 ```
 
 > [!NOTE]
-> WuppieFuzz supports WFC schema version `0.2.0`. Files declaring a newer
+> WuppieFuzz supports WFC schema version `0.4.0`. Files declaring a newer
 > `schemaVersion` will still be parsed, but a warning will be emitted.
