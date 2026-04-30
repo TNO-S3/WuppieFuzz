@@ -128,8 +128,13 @@ For more information on each of these, see the READMEs in these directories.
 
 By default, WuppieFuzz vendors its C dependencies (OpenSSL, SQLite, Z3) so that
 a regular `cargo build` works out of the box. For faster compilation during
-development, you can disable these bundled dependencies and link against
+development, you can disable all vendored dependencies and link against
 system-installed libraries instead.
+
+> [!NOTE]
+> The `z3` crate requires Z3 4.15+, which is newer than the version shipped by
+> most Linux distribution package managers. Install Z3 via
+> [Homebrew](https://brew.sh/) (`brew install z3`) to get a compatible version.
 
 ### System dependencies
 
@@ -138,10 +143,11 @@ Install the following libraries on your system:
 **Debian/Ubuntu:**
 
 ```sh
-sudo apt install libssl-dev libsqlite3-dev libz3-dev
+sudo apt install libssl-dev libsqlite3-dev
+brew install z3  # apt's libz3-dev is too old; use Homebrew instead
 ```
 
-**Fedora/RHEL:**
+**Fedora (42+):**
 
 ```sh
 sudo dnf install openssl-devel sqlite-devel z3-devel
@@ -156,7 +162,7 @@ brew install openssl sqlite z3
 ### Cargo aliases
 
 The repository includes cargo aliases in `.cargo/config.toml` that build with
-`--no-default-features`, skipping the vendored/bundled dependencies:
+`--no-default-features`, linking against all system libraries:
 
 ```sh
 cargo dev-build          # build without vendored dependencies
