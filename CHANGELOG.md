@@ -2,6 +2,14 @@
 
 ## Highlights
 
+## Features
+
+## Fixes
+
+# v1.5.0 (2026-04-30)
+
+## Highlights
+
 - Added `publiccode.yml` metadata file, conforming to the publiccode standard for public software cataloging in [#296](https://github.com/TNO-S3/WuppieFuzz/pull/296)
 
 ## Features

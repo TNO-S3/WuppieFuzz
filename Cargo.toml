@@ -1,6 +1,6 @@
 [package]
 name = "wuppiefuzz"
-version = "1.4.3"
+version = "1.5.0"
 authors = [
     "TNO Software and System Security"
 ]
@@ -94,33 +94,6 @@ walkdir = "2.5.0"
 z3 = "0.19.13"
 oas3 = { version = "0.21.0", features = ["yaml-spec"] }
 semver = "1.0.28"
-
-# Config for 'dist'
-[workspace.metadata.dist]
-# Which actions to run on pull requests
-pr-run-mode = "plan"
-# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.31.0"
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell", "msi"]
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
-# Path that installers should place binaries in
-install-path = "CARGO_HOME"
-# Whether to install an updater program
-install-updater = true
-
-[workspace.metadata.dist.github-custom-runners]
-aarch64-apple-darwin = "macos-15"
-x86_64-unknown-linux-gnu = "ubuntu-24.04"
-aarch64-unknown-linux-gnu = "ubuntu-24.04"
-
-[workspace.metadata.dist.github-action-commits]
-"actions/checkout" = "de0fac2e4500dabe0009e67214ff5f5447ce83dd"
-"actions/upload-artifact" = "bbbca2ddaa5d8feaa63e36b76fdaad77386f024f"
-"actions/download-artifact" = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
 
 [dev-dependencies]
 mockito = "1.7.2"
