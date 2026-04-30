@@ -6,7 +6,7 @@
 
 ## Fixes
 
-- Optimize SQLite reporting performance: enable WAL journal mode, set SYNCHRONOUS=NORMAL, increase cache size, and cache prepared statements to avoid re-parsing SQL on every insert
+- Optimize SQLite reporting performance: enable WAL journal mode, set SYNCHRONOUS=NORMAL, increase cache size, cache prepared statements, and batch inserts in transactions to minimise disk flushes
 
 # v1.5.0 (2026-04-30)
 
