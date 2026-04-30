@@ -1,0 +1,4 @@
+[alias]
+dev-build = "build --no-default-features"
+dev-run = "run --no-default-features"
+dev-test = "test --no-default-features"
