@@ -31,6 +31,18 @@ impl MySqLite {
     pub fn new(path: &Path) -> anyhow::Result<MySqLite> {
         let conn = Connection::open(path).expect("Can not create database file for reporting");
 
+        // Performance pragmas: WAL mode allows concurrent reads/writes and batches
+        // disk syncs. SYNCHRONOUS=NORMAL is safe with WAL (protects against process
+        // crashes, not power loss mid-write). Increased cache keeps more pages in memory.
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=-16000;
+             PRAGMA busy_timeout=5000;
+             PRAGMA temp_store=MEMORY;",
+        )
+        .context("Could not set performance pragmas")?;
+
         conn.execute(
             "CREATE TABLE IF NOT EXISTS runs (
                 id INTEGER PRIMARY KEY NOT NULL,
@@ -114,7 +126,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
         let method = request.method.to_string();
 
         let time = chrono::offset::Utc::now();
-        let mut insert_stmt = self.conn.prepare("INSERT INTO requests (timestamp, testcase, path, type, url, body, inputid, runid, data) VALUES(:timestamp, :testcase, :path, :type, :url, :body, :inputid, :runid, :data)")
+        let mut insert_stmt = self.conn.prepare_cached("INSERT INTO requests (timestamp, testcase, path, type, url, body, inputid, runid, data) VALUES(:timestamp, :testcase, :path, :type, :url, :body, :inputid, :runid, :data)")
             .expect("Could not prepare insert statement for request");
         let params = named_params! {
             ":timestamp": time.to_rfc3339_opts(SecondsFormat::Millis, true),
@@ -137,7 +149,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
         let time = chrono::offset::Utc::now();
         let mut insert_stmt = self
             .conn
-            .prepare("INSERT INTO responses (timestamp, status, reqid, data) VALUES(?,?,?,?)")
+            .prepare_cached("INSERT INTO responses (timestamp, status, reqid, data) VALUES(?,?,?,?)")
             .expect("Could not prepare insert statement for response with status");
         insert_stmt
             .insert((
@@ -153,7 +165,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
         let time = chrono::offset::Utc::now();
         let mut insert_stmt = self
             .conn
-            .prepare("INSERT INTO responses (timestamp, error, reqid) VALUES(?,?,?)")
+            .prepare_cached("INSERT INTO responses (timestamp, error, reqid) VALUES(?,?,?)")
             .expect("Could not prepare insert statement for response with status");
         insert_stmt
             .insert((
@@ -173,7 +185,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
     ) {
         let mut insert_stmt = self
             .conn
-            .prepare("INSERT INTO coverage (line_coverage, line_coverage_total, endpoint_coverage, endpoint_coverage_total, runid) VALUES(?,?,?,?,?)")
+            .prepare_cached("INSERT INTO coverage (line_coverage, line_coverage_total, endpoint_coverage, endpoint_coverage_total, runid) VALUES(?,?,?,?,?)")
             .expect("Could not prepare insert statement for coverage");
         insert_stmt
             .insert((
