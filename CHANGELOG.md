@@ -4,6 +4,8 @@
 
 ## Features
 
+- Implement support for WFC authentication format in [#282](https://github.com/TNO-S3/WuppieFuzz/pull/282)
+
 ## Fixes
 
 - Use type-based fallback when schema-based example generation does not yield interesting parameters in [#285](https://github.com/TNO-S3/WuppieFuzz/pull/285)
