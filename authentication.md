@@ -81,3 +81,85 @@ configuration:
 ```
 
 The `mode` parameter can be set to `cookie`, if the access token should be sent as a cookie with each request, or `authorization_header`, if it should be a Bearer token. Refreshing is done via cookie in both cases.
+
+## Web Fuzzing Commons (WFC) authentication
+
+WuppieFuzz also supports the [Web Fuzzing Commons (WFC) authentication file format](https://github.com/WebFuzzing/Commons), a community standard for describing API authentication. WFC files are automatically detected by the presence of an `auth` key at the top level, so no additional flags are needed.
+
+WFC files support multiple named users; WuppieFuzz will use the first entry in the `auth` list.
+
+### Static header authentication
+
+If you already have a token or API key, you can provide it as a fixed `Authorization` header. The value is interpreted as Bearer, Basic, or raw depending on its prefix.
+
+```yaml
+# WFC format — static Authorization header
+schemaVersion: "0.2.0"
+auth:
+  - name: admin
+    fixedHeaders:
+      - name: Authorization
+        value: Basic YWRtaW46cGFzc3dvcmQ=
+```
+
+```yaml
+# WFC format — API key
+schemaVersion: "0.2.0"
+auth:
+  - name: user
+    fixedHeaders:
+      - name: Authorization
+        value: ApiKey my-api-key
+```
+
+### Login endpoint — token in response body
+
+If the server issues a token via a login endpoint, use `loginEndpointAuth`. An `authTemplate` can hold shared fields so they do not need to be repeated for each user.
+
+```yaml
+# WFC format — POST to a login endpoint, extract Bearer token from JSON response
+schemaVersion: "0.2.0"
+auth:
+  - name: admin
+    loginEndpointAuth:
+      payloadRaw: '{"usernameOrEmail": "admin", "password": "s3cr3t"}'
+  - name: regular-user
+    loginEndpointAuth:
+      payloadRaw: '{"usernameOrEmail": "user", "password": "s3cr3t"}'
+
+authTemplate:
+  loginEndpointAuth:
+    endpoint: /api/auth/signin
+    verb: POST
+    contentType: application/json
+    token:
+      extractFrom: body
+      extractSelector: /accessToken   # JSON Pointer (RFC 6901) into the response body
+      sendIn: header
+      sendName: Authorization
+      sendTemplate: "Bearer {token}"
+```
+
+### Login endpoint — cookie-based session
+
+If the server authenticates via cookies, set `expectCookies: true` instead of providing a `token` block.
+
+```yaml
+# WFC format — POST to a login endpoint, use cookies from the response
+schemaVersion: "0.2.0"
+auth:
+  - name: admin
+    loginEndpointAuth:
+      payloadRaw: "username=admin&password=s3cr3t"
+
+authTemplate:
+  loginEndpointAuth:
+    endpoint: /app/login
+    verb: POST
+    contentType: application/x-www-form-urlencoded
+    expectCookies: true
+```
+
+> [!NOTE]
+> WuppieFuzz supports WFC schema version `0.2.0`. Files declaring a newer
+> `schemaVersion` will still be parsed, but a warning will be emitted.
