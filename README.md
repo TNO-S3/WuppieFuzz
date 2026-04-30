@@ -147,6 +147,18 @@ sudo apt install libssl-dev libsqlite3-dev
 brew install z3  # apt's libz3-dev is too old; use Homebrew instead
 ```
 
+On Linux, Homebrew installs to a non-standard path. Add its library directory
+to your environment so the compiler and runtime linker can find Z3:
+
+```sh
+eval "$(brew shellenv)"
+export LIBRARY_PATH="$(brew --prefix z3)/lib:$LIBRARY_PATH"
+export LD_LIBRARY_PATH="$(brew --prefix z3)/lib:$LD_LIBRARY_PATH"
+```
+
+> [!TIP]
+> Add the lines above to your `~/.bashrc` or `~/.zshrc` to make them permanent.
+
 **Fedora (42+):**
 
 ```sh
