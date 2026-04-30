@@ -98,7 +98,7 @@ semver = "1.0.28"
 # Config for 'dist'
 [workspace.metadata.dist]
 # Which actions to run on pull requests
-pr-run-mode = "plan"
+pr-run-mode = "upload"
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.31.0"
 # CI backends to support
