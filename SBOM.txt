@@ -28,10 +28,10 @@ anstyle-wincon 3.0.11
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
-aws-lc-rs 1.16.2
+aws-lc-rs 1.16.3
 	licensed under "(Apache-2.0 OR ISC) AND ISC"
 	by AWS-LibCrypto
-aws-lc-sys 0.39.1
+aws-lc-sys 0.40.0
 	licensed under "(Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) AND (Apache-2.0 OR ISC) AND Apache-2.0 AND BSD-3-Clause AND ISC AND MIT"
 	by AWS-LC
 backtrace 0.3.76
@@ -40,13 +40,13 @@ backtrace 0.3.76
 base64 0.22.1
 	licensed under "Apache-2.0 OR MIT"
 	by Marshall Pierce <marshall@mpierce.org>
-bitflags 2.11.0
+bitflags 2.11.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 block2 0.6.2
 	licensed under "MIT"
 	by Mads Marquart <mads@marquart.dk>
-build_html 2.7.0
+build_html 2.8.0
 	licensed under "MIT"
 	by Joseph Skubal
 bumpalo 3.20.2
@@ -73,7 +73,7 @@ chacha20 0.10.0
 chrono 0.4.44
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.6.0
+clap 4.6.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_builder 4.6.0
@@ -94,7 +94,7 @@ combine 4.6.7
 console 0.16.3
 	licensed under "MIT"
 	by unspecified authors
-const_format 0.2.35
+const_format 0.2.36
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 const_panic 0.2.15
@@ -247,6 +247,9 @@ hashbrown 0.15.5
 hashbrown 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
+hashbrown 0.17.0
+	licensed under "Apache-2.0 OR MIT"
+	by Amanieu d'Antras <amanieu@gmail.com>
 hashlink 0.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -271,7 +274,7 @@ httpdate 1.0.3
 hyper 1.9.0
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
-hyper-rustls 0.27.7
+hyper-rustls 0.27.9
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
 hyper-util 0.1.20
@@ -310,10 +313,10 @@ id-arena 2.3.0
 idna 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-idna_adapter 1.2.1
+idna_adapter 1.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
-indexmap 2.13.1
+indexmap 2.14.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 indicatif 0.18.4
@@ -334,30 +337,36 @@ iter-read 1.1.0
 itoa 1.0.18
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-jiff 0.2.23
+jiff 0.2.24
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-jiff-static 0.2.23
+jiff-static 0.2.24
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-jni 0.21.1
+jni 0.22.4
 	licensed under "Apache-2.0 OR MIT"
-	by Josh Chase <josh@prevoty.com>
-jni-sys 0.3.1
+	by jni team
+jni-macros 0.22.4
 	licensed under "Apache-2.0 OR MIT"
-	by Steven Fackler <sfackler@gmail.com>
+	by unspecified authors
 jni-sys 0.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Fackler <sfackler@gmail.com>|Robert Bragg <robert@sixbynine.org>
 jni-sys-macros 0.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by Robert Bragg <robert@sixbynine.org>
-js-sys 0.3.91
+js-sys 0.3.97
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 json_env_logger2 0.2.1
 	licensed under "MIT"
 	by zdannar@gmail.com|softprops <d.tangren@gmail.com>
+konst 0.2.20
+	licensed under "Zlib"
+	by rodrimati1992 <rodrimatt1985@gmail.com>
+konst_macro_rules 0.2.19
+	licensed under "Zlib"
+	by rodrimati1992 <rodrimatt1985@gmail.com>
 kv-log-macro 1.0.7
 	licensed under "Apache-2.0 OR MIT"
 	by Yoshua Wuyts <yoshuawuyts@gmail.com>
@@ -499,7 +508,7 @@ pin-project-lite 0.2.17
 portable-atomic 1.13.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-portable-atomic-util 0.2.6
+portable-atomic-util 0.2.7
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 porter-stemmer 0.1.2
@@ -538,7 +547,7 @@ r-efi 5.3.0
 r-efi 6.0.0
 	licensed under "Apache-2.0 OR LGPL-2.1-or-later OR MIT"
 	by unspecified authors
-rand 0.9.2
+rand 0.9.4
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers
 rand 0.10.1
@@ -550,7 +559,7 @@ rand_chacha 0.9.0
 rand_core 0.9.5
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers|The Rust Project Developers
-rand_core 0.10.0
+rand_core 0.10.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
 rand_regex 0.19.0
@@ -568,7 +577,7 @@ regex-automata 0.4.14
 regex-syntax 0.8.10
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-reqwest 0.13.2
+reqwest 0.13.3
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 reqwest_cookie_store 0.10.0
@@ -592,16 +601,16 @@ rustc-hash 2.1.2
 rustix 1.1.4
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>|Jakub Konka <kubkon@jakubkonka.com>
-rustls 0.23.37
+rustls 0.23.40
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
 rustls-native-certs 0.8.3
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
-rustls-pki-types 1.14.0
+rustls-pki-types 1.14.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-platform-verifier 0.6.2
+rustls-platform-verifier 0.7.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 rustls-platform-verifier-android 0.1.1
@@ -655,6 +664,9 @@ serial_test 3.4.0
 simd-adler32 0.3.9
 	licensed under "MIT"
 	by Marvin Countryman <me@maar.vin>
+simdutf8 0.1.5
+	licensed under "Apache-2.0 OR MIT"
+	by Hans Kratz <hans@appfour.com>
 siphasher 1.0.2
 	licensed under "Apache-2.0 OR MIT"
 	by Frank Denis <github@pureftpd.org>
@@ -667,7 +679,7 @@ smallvec 1.15.1
 socket2 0.6.3
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>
-sqlite-wasm-rs 0.5.2
+sqlite-wasm-rs 0.5.3
 	licensed under "MIT"
 	by Spxg <unsafe@outlook.es>
 stable_deref_trait 1.2.1
@@ -694,9 +706,6 @@ system-configuration-sys 0.6.0
 tempfile 3.27.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
-thiserror-impl 1.0.69
-	licensed under "Apache-2.0 OR MIT"
-	by David Tolnay <dtolnay@gmail.com>
 thiserror-impl 2.0.18
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
@@ -715,7 +724,7 @@ tinyvec 1.11.0
 tinyvec_macros 0.1.1
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Soveu <marx.tomasz@gmail.com>
-tokio 1.51.1
+tokio 1.52.1
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
 tokio-rustls 0.26.4
@@ -757,7 +766,7 @@ typed-builder-macro 0.22.0
 typeid 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-typewit 1.15.1
+typewit 1.15.2
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 uds 0.4.2
@@ -799,7 +808,7 @@ utf8_iter 1.0.4
 utf8parse 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Joe Wilm <joe@jwilm.com>|Christian Duerr <contact@christianduerr.com>
-uuid 1.23.0
+uuid 1.23.1
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
 value-bag 1.12.0
@@ -817,22 +826,22 @@ want 0.3.1
 wasi 0.11.1+wasi-snapshot-preview1
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by The Cranelift Project Developers
-wasip2 1.0.2+wasi-0.2.9
+wasip2 1.0.3+wasi-0.2.9
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by unspecified authors
 wasip3 0.4.0+wasi-0.3.0-rc-2026-01-06
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by unspecified authors
-wasm-bindgen 0.2.114
+wasm-bindgen 0.2.120
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-futures 0.4.64
+wasm-bindgen-futures 0.4.70
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-macro 0.2.114
+wasm-bindgen-macro 0.2.120
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-shared 0.2.114
+wasm-bindgen-shared 0.2.120
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 wasm-encoder 0.244.0
@@ -844,16 +853,16 @@ wasm-metadata 0.244.0
 wasmparser 0.244.0
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Yury Delendik <ydelendik@mozilla.com>
-web-sys 0.3.91
+web-sys 0.3.97
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 web-time 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-webpki-root-certs 1.0.6
+webpki-root-certs 1.0.7
 	licensed under "CDLA-Permissive-2.0"
 	by unspecified authors
-webpki-roots 1.0.6
+webpki-roots 1.0.7
 	licensed under "CDLA-Permissive-2.0"
 	by unspecified authors
 wide 0.7.33
@@ -904,70 +913,76 @@ windows-result 0.4.1
 windows-strings 0.5.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-windows-sys 0.45.0
+windows-sys 0.52.0
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows-sys 0.52.0
+windows-sys 0.60.2
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
 windows-sys 0.61.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-windows-targets 0.42.2
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows-targets 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
+windows-targets 0.53.5
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
 windows-threading 0.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-windows_aarch64_gnullvm 0.42.2
-	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
 windows_aarch64_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_aarch64_msvc 0.42.2
+windows_aarch64_gnullvm 0.53.1
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
 windows_aarch64_msvc 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_i686_gnu 0.42.2
+windows_aarch64_msvc 0.53.1
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
 windows_i686_gnu 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
+windows_i686_gnu 0.53.1
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
 windows_i686_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_i686_msvc 0.42.2
+windows_i686_gnullvm 0.53.1
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
 windows_i686_msvc 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_x86_64_gnu 0.42.2
+windows_i686_msvc 0.53.1
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
 windows_x86_64_gnu 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_x86_64_gnullvm 0.42.2
+windows_x86_64_gnu 0.53.1
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
 windows_x86_64_gnullvm 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
-windows_x86_64_msvc 0.42.2
+windows_x86_64_gnullvm 0.53.1
 	licensed under "Apache-2.0 OR MIT"
-	by Microsoft
+	by unspecified authors
 windows_x86_64_msvc 0.52.6
 	licensed under "Apache-2.0 OR MIT"
 	by Microsoft
+windows_x86_64_msvc 0.53.1
+	licensed under "Apache-2.0 OR MIT"
+	by unspecified authors
 wit-bindgen 0.51.0
+	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
+	by Alex Crichton <alex@alexcrichton.com>
+wit-bindgen 0.57.1
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
 wit-bindgen-rust-macro 0.51.0
