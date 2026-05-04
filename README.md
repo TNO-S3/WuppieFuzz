@@ -124,6 +124,64 @@ Grafana dashboard.
 
 For more information on each of these, see the READMEs in these directories.
 
+## Development build
+
+By default, WuppieFuzz vendors its C dependencies (OpenSSL, SQLite, Z3) so that
+a regular `cargo build` works out of the box. For faster compilation during
+development, you can disable all vendored dependencies and link against
+system-installed libraries instead.
+
+> [!NOTE]
+> The `z3` crate requires Z3 4.15+, which is newer than the version shipped by
+> most Linux distribution package managers. Install Z3 via
+> [Homebrew](https://brew.sh/) (`brew install z3`) to get a compatible version.
+
+### System dependencies
+
+Install the following libraries on your system:
+
+**Debian/Ubuntu:**
+
+```sh
+sudo apt install libssl-dev libsqlite3-dev
+brew install z3  # apt's libz3-dev is too old; use Homebrew instead
+```
+
+On Linux, Homebrew installs to a non-standard path. Add its library directory
+to your environment so the compiler and runtime linker can find Z3:
+
+```sh
+eval "$(brew shellenv)"
+export LIBRARY_PATH="$(brew --prefix z3)/lib:$LIBRARY_PATH"
+export LD_LIBRARY_PATH="$(brew --prefix z3)/lib:$LD_LIBRARY_PATH"
+```
+
+> [!TIP]
+> Add the lines above to your `~/.bashrc` or `~/.zshrc` to make them permanent.
+
+**Fedora (42+):**
+
+```sh
+sudo dnf install openssl-devel sqlite-devel z3-devel
+```
+
+**macOS (Homebrew):**
+
+```sh
+brew install openssl sqlite z3
+```
+
+### Cargo aliases
+
+The repository includes cargo aliases in `.cargo/config.toml` that build with
+`--no-default-features`, linking against all system libraries:
+
+```sh
+cargo dev-build          # build without vendored dependencies
+cargo dev-run -- <args>  # run without vendored dependencies
+cargo dev-test           # test without vendored dependencies
+```
+
 ## Generating documentation
 
 `cargo doc --no-deps` to generate documentation from comments in the source
