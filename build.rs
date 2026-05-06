@@ -78,9 +78,9 @@ fn main() {
         (version_hash_path, &get_hash_version()),
     ] {
         let mut file = File::create(file_path.clone())
-            .unwrap_or_else(|_| panic!("Failed to create {:?}", &file_path.as_path()));
+            .unwrap_or_else(|_| panic!("Failed to create {:?}", file_path.as_path()));
         file.write_all(content.as_bytes())
-            .unwrap_or_else(|_| panic!("Failed to write to {:?}", &file_path.as_path()));
+            .unwrap_or_else(|_| panic!("Failed to write to {:?}", file_path.as_path()));
     }
 
     // Tell Cargo to re-run this build script if `build.rs` of `Cargo.lock` is changed

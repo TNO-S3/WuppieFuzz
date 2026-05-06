@@ -282,8 +282,8 @@ impl ParameterContents {
 impl Display for ParameterContents {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ParameterContents::Object(obj) => write!(f, "{:?}", &obj),
-            ParameterContents::Array(arr) => write!(f, "{:?}", &arr),
+            ParameterContents::Object(obj) => write!(f, "{:?}", obj),
+            ParameterContents::Array(arr) => write!(f, "{:?}", arr),
             ParameterContents::LeafValue(v) => Display::fmt(&v, f),
             ParameterContents::Bytes(bi) => Base64Display::new(bi, &STANDARD).fmt(f),
             ParameterContents::OReference(OReference {
