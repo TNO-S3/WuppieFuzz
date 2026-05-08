@@ -11,8 +11,27 @@ LibAFL, targeting a wide audience of end-users, with a strong focus on
 ease-of-use, explainability of the discovered flaws and modularity. WuppieFuzz
 supports all three settings of testing (black box, grey box and white box).
 
-WuppieFuzz was featured in
-[the ONE Conference e-magazine 2024](https://emagazine.one-conference.nl/2024/finally-validate-your-publicly-exposed-interfaces-with-ease/).
+## Media coverage
+
+WuppieFuzz has been featured in:
+
+- [The ONE Conference e-magazine 2024](https://emagazine.one-conference.nl/2024/finally-validate-your-publicly-exposed-interfaces-with-ease/)
+- [Test your APIs easily with TNO's new REST API fuzzer](https://www.tno.nl/en/newsroom/insights/2024/10/application-security-testing/)
+- [OpenAPI.tools listing: WuppieFuzz](https://openapi.tools/tools/wuppiefuzz)
+- [Automated REST API Vulnerability Detection with WuppieFuzz (Nordic APIs on YouTube)](https://www.youtube.com/watch?v=JcV9RUBvb2w)
+- [Thoughtworks Technology Radar: WuppieFuzz](https://www.thoughtworks.com/radar/tools/wuppiefuzz)
+
+
+### Scientific publication
+
+If you want to cite WuppieFuzz in academic work, please use the preferred
+publication listed in [CITATION.cff](./CITATION.cff):
+
+Rooijakkers, T., Nijsten, A., Daniele, C., Weitenberg, E., Groenewegen, R., &
+Melissen, A. (2026). *WuppieFuzz: Coverage-Guided, Stateful REST API Fuzzing*.
+In *Proceedings of the 12th International Conference on Information Systems
+Security and Privacy (ICISSP), Volume 2*, 221-231. SciTePress.
+https://doi.org/10.5220/0000217100004061
 
 > [!NOTE]  
 > For a quick, follow-along guidance please follow the [tutorial](./tutorial)!
