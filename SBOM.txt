@@ -667,7 +667,7 @@ simd-adler32 0.3.9
 simdutf8 0.1.5
 	licensed under "Apache-2.0 OR MIT"
 	by Hans Kratz <hans@appfour.com>
-siphasher 1.0.2
+siphasher 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by Frank Denis <github@pureftpd.org>
 slab 0.4.12
