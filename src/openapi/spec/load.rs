@@ -72,9 +72,11 @@ pub fn get_api_spec(path: &Path) -> Result<Box<Spec>, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Write;
+
     use tempfile::NamedTempFile;
+
+    use super::*;
 
     /// Helper: write `contents` to a temp file and load it via `openapi_from_file`.
     fn load_spec_from_str(contents: &str) -> Spec {
