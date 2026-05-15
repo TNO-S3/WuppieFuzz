@@ -3,13 +3,13 @@ use std::{cell::Cell, fs::create_dir_all, path::Path};
 use anyhow::Context;
 use chrono::SecondsFormat;
 use log::info;
-use rusqlite::{Connection, named_params};
+use rusqlite::{Connection, named_params, params};
 
 use crate::{
     configuration::Configuration,
     input::OpenApiRequest,
     openapi::{curl_request::CurlRequest, validate_response::Response},
-    reporting::Reporting,
+    reporting::{CampaignStats, Reporting},
     types::OpenApiFuzzerStateType,
 };
 
@@ -103,6 +103,22 @@ impl MySqLite {
             [],
         )
         .context("Could not create `coverage` table")?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `timestamp` DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                `seq_per_sec` REAL NOT NULL,
+                `req_per_sec` REAL NOT NULL,
+                `requests_completed_total` INTEGER NOT NULL DEFAULT 0,
+                `corpus_size` INTEGER NOT NULL,
+                `objectives` INTEGER NOT NULL,
+                `runid` INTEGER NOT NULL,
+                CONSTRAINT run_FK FOREIGN KEY (runid) REFERENCES runs(id)
+            )",
+            [],
+        )
+        .context("Could not create `stats` table")?;
 
         info!("Created tables for the reporting");
 
@@ -239,5 +255,31 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
             ))
             .expect("Could not insert coverage into database");
         self.maybe_commit_batch();
+    }
+
+    fn report_stats(&self, stats: CampaignStats) {
+        let mut insert_stmt = self
+            .conn
+            .prepare(
+                "INSERT INTO stats (
+                    seq_per_sec,
+                    req_per_sec,
+                    requests_completed_total,
+                    corpus_size,
+                    objectives,
+                    runid
+                ) VALUES (?, ?, ?, ?, ?, ?)",
+            )
+            .expect("Could not prepare insert statement for stats");
+        insert_stmt
+            .insert(params![
+                stats.seq_per_sec,
+                stats.req_per_sec,
+                i64::try_from(stats.requests_completed_total).unwrap_or(i64::MAX),
+                stats.corpus_size,
+                stats.objectives,
+                self.run_id,
+            ])
+            .expect("Could not insert stats into database");
     }
 }

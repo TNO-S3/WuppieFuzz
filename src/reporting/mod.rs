@@ -10,6 +10,21 @@ use crate::{
 
 pub mod sqlite;
 
+/// Periodic high-level campaign statistics for dashboard reporting.
+#[derive(Debug, Clone, Copy)]
+pub struct CampaignStats {
+    /// Number of input sequences executed per second in the latest reporting window.
+    pub seq_per_sec: f64,
+    /// Number of successfully completed HTTP requests per second in the latest reporting window.
+    pub req_per_sec: f64,
+    /// Cumulative number of successfully completed HTTP requests in this campaign.
+    pub requests_completed_total: u64,
+    /// Current number of corpus entries.
+    pub corpus_size: u32,
+    /// Current number of objective entries.
+    pub objectives: u32,
+}
+
 /// Creates and returns the report path for this run. It is typically of the form
 /// `reports/2023-06-13T105302.602Z`, the filename being an ISO 8601 timestamp.
 pub fn generate_report_path() -> PathBuf {
@@ -49,6 +64,9 @@ pub trait Reporting<T, S> {
         endpoint_coverage: u32,
         endpoint_coverage_total: u32,
     );
+
+    /// Report a periodic snapshot of high-level campaign statistics.
+    fn report_stats(&self, stats: CampaignStats);
 }
 
 impl<R, T, S> Reporting<T, S> for Option<R>
@@ -95,6 +113,12 @@ where
                 endpoint_coverage,
                 endpoint_coverage_total,
             )
+        }
+    }
+
+    fn report_stats(&self, stats: CampaignStats) {
+        if let Some(reporter) = self.as_ref() {
+            reporter.report_stats(stats)
         }
     }
 }

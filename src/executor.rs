@@ -12,11 +12,12 @@ use std::{
 };
 
 use libafl::{
+    corpus::Corpus,
     events::{Event, EventFirer, EventRestarter, EventWithStats, ExecStats, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
-    state::{HasExecutions, Stoppable},
+    state::{HasCorpus, HasExecutions, HasSolutions, Stoppable},
 };
 use libafl_bolts::{current_time, prelude::RefIndexable};
 use reqwest::blocking::Client;
@@ -37,7 +38,7 @@ use crate::{
         },
     },
     parameter_feedback::ParameterFeedback,
-    reporting::{Reporting, sqlite::MySqLite},
+    reporting::{CampaignStats, Reporting, sqlite::MySqLite},
 };
 
 /// How often to print a new log line
@@ -75,6 +76,8 @@ where
     last_window_time: Instant,
     last_covered: u64,
     last_endpoint_covered: u64,
+    last_window_seqs: usize,
+    last_window_reqs: u64,
 }
 
 pub(crate) fn process_response(
@@ -147,6 +150,8 @@ where
             last_window_time: Instant::now(),
             last_covered: 0,
             last_endpoint_covered: 0,
+            last_window_seqs: 0,
+            last_window_reqs: 0,
         })
     }
 
@@ -336,6 +341,18 @@ where
                 "requests",
                 UserStatsValue::Number(self.performed_requests),
             );
+
+            let seq_delta = self.inputs_tested - self.last_window_seqs;
+            let req_delta = self.performed_requests - self.last_window_reqs;
+            self.reporter.report_stats(CampaignStats {
+                seq_per_sec: seq_delta as f64 / diff as f64,
+                req_per_sec: req_delta as f64 / diff as f64,
+                requests_completed_total: self.performed_requests,
+                corpus_size: state.corpus().count().try_into().unwrap_or(u32::MAX),
+                objectives: state.solutions().count().try_into().unwrap_or(u32::MAX),
+            });
+            self.last_window_seqs = self.inputs_tested;
+            self.last_window_reqs = self.performed_requests;
         }
 
         self.reporter.report_coverage(
