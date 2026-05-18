@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Fix endpoint coverage count for unexpected responses in [#308](https://github.com/TNO-S3/WuppieFuzz/pull/308)
+
 # v1.5.0 (2026-04-30)
 
 ## Highlights
