@@ -6,6 +6,7 @@
 
 ## Fixes
 
+- Fix OAS3/OpenAPIv3 spec loading discrepancies [#310](https://github.com/TNO-S3/WuppieFuzz/pull/310)
 - Fix coverage map updates and bit counting logic in [#309](https://github.com/TNO-S3/WuppieFuzz/pull/309)
 - Fix endpoint coverage count for unexpected responses in [#308](https://github.com/TNO-S3/WuppieFuzz/pull/308)
 - Optimize SQLite reporting performance: enable WAL journal mode, set SYNCHRONOUS=NORMAL, increase cache size, cache prepared statements, and batch inserts in transactions to minimise disk flushes in [#299](https://github.com/TNO-S3/WuppieFuzz/pull/299)
