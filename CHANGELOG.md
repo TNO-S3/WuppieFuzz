@@ -7,6 +7,7 @@
 ## Fixes
 
 - Fix endpoint coverage count for unexpected responses in [#308](https://github.com/TNO-S3/WuppieFuzz/pull/308)
+- Optimize SQLite reporting performance: enable WAL journal mode, set SYNCHRONOUS=NORMAL, increase cache size, cache prepared statements, and batch inserts in transactions to minimise disk flushes
 
 # v1.5.0 (2026-04-30)
 
