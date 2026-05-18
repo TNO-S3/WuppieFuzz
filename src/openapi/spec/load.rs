@@ -621,28 +621,20 @@ components:
         let oas3_param = spec_via_oas3
             .paths
             .as_ref()
-            .unwrap()
-            .get("/items/{id}")
-            .unwrap()
-            .get
-            .as_ref()
-            .unwrap()
-            .parameters
-            .iter()
+            .into_iter()
+            .flat_map(|map| map.get("/items/{id}"))
+            .flat_map(|path_item| path_item.get.as_ref())
+            .flat_map(|op| op.parameters.iter())
             .filter_map(|p| p.resolve(&spec_via_oas3).ok())
             .find(|p| p.name == "id")
             .unwrap();
         let openapiv3_param = spec_via_openapiv3
             .paths
             .as_ref()
-            .unwrap()
-            .get("/items/{id}")
-            .unwrap()
-            .get
-            .as_ref()
-            .unwrap()
-            .parameters
-            .iter()
+            .into_iter()
+            .flat_map(|map| map.get("/items/{id}"))
+            .flat_map(|path_item| path_item.get.as_ref())
+            .flat_map(|op| op.parameters.iter())
             .filter_map(|p| p.resolve(&spec_via_openapiv3).ok())
             .find(|p| p.name == "id")
             .unwrap();
