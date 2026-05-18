@@ -7,6 +7,7 @@
 ## Fixes
 
 - Fix coverage map updates and bit counting logic in [#309](https://github.com/TNO-S3/WuppieFuzz/pull/309)
+- Optimize SQLite reporting performance: enable WAL journal mode, set SYNCHRONOUS=NORMAL, increase cache size, cache prepared statements, and batch inserts in transactions to minimise disk flushes in [#299](https://github.com/TNO-S3/WuppieFuzz/pull/299)
 
 # v1.5.0 (2026-04-30)
 
