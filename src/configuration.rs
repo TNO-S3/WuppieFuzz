@@ -20,6 +20,8 @@ const DEFAULT_CORPUS_SEQUENCE_MODE: CorpusSequenceMode = CorpusSequenceMode::Ful
 const DEFAULT_MAX_CORPUS_ENTRIES: usize = 1000;
 const DEFAULT_MAX_REVISITS: usize = 0;
 const DEFAULT_MIN_REQUEST_CHAIN_LENGTH: usize = 1;
+const DEFAULT_ENFORCE_CRUD_ORDER: bool = false;
+const DEFAULT_MIN_CYCLE_SIZE: usize = 2;
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
 lazy_static! {
@@ -116,6 +118,22 @@ pub enum Commands {
             hide_short_help = true
         )]
         min_request_chain_length: Option<usize>,
+        /// Enforce CRUD method ordering in dependency graph when using `full` mode. Default: false.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        enforce_crud_order: Option<bool>,
+        /// Minimum cycle size in the dependency graph when using `full` mode. 1 = self-loops allowed, 2 = no self-loops. Default: 2.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        min_cycle_size: Option<usize>,
         // Manually added possible values below, since automatically showing possible values of an external (remote) enum
         // such as log::LevelFilter is not well supported.
         // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
@@ -309,6 +327,22 @@ pub enum Commands {
             hide_short_help = true
         )]
         min_request_chain_length: Option<usize>,
+        /// Enforce CRUD method ordering in dependency graph when using `full` mode. Default: false.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        enforce_crud_order: Option<bool>,
+        /// Minimum cycle size in the dependency graph when using `full` mode. 1 = self-loops allowed, 2 = no self-loops. Default: 2.
+        #[arg(
+            value_parser,
+            long,
+            help_heading = "Corpus Generation Options",
+            hide_short_help = true
+        )]
+        min_cycle_size: Option<usize>,
     },
 }
 
@@ -377,6 +411,8 @@ impl Commands {
                 max_corpus_entries,
                 max_revisits,
                 min_request_chain_length,
+                enforce_crud_order,
+                min_cycle_size,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -401,6 +437,8 @@ impl Commands {
                 max_corpus_entries,
                 max_revisits,
                 min_request_chain_length,
+                enforce_crud_order,
+                min_cycle_size,
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,
@@ -410,6 +448,8 @@ impl Commands {
                 max_corpus_entries,
                 max_revisits,
                 min_request_chain_length,
+                enforce_crud_order,
+                min_cycle_size,
                 log_level,
             } => Ok(PartialConfiguration {
                 openapi_spec: Some(openapi_spec),
@@ -417,6 +457,8 @@ impl Commands {
                 max_corpus_entries,
                 max_revisits,
                 min_request_chain_length,
+                enforce_crud_order,
+                min_cycle_size,
                 log_level,
                 ..Default::default()
             }),
@@ -549,6 +591,14 @@ struct PartialConfiguration {
     /// Minimum request-chain length when using `full` mode.
     #[clap(value_parser, long)]
     pub min_request_chain_length: Option<usize>,
+
+    /// Enforce CRUD method ordering in dependency graph when using `full` mode.
+    #[clap(value_parser, long)]
+    pub enforce_crud_order: Option<bool>,
+
+    /// Minimum cycle size in the dependency graph when using `full` mode.
+    #[clap(value_parser, long)]
+    pub min_cycle_size: Option<usize>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -648,6 +698,12 @@ pub struct Configuration {
 
     /// Minimum request-chain length when using `full` mode.
     pub min_request_chain_length: usize,
+
+    /// Whether to enforce CRUD method ordering in the dependency graph when using `full` mode.
+    pub enforce_crud_order: bool,
+
+    /// Minimum cycle size in the dependency graph when using `full` mode.
+    pub min_cycle_size: usize,
 
     /// Output to stdout can be formatted in human readable format or json.
     pub output_format: OutputFormat,
@@ -781,6 +837,10 @@ impl TryFrom<PartialConfiguration> for Configuration {
             min_request_chain_length: value
                 .min_request_chain_length
                 .unwrap_or(DEFAULT_MIN_REQUEST_CHAIN_LENGTH),
+            enforce_crud_order: value
+                .enforce_crud_order
+                .unwrap_or(DEFAULT_ENFORCE_CRUD_ORDER),
+            min_cycle_size: value.min_cycle_size.unwrap_or(DEFAULT_MIN_CYCLE_SIZE),
             output_format: value.output_format.unwrap_or(OutputFormat::HumanReadable),
             authentication: value.authentication,
             header: value.header,
@@ -847,6 +907,8 @@ impl PartialConfiguration {
             min_request_chain_length: other
                 .min_request_chain_length
                 .or(self.min_request_chain_length.take()),
+            enforce_crud_order: other.enforce_crud_order.or(self.enforce_crud_order.take()),
+            min_cycle_size: other.min_cycle_size.or(self.min_cycle_size.take()),
         };
     }
 }

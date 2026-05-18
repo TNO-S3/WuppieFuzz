@@ -119,6 +119,8 @@ pub fn generate_corpus_to_files(spec: &Spec, corpus_dir: &Path, report_path: Opt
             min_path_length: config.min_request_chain_length,
             max_revisits: config.max_revisits,
             max_paths: config.max_corpus_entries,
+            enforce_crud_order: config.enforce_crud_order,
+            min_cycle_size: config.min_cycle_size,
         },
     );
     log::debug!("Writing corpus to file...");
@@ -130,7 +132,7 @@ pub fn generate_corpus_to_files(spec: &Spec, corpus_dir: &Path, report_path: Opt
     if let Some(report_path) = report_path {
         // The dependency graph was already generated while creating it from the API
         // but it is cheap to build, so we can afford to do it again for reporting.
-        let dependency_graph = DependencyGraph::new(spec);
+        let dependency_graph = DependencyGraph::new(spec, true);
         let _ = dependency_graph.write_report(report_path);
         let _ = write_corpus_report(&inputs, report_path);
     }
@@ -270,12 +272,14 @@ fn fill_corpus_from_api(
             min_path_length: config.min_request_chain_length,
             max_revisits: config.max_revisits,
             max_paths: config.max_corpus_entries,
+            enforce_crud_order: config.enforce_crud_order,
+            min_cycle_size: config.min_cycle_size,
         },
     );
     if let Some(report_path) = report_path {
         // The dependency graph was already generated while creating it from the API
         // but it is cheap to build, so we can afford to do it again for reporting.
-        let dependency_graph = DependencyGraph::new(api);
+        let dependency_graph = DependencyGraph::new(api, true);
         let _ = dependency_graph.write_report(report_path);
         let _ = write_corpus_report(&inputs, report_path);
     }
