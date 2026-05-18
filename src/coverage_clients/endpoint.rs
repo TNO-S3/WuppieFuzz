@@ -146,7 +146,7 @@ impl EndpointCoverageClient {
         // during a run: once a triplet is inserted, its index must be unique since this
         // determines the mapping into the AFL-coverage maps.
         assert!(index / 8 < MAP_SIZE, "Coverage map is full");
-        self.len = std::cmp::max(self.len, index);
+        self.len = std::cmp::max(self.len, index + 1);
         // Map the method-path-status triplets via their index to *bits*, not bytes.
         // Hence the bitwise operations, the first 8 indices get mapped into the first byte
         // and since we always *add* coverage, we can OR the corresponding bit into that byte.

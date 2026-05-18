@@ -1,4 +1,4 @@
-use std::{fs::create_dir_all, path::Path};
+use std::{cell::Cell, fs::create_dir_all, path::Path};
 
 use anyhow::Context;
 use chrono::SecondsFormat;
@@ -22,14 +22,31 @@ pub fn get_reporter(config: &Configuration) -> Result<Option<MySqLite>, anyhow::
     Ok(Some(MySqLite::new(Path::new("reports/grafana/report.db"))?))
 }
 
+/// Number of inserts between transaction commits. Each commit flushes the WAL
+/// to disk, so batching amortises that cost across many writes.
+const BATCH_SIZE: u32 = 4096;
+
 pub struct MySqLite {
     conn: Connection,
     run_id: i64,
+    inserts_since_commit: Cell<u32>,
 }
 
 impl MySqLite {
     pub fn new(path: &Path) -> anyhow::Result<MySqLite> {
         let conn = Connection::open(path).expect("Can not create database file for reporting");
+
+        // Performance pragmas: WAL mode allows concurrent reads/writes and batches
+        // disk syncs. SYNCHRONOUS=NORMAL is safe with WAL (protects against process
+        // crashes, not power loss mid-write). Increased cache keeps more pages in memory.
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=-16000;
+             PRAGMA busy_timeout=5000;
+             PRAGMA temp_store=MEMORY;",
+        )
+        .context("Could not set performance pragmas")?;
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS runs (
@@ -98,7 +115,38 @@ impl MySqLite {
             .context("Could not create new run")?;
         // end borrow of connection
         drop(stmt);
-        Ok(MySqLite { conn, run_id })
+
+        // Begin a long-running transaction. Individual inserts execute immediately
+        // (so row IDs are available) but the disk flush is deferred until commit.
+        conn.execute_batch("BEGIN")
+            .context("Could not begin initial transaction")?;
+
+        Ok(MySqLite {
+            conn,
+            run_id,
+            inserts_since_commit: Cell::new(0),
+        })
+    }
+
+    /// Commits the current transaction and begins a new one when the batch
+    /// threshold is reached. Called after every insert.
+    fn maybe_commit_batch(&self) {
+        let count = self.inserts_since_commit.get() + 1;
+        if count >= BATCH_SIZE {
+            self.conn
+                .execute_batch("COMMIT; BEGIN")
+                .expect("Could not commit batch transaction");
+            self.inserts_since_commit.set(0);
+        } else {
+            self.inserts_since_commit.set(count);
+        }
+    }
+}
+
+impl Drop for MySqLite {
+    fn drop(&mut self) {
+        // Flush any remaining inserts
+        let _ = self.conn.execute_batch("COMMIT");
     }
 }
 
@@ -114,7 +162,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
         let method = request.method.to_string();
 
         let time = chrono::offset::Utc::now();
-        let mut insert_stmt = self.conn.prepare("INSERT INTO requests (timestamp, testcase, path, type, url, body, inputid, runid, data) VALUES(:timestamp, :testcase, :path, :type, :url, :body, :inputid, :runid, :data)")
+        let mut insert_stmt = self.conn.prepare_cached("INSERT INTO requests (timestamp, testcase, path, type, url, body, inputid, runid, data) VALUES(:timestamp, :testcase, :path, :type, :url, :body, :inputid, :runid, :data)")
             .expect("Could not prepare insert statement for request");
         let params = named_params! {
             ":timestamp": time.to_rfc3339_opts(SecondsFormat::Millis, true),
@@ -127,9 +175,11 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
             ":inputid": input_id,
             ":runid": self.run_id,
         };
-        insert_stmt
+        let id = insert_stmt
             .insert(params)
-            .expect("Could not insert request into database")
+            .expect("Could not insert request into database");
+        self.maybe_commit_batch();
+        id
     }
 
     fn report_response(&self, response: &Response, request_id: i64) {
@@ -137,7 +187,9 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
         let time = chrono::offset::Utc::now();
         let mut insert_stmt = self
             .conn
-            .prepare("INSERT INTO responses (timestamp, status, reqid, data) VALUES(?,?,?,?)")
+            .prepare_cached(
+                "INSERT INTO responses (timestamp, status, reqid, data) VALUES(?,?,?,?)",
+            )
             .expect("Could not prepare insert statement for response with status");
         insert_stmt
             .insert((
@@ -147,13 +199,14 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                 response.text().unwrap_or_default(),
             ))
             .expect("Could not insert reponse into database");
+        self.maybe_commit_batch();
     }
 
     fn report_response_error(&self, error: &str, request_id: i64) {
         let time = chrono::offset::Utc::now();
         let mut insert_stmt = self
             .conn
-            .prepare("INSERT INTO responses (timestamp, error, reqid) VALUES(?,?,?)")
+            .prepare_cached("INSERT INTO responses (timestamp, error, reqid) VALUES(?,?,?)")
             .expect("Could not prepare insert statement for response with status");
         insert_stmt
             .insert((
@@ -162,6 +215,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                 request_id,
             ))
             .expect("Could not insert reponse into database");
+        self.maybe_commit_batch();
     }
 
     fn report_coverage(
@@ -173,7 +227,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
     ) {
         let mut insert_stmt = self
             .conn
-            .prepare("INSERT INTO coverage (line_coverage, line_coverage_total, endpoint_coverage, endpoint_coverage_total, runid) VALUES(?,?,?,?,?)")
+            .prepare_cached("INSERT INTO coverage (line_coverage, line_coverage_total, endpoint_coverage, endpoint_coverage_total, runid) VALUES(?,?,?,?,?)")
             .expect("Could not prepare insert statement for coverage");
         insert_stmt
             .insert((
@@ -184,5 +238,6 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                 self.run_id,
             ))
             .expect("Could not insert coverage into database");
+        self.maybe_commit_batch();
     }
 }
