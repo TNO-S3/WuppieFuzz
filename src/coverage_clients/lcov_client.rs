@@ -217,7 +217,6 @@ impl LcovCoverageClient {
         match bit_idx.cmp(&MAP_SIZE) {
             cmp::Ordering::Less => {
                 self.cov_map[bit_idx] = val;
-                self.cov_map_total[bit_idx] = val;
             }
             cmp::Ordering::Equal => {
                 log::debug!(
@@ -251,8 +250,8 @@ impl LcovCoverageClient {
                     line,
                     count,
                     checksum: _,
-                } if count != 0 => {
-                    self.set_cov_bit(&source_path, line, 1);
+                } => {
+                    self.set_cov_bit(&source_path, line, u8::from(count != 0));
                 }
                 _ => (),
             }
@@ -361,7 +360,7 @@ impl CoverageClient for LcovCoverageClient {
             .cov_map_total
             .iter()
             .fold(0u64, |sum, val| sum + u64::from(val.count_ones()));
-        let total = self.first_unused_idx as u64 * 8;
+        let total = self.first_unused_idx as u64;
         // update the max coverage ratio
         self.max_ratio.0 = std::cmp::max(self.max_ratio.0, count);
         self.max_ratio.1 = std::cmp::max(self.max_ratio.1, total);
