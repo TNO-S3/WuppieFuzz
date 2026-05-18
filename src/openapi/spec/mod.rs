@@ -305,22 +305,58 @@ fn convert_ref_schema(
     convert_reference(ref_schema, convert_schema)
 }
 
+/// Applies metadata from `openapiv3::SchemaData` onto an `oas3::spec::ObjectSchema`.
+/// This converts the v3.0 singular `example` into the v3.1 `examples` Vec.
+fn apply_schema_data(schema: &mut oas3::spec::ObjectSchema, data: openapiv3::SchemaData) {
+    // The `example` field is populated when parsing v3.0 specs directly.
+    // For Swagger 2.0 specs upgraded via openapiv3-extended, the `example` ends up
+    // in `extensions` because the v2::Schema struct doesn't have a dedicated field for it.
+    let example = data
+        .example
+        .or_else(|| data.extensions.get("example").cloned());
+    if let Some(ex) = example {
+        schema.examples.push(ex);
+    }
+    schema.title = data.title;
+    schema.description = data.description;
+    schema.default = data.default;
+    schema.deprecated = Some(data.deprecated);
+    schema.read_only = Some(data.read_only);
+    schema.write_only = Some(data.write_only);
+}
+
 fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
     let openapiv3::Schema { data, kind } = schema;
     match kind {
-        openapiv3::SchemaKind::Type(r#type) => convert_elementary_type(r#type),
-        openapiv3::SchemaKind::OneOf { one_of } => oas3::spec::ObjectSchema {
-            one_of: convert_vec_ref(one_of, &convert_schema),
-            ..Default::default()
-        },
-        openapiv3::SchemaKind::AllOf { all_of } => oas3::spec::ObjectSchema {
-            all_of: convert_vec_ref(all_of, &convert_schema),
-            ..Default::default()
-        },
-        openapiv3::SchemaKind::AnyOf { any_of } => oas3::spec::ObjectSchema {
-            any_of: convert_vec_ref(any_of, &convert_schema),
-            ..Default::default()
-        },
+        openapiv3::SchemaKind::Type(r#type) => {
+            let mut schema = convert_elementary_type(r#type);
+            apply_schema_data(&mut schema, data);
+            schema
+        }
+        openapiv3::SchemaKind::OneOf { one_of } => {
+            let mut schema = oas3::spec::ObjectSchema {
+                one_of: convert_vec_ref(one_of, &convert_schema),
+                ..Default::default()
+            };
+            apply_schema_data(&mut schema, data);
+            schema
+        }
+        openapiv3::SchemaKind::AllOf { all_of } => {
+            let mut schema = oas3::spec::ObjectSchema {
+                all_of: convert_vec_ref(all_of, &convert_schema),
+                ..Default::default()
+            };
+            apply_schema_data(&mut schema, data);
+            schema
+        }
+        openapiv3::SchemaKind::AnyOf { any_of } => {
+            let mut schema = oas3::spec::ObjectSchema {
+                any_of: convert_vec_ref(any_of, &convert_schema),
+                ..Default::default()
+            };
+            apply_schema_data(&mut schema, data);
+            schema
+        }
         openapiv3::SchemaKind::Not { not: _ } => {
             unimplemented!("The `not` schema kind is not implemented by `oas3`.")
         }
@@ -338,12 +374,6 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
                 properties.insert(name, convert_ref_schema(ref_or_schema));
             }
 
-            // Map composition keywords
-            let mut examples = Vec::new();
-            if let Some(ex) = data.example {
-                examples.push(ex);
-            }
-
             // Items / prefixItems:
             // - v3.0 has `items: Option<Box<RefOr<Schema>>>`
             // - oas3 `ObjectSchema` uses `items: Option<Box<Schema>>` and `prefix_items` for tuple validation
@@ -353,7 +383,8 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
             let prefix_items =
                 Vec::<oas3::spec::ObjectOrReference<oas3::spec::ObjectSchema>>::new();
 
-            oas3::spec::ObjectSchema {
+            let nullable = data.nullable;
+            let mut schema = oas3::spec::ObjectSchema {
                 // Compositions
                 all_of: convert_vec_ref(any_schema.all_of, &convert_schema),
                 any_of: convert_vec_ref(any_schema.any_of, &convert_schema),
@@ -368,7 +399,7 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
                 additional_properties: None,
 
                 // Types
-                schema_type: convert_type_set(any_schema.typ, data.nullable),
+                schema_type: convert_type_set(any_schema.typ, nullable),
 
                 // Enum / const
                 enum_values: any_schema.enumeration,
@@ -396,19 +427,13 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
                 min_properties: any_schema.min_properties.map(|v| v as u64),
                 required: any_schema.required,
 
-                // Format & metadata
+                // Format
                 format: any_schema.format,
-                title: data.title,
-                description: data.description,
-                default: data.default,
 
-                deprecated: Some(data.deprecated),
-                read_only: Some(data.read_only),
-                write_only: Some(data.write_only),
-
-                examples,
                 ..Default::default()
-            }
+            };
+            apply_schema_data(&mut schema, data);
+            schema
         }
     }
 }
