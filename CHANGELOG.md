@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Fix coverage map updates and bit counting logic in [#309](https://github.com/TNO-S3/WuppieFuzz/pull/309)
+
 # v1.5.0 (2026-04-30)
 
 ## Highlights
