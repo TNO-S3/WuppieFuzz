@@ -76,7 +76,7 @@ pub fn verify_auth(api: Spec) -> Result<()> {
 
     // Check all paths for a "401 Unauthorized" error, which means authentication has failed
     if let Some(paths) = &api.paths {
-        for (path, _path_item) in paths.iter() {
+        for path in paths.keys() {
             let url = server.url.clone() + path;
             let t_response = send_request(client.clone(), &url);
             if log::log_enabled!(Info) {

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fs::File, path::Path, sync::Arc};
+use std::{borrow::Cow, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use reqwest::header::{AUTHORIZATION, HeaderMap, IntoHeaderName};
@@ -14,6 +14,7 @@ pub mod custom;
 pub mod oauth;
 pub mod raw;
 pub mod verify_auth;
+pub mod wfc;
 
 /// Authentication mode and configuration. The configuration data
 /// contains the information necessary to authenticate with the server
@@ -71,12 +72,33 @@ pub fn initialize() -> Result<Authentication> {
 pub fn initialize_from_config(config_path: Option<&Path>) -> Result<Authentication> {
     let auth_mode = match config_path {
         None => Mode::None,
-        Some(path) => serde_yaml::from_reader(File::open(path).with_context(|| {
-            format!("Error opening file given for --authentication, which is {path:?}")
-        })?)
-        .with_context(|| {
-            format!("Error parsing file given for --authentication, which is {path:?}")
-        })?,
+        Some(path) => {
+            let file_contents = std::fs::read_to_string(path).with_context(|| {
+                format!("Error opening file given for --authentication, which is {path:?}")
+            })?;
+            // Try to detect WFC format by checking for the "auth" key at the top level
+            let value: serde_yaml::Value =
+                serde_yaml::from_str(&file_contents).with_context(|| {
+                    format!("Error parsing file given for --authentication, which is {path:?}")
+                })?;
+            if value.get("auth").is_some() {
+                // Web Fuzzing Commons format
+                let wfc_config: wfc::WfcAuth =
+                    serde_yaml::from_value(value).with_context(|| {
+                        format!(
+                            "Error parsing WFC authentication file given for --authentication, which is {path:?}"
+                        )
+                    })?;
+                return wfc_config
+                    .into_authentication()
+                    .context("Error converting WFC authentication config");
+            } else {
+                // Internal format
+                serde_yaml::from_str(&file_contents).with_context(|| {
+                    format!("Error parsing file given for --authentication, which is {path:?}")
+                })?
+            }
+        }
     };
 
     Ok(match auth_mode {

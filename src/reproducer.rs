@@ -61,6 +61,7 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
             );
             continue;
         };
+        parameter_feedback.process_request(request_index, &request);
 
         let request_built = match build_request_from_input(
             &client,

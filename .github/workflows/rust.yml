@@ -26,7 +26,7 @@ jobs:
     steps:
       # More disk space please
       - name: Reclaim disk space
-        uses: mathio/gha-cleanup@ce9480b80d151ff36572df0d3c54aef2653e6054 # v1.0.0
+        uses: mathio/gha-cleanup@ce9480b80d151ff36572df0d3c54aef2653e6054
         with:
           remove-browsers: true
           verbose: true
@@ -48,7 +48,7 @@ jobs:
 
       # Cache dependencies to speed up builds
       - name: Cache Cargo registry and build artifacts
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.cargo/registry
@@ -107,7 +107,7 @@ jobs:
     steps:
       # More disk space please
       - name: Reclaim disk space
-        uses: mathio/gha-cleanup@ce9480b80d151ff36572df0d3c54aef2653e6054 # v1.0.0
+        uses: mathio/gha-cleanup@ce9480b80d151ff36572df0d3c54aef2653e6054
         with:
           remove-browsers: true
           verbose: true
@@ -139,7 +139,7 @@ jobs:
 
       # Upload the generated coverage report as an artifact to GitHub Actions for inspection or download.
       - name: Upload code coverage report as artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: code-coverage-report-html
           path: ./coverage-report/

@@ -6,6 +6,25 @@
 
 ## Fixes
 
+- Optimize SQLite reporting performance: enable WAL journal mode, set SYNCHRONOUS=NORMAL, increase cache size, cache prepared statements, and batch inserts in transactions to minimise disk flushes
+
+# v1.5.0 (2026-04-30)
+
+## Highlights
+
+- Added `publiccode.yml` metadata file, conforming to the publiccode standard for public software cataloging in [#296](https://github.com/TNO-S3/WuppieFuzz/pull/296)
+
+## Features
+
+- Implement support for WFC authentication format in [#282](https://github.com/TNO-S3/WuppieFuzz/pull/282)
+
+## Fixes
+
+- Use type-based fallback when schema-based example generation does not yield interesting parameters in [#285](https://github.com/TNO-S3/WuppieFuzz/pull/285)
+- Fix typo in x-www-form-urlencoded content type in [#285](https://github.com/TNO-S3/WuppieFuzz/pull/285)
+- Process requests for feedback so that parameter references can resolve in [#289](https://github.com/TNO-S3/WuppieFuzz/pull/289)
+- Add documentation to the examples module and rename functions for consistency in [#291](https://github.com/TNO-S3/WuppieFuzz/pull/291)
+
 # v1.4.3 (2026-03-16)
 
 ## Highlights

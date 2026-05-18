@@ -36,7 +36,7 @@ use crate::{
     },
     openapi::{
         QualifiedOperation,
-        examples::{example_from_qualified_operation, openapi_inputs_from_ops},
+        examples::{all_interesting_inputs_for_operations, example_request_for_operation},
         spec::Spec,
     },
     parameter_access::{ParameterAddressing, ParameterMatching},
@@ -61,22 +61,18 @@ pub fn initial_corpus_from_api(
                 .map(|nodes| dependency_graph.subgraph(nodes))
                 .map(|subgraph| {
                     ops_from_subgraph(&subgraph).map(|(ops, idxs)| {
-                        // TODO: pass subgraph into openapi_inputs_from_ops to prevent generation of parameter values
-                        // that will be replaced by references below anyway. The current implementation often
-                        // massively overgenerates all the different combinations, most of which then get
-                        // mapped back to the same OpenApiInput since all concrete parameter values get
-                        // overwritten with references to the same parameter in an earlier response.
-                        let inputs =
-                            openapi_inputs_from_ops(api, ops.clone().into_iter(), &subgraph, &idxs)
-                                .inspect_err(|err| {
-                                    log::warn!(
-                                        "{err} - falling back to single example generation."
-                                    );
-                                })
-                                .unwrap_or(vec![openapi_example_input_from_ops(
-                                    api,
-                                    ops.into_iter(),
-                                )]);
+                        let inputs = all_interesting_inputs_for_operations(
+                            api,
+                            ops.clone().into_iter(),
+                            &subgraph,
+                            &idxs,
+                        )
+                        .inspect_err(|err| {
+                            log::warn!("{err} - falling back to single example generation.");
+                        })
+                        .unwrap_or_else(|_| {
+                            vec![openapi_example_input_from_ops(api, ops.into_iter())]
+                        });
 
                         inputs.into_iter().flat_map(move |input| {
                             add_references_to_openapi_input(&subgraph, &idxs, &input)
@@ -137,7 +133,7 @@ fn openapi_example_input_from_ops<'a>(
 ) -> OpenApiInput {
     OpenApiInput(
         ops_iter
-            .map(|op| example_from_qualified_operation(api, op))
+            .map(|op| example_request_for_operation(api, op))
             .collect(),
     )
 }

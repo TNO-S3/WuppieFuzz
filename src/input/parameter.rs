@@ -262,9 +262,8 @@ impl ParameterContents {
     /// Returns a nested field of this ParameterContents, as addressed by the parameter_access.
     /// If the addressing does not identify a field (by having bad field names, out-of-bound indexes,
     /// or too many elements), None is returned.
-    pub fn resolve(&self, parameter_access: &ParameterAccess) -> Option<&Self> {
+    pub fn resolve(&self, elements: &ParameterAccessElements) -> Option<&Self> {
         let mut result = self;
-        let elements = parameter_access.get_body_access_elements().unwrap();
         for path_element in &elements.0 {
             match (result, path_element) {
                 (ParameterContents::Object(mapping), ParameterAccessElement::Name(name)) => {
@@ -283,8 +282,8 @@ impl ParameterContents {
 impl Display for ParameterContents {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ParameterContents::Object(obj) => write!(f, "{:?}", &obj),
-            ParameterContents::Array(arr) => write!(f, "{:?}", &arr),
+            ParameterContents::Object(obj) => write!(f, "{:?}", obj),
+            ParameterContents::Array(arr) => write!(f, "{:?}", arr),
             ParameterContents::LeafValue(v) => Display::fmt(&v, f),
             ParameterContents::Bytes(bi) => Base64Display::new(bi, &STANDARD).fmt(f),
             ParameterContents::OReference(OReference {

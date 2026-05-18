@@ -29,6 +29,8 @@ Components:
 - const_format
 - const_panic
 - foldhash
+- konst
+- konst_macro_rules
 - typewit
 
 ===============================================================================

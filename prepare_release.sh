@@ -3,11 +3,12 @@
 #
 # Decide next version from CHANGELOG.md or override via --version,
 # then update:
-#  - CITATION.cff: version: "v<NEW_VERSION>", date-released: "<DATE>"
-#  - Cargo.toml:   [package] version = "<NEW_VERSION>"
-#  - CHANGELOG.md: reset 'in progress' template and insert '# v<NEW_VERSION> (<DATE>)'
-#  - README.md:    replace '# WuppieFuzz v<OLD_VERSION>' with '# WuppieFuzz v<NEW_VERSION>'
-#  - LICENSE:      ensure '2021-<RELEASE_YEAR>' exists (update if needed)
+#  - CITATION.cff:    version: "v<NEW_VERSION>", date-released: "<DATE>"
+#  - Cargo.toml:      [package] version = "<NEW_VERSION>"
+#  - CHANGELOG.md:    reset 'in progress' template and insert '# v<NEW_VERSION> (<DATE>)'
+#  - README.md:       replace '# WuppieFuzz v<OLD_VERSION>' with '# WuppieFuzz v<NEW_VERSION>'
+#  - LICENSE:         ensure '2021-<RELEASE_YEAR>' exists (update if needed)
+#  - publiccode.yml:  softwareVersion: "<NEW_VERSION>", releaseDate: "<DATE>"
 #  - Run `cargo generate-lockfile` to refresh Cargo.lock
 #
 # Rules from '# v1.x (in progress)':
@@ -61,11 +62,13 @@ CARGO_FILE="Cargo.toml"
 CHANGELOG_FILE="CHANGELOG.md"
 README_FILE="README.md"
 LICENSE_FILE="LICENSE"
+PUBLICCODE_FILE="publiccode.yml"
 
-[ -f "$CITATION_FILE" ]  || { echo "Missing $CITATION_FILE" >&2; exit 1; }
-[ -f "$CARGO_FILE" ]     || { echo "Missing $CARGO_FILE" >&2; exit 1; }
-[ -f "$CHANGELOG_FILE" ] || { echo "Missing $CHANGELOG_FILE" >&2; exit 1; }
-[ -f "$LICENSE_FILE" ]   || { echo "Missing $LICENSE_FILE" >&2; exit 1; }  # required to ensure the year range
+[ -f "$CITATION_FILE" ]   || { echo "Missing $CITATION_FILE" >&2; exit 1; }
+[ -f "$CARGO_FILE" ]      || { echo "Missing $CARGO_FILE" >&2; exit 1; }
+[ -f "$CHANGELOG_FILE" ]  || { echo "Missing $CHANGELOG_FILE" >&2; exit 1; }
+[ -f "$LICENSE_FILE" ]    || { echo "Missing $LICENSE_FILE" >&2; exit 1; }  # required to ensure the year range
+[ -f "$PUBLICCODE_FILE" ] || { echo "Missing $PUBLICCODE_FILE" >&2; exit 1; }
 
 # Choose date (default today, strictly YYYY-MM-DD)
 if [ -n "$DATE_OVERRIDE" ]; then
@@ -230,9 +233,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
   if [ -f "$README_FILE" ]; then
     echo " - $README_FILE"
   else
-    echo " - (no README.md present)"
+    echo " - (no $README_FILE present)"
   fi
   echo " - $LICENSE_FILE"
+  echo " - $PUBLICCODE_FILE"
   echo " - Cargo.lock (via cargo generate-lockfile)"
   echo
   echo "Commands that WOULD run:"
@@ -252,6 +256,7 @@ if [ -f "$README_FILE" ]; then
   cp "$README_FILE" "${README_FILE}.bak.$(ts)"
 fi
 cp "$LICENSE_FILE" "${LICENSE_FILE}.bak.$(ts)"
+cp "$PUBLICCODE_FILE" "${PUBLICCODE_FILE}.bak.$(ts)"
 
 # --------------------------------------------------------------------
 # Update CITATION.cff: version and date-released
@@ -385,6 +390,18 @@ grep -Fq "2021-${RELEASE_YEAR}" "$LICENSE_FILE" \
   || { echo "LICENSE: did not update to '2021-${RELEASE_YEAR}' as expected" >&2; exit 1; }
 
 # --------------------------------------------------------------------
+# Update publiccode.yml: softwareVersion and releaseDate
+# --------------------------------------------------------------------
+awk -v newv="$NEW_VERSION" -v rdate="$RELEASE_DATE" '
+{
+  if ($0 ~ /^softwareVersion:[[:space:]]/) { print "softwareVersion: \"" newv "\""; next }
+  if ($0 ~ /^releaseDate:[[:space:]]/)      { print "releaseDate: \"" rdate "\""; next }
+  print
+}
+' "$PUBLICCODE_FILE" > "${PUBLICCODE_FILE}.tmp"
+mv "${PUBLICCODE_FILE}.tmp" "$PUBLICCODE_FILE"
+
+# --------------------------------------------------------------------
 # Post-change sanity checks
 # --------------------------------------------------------------------
 grep -q "^version:[[:space:]]*\"v${NEW_VERSION}\"" "$CITATION_FILE" \
@@ -409,6 +426,11 @@ fi
 grep -Fq "2021-${RELEASE_YEAR}" "$LICENSE_FILE" \
   || { echo "LICENSE: final year is not '${RELEASE_YEAR}'" >&2; exit 1; }
 
+grep -q "^softwareVersion:[[:space:]]*\"${NEW_VERSION}\"" "$PUBLICCODE_FILE" \
+  || { echo "publiccode.yml: softwareVersion not set to ${NEW_VERSION}" >&2; exit 1; }
+grep -q "^releaseDate:[[:space:]]*\"${RELEASE_DATE}\"" "$PUBLICCODE_FILE" \
+  || { echo "publiccode.yml: releaseDate not set to ${RELEASE_DATE}" >&2; exit 1; }
+
 # --------------------------------------------------------------------
 # Generate or refresh Cargo.lock
 # --------------------------------------------------------------------
@@ -423,8 +445,9 @@ if ! cargo generate-lockfile; then
   exit 1
 fi
 
-printf '✅ Release prepared.\n- Bump: %s\n- Version: %s → %s\n- Date: %s\n- Files updated: CITATION.cff, Cargo.toml, CHANGELOG.md%s, %s, Cargo.lock\n' \
+printf '✅ Release prepared.\n- Bump: %s\n- Version: %s → %s\n- Date: %s\n- Files updated: %s, %s, %s%s, %s, %s, Cargo.lock\n' \
   "$BUMP_KIND" "$CURRENT_VERSION" "$NEW_VERSION" "$RELEASE_DATE" \
-  "$( [ -f "$README_FILE" ] && printf ", README.md" || printf "" )" \
-  "$LICENSE_FILE"
+  "$CITATION_FILE" "$CARGO_FILE" "$CHANGELOG_FILE" \
+  "$( [ -f "$README_FILE" ] && printf ", %s" "$README_FILE" || printf "" )" \
+  "$LICENSE_FILE" "$PUBLICCODE_FILE"
 ``
