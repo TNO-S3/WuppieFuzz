@@ -282,32 +282,6 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                     requests_completed_total,
                     corpus_size,
                     objectives,
-                    runid
-                ) VALUES (?, ?, ?, ?, ?, ?)",
-            )
-            .expect("Could not prepare insert statement for stats");
-        insert_stmt
-            .insert(params![
-                stats.seq_per_sec,
-                stats.req_per_sec,
-                i64::try_from(stats.requests_completed_total).unwrap_or(i64::MAX),
-                stats.corpus_size,
-                stats.objectives,
-                self.run_id,
-            ])
-            .expect("Could not insert stats into database");
-    }
-
-    fn report_stats(&self, stats: CampaignStats) {
-        let mut insert_stmt = self
-            .conn
-            .prepare(
-                "INSERT INTO stats (
-                    seq_per_sec,
-                    req_per_sec,
-                    requests_completed_total,
-                    corpus_size,
-                    objectives,
                     sequences_completed_total,
                     sequences_missing_backreference_total,
                     sequences_request_build_error_total,
