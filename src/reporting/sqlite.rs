@@ -275,7 +275,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
     fn report_stats(&self, stats: CampaignStats) {
         let mut insert_stmt = self
             .conn
-            .prepare(
+            .prepare_cached(
                 "INSERT INTO stats (
                     seq_per_sec,
                     req_per_sec,
