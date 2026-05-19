@@ -28,10 +28,10 @@ anstyle-wincon 3.0.11
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
-aws-lc-rs 1.16.3
+aws-lc-rs 1.17.0
 	licensed under "(Apache-2.0 OR ISC) AND ISC"
 	by AWS-LibCrypto
-aws-lc-sys 0.40.0
+aws-lc-sys 0.41.0
 	licensed under "(Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) AND (Apache-2.0 OR ISC) AND Apache-2.0 AND BSD-3-Clause AND ISC AND MIT"
 	by AWS-LC
 backtrace 0.3.76
@@ -238,7 +238,7 @@ getrandom 0.4.2
 gimli 0.32.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-h2 0.4.13
+h2 0.4.14
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
 hashbrown 0.15.5
@@ -247,9 +247,9 @@ hashbrown 0.15.5
 hashbrown 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-hashbrown 0.17.0
+hashbrown 0.17.1
 	licensed under "Apache-2.0 OR MIT"
-	by Amanieu d'Antras <amanieu@gmail.com>
+	by unspecified authors
 hashlink 0.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -325,9 +325,6 @@ indicatif 0.18.4
 ipnet 2.12.0
 	licensed under "Apache-2.0 OR MIT"
 	by Kris Price <kris@krisprice.nz>
-iri-string 0.7.12
-	licensed under "Apache-2.0 OR MIT"
-	by YOSHIOKA Takuma <nop_thread@nops.red>
 is_terminal_polyfill 1.70.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -355,7 +352,7 @@ jni-sys 0.4.1
 jni-sys-macros 0.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by Robert Bragg <robert@sixbynine.org>
-js-sys 0.3.97
+js-sys 0.3.98
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 json_env_logger2 0.2.1
@@ -433,9 +430,9 @@ mio 1.2.0
 nix 0.30.1
 	licensed under "MIT"
 	by The nix-rust Project Developers
-nix 0.31.2
+nix 0.31.3
 	licensed under "MIT"
-	by The nix-rust Project Developers
+	by unspecified authors
 num-bigint 0.4.6
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
@@ -478,7 +475,7 @@ once_cell_polyfill 1.70.2
 openapiv3-extended 6.0.1
 	licensed under "Apache-2.0 OR MIT"
 	by Kurt Wolf <kurtwolfbuilds@gmail.com>
-openssl 0.10.79
+openssl 0.10.80
 	licensed under "Apache-2.0"
 	by Steven Fackler <sfackler@gmail.com>
 openssl-macros 0.1.1
@@ -487,7 +484,7 @@ openssl-macros 0.1.1
 openssl-probe 0.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-openssl-sys 0.9.115
+openssl-sys 0.9.116
 	licensed under "MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Steven Fackler <sfackler@gmail.com>
 parking_lot 0.12.5
@@ -724,7 +721,7 @@ tinyvec 1.11.0
 tinyvec_macros 0.1.1
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Soveu <marx.tomasz@gmail.com>
-tokio 1.52.1
+tokio 1.52.3
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
 tokio-rustls 0.26.4
@@ -736,7 +733,7 @@ tokio-util 0.7.18
 tower 0.5.3
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
-tower-http 0.6.8
+tower-http 0.6.11
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
 tower-layer 0.3.3
@@ -832,16 +829,16 @@ wasip2 1.0.3+wasi-0.2.9
 wasip3 0.4.0+wasi-0.3.0-rc-2026-01-06
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by unspecified authors
-wasm-bindgen 0.2.120
+wasm-bindgen 0.2.121
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-futures 0.4.70
+wasm-bindgen-futures 0.4.71
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-macro 0.2.120
+wasm-bindgen-macro 0.2.121
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-shared 0.2.120
+wasm-bindgen-shared 0.2.121
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 wasm-encoder 0.244.0
@@ -853,7 +850,7 @@ wasm-metadata 0.244.0
 wasmparser 0.244.0
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Yury Delendik <ydelendik@mozilla.com>
-web-sys 0.3.97
+web-sys 0.3.98
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 web-time 1.1.0
@@ -1021,9 +1018,9 @@ zerocopy 0.8.48
 zerocopy-derive 0.8.48
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
-zerofrom 0.1.7
+zerofrom 0.1.8
 	licensed under "Unicode-3.0"
-	by Manish Goregaokar <manishsmail@gmail.com>
+	by The ICU4X Project Developers
 zerofrom-derive 0.1.7
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
