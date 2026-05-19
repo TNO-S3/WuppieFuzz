@@ -3,8 +3,8 @@ publiccodeYmlVersion: "0.5"
 name: WuppieFuzz
 url: "https://github.com/TNO-S3/WuppieFuzz"
 landingURL: "https://tno.to/wuppiefuzz"
-softwareVersion: "1.5.0"
-releaseDate: "2026-04-30"
+softwareVersion: "1.5.1"
+releaseDate: "2026-05-19"
 logo: "assets/WuppieFuzz.svg"
 
 platforms:
