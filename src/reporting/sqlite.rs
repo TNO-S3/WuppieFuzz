@@ -3,7 +3,7 @@ use std::{cell::Cell, fs::create_dir_all, path::Path};
 use anyhow::Context;
 use chrono::SecondsFormat;
 use log::info;
-use rusqlite::{Connection, named_params, params};
+use rusqlite::{Connection, named_params};
 
 use crate::{
     configuration::Configuration,
@@ -298,37 +298,55 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                     endpoint_coverage_phase_us_total,
                     post_exec_reporting_us_total,
                     runid
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ) VALUES (
+                    :seq_per_sec,
+                    :req_per_sec,
+                    :requests_completed_total,
+                    :corpus_size,
+                    :objectives,
+                    :sequences_completed_total,
+                    :sequences_missing_backreference_total,
+                    :sequences_request_build_error_total,
+                    :sequences_crash_or_validation_total,
+                    :sequences_transport_error_total,
+                    :resolve_backreference_us_total,
+                    :build_request_us_total,
+                    :report_request_us_total,
+                    :http_execute_us_total,
+                    :report_response_us_total,
+                    :process_response_us_total,
+                    :endpoint_cover_us_total,
+                    :code_coverage_phase_us_total,
+                    :endpoint_coverage_phase_us_total,
+                    :post_exec_reporting_us_total,
+                    :runid
+                )",
             )
             .expect("Could not prepare insert statement for stats");
         insert_stmt
-            .insert(params![
-                stats.seq_per_sec,
-                stats.req_per_sec,
-                i64::try_from(stats.requests_completed_total).unwrap_or(i64::MAX),
-                stats.corpus_size,
-                stats.objectives,
-                i64::try_from(stats.sequence_stop_stats.completed).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_stop_stats.missing_backreference).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_stop_stats.request_build_error).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_stop_stats.crash_or_validation).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_stop_stats.transport_error).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.resolve_backreference_us)
-                    .unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.build_request_us).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.report_request_us).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.http_execute_us).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.report_response_us).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.process_response_us).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.endpoint_cover_us).unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.code_coverage_phase_us)
-                    .unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.endpoint_coverage_phase_us)
-                    .unwrap_or(i64::MAX),
-                i64::try_from(stats.sequence_timing_stats.post_exec_reporting_us)
-                    .unwrap_or(i64::MAX),
-                self.run_id,
-            ])
+            .insert(named_params! {
+                ":seq_per_sec": stats.seq_per_sec,
+                ":req_per_sec": stats.req_per_sec,
+                ":requests_completed_total": i64::try_from(stats.requests_completed_total).unwrap_or(i64::MAX),
+                ":corpus_size": stats.corpus_size,
+                ":objectives": stats.objectives,
+                ":sequences_completed_total": i64::try_from(stats.sequence_stop_stats.completed).unwrap_or(i64::MAX),
+                ":sequences_missing_backreference_total": i64::try_from(stats.sequence_stop_stats.missing_backreference).unwrap_or(i64::MAX),
+                ":sequences_request_build_error_total": i64::try_from(stats.sequence_stop_stats.request_build_error).unwrap_or(i64::MAX),
+                ":sequences_crash_or_validation_total": i64::try_from(stats.sequence_stop_stats.crash_or_validation).unwrap_or(i64::MAX),
+                ":sequences_transport_error_total": i64::try_from(stats.sequence_stop_stats.transport_error).unwrap_or(i64::MAX),
+                ":resolve_backreference_us_total": i64::try_from(stats.sequence_timing_stats.resolve_backreference_us).unwrap_or(i64::MAX),
+                ":build_request_us_total": i64::try_from(stats.sequence_timing_stats.build_request_us).unwrap_or(i64::MAX),
+                ":report_request_us_total": i64::try_from(stats.sequence_timing_stats.report_request_us).unwrap_or(i64::MAX),
+                ":http_execute_us_total": i64::try_from(stats.sequence_timing_stats.http_execute_us).unwrap_or(i64::MAX),
+                ":report_response_us_total": i64::try_from(stats.sequence_timing_stats.report_response_us).unwrap_or(i64::MAX),
+                ":process_response_us_total": i64::try_from(stats.sequence_timing_stats.process_response_us).unwrap_or(i64::MAX),
+                ":endpoint_cover_us_total": i64::try_from(stats.sequence_timing_stats.endpoint_cover_us).unwrap_or(i64::MAX),
+                ":code_coverage_phase_us_total": i64::try_from(stats.sequence_timing_stats.code_coverage_phase_us).unwrap_or(i64::MAX),
+                ":endpoint_coverage_phase_us_total": i64::try_from(stats.sequence_timing_stats.endpoint_coverage_phase_us).unwrap_or(i64::MAX),
+                ":post_exec_reporting_us_total": i64::try_from(stats.sequence_timing_stats.post_exec_reporting_us).unwrap_or(i64::MAX),
+                ":runid": self.run_id,
+            })
             .expect("Could not insert stats into database");
     }
 }
