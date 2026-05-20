@@ -19,6 +19,7 @@ eula = false
 [features]
 default = ["std", "vendored-openssl", "bundled-sqlite", "bundled-z3"]
 std = []
+sequence-diagnostics = []
 vendored-openssl = ["openssl/vendored"]
 bundled-sqlite = ["rusqlite/bundled"]
 bundled-z3 = ["z3/bundled"]

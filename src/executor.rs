@@ -46,6 +46,10 @@ use crate::{
 /// How often to print a new log line
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5;
 
+/// Collect detailed per-sequence diagnostic stats only when explicitly enabled
+/// for dev profile builds.
+const COLLECT_SEQUENCE_DIAGNOSTIC_STATS: bool = cfg!(feature = "sequence-diagnostics");
+
 #[derive(Clone, Copy, Debug)]
 enum SequenceStopReason {
     Completed,
@@ -175,6 +179,9 @@ where
     }
 
     fn record_sequence_stop_reason(&mut self, reason: SequenceStopReason) {
+        if !COLLECT_SEQUENCE_DIAGNOSTIC_STATS {
+            return;
+        }
         match reason {
             SequenceStopReason::Completed => self.sequence_stop_stats.completed += 1,
             SequenceStopReason::MissingBackreference => {
@@ -191,7 +198,9 @@ where
     }
 
     fn add_timing(total: &mut u64, start: Instant) {
-        *total = total.saturating_add(duration_as_us(start));
+        if COLLECT_SEQUENCE_DIAGNOSTIC_STATS {
+            *total = total.saturating_add(duration_as_us(start));
+        }
     }
 
     /// Executes the given input, tracking and using response parameters and verifying responses.
