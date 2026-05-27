@@ -1,7 +1,7 @@
 //! Mutates a request series by adding a new request to it. The new request is taken
 //! at random from the API specification.
 
-use std::{borrow::Cow, collections::BTreeMap};
+use std::borrow::Cow;
 
 pub use libafl::mutators::mutations::*;
 use libafl::{
@@ -10,16 +10,10 @@ use libafl::{
     mutators::{MutationResult, Mutator},
 };
 use libafl_bolts::{Named, rands::Rand};
-use oas3::spec::RequestBody;
 
-// use openapiv3::{OpenAPI, RequestBody};
 use crate::{
-    input::{
-        Body, OpenApiInput, OpenApiRequest, ParameterContents, new_rand_input,
-        parameter::ParameterKind,
-    },
-    openapi::{JsonContent, spec::Spec},
-    openapi_mutator::SimpleValue,
+    input::OpenApiInput,
+    openapi::{QualifiedOperation, examples::example_request_for_operation},
     state::HasRandAndOpenAPI,
 };
 
@@ -59,47 +53,10 @@ where
         let new_path_i = rand.below(core::num::NonZero::new(n_ops).unwrap());
 
         let (new_path, new_method, new_op) = api.operations().nth(new_path_i).unwrap();
-        let (method, path) = (new_method.into(), new_path.to_owned());
+        let qualified_op = QualifiedOperation::new(new_path.to_owned(), new_method, new_op);
+        let new_request = example_request_for_operation(api, qualified_op);
 
-        let parameters: BTreeMap<(String, ParameterKind), ParameterContents> = new_op
-            .parameters
-            .iter()
-            // Keep only concrete values and valid references
-            .filter_map(|ref_or_param| ref_or_param.resolve(api).ok())
-            // Convert to (parameter_name, parameter_kind) tuples
-            .map(|param| (param.name.clone(), param.into()))
-            // Convert to (parameter_name, parameter_kind) tuples with appropriate default value
-            .map(|name_kind| {
-                let bytes = new_rand_input(rand);
-                let s = String::from_utf8_lossy(&bytes).into_owned();
-                (
-                    name_kind,
-                    ParameterContents::LeafValue(SimpleValue::String(s)),
-                )
-            })
-            .collect();
-        let body_contents: Option<BTreeMap<String, ParameterContents>> = new_op
-            .request_body
-            .as_ref()
-            .and_then(|ref_or_body| ref_or_body.resolve(api).ok())
-            .map(|request_body| {
-                field_names(api, &request_body)
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|name| (name.clone(), ParameterContents::Bytes(new_rand_input(rand))))
-                    .collect()
-            });
-        let body = match body_contents {
-            Some(body_contents) => Body::build(api, new_op, Some(body_contents.into())),
-            None => Body::Empty,
-        };
-
-        input.0.push(OpenApiRequest {
-            method,
-            path,
-            parameters,
-            body,
-        });
+        input.0.push(new_request);
 
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
@@ -108,22 +65,6 @@ where
     fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
-}
-
-fn field_names(api: &Spec, request_body: &RequestBody) -> Option<Vec<String>> {
-    Some(
-        request_body
-            .content
-            .get_json_content()?
-            .schema
-            .as_ref()?
-            .resolve(api)
-            .ok()?
-            .properties
-            .keys()
-            .cloned()
-            .collect(),
-    )
 }
 
 #[cfg(test)]
