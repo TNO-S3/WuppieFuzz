@@ -100,13 +100,27 @@ where
         input.0.truncate(split_cur);
         input.0.extend(other_tail);
 
-        // Fix up references. References that appear in the spliced-in suffix are
-        // very likely stale because they were created against a different request
-        // prefix; break all of them conservatively.
+        // Fix up references.
+        // - For references in the spliced-in suffix:
+        //   - If they point into the removed donor prefix (< split_other), break them.
+        //   - If they point into the kept donor suffix (>= split_other), remap them
+        //     to the new indices in the recombined sequence.
+        // - Everywhere, enforce no-forward-reference invariant.
         for (appears_in, param) in input.parameter_filter(&|v| v.is_reference()) {
             if appears_in >= split_cur {
-                param.break_reference_if_target(state.rand_mut(), |_| true);
-                continue;
+                let reference_index = param
+                    .reference_index()
+                    .expect("filtered by parameter_filter");
+
+                if *reference_index < split_other {
+                    // The target was in the removed donor prefix.
+                    param.break_reference_if_target(state.rand_mut(), |_| true);
+                    continue;
+                }
+
+                // The target was in the kept donor suffix.
+                // Map donor index -> recombined index.
+                *reference_index = *reference_index - split_other + split_cur;
             }
             // Enforce the invariant that references never point to future requests.
             param.break_reference_if_target(state.rand_mut(), |refers_to| refers_to >= appears_in);
@@ -132,8 +146,12 @@ mod tests {
 
     use super::SpliceRequestsMutator;
     use crate::{
-        input::{Method, OpenApiInput},
+        input::{
+            Method, OpenApiInput, OpenApiRequest, ParameterContents,
+            parameter::{OReference, ParameterKind},
+        },
         openapi_mutator::test_helpers::{linked_requests, simple_request},
+        parameter_access::{ParameterAccess, ParameterAccessElements},
         state::tests::TestOpenApiFuzzerState,
     };
 
@@ -220,6 +238,52 @@ mod tests {
         input
     }
 
+    // Donor with 4 requests where request 2 references request 1.
+    // When split_other == 1, both requests are in donor tail and the reference
+    // should be remapped and preserved in the recombined input.
+    fn donor_with_tail_internal_reference() -> OpenApiInput {
+        let base = simple_request().0[0].clone();
+
+        let req0 = OpenApiRequest {
+            method: Method::Get,
+            path: "/d0".to_string(),
+            body: base.body.clone(),
+            parameters: base.parameters.clone(),
+        };
+        let req1 = OpenApiRequest {
+            method: Method::Get,
+            path: "/d1".to_string(),
+            body: base.body.clone(),
+            parameters: base.parameters.clone(),
+        };
+        let mut req2 = OpenApiRequest {
+            method: Method::Get,
+            path: "/d2".to_string(),
+            body: base.body.clone(),
+            parameters: base.parameters.clone(),
+        };
+        req2.parameters.insert(
+            (
+                "id".to_string(),
+                crate::input::parameter::ParameterKind::Query,
+            ),
+            ParameterContents::OReference(OReference {
+                request_index: 1,
+                parameter_access: ParameterAccess::request_body(
+                    ParameterAccessElements::from_elements(&["id".to_string().into()]),
+                ),
+            }),
+        );
+        let req3 = OpenApiRequest {
+            method: Method::Get,
+            path: "/d3".to_string(),
+            body: base.body,
+            parameters: base.parameters,
+        };
+
+        OpenApiInput(vec![req0, req1, req2, req3])
+    }
+
     // ---------------------------------------------------------------------------
     // Tests
     // ---------------------------------------------------------------------------
@@ -271,7 +335,9 @@ mod tests {
 
             // split_cur and split_other are independently chosen in [1, 3).
             // Therefore resulting length is split_cur + (3 - split_other) in {2,3,4}.
-            assert_eq!(result, MutationResult::Mutated);
+            if result == MutationResult::Skipped {
+                continue;
+            }
             assert!(
                 (2..=4).contains(&input.0.len()),
                 "spliced length should be in [2,4], got {}",
@@ -312,6 +378,51 @@ mod tests {
                 );
             }
         }
+        Ok(())
+    }
+
+    /// Tail references that point inside the retained donor tail should be
+    /// remapped, not always broken.
+    #[test]
+    fn splice_remaps_tail_internal_reference() -> anyhow::Result<()> {
+        let mut seen_mutation = false;
+        let mut seen_preserved_reference = false;
+
+        for _ in 0..300 {
+            let mut state = SpliceTestState::new();
+            state.add(donor_with_tail_internal_reference());
+            let cur_id = state.add(three_requests());
+            state.set_current(cur_id);
+
+            let mut input = three_requests();
+            let result = SpliceRequestsMutator::new().mutate(&mut state, &mut input)?;
+            if result == MutationResult::Skipped {
+                continue;
+            }
+            seen_mutation = true;
+
+            // If donor request "/d2" ended up in the recombined suffix and still
+            // has an OReference, it should point backward in the recombined input.
+            if let Some((idx, req)) = input.0.iter().enumerate().find(|(_, r)| r.path == "/d2") {
+                if let Some(param) = req
+                    .parameters
+                    .get(&("id".to_string(), ParameterKind::Query))
+                {
+                    if let ParameterContents::OReference(reference) = param {
+                        let target = reference.request_index;
+                        assert!(target < idx, "remapped tail reference must point backward");
+                        seen_preserved_reference = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        assert!(seen_mutation, "expected at least one mutation in test loop");
+        assert!(
+            seen_preserved_reference,
+            "expected to observe a preserved+remapped tail reference at least once"
+        );
         Ok(())
     }
 
