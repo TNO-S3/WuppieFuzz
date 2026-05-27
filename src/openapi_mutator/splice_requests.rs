@@ -56,14 +56,14 @@ where
         }
 
         // Pick a random corpus entry that is not the current one.
+        // If we hit the current entry, move to the next corpus slot deterministically.
         let current_id = state.current_corpus_id()?;
         let rand_idx = state.rand_mut().below(NonZero::new(corpus_count).unwrap());
-        let mut other_id = state.corpus().nth(rand_idx);
-        let mut attempts = 0;
-        while Some(other_id) == current_id && attempts < 8 {
-            let rand_idx = state.rand_mut().below(NonZero::new(corpus_count).unwrap());
-            other_id = state.corpus().nth(rand_idx);
-            attempts += 1;
+        let mut other_idx = rand_idx;
+        let mut other_id = state.corpus().nth(other_idx);
+        if Some(other_id) == current_id {
+            other_idx = (other_idx + 1) % corpus_count;
+            other_id = state.corpus().nth(other_idx);
         }
         if Some(other_id) == current_id {
             return Ok(MutationResult::Skipped);
