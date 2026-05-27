@@ -1,4 +1,4 @@
-/// Mutates a request series by adding a new request to it. The new request is taken
+//! Mutates a request series by adding a new request to it. The new request is taken
 //! at random from the API specification.
 
 use std::{borrow::Cow, collections::BTreeMap};
@@ -19,6 +19,7 @@ use crate::{
         parameter::ParameterKind,
     },
     openapi::{JsonContent, spec::Spec},
+    openapi_mutator::SimpleValue,
     state::HasRandAndOpenAPI,
 };
 
@@ -71,7 +72,10 @@ where
             .map(|name_kind| {
                 let bytes = new_rand_input(rand);
                 let s = String::from_utf8_lossy(&bytes).into_owned();
-                (name_kind, ParameterContents::LeafValue(SimpleValue::String(s)))
+                (
+                    name_kind,
+                    ParameterContents::LeafValue(SimpleValue::String(s)),
+                )
             })
             .collect();
         let body_contents: Option<BTreeMap<String, ParameterContents>> = new_op
@@ -100,12 +104,7 @@ where
         input.assert_valid(self.name());
         Ok(MutationResult::Mutated)
     }
-}
 
-impl<S> Mutator<OpenApiInput, S> for AddRequestMutator
-where
-    S: HasRandAndOpenAPI,
-{
     fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
