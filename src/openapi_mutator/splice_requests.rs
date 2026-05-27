@@ -1,8 +1,10 @@
 //! Mutates a request series by splicing two sequences together.
 //!
-//! Inspired by the byte-level `SpliceMutator` in LibAFL: a split point is chosen
-//! within the overlap of two request sequences, and the tail of a randomly-selected
-//! corpus entry replaces the tail of the current input.
+//! Inspired by the byte-level `SpliceMutator` in LibAFL, but adapted for request
+//! sequences with independent cut points: one cut in the current input and one cut
+//! in a randomly-selected corpus input. The prefix of the current input is kept and
+//! the suffix of the corpus input is appended, enabling broader recombination even
+//! when two sequences have little semantic overlap.
 
 use core::num::NonZero;
 use std::borrow::Cow;
@@ -18,9 +20,9 @@ use libafl_bolts::{Named, rands::Rand};
 use crate::input::OpenApiInput;
 
 /// The `SpliceRequestsMutator` splices two request sequences from the corpus
-/// together. It picks a random split point within the overlap of the current
-/// input and a randomly-chosen corpus entry, then replaces the tail of the
-/// current input with the tail of the corpus entry starting at that split point.
+/// together. It picks one split point in the current input and one split point in
+/// a randomly-chosen corpus entry, then keeps the current prefix and appends the
+/// corpus suffix.
 pub struct SpliceRequestsMutator;
 
 impl SpliceRequestsMutator {
@@ -74,45 +76,37 @@ where
         };
 
         let cur_len = input.0.len();
-        // The overlap region is [0, min_len). We need at least 2 requests in the
-        // overlap so that there is a meaningful split point at index 1.
-        let min_len = cur_len.min(other_len);
-        if min_len < 2 {
+        if cur_len < 2 || other_len < 2 {
             return Ok(MutationResult::Skipped);
         }
 
-        // Choose split point in [1, min_len).
-        let split_at = 1 + state.rand_mut().below(NonZero::new(min_len - 1).unwrap());
+        // Choose split points in [1, cur_len) and [1, other_len).
+        let split_cur = 1 + state.rand_mut().below(NonZero::new(cur_len - 1).unwrap());
+        let split_other = 1 + state.rand_mut().below(NonZero::new(other_len - 1).unwrap());
 
-        // Clone the tail of the other input. We do this in its own scope so the
-        // borrow on the corpus entry is released before we modify `input`.
+        // Clone the tail of the other input (from `split_other` to its end).
+        // We do this in its own scope so the borrow on the corpus entry is
+        // released before we modify `input`.
         let other_tail: Vec<_> = {
             let other_testcase = state.corpus().get(other_id)?.borrow();
             let other = other_testcase
                 .input()
                 .as_ref()
                 .expect("input was loaded above");
-            other.0[split_at..].to_vec()
+            other.0[split_other..].to_vec()
         };
 
         // Replace the tail of the current input.
-        input.0.truncate(split_at);
+        input.0.truncate(split_cur);
         input.0.extend(other_tail);
 
-        // Fix up references. Any reference in the spliced-in tail (indices >= split_at)
-        // that points to a request index >= split_at is now stale — those request
-        // indices come from a different sequence that is no longer present.
-        // Additionally, as always, forward references must be broken everywhere.
+        // Fix up references. References that appear in the spliced-in suffix are
+        // very likely stale because they were created against a different request
+        // prefix; break all of them conservatively.
         for (appears_in, param) in input.parameter_filter(&|v| v.is_reference()) {
-            if appears_in >= split_at {
-                let reference_index = param
-                    .reference_index()
-                    .expect("filtered by parameter_filter");
-                if *reference_index >= split_at {
-                    // This reference points into the (now replaced) old tail; break it.
-                    param.break_reference_if_target(state.rand_mut(), |_| true);
-                    continue;
-                }
+            if appears_in >= split_cur {
+                param.break_reference_if_target(state.rand_mut(), |_| true);
+                continue;
             }
             // Enforce the invariant that references never point to future requests.
             param.break_reference_if_target(state.rand_mut(), |refers_to| refers_to >= appears_in);
@@ -261,13 +255,13 @@ mod tests {
         Ok(())
     }
 
-    /// Splicing two 3-request sequences must produce an output whose length is
-    /// exactly 3 (head from current + tail from other, split somewhere in [1,3)).
+    /// Splicing two 3-request sequences with independent cuts can produce length
+    /// 2, 3, or 4.
     #[test]
     fn splice_produces_correct_length() -> anyhow::Result<()> {
         for _ in 0..50 {
             let mut state = SpliceTestState::new();
-            let other = three_requests();
+            let other = three_requests(); // length 3
             state.add(other);
             let cur_id = state.add(three_requests());
             state.set_current(cur_id);
@@ -275,9 +269,14 @@ mod tests {
             let mut input = three_requests();
             let result = SpliceRequestsMutator::new().mutate(&mut state, &mut input)?;
 
-            // The split is somewhere in [1, 3), so the total length stays at 3.
+            // split_cur and split_other are independently chosen in [1, 3).
+            // Therefore resulting length is split_cur + (3 - split_other) in {2,3,4}.
             assert_eq!(result, MutationResult::Mutated);
-            assert_eq!(input.0.len(), 3, "spliced length should equal min_len (3)");
+            assert!(
+                (2..=4).contains(&input.0.len()),
+                "spliced length should be in [2,4], got {}",
+                input.0.len()
+            );
         }
         Ok(())
     }
@@ -316,10 +315,11 @@ mod tests {
         Ok(())
     }
 
-    /// If the two sequences are identical, the result—regardless of split—must
-    /// be identical to the original (same method at each position).
+    /// With independent split points, even identical inputs can produce different
+    /// outputs due to different cut locations. The mutator should still return a
+    /// valid result and keep at least one request.
     #[test]
-    fn splice_of_identical_inputs_is_identity() -> anyhow::Result<()> {
+    fn splice_of_identical_inputs_remains_valid() -> anyhow::Result<()> {
         for _ in 0..20 {
             let mut state = SpliceTestState::new();
             let original = three_requests();
@@ -330,52 +330,43 @@ mod tests {
             let mut input = original.clone();
             let result = SpliceRequestsMutator::new().mutate(&mut state, &mut input)?;
 
-            assert_eq!(result, MutationResult::Mutated);
-            // Content must be unchanged because both halves come from identical sequences.
-            for (i, (a, b)) in input.0.iter().zip(original.0.iter()).enumerate() {
-                assert_eq!(
-                    a.method, b.method,
-                    "request {i} method changed after splicing identical inputs"
-                );
-                assert_eq!(
-                    a.path, b.path,
-                    "request {i} path changed after splicing identical inputs"
-                );
+            if result == MutationResult::Skipped {
+                continue;
             }
+            assert!(!input.0.is_empty());
+            assert!(input.0.len() <= original.0.len() + 1);
         }
         Ok(())
     }
 
-    /// When one sequence is longer than the other, the result must have exactly
-    /// `min_len` entries (the overlap length).
+    /// With independent split points and lengths 3 (current) and 2 (other), the
+    /// result length can be either 2 or 3.
     #[test]
-    fn splice_respects_min_len_when_lengths_differ() -> anyhow::Result<()> {
+    fn splice_output_length_varies_with_two_cuts() -> anyhow::Result<()> {
         for _ in 0..30 {
             let mut state = SpliceTestState::new();
-            let short = simple_request(); // length 1 — still too short for a split
-            state.add(short.clone());
-            // Make short 2 requests so overlap is valid
-            let mut short2 = short.clone();
-            short2.0.push(short.0[0].clone());
-            let short2_len = short2.0.len(); // 2
-            state.add(short2);
 
+            // Corpus entry A: length 2 (short, but long enough for a split)
+            let mut short = simple_request();
+            short.0.push(short.0[0].clone());
+            let short_len = short.0.len(); // 2
+            state.add(short);
+
+            // Corpus entry B: length 3
             let cur_id = state.add(three_requests()); // length 3
             state.set_current(cur_id);
 
-            let mut input = three_requests(); // length 3
+            // Input under mutation: length 3
+            let mut input = three_requests();
             let result = SpliceRequestsMutator::new().mutate(&mut state, &mut input)?;
 
             if result == MutationResult::Skipped {
                 continue;
             }
-            // The chosen other could be either length-1 or length-2.
-            // Acceptable output lengths are 3 (overlap with 3-request entry)
-            // or 2 (overlap with 2-request entry).
-            let len = input.0.len();
             assert!(
-                len == 3 || len == short2_len,
-                "unexpected length {len} after splicing"
+                input.0.len() == short_len || input.0.len() == 3,
+                "unexpected length {} for independent two-cut splice",
+                input.0.len()
             );
         }
         Ok(())
