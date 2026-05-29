@@ -56,17 +56,23 @@ where
         }
 
         // Pick a random corpus entry that is not the current one.
-        // If we hit the current entry, move to the next corpus slot deterministically.
+        // If we hit the current entry, re-sample uniformly from all other indices.
         let current_id = state.current_corpus_id()?;
         let rand_idx = state.rand_mut().below(NonZero::new(corpus_count).unwrap());
         let mut other_idx = rand_idx;
         let mut other_id = state.corpus().nth(other_idx);
         if Some(other_id) == current_id {
-            other_idx = (other_idx + 1) % corpus_count;
+            // Re-sample uniformly from all indices except the current one.
+            // `other_idx` currently points at the current corpus entry.
+            let sampled = state
+                .rand_mut()
+                .below(NonZero::new(corpus_count - 1).unwrap());
+            other_idx = if sampled >= other_idx {
+                sampled + 1
+            } else {
+                sampled
+            };
             other_id = state.corpus().nth(other_idx);
-        }
-        if Some(other_id) == current_id {
-            return Ok(MutationResult::Skipped);
         }
 
         // Determine the length of the other input without holding onto a borrow.
