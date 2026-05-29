@@ -403,18 +403,16 @@ mod tests {
 
             // If donor request "/d2" ended up in the recombined suffix and still
             // has an OReference, it should point backward in the recombined input.
-            if let Some((idx, req)) = input.0.iter().enumerate().find(|(_, r)| r.path == "/d2") {
-                if let Some(param) = req
+            if let Some((idx, req)) = input.0.iter().enumerate().find(|(_, r)| r.path == "/d2")
+                && let Some(param) = req
                     .parameters
                     .get(&("id".to_string(), ParameterKind::Query))
-                {
-                    if let ParameterContents::OReference(reference) = param {
-                        let target = reference.request_index;
-                        assert!(target < idx, "remapped tail reference must point backward");
-                        seen_preserved_reference = true;
-                        break;
-                    }
-                }
+                && let ParameterContents::OReference(reference) = param
+            {
+                let target = reference.request_index;
+                assert!(target < idx, "remapped tail reference must point backward");
+                seen_preserved_reference = true;
+                break;
             }
         }
 
