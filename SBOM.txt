@@ -49,7 +49,7 @@ block2 0.6.2
 build_html 2.8.0
 	licensed under "MIT"
 	by Joseph Skubal
-bumpalo 3.20.2
+bumpalo 3.20.3
 	licensed under "Apache-2.0 OR MIT"
 	by Nick Fitzgerald <fitzgen@gmail.com>
 bytemuck 1.25.0
@@ -148,9 +148,9 @@ dtor 0.1.1
 dtor-proc-macro 0.0.6
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
-either 1.15.0
+either 1.16.0
 	licensed under "Apache-2.0 OR MIT"
-	by bluss
+	by unspecified authors
 embedded-io 0.4.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -256,7 +256,7 @@ hashlink 0.11.0
 hostname 0.4.2
 	licensed under "MIT"
 	by unspecified authors
-http 1.4.0
+http 1.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
 http-body 1.0.1
@@ -334,10 +334,10 @@ iter-read 1.1.0
 itoa 1.0.18
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-jiff 0.2.24
+jiff 0.2.28
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-jiff-static 0.2.24
+jiff-static 0.2.28
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
 jni 0.22.4
@@ -400,7 +400,7 @@ litemap 0.8.2
 lock_api 0.4.14
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-log 0.4.29
+log 0.4.30
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 lru-slab 0.1.2
@@ -454,7 +454,7 @@ num-rational 0.4.2
 num_enum 0.7.6
 	licensed under "Apache-2.0 OR BSD-3-Clause OR MIT"
 	by Daniel Wagner-Hall <dawagner@gmail.com>|Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>|Vincent Esche <regexident@gmail.com>
-oas3 0.21.0
+oas3 0.22.0
 	licensed under "MIT"
 	by softprops <d.tangren@gmail.com>|Rob Ede <robjtede@icloud.com>
 objc2 0.6.4
@@ -574,7 +574,7 @@ regex-automata 0.4.14
 regex-syntax 0.8.10
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-reqwest 0.13.3
+reqwest 0.13.4
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 reqwest_cookie_store 0.10.0
@@ -583,7 +583,7 @@ reqwest_cookie_store 0.10.0
 ring 0.17.14
 	licensed under "Apache-2.0 AND ISC"
 	by unspecified authors
-rsqlite-vfs 0.1.0
+rsqlite-vfs 0.1.1
 	licensed under "MIT"
 	by unspecified authors
 rusqlite 0.39.0
@@ -676,7 +676,7 @@ smallvec 1.15.1
 socket2 0.6.3
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>
-sqlite-wasm-rs 0.5.3
+sqlite-wasm-rs 0.5.5
 	licensed under "MIT"
 	by Spxg <unsafe@outlook.es>
 stable_deref_trait 1.2.1
