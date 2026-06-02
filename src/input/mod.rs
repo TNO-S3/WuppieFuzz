@@ -347,7 +347,7 @@ impl std::fmt::Display for OpenApiRequest {
             Body::Empty => (),
             Body::TextPlain(text) => write!(fmt, "\n text body: {text}")?,
             Body::ApplicationJson(body_content) | Body::XWwwFormUrlencoded(body_content) => {
-                write!(fmt, "Contents in body: {body_content}")?;
+                write!(fmt, "\n Contents in body: {body_content}")?;
             }
         }
         Ok(())
