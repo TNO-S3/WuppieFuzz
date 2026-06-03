@@ -166,13 +166,25 @@ fn value_to_parameter_contents(val: Value) -> Result<ParameterContents, serde_ya
         Value::String(s) => Ok(ParameterContents::LeafValue(SimpleValue::String(s))),
 
         Value::Number(n) => {
-            // Convert YAML number into f64 for SimpleValue::Number (adjust if needed)
+            // Preserve integer semantics when possible so IDs and counters are not
+            // serialized as floating-point values in generated requests.
+            if let Some(i) = n.as_i64() {
+                return Ok(ParameterContents::LeafValue(SimpleValue::Number(
+                    serde_json::Number::from(i),
+                )));
+            }
+            if let Some(u) = n.as_u64() {
+                return Ok(ParameterContents::LeafValue(SimpleValue::Number(
+                    serde_json::Number::from(u),
+                )));
+            }
+
             let f = n
                 .as_f64()
                 .ok_or_else(|| -> serde_yaml::Error { Error::custom("invalid number") })?;
-            Ok(ParameterContents::LeafValue(SimpleValue::Number(
-                serde_json::Number::from_f64(f).unwrap(),
-            )))
+            let number = serde_json::Number::from_f64(f)
+                .ok_or_else(|| -> serde_yaml::Error { Error::custom("invalid floating number") })?;
+            Ok(ParameterContents::LeafValue(SimpleValue::Number(number)))
         }
 
         Value::Bool(b) => Ok(ParameterContents::LeafValue(SimpleValue::Bool(b))),
@@ -189,5 +201,62 @@ impl<'de> Deserialize<'de> for ParameterContents {
         let val = Value::deserialize(deserializer)?;
         value_to_parameter_contents(val)
             .map_err(|e| D::Error::custom(format!("Deserialization failed: {e}")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::parameter::SimpleValue;
+
+    #[test]
+    fn yaml_integer_stays_integer_number() {
+        let parsed: ParameterContents = serde_yaml::from_str("42").expect("failed to parse YAML");
+
+        match parsed {
+            ParameterContents::LeafValue(SimpleValue::Number(n)) => {
+                assert_eq!(n.as_i64(), Some(42));
+                assert_eq!(n.as_u64(), Some(42));
+            }
+            other => panic!("unexpected parsed value: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn yaml_float_stays_float_number() {
+        let parsed: ParameterContents = serde_yaml::from_str("42.5").expect("failed to parse YAML");
+
+        match parsed {
+            ParameterContents::LeafValue(SimpleValue::Number(n)) => {
+                assert_eq!(n.as_f64(), Some(42.5));
+                assert_eq!(n.as_i64(), None);
+            }
+            other => panic!("unexpected parsed value: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn yaml_mapping_preserves_integer_parameter_value() {
+        let parsed: ParameterContents =
+            serde_yaml::from_str("id: 123\nratio: 1.25\n").expect("failed to parse YAML");
+
+        match parsed {
+            ParameterContents::Object(map) => {
+                match map.get("id") {
+                    Some(ParameterContents::LeafValue(SimpleValue::Number(id))) => {
+                        assert_eq!(id.as_i64(), Some(123));
+                    }
+                    other => panic!("unexpected id value: {other:?}"),
+                }
+
+                match map.get("ratio") {
+                    Some(ParameterContents::LeafValue(SimpleValue::Number(ratio))) => {
+                        assert_eq!(ratio.as_f64(), Some(1.25));
+                    }
+                    other => panic!("unexpected ratio value: {other:?}"),
+                }
+            }
+            other => panic!("unexpected parsed value: {other:?}"),
+        }
     }
 }
