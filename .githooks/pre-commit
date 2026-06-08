@@ -1,0 +1,11 @@
+#!/bin/sh
+# fmt: nightly only — rustfmt.toml uses nightly-only settings (imports_granularity).
+# clippy: stable only — avoids double recompile; CI covers nightly-specific lints.
+# Skip with: git commit --no-verify
+set -e
+
+echo ">>> cargo +nightly fmt --check"
+cargo +nightly fmt --all -- --check
+
+echo ">>> cargo clippy"
+cargo clippy --all-targets --all-features -- -D warnings
