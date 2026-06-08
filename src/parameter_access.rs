@@ -17,7 +17,7 @@ use std::{
     hash::Hash,
 };
 
-use oas3::spec::{ObjectOrReference, ObjectSchema, Parameter};
+use oas3::spec::{ObjectOrReference, Parameter, Schema};
 use serde::{Deserialize, Serialize};
 
 use crate::{input::parameter::ParameterKind, openapi::spec::Spec};
@@ -82,28 +82,38 @@ impl ParameterAccessElements {
 
     pub fn parameter_accesses_from_schema(
         parent_access: ParameterAccessElements,
-        schema: &ObjectOrReference<ObjectSchema>,
+        schema: &Schema,
         api: &Spec,
     ) -> Vec<ParameterAccessElements> {
-        match schema.resolve(api) {
-            Ok(schema) => schema
-                .properties
-                .iter()
-                .flat_map(|(name, child_schema)| {
-                    let mut accesses = vec![];
-                    let current_access =
-                        parent_access.with_new_element(ParameterAccessElement::Name(name.clone()));
-                    accesses.push(current_access.clone());
-                    accesses.extend(Self::parameter_accesses_from_schema(
-                        current_access,
-                        child_schema,
-                        api,
-                    ));
-                    accesses
-                })
-                .collect(),
-            Err(_) => vec![],
-        }
+        let resolved = match schema.resolve(api) {
+            Ok(resolved) => resolved,
+            Err(_) => return vec![],
+        };
+
+        let object_schema = match resolved {
+            Schema::Boolean(_) => return vec![],
+            Schema::Object(object_or_reference) => match *object_or_reference {
+                ObjectOrReference::Object(object_schema) => object_schema,
+                ObjectOrReference::Ref { .. } => return vec![],
+            },
+        };
+
+        object_schema
+            .properties
+            .iter()
+            .flat_map(|(name, child_schema)| {
+                let mut accesses = vec![];
+                let current_access =
+                    parent_access.with_new_element(ParameterAccessElement::Name(name.clone()));
+                accesses.push(current_access.clone());
+                accesses.extend(Self::parameter_accesses_from_schema(
+                    current_access,
+                    child_schema,
+                    api,
+                ));
+                accesses
+            })
+            .collect()
     }
 
     pub fn with_new_element(&self, new_element: ParameterAccessElement) -> Self {

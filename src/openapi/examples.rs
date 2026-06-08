@@ -42,7 +42,10 @@ use std::{
     f64::consts::PI,
 };
 
-use oas3::spec::{MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, SchemaType};
+use oas3::spec::{
+    BooleanSchema, MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, Schema,
+    SchemaType,
+};
 use petgraph::{csr::DefaultIx, graph::DiGraph, prelude::NodeIndex, visit::EdgeRef};
 use rand::{RngExt, prelude::Distribution};
 use regex::Regex;
@@ -92,47 +95,39 @@ fn example_body_for_operation(api: &Spec, operation: &Operation) -> Option<Param
 
     // Return None if the schema cannot be resolved
     let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
+    let object_schema = match schema {
+        Schema::Boolean(_) => return None,
+        Schema::Object(object_or_reference) => match *object_or_reference {
+            ObjectOrReference::Object(object_schema) => object_schema,
+            ObjectOrReference::Ref { .. } => return None,
+        },
+    };
 
-    if schema
+    if object_schema
         .schema_type
         .as_ref()
         .is_some_and(|st| st.contains(SchemaType::Object))
     {
-        let body_map: BTreeMap<String, ParameterContents> = schema
+        let body_map: BTreeMap<String, ParameterContents> = object_schema
             .properties
             .iter()
-            .filter_map(|(param, ref_or_schema)| {
+            .filter_map(|(param, schema)| {
                 Some((
                     param.clone(),
-                    ParameterContents::from(example_value_for_schema(
-                        api,
-                        &ref_or_schema.resolve(api).ok()?,
-                        0,
-                    )?),
+                    ParameterContents::from(example_value_for_schema(api, schema, 0)?),
                 ))
             })
             .collect();
         return Some(body_map.into());
     }
-    if schema
+    if object_schema
         .schema_type
         .is_some_and(|st| st.contains(SchemaType::Array))
     {
-        return match &schema.items {
-            Some(items) => match &**items {
-                oas3::spec::Schema::Boolean(boolean_schema) => {
-                    // Boolean schemas only serve to signal whether something will (true) or will not (false) validate against it.
-                    // For the true variant any example will do, and we choose to return an empty object as an example.
-                    // For the false variant no examples will validate, so we choose to not return any example.
-                    match boolean_schema.0 {
-                        true => Some(ParameterContents::Object(Default::default())),
-                        false => None,
-                    }
-                }
-                oas3::spec::Schema::Object(object_or_reference) => Some(ParameterContents::from(
-                    example_value_for_schema(api, &object_or_reference.resolve(api).ok()?, 0)?,
-                )),
-            },
+        return match &object_schema.items {
+            Some(items) => Some(ParameterContents::from(example_value_for_schema(
+                api, items, 0,
+            )?)),
             None => None,
         };
     }
@@ -200,12 +195,8 @@ fn example_value_for_parameter(api: &Spec, param: &Parameter) -> Result<Value, S
         // media types, examples, schemas and references. We put in some effort
         // to extract any useful value that may exist.
         if let Some(schema) = param.schema.as_ref() {
-            example_value_for_schema(
-                api,
-                &schema.resolve(api).expect("Could not resolve schema"),
-                0,
-            )
-            .ok_or("Could not create example from schema".to_owned())
+            example_value_for_schema(api, schema, 0)
+                .ok_or("Could not create example from schema".to_owned())
         } else if let Some(content) = param.content.as_ref() {
             content
                 .get_json_content()
@@ -266,7 +257,7 @@ fn interesting_values_for_parameters(
         .parameters
         .iter()
         .filter_map(|ref_or_parameter| ref_or_parameter.resolve(api).ok())
-        .map(|mut parameter| {
+        .map(|parameter| {
             let par_kind: ParameterKind = parameter.clone().into();
             let mut interesting_combinations: Vec<Value> = vec![];
             // If this parameter is a reference target (it will get replaced with a reference
@@ -275,8 +266,8 @@ fn interesting_values_for_parameters(
             if single_valued.contains(&parameter) {
                 if let Some(example) = parameter.example {
                     interesting_combinations.push(example.clone());
-                } else if let Some(example) = parameter.examples.first_entry()
-                    && let Ok(exvalue) = example.get().resolve(api)
+                } else if let Some((_, example)) = parameter.examples.iter().next()
+                    && let Ok(exvalue) = example.resolve(api)
                     && let Some(value) = exvalue.value
                 {
                     interesting_combinations.push(value)
@@ -357,18 +348,16 @@ fn example_value_for_media_type(
         .and_then(|examples| {
             examples
                 .resolve_all(api)
-                .into_values()
+                .into_iter()
+                .map(|(_, val)| val)
                 .filter_map(|val| val.value)
                 .next()
         })
         .or_else(|| {
-            contents.schema.as_ref().and_then(|ref_or_schema| {
-                example_value_for_schema(
-                    api,
-                    &ref_or_schema.resolve(api).ok()?,
-                    recursion_limit + 1,
-                )
-            })
+            contents
+                .schema
+                .as_ref()
+                .and_then(|schema| example_value_for_schema(api, schema, recursion_limit + 1))
         })
 }
 
@@ -382,14 +371,15 @@ fn interesting_values_for_media_type(api: &Spec, contents: &MediaType) -> Vec<Va
         result.extend(
             examples
                 .resolve_all(api)
-                .into_values()
+                .into_iter()
+                .map(|(_, ex)| ex)
                 .filter_map(|ex| ex.value),
         );
     };
     if let Some(more_examples) = contents
         .schema
         .as_ref()
-        .map(|ref_or_schema| interesting_values_for_schema(api, ref_or_schema, &[]))
+        .map(|schema| interesting_values_for_schema(api, schema, &[]))
     {
         result.extend(more_examples);
     }
@@ -429,24 +419,21 @@ fn example_recursion_limit_exceeded(recursion_depth: usize) -> bool {
 /// 6. Type-specific generation via [`example_value_for_type`].
 ///
 /// Respects a recursion depth limit via [`example_recursion_limit_exceeded`].
-fn example_value_for_schema(
-    api: &Spec,
-    schema: &ObjectSchema,
-    recursion_depth: usize,
-) -> Option<Value> {
-    // TODO: Probably remove this read_only check.
-    // Returning None below is likely because we misinterpreted read_only as pertaining to a type, rather than a schema.
-    // The documentation of schema explains readOnly as meaning:
-    //
-    // "the value of the instance is managed exclusively by the owning authority, and attempts by an application to modify the
-    // value of this property are expected to be ignored or rejected by that owning authority."
-    //
-    // and refers to the json-schema definition. By contrast, readOnly on types means they should only be used in responses
-    // as defined here: https://swagger.io/docs/specification/v3_0/data-models/data-types/
-    // (hence returning None here, since we generate examples for requests only)
+fn example_value_for_schema(api: &Spec, schema: &Schema, recursion_depth: usize) -> Option<Value> {
     if example_recursion_limit_exceeded(recursion_depth) {
         return None;
     }
+
+    let schema = schema.resolve(api).ok()?;
+    let schema = match schema {
+        Schema::Boolean(BooleanSchema(true)) => return Some(Value::Object(Default::default())),
+        Schema::Boolean(BooleanSchema(false)) => return None,
+        Schema::Object(object_or_reference) => match *object_or_reference {
+            ObjectOrReference::Object(schema) => schema,
+            ObjectOrReference::Ref { .. } => return None,
+        },
+    };
+
     if Some(true) == schema.read_only {
         return None;
     }
@@ -459,33 +446,26 @@ fn example_value_for_schema(
     if !schema.examples.is_empty() {
         return Some(schema.examples[0].clone());
     }
-    // Return an example from all_of if it has exactly one entry
+
     match schema.all_of.len() {
         0 => (),
         1 => {
-            return example_value_for_schema(
-                api,
-                &schema.all_of[0].resolve(api).ok()?,
-                recursion_depth + 1,
-            );
+            return example_value_for_schema(api, &schema.all_of[0], recursion_depth + 1);
         }
         _ => {
             log::warn!(concat!(
                 "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
                 "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
             ));
-            log_schema_debug(schema);
+            log_schema_debug(&schema);
             return None;
         }
     }
-    // Return the first schema that produces an example if one_of is populated
+
     let one_of_example = schema
         .one_of
         .iter()
-        .filter_map(|ref_or_schema| {
-            example_value_for_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_depth + 1)
-        })
-        .next();
+        .find_map(|schema| example_value_for_schema(api, schema, recursion_depth + 1));
     if one_of_example.is_some() {
         if schema.one_of.len() > 1 {
             log::warn!(
@@ -494,25 +474,23 @@ fn example_value_for_schema(
         }
         return one_of_example;
     }
+
     let any_of_example = schema
         .any_of
         .iter()
-        .filter_map(|ref_or_schema| {
-            example_value_for_schema(api, &ref_or_schema.resolve(api).ok()?, recursion_depth + 1)
-        })
-        .next();
+        .find_map(|schema| example_value_for_schema(api, schema, recursion_depth + 1));
     if any_of_example.is_some() {
         return any_of_example;
     }
-    // Returning None explicitly if no example could be generated.
+
     if let Some(type_set) = &schema.schema_type {
         match type_set {
             oas3::spec::SchemaTypeSet::Single(single_type) => {
-                return example_value_for_type(api, single_type, schema, recursion_depth + 1);
+                return example_value_for_type(api, single_type, &schema, recursion_depth + 1);
             }
             oas3::spec::SchemaTypeSet::Multiple(multiple_types) => {
                 if let Some(first_type) = multiple_types.first() {
-                    return example_value_for_type(api, first_type, schema, recursion_depth + 1);
+                    return example_value_for_type(api, first_type, &schema, recursion_depth + 1);
                 }
             }
         }
@@ -536,19 +514,34 @@ fn example_value_for_schema(
 /// its parent schema.
 fn interesting_values_for_schema(
     api: &Spec,
-    schema: &ObjectOrReference<ObjectSchema>,
+    schema: &Schema,
     ignore_reference_names: &[&str],
 ) -> Vec<Value> {
-    // Add the current schema name to the list of names not to descend into again, to prevent cycles
     let mut ignore_references = ignore_reference_names.to_owned();
-    if let ObjectOrReference::Ref { ref_path, .. } = schema {
+    if let Schema::Object(object_or_reference) = schema
+        && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
+    {
         ignore_references.push(ref_path);
     }
-    let schema = schema.resolve(api).expect("Failed to resolve schema.");
+
+    let schema = match schema.resolve(api) {
+        Ok(schema) => schema,
+        Err(_) => return vec![],
+    };
+
+    let schema = match schema {
+        Schema::Boolean(BooleanSchema(true)) => return vec![Value::Object(Default::default())],
+        Schema::Boolean(BooleanSchema(false)) => return vec![],
+        Schema::Object(object_or_reference) => match *object_or_reference {
+            ObjectOrReference::Object(schema) => schema,
+            ObjectOrReference::Ref { .. } => return vec![],
+        },
+    };
+
     if schema.read_only.is_some_and(|x| x) {
-        // schema property may only be sent in responses, never in requests.
         return vec![];
     }
+
     let mut result = vec![];
     if let Some(default_schema) = schema.default.clone() {
         result.push(default_schema);
@@ -557,6 +550,7 @@ fn interesting_values_for_schema(
         result.push(example_schema);
     }
     result.extend(schema.examples.clone());
+
     if schema.discriminator.is_some() {
         result.extend(interesting_values_for_discriminator(
             api,
@@ -564,60 +558,55 @@ fn interesting_values_for_schema(
             &ignore_references,
         ));
     } else {
-        // INTERESTING ALL_OF VALUES
-        // Creates the union of fields of all interesting values we find for each schema,
-        // which might blow up quite a bit depending on the schema.
         let all_examples: Vec<Vec<Value>> = schema
             .all_of
             .iter()
-            .filter_map(|ref_or_schema| match ref_or_schema {
-                ObjectOrReference::Ref { ref_path, .. }
-                    if ignore_references.contains(&ref_path.as_str()) =>
+            .filter_map(|schema| {
+                if let Schema::Object(object_or_reference) = schema
+                    && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
+                    && ignore_references.contains(&ref_path.as_str())
                 {
                     None
+                } else {
+                    Some(interesting_values_for_schema(
+                        api,
+                        schema,
+                        &ignore_references,
+                    ))
                 }
-                _ => Some(interesting_values_for_schema(
-                    api,
-                    ref_or_schema,
-                    &ignore_references,
-                )),
             })
             .collect();
-        // By combining fields like this, we ensure each example satisfies
-        // all of the all_of entries.
+
         let all_combinations: Vec<Value> = all_examples
             .into_iter()
             .reduce(cartesian_product_values)
             .unwrap_or_default();
         result.extend(all_combinations);
-        // INTERESTING ONE_OF AND ANY_OF VALUES
+
         if schema.one_of.len() > 1 {
             log::warn!("Schema has more than one_of schema: conflicting examples may be generated.")
         }
+
         result.extend(
             [&schema.one_of, &schema.any_of]
                 .iter()
                 .flat_map(|schema_vec| {
-                    schema_vec
-                        .iter()
-                        .flat_map(|ref_or_schema| match ref_or_schema {
-                            ObjectOrReference::Ref { ref_path, .. }
-                                if ignore_references.contains(&ref_path.as_str()) =>
-                            {
-                                Vec::new()
-                            }
-                            _ => interesting_values_for_schema(
-                                api,
-                                ref_or_schema,
-                                &ignore_references,
-                            ),
-                        })
+                    schema_vec.iter().flat_map(|schema| {
+                        if let Schema::Object(object_or_reference) = schema
+                            && let ObjectOrReference::Ref { ref_path, .. } =
+                                object_or_reference.as_ref()
+                            && ignore_references.contains(&ref_path.as_str())
+                        {
+                            Vec::new()
+                        } else {
+                            interesting_values_for_schema(api, schema, &ignore_references)
+                        }
+                    })
                 }),
         );
     }
+
     if result.is_empty() {
-        // No suitable defaults or examples found; fall back to generating
-        // ones based on the type information embedded in the schema
         result.extend(interesting_values_for_type(api, &schema, 0));
     }
     result
@@ -680,7 +669,9 @@ fn interesting_values_for_discriminator(
     // Collect variants and default names from OneOf/AnyOf
     // Only references are allowed by the spec, no inline schemas
     for variant in schema.one_of.iter().chain(schema.any_of.iter()) {
-        if let ObjectOrReference::Ref { ref_path, .. } = variant {
+        if let Schema::Object(object_or_reference) = variant
+            && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
+        {
             // Select the Dog in '#/components/schemas/Dog'
             if let Some(name) = ref_path.split('/').next_back() {
                 mapping.insert(ref_path.clone(), name.to_string());
@@ -708,11 +699,11 @@ fn interesting_values_for_discriminator(
         all_examples.extend(
             interesting_values_for_schema(
                 api,
-                &ObjectOrReference::Ref {
+                &Schema::Object(Box::new(ObjectOrReference::Ref {
                     ref_path: path,
                     summary: None,
                     description: None,
-                },
+                })),
                 ignore_names,
             )
             .into_iter()
@@ -829,11 +820,7 @@ fn interesting_values_for_type(
                                 .filter_map(|(k, v)| {
                                     Some((
                                         k.clone(),
-                                        example_value_for_schema(
-                                            api,
-                                            &v.resolve(api).expect("Could not resolve schema."),
-                                            recursion_depth + 1,
-                                        )?,
+                                        example_value_for_schema(api, v, recursion_depth + 1)?,
                                     ))
                                 })
                                 .collect(),
@@ -850,28 +837,13 @@ fn interesting_values_for_type(
                                 return schema.examples.clone();
                             }
 
-                            let items_schema = *schema
+                            let items_schema = schema
                                 .items
-                                .clone()
+                                .as_deref()
                                 .expect("Array-schema should have a schema for its items.");
-                            let item_value = match items_schema {
-                                oas3::spec::Schema::Boolean(boolean_schema) => {
-                                    match &boolean_schema.0 {
-                                        true => Value::Object(Default::default()),
-                                        false => Value::Null,
-                                    }
-                                }
-                                oas3::spec::Schema::Object(object_or_reference) => {
-                                    example_value_for_schema(
-                                        api,
-                                        &object_or_reference
-                                            .resolve(api)
-                                            .expect("Could not resolve schema."),
-                                        recursion_depth + 1,
-                                    )
-                                    .unwrap_or_default()
-                                }
-                            };
+                            let item_value =
+                                example_value_for_schema(api, items_schema, recursion_depth + 1)
+                                    .unwrap_or_default();
                             // Repeat the example. If a maximum number of array elements is specified,
                             // we use that many, otherwise the minimum number, otherwise 3.
                             vec![Value::Array(vec![
@@ -984,11 +956,7 @@ fn example_value_for_type(
                 .filter_map(|(k, v)| {
                     Some((
                         k.clone(),
-                        example_value_for_schema(
-                            api,
-                            &v.resolve(api).expect("Could not resolve schema."),
-                            recursion_depth + 1,
-                        )?,
+                        example_value_for_schema(api, v, recursion_depth + 1)?,
                     ))
                 })
                 .collect(),

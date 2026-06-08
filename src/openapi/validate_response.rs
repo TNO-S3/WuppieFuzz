@@ -291,13 +291,13 @@ pub fn validate_response(
         .schema
         .as_ref()
         .ok_or_else(|| ValidationError::MediaTypeContainsNoSchema)?;
-    let response_schema = resolve_ref_or_validation_error(ref_or_response_schema, api)?;
+    let response_schema = ref_or_response_schema;
 
     let response_contents = response
         .json()
         .map_err(|e| ValidationError::ResponseMalformedJSON { error: e })?;
 
-    validate_object_against_object_schema(api, &response_schema, &response_contents)
+    validate_object_against_schema(api, response_schema, &response_contents)
 }
 
 /// Validates whether an object is correct according to a schema.
@@ -311,11 +311,32 @@ fn validate_object_against_schema(
     match schema {
         Schema::Boolean(BooleanSchema(true)) => Ok(()),
         Schema::Boolean(BooleanSchema(false)) => Err(ValidationError::SchemaIsFalse),
-        Schema::Object(object_or_reference) => validate_object_against_object_schema(
-            api,
-            &resolve_ref_or_validation_error(object_or_reference, api)?,
-            response_contents,
-        ),
+        Schema::Object(object_or_reference) => {
+            let resolved = Schema::Object(object_or_reference.clone())
+                .resolve(api)
+                .map_err(|err| ValidationError::ResponseReferenceBroken {
+                    reference: "schema".to_owned(),
+                    inner_err: err.into(),
+                })?;
+            match resolved {
+                Schema::Boolean(boolean_schema) => validate_object_against_schema(
+                    api,
+                    &Schema::Boolean(boolean_schema),
+                    response_contents,
+                ),
+                Schema::Object(object_or_reference) => match *object_or_reference {
+                    ObjectOrReference::Object(schema) => {
+                        validate_object_against_object_schema(api, &schema, response_contents)
+                    }
+                    ObjectOrReference::Ref { ref_path, .. } => {
+                        Err(ValidationError::ResponseReferenceBroken {
+                            reference: ref_path,
+                            inner_err: anyhow::anyhow!("Unresolved schema reference"),
+                        })
+                    }
+                },
+            }
+        }
     }
 }
 
@@ -377,15 +398,10 @@ fn validate_object_against_object_schema(
 /// schema
 fn validate_object_against_ref_or_schema(
     api: &Spec,
-    ref_or_schema: &ObjectOrReference<ObjectSchema>,
+    schema: &Schema,
     response_contents: &Value,
 ) -> Result<(), ValidationError> {
-    // First resolve the ReferenceOr object using the API ... and then use the schema to validate the given response
-    validate_object_against_object_schema(
-        api,
-        &resolve_ref_or_validation_error(ref_or_schema, api)?,
-        response_contents,
-    )
+    validate_object_against_schema(api, schema, response_contents)
 }
 
 /// Validates whether an object is correct according to a type set
@@ -468,17 +484,18 @@ fn validate_object_against_type(
             // and if it matches the schema. If we find no schema, we assume that is
             // because the field shouldn't be there
             for (key, value) in o_map.iter() {
-                let item_schema: ObjectSchema = match schema.properties.get(key) {
-                    Some(ref_or) => resolve_ref_or_validation_error(ref_or,api).map_err(|err| err.nested(key))?,
+                let item_schema = match schema.properties.get(key) {
+                    Some(item_schema) => item_schema,
                     None => {
                         return make_err(format!(
                             "Object property \"{key}\" in response not expected \
                             in specified object schema. Expected properties: {:?}",
                             schema.properties,
-                        )).map_err(|err| err.nested(key));
+                        ))
+                        .map_err(|err| err.nested(key));
                     }
                 };
-                validate_object_against_object_schema(api, &item_schema, value)
+                validate_object_against_schema(api, item_schema, value)
                     .map_err(|err| err.nested(key))?;
             }
 

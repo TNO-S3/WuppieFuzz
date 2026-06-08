@@ -1,8 +1,11 @@
-use std::{collections::BTreeMap, fmt::Debug};
+use std::fmt::Debug;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use oas3::spec::{MediaType, Operation, Server};
+use oas3::{
+    Map,
+    spec::{MediaType, Operation, Server},
+};
 
 use crate::{configuration::Configuration, input::Method, openapi::spec::Spec};
 
@@ -25,8 +28,8 @@ pub fn parse_api_spec(config: &'static Configuration) -> Result<Box<Spec>, anyho
         api.servers = vec![Server {
             url: server_override.as_str().trim_end_matches('/').to_string(),
             description: None,
-            variables: BTreeMap::new(),
-            extensions: BTreeMap::new(),
+            variables: Default::default(),
+            extensions: Default::default(),
         }];
     }
     Ok(api)
@@ -87,6 +90,13 @@ impl JsonContent for std::collections::BTreeMap<String, MediaType> {
     }
 }
 
+impl JsonContent for Map<String, MediaType> {
+    fn get_json_content(&self) -> Option<&MediaType> {
+        self.iter()
+            .find_map(|(key, value)| key.starts_with("application/json").then_some(value))
+    }
+}
+
 pub trait WwwForm {
     fn get_www_form_content(&self) -> Option<&MediaType>;
 }
@@ -100,7 +110,16 @@ impl WwwForm for IndexMap<String, MediaType> {
     }
 }
 
-impl WwwForm for BTreeMap<String, MediaType> {
+impl WwwForm for std::collections::BTreeMap<String, MediaType> {
+    fn get_www_form_content(&self) -> Option<&MediaType> {
+        self.iter().find_map(|(key, value)| {
+            key.starts_with("application/x-www-form-urlencoded")
+                .then_some(value)
+        })
+    }
+}
+
+impl WwwForm for Map<String, MediaType> {
     fn get_www_form_content(&self) -> Option<&MediaType> {
         self.iter().find_map(|(key, value)| {
             key.starts_with("application/x-www-form-urlencoded")
