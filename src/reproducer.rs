@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path};
+use std::path::Path;
 
 use anyhow::Result;
 #[allow(unused_imports)]
@@ -35,8 +35,8 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
         api.servers = vec![Server {
             url: server_override.as_str().trim_end_matches('/').to_string(),
             description: None,
-            variables: BTreeMap::new(),
-            extensions: BTreeMap::new(),
+            variables: Default::default(),
+            extensions: Default::default(),
         }];
     }
     let inputs = OpenApiInput::from_file(input_file)?;

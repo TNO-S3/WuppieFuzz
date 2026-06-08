@@ -6,10 +6,13 @@
 //! in an accessble form. We choose the `oas3` version as the one we use throughout
 //! the fuzzer. Most of this module is therefore conversion code.
 
-use std::{collections::BTreeMap, default::Default};
+use std::default::Default;
 
 use indexmap::IndexMap;
-use oas3::spec::{ObjectOrReference, Operation};
+use oas3::{
+    Map,
+    spec::{ObjectOrReference, Operation},
+};
 use serde_json::Number;
 
 pub mod load;
@@ -136,9 +139,7 @@ fn convert_servers(servers: Vec<openapiv3::Server>) -> Vec<oas3::spec::Server> {
 }
 
 /// Converts the "paths" key of the API spec.
-fn convert_paths(
-    paths: openapiv3::Paths,
-) -> Option<std::collections::BTreeMap<String, oas3::spec::PathItem>> {
+fn convert_paths(paths: openapiv3::Paths) -> Option<Map<String, oas3::spec::PathItem>> {
     if paths.is_empty() {
         return None;
     }
@@ -176,7 +177,7 @@ fn convert_paths(
 /// Converts the "components" key of the API spec.
 fn convert_components(components: openapiv3::Components) -> Option<oas3::spec::Components> {
     Some(oas3::spec::Components {
-        schemas: convert_ref_map(components.schemas, &convert_schema),
+        schemas: convert_schema_map(components.schemas),
         responses: convert_ref_map(components.responses, &convert_response),
         parameters: convert_ref_map(components.parameters, &convert_parameter),
         examples: convert_ref_map(components.examples, &convert_example),
@@ -248,8 +249,8 @@ fn convert_request_body(body: openapiv3::RequestBody) -> oas3::spec::RequestBody
 
 fn convert_responses(
     responses: openapiv3::Responses,
-) -> Option<BTreeMap<String, oas3::spec::ObjectOrReference<oas3::spec::Response>>> {
-    let mut new_responses: BTreeMap<String, oas3::spec::ObjectOrReference<oas3::spec::Response>> =
+) -> Option<Map<String, oas3::spec::ObjectOrReference<oas3::spec::Response>>> {
+    let mut new_responses: Map<String, oas3::spec::ObjectOrReference<oas3::spec::Response>> =
         responses
             .responses
             .into_iter()
@@ -276,7 +277,7 @@ fn convert_response(response: openapiv3::Response) -> oas3::spec::Response {
 
 fn convert_map_media_type(
     map_media: IndexMap<String, openapiv3::MediaType>,
-) -> BTreeMap<String, oas3::spec::MediaType> {
+) -> Map<String, oas3::spec::MediaType> {
     map_media
         .into_iter()
         .map(|(key, value)| (key, convert_media_type(value)))
@@ -299,10 +300,19 @@ fn convert_media_type(media_type: openapiv3::MediaType) -> oas3::spec::MediaType
 
 /// This is really a shorthand for `convert_reference` with `convert_schema`,
 /// but we use it so often that this saves space and readability.
-fn convert_ref_schema(
-    ref_schema: openapiv3::RefOr<openapiv3::Schema>,
-) -> oas3::spec::ObjectOrReference<oas3::spec::ObjectSchema> {
-    convert_reference(ref_schema, convert_schema)
+fn convert_ref_schema(ref_schema: openapiv3::RefOr<openapiv3::Schema>) -> oas3::spec::Schema {
+    match ref_schema {
+        openapiv3::Ref::Item(item) => oas3::spec::Schema::Object(Box::new(
+            oas3::spec::ObjectOrReference::Object(convert_schema(item)),
+        )),
+        openapiv3::Ref::Reference { reference } => {
+            oas3::spec::Schema::Object(Box::new(oas3::spec::ObjectOrReference::Ref {
+                ref_path: reference,
+                summary: None,
+                description: None,
+            }))
+        }
+    }
 }
 
 /// Applies metadata from `openapiv3::SchemaData` onto an `oas3::spec::ObjectSchema`.
@@ -335,7 +345,7 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
         }
         openapiv3::SchemaKind::OneOf { one_of } => {
             let mut schema = oas3::spec::ObjectSchema {
-                one_of: convert_vec_ref(one_of, &convert_schema),
+                one_of: convert_vec_schema(one_of),
                 ..Default::default()
             };
             apply_schema_data(&mut schema, data);
@@ -343,7 +353,7 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
         }
         openapiv3::SchemaKind::AllOf { all_of } => {
             let mut schema = oas3::spec::ObjectSchema {
-                all_of: convert_vec_ref(all_of, &convert_schema),
+                all_of: convert_vec_schema(all_of),
                 ..Default::default()
             };
             apply_schema_data(&mut schema, data);
@@ -351,7 +361,7 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
         }
         openapiv3::SchemaKind::AnyOf { any_of } => {
             let mut schema = oas3::spec::ObjectSchema {
-                any_of: convert_vec_ref(any_of, &convert_schema),
+                any_of: convert_vec_schema(any_of),
                 ..Default::default()
             };
             apply_schema_data(&mut schema, data);
@@ -365,12 +375,8 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
             let (minimum, exclusive_minimum, maximum, exclusive_maximum) =
                 split_min_max(&any_schema);
 
-            let mut properties: BTreeMap<
-                String,
-                oas3::spec::ObjectOrReference<oas3::spec::ObjectSchema>,
-            > = BTreeMap::new();
+            let mut properties: Map<String, oas3::spec::Schema> = Map::new();
             for (name, ref_or_schema) in any_schema.properties.into_iter() {
-                // Assuming `RefOrMap` yields (&String, &RefOr<Schema>)
                 properties.insert(name, convert_ref_schema(ref_or_schema));
             }
 
@@ -380,15 +386,14 @@ fn convert_schema(schema: openapiv3::Schema) -> oas3::spec::ObjectSchema {
             //
             // Without your `Schema` converter, we leave `items` as None. If you have one, plug it in here.
             let items = None::<Box<oas3::spec::Schema>>;
-            let prefix_items =
-                Vec::<oas3::spec::ObjectOrReference<oas3::spec::ObjectSchema>>::new();
+            let prefix_items = Vec::<oas3::spec::Schema>::new();
 
             let nullable = data.nullable;
             let mut schema = oas3::spec::ObjectSchema {
                 // Compositions
-                all_of: convert_vec_ref(any_schema.all_of, &convert_schema),
-                any_of: convert_vec_ref(any_schema.any_of, &convert_schema),
-                one_of: convert_vec_ref(any_schema.one_of, &convert_schema),
+                all_of: convert_vec_schema(any_schema.all_of),
+                any_of: convert_vec_schema(any_schema.any_of),
+                one_of: convert_vec_schema(any_schema.one_of),
 
                 // Arrays / tuples
                 items,
@@ -493,7 +498,11 @@ fn convert_elementary_type(r#type: openapiv3::Type) -> oas3::spec::ObjectSchema 
         }
         openapiv3::Type::Object(object_type) => ObjectSchema {
             schema_type: Some(SchemaTypeSet::Single(SchemaType::Object)),
-            properties: convert_ref_map(object_type.properties, &convert_schema),
+            properties: object_type
+                .properties
+                .into_iter()
+                .map(|(key, value)| (key, convert_ref_schema(value)))
+                .collect(),
             required: object_type.required,
             min_properties: object_type.min_properties.map(|v| v as u64),
             max_properties: object_type.max_properties.map(|v| v as u64),
@@ -501,11 +510,9 @@ fn convert_elementary_type(r#type: openapiv3::Type) -> oas3::spec::ObjectSchema 
         },
         openapiv3::Type::Array(array_type) => ObjectSchema {
             schema_type: Some(SchemaTypeSet::Single(SchemaType::Array)),
-            items: array_type.items.map(|boxed_ref_schema| {
-                Box::new(oas3::spec::Schema::Object(Box::new(convert_ref_schema(
-                    *boxed_ref_schema,
-                ))))
-            }),
+            items: array_type
+                .items
+                .map(|boxed_ref_schema| Box::new(convert_ref_schema(*boxed_ref_schema))),
             min_items: array_type.min_items.map(|v| v as u64),
             max_items: array_type.max_items.map(|v| v as u64),
             unique_items: Some(array_type.unique_items),
@@ -598,10 +605,25 @@ fn convert_vec_ref<T, U>(
 fn convert_ref_map<T, U>(
     ref_map: openapiv3::RefMap<T>,
     converter: &impl Fn(T) -> U,
-) -> BTreeMap<String, oas3::spec::ObjectOrReference<U>> {
+) -> Map<String, oas3::spec::ObjectOrReference<U>> {
     ref_map
         .into_iter()
         .map(|(key, value)| (key, convert_reference(value, converter)))
+        .collect()
+}
+
+fn convert_vec_schema(
+    vec_ref: Vec<openapiv3::RefOr<openapiv3::Schema>>,
+) -> Vec<oas3::spec::Schema> {
+    vec_ref.into_iter().map(convert_ref_schema).collect()
+}
+
+fn convert_schema_map(
+    ref_map: openapiv3::RefMap<openapiv3::Schema>,
+) -> Map<String, oas3::spec::Schema> {
+    ref_map
+        .into_iter()
+        .map(|(key, value)| (key, convert_ref_schema(value)))
         .collect()
 }
 
@@ -682,9 +704,10 @@ impl HasMinMax for openapiv3::IntegerType {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
-    use oas3::spec::{Info, ObjectOrReference, Operation, Parameter, PathItem};
+    use oas3::{
+        Map,
+        spec::{Info, ObjectOrReference, Operation, Parameter, PathItem},
+    };
     use reqwest::Method;
 
     // Test whether a common parameter is added to the parameters of specific operations during simplification:
@@ -693,7 +716,7 @@ mod tests {
     // - Common parameter is not added to an operation that is not specified
     #[test]
     fn test_simplify() {
-        let mut test_paths = BTreeMap::new();
+        let mut test_paths = Map::new();
         test_paths.insert(
             "test_path".to_string(),
             PathItem {

@@ -85,15 +85,22 @@ mod tests {
         openapi_from_file(file.path()).expect("Failed to load spec")
     }
 
+    fn schema_object(schema: &oas3::spec::Schema) -> &oas3::spec::ObjectSchema {
+        match schema {
+            oas3::spec::Schema::Boolean(_) => panic!("Expected object schema, got boolean schema"),
+            oas3::spec::Schema::Object(schema_ref) => match schema_ref.as_ref() {
+                oas3::spec::ObjectOrReference::Object(schema) => schema,
+                oas3::spec::ObjectOrReference::Ref { .. } => {
+                    panic!("Expected concrete schema, got $ref")
+                }
+            },
+        }
+    }
+
     /// Helper: given a loaded Spec, find the schema for a given component name.
     fn get_component_schema<'a>(spec: &'a Spec, name: &str) -> &'a oas3::spec::ObjectSchema {
         let components = spec.components.as_ref().expect("spec has no components");
-        match components.schemas.get(name).expect("schema not found") {
-            oas3::spec::ObjectOrReference::Object(schema) => schema,
-            oas3::spec::ObjectOrReference::Ref { .. } => {
-                panic!("Expected concrete schema, got $ref")
-            }
-        }
+        schema_object(components.schemas.get(name).expect("schema not found"))
     }
 
     /// Verifies that schema-level `example` (singular, v3.0 keyword) is preserved
@@ -169,10 +176,7 @@ components:
         );
 
         // Nested property example
-        let name_schema = match user.properties.get("name").unwrap() {
-            oas3::spec::ObjectOrReference::Object(s) => s,
-            _ => panic!("Expected concrete schema for nested property"),
-        };
+        let name_schema = schema_object(user.properties.get("name").unwrap());
         assert_eq!(
             name_schema.example,
             Some(serde_json::json!("nested@example.com")),
@@ -365,8 +369,8 @@ paths:
         // Schema-level example (nested inside the parameter's schema)
         // oas3 stores v3.0's singular `example` in the deprecated `example` field
         let schema = match &param.schema {
-            Some(oas3::spec::ObjectOrReference::Object(s)) => s,
-            _ => panic!("Expected concrete schema on parameter"),
+            Some(s) => schema_object(s),
+            None => panic!("Expected concrete schema on parameter"),
         };
         assert_eq!(
             schema.example,
@@ -442,13 +446,10 @@ paths:
             .resolve(&spec)
             .expect("could not resolve body");
         let wrapper_schema = match &body.content.iter().next().unwrap().1.schema {
-            Some(oas3::spec::ObjectOrReference::Object(s)) => s,
-            _ => panic!("Expected concrete schema on request body"),
+            Some(s) => schema_object(s),
+            None => panic!("Expected concrete schema on request body"),
         };
-        let body_schema = match wrapper_schema.properties.get("body").unwrap() {
-            oas3::spec::ObjectOrReference::Object(s) => s,
-            _ => panic!("Expected concrete schema for 'body' property"),
-        };
+        let body_schema = schema_object(wrapper_schema.properties.get("body").unwrap());
         assert!(
             body_schema
                 .examples
@@ -458,10 +459,7 @@ paths:
         );
 
         // Nested property example
-        let query_prop = match body_schema.properties.get("query").unwrap() {
-            oas3::spec::ObjectOrReference::Object(s) => s,
-            _ => panic!("Expected concrete schema for 'query'"),
-        };
+        let query_prop = schema_object(body_schema.properties.get("query").unwrap());
         assert!(
             query_prop
                 .examples
@@ -471,14 +469,8 @@ paths:
         );
 
         // Deeply nested property example (options.limit)
-        let options_prop = match body_schema.properties.get("options").unwrap() {
-            oas3::spec::ObjectOrReference::Object(s) => s,
-            _ => panic!("Expected concrete schema for 'options'"),
-        };
-        let limit_prop = match options_prop.properties.get("limit").unwrap() {
-            oas3::spec::ObjectOrReference::Object(s) => s,
-            _ => panic!("Expected concrete schema for 'options.limit'"),
-        };
+        let options_prop = schema_object(body_schema.properties.get("options").unwrap());
+        let limit_prop = schema_object(options_prop.properties.get("limit").unwrap());
         assert!(
             limit_prop.examples.contains(&serde_json::json!(50)),
             "Deeply nested example lost. examples: {:?}",
@@ -547,14 +539,9 @@ components:
         let openapiv3_components = spec_via_openapiv3.components.as_ref().unwrap();
 
         for schema_name in ["Item", "Status"] {
-            let oas3_schema = match oas3_components.schemas.get(schema_name).unwrap() {
-                oas3::spec::ObjectOrReference::Object(s) => s,
-                _ => panic!("Expected Object for {schema_name} in oas3 path"),
-            };
-            let openapiv3_schema = match openapiv3_components.schemas.get(schema_name).unwrap() {
-                oas3::spec::ObjectOrReference::Object(s) => s,
-                _ => panic!("Expected Object for {schema_name} in openapiv3 path"),
-            };
+            let oas3_schema = schema_object(oas3_components.schemas.get(schema_name).unwrap());
+            let openapiv3_schema =
+                schema_object(openapiv3_components.schemas.get(schema_name).unwrap());
 
             // oas3 path stores v3.0's singular `example` in deprecated `example` field,
             // openapiv3 conversion stores it in the v3.1 `examples` Vec.
@@ -584,23 +571,11 @@ components:
         }
 
         // Compare nested property schemas
-        let oas3_item = match oas3_components.schemas.get("Item").unwrap() {
-            oas3::spec::ObjectOrReference::Object(s) => s,
-            _ => unreachable!(),
-        };
-        let openapiv3_item = match openapiv3_components.schemas.get("Item").unwrap() {
-            oas3::spec::ObjectOrReference::Object(s) => s,
-            _ => unreachable!(),
-        };
+        let oas3_item = schema_object(oas3_components.schemas.get("Item").unwrap());
+        let openapiv3_item = schema_object(openapiv3_components.schemas.get("Item").unwrap());
         for prop_name in ["name", "price"] {
-            let oas3_prop = match oas3_item.properties.get(prop_name).unwrap() {
-                oas3::spec::ObjectOrReference::Object(s) => s,
-                _ => panic!("Missing property '{prop_name}' in oas3 path"),
-            };
-            let openapiv3_prop = match openapiv3_item.properties.get(prop_name).unwrap() {
-                oas3::spec::ObjectOrReference::Object(s) => s,
-                _ => panic!("Missing property '{prop_name}' in openapiv3 path"),
-            };
+            let oas3_prop = schema_object(oas3_item.properties.get(prop_name).unwrap());
+            let openapiv3_prop = schema_object(openapiv3_item.properties.get(prop_name).unwrap());
             let oas3_example = oas3_prop.example.clone();
             let openapiv3_examples = &openapiv3_prop.examples;
             if let Some(ex) = &oas3_example {
@@ -645,12 +620,12 @@ components:
             oas3_param.example, openapiv3_param.example
         );
         let oas3_param_schema = match &oas3_param.schema {
-            Some(oas3::spec::ObjectOrReference::Object(s)) => s,
-            _ => panic!("Expected concrete schema on id param in oas3 path"),
+            Some(s) => schema_object(s),
+            None => panic!("Expected concrete schema on id param in oas3 path"),
         };
         let openapiv3_param_schema = match &openapiv3_param.schema {
-            Some(oas3::spec::ObjectOrReference::Object(s)) => s,
-            _ => panic!("Expected concrete schema on id param in openapiv3 path"),
+            Some(s) => schema_object(s),
+            None => panic!("Expected concrete schema on id param in openapiv3 path"),
         };
         let oas3_param_example = oas3_param_schema.example.clone();
         let openapiv3_param_examples = &openapiv3_param_schema.examples;
