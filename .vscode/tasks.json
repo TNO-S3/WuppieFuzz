@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "cargo test --workspace",
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "validate (stable)",
+      "type": "shell",
+      "command": "cargo fmt --all && cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --workspace",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "validate (nightly)",
+      "type": "shell",
+      "command": "cargo +nightly fmt --all && cargo +nightly fmt --all -- --check && cargo +nightly clippy --all-targets --all-features -- -D warnings && cargo +nightly test --workspace",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": ["$rustc"]
+    }
+  ]
+}
