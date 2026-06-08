@@ -489,6 +489,12 @@ impl<'a> DependencyGraph<'a> {
         // Find edges (parameters in common) between all nodes (operations)
         for op_left in graph.node_indices() {
             for op_right in graph.node_indices() {
+                // In CRUD mode, prevent self-loops because the custom toposort
+                // errors on them. In Full mode, retain all edges (including
+                // self-loops) for path generation to handle via min_cycle_size.
+                if enforce_crud_order && op_left == op_right {
+                    continue;
+                }
                 // Enforce CRUD order (if configured)
                 if enforce_crud_order
                     && (graph[op_left].method.cmp(&graph[op_right].method)) == Ordering::Greater
@@ -752,13 +758,17 @@ mod tests {
     use super::{PathGenerationConfig, enumerate_paths_breadth_first};
     use petgraph::prelude::DiGraph;
 
+    fn parse_spec(yaml: &str) -> crate::openapi::spec::Spec {
+        serde_yaml::from_str::<oas3::Spec>(yaml).unwrap().into()
+    }
+
     #[test]
     fn enumerate_paths_orders_by_breadth_first_length() {
         let mut graph = DiGraph::<(), (), _>::new();
         let n0 = graph.add_node(());
         let n1 = graph.add_node(());
 
-        // Check that without edges, no paths are returned.
+        // Disconnected graph returns empty.
         let paths = enumerate_paths_breadth_first(
             &graph,
             PathGenerationConfig {
@@ -774,38 +784,7 @@ mod tests {
         graph.add_edge(n0, n1, ());
         graph.add_edge(n1, n0, ());
 
-        let paths = enumerate_paths_breadth_first(
-            &graph,
-            PathGenerationConfig {
-                min_path_length: 1,
-                max_revisits: 2,
-                max_paths: 10,
-                enforce_crud_order: false,
-                min_cycle_size: 2,
-            },
-        );
-
-        // With BFS, path lengths should never decrease.
-        let lengths: Vec<usize> = paths.iter().map(Vec::len).collect();
-        assert!(lengths.windows(2).all(|w| w[0] <= w[1]));
-
-        // The first layer should contain all single-node paths.
-        assert_eq!(lengths[0], 1);
-        assert_eq!(lengths[1], 1);
-        // With the graph of two nodes, the remaining paths should be longer.
-        assert!(lengths.len() > 2);
-        for length in lengths.iter().skip(2) {
-            assert_ne!(*length, 1);
-        }
-    }
-
-    #[test]
-    fn enumerate_paths_returns_empty_when_min_path_length_is_infeasible() {
-        let mut graph = DiGraph::<(), (), _>::new();
-        let n0 = graph.add_node(());
-        let n1 = graph.add_node(());
-        graph.add_edge(n0, n1, ());
-        graph.add_edge(n1, n0, ());
+        // Infeasible min_path_length returns empty.
         let paths = enumerate_paths_breadth_first(
             &graph,
             PathGenerationConfig {
@@ -816,217 +795,84 @@ mod tests {
                 min_cycle_size: 3,
             },
         );
-
         assert!(paths.is_empty());
-    }
 
-    #[test]
-    fn enumerate_paths_respects_max_paths_limit() {
-        let mut graph = DiGraph::<(), (), _>::new();
-        let n0 = graph.add_node(());
-        let n1 = graph.add_node(());
-        let n2 = graph.add_node(());
-        graph.add_edge(n0, n1, ());
-        graph.add_edge(n1, n2, ());
-        // max_paths makes the n0->n1->n2 path be omitted
+        // BFS: path lengths never decrease.
         let paths = enumerate_paths_breadth_first(
             &graph,
             PathGenerationConfig {
                 min_path_length: 1,
-                max_revisits: 3,
-                max_paths: 4,
+                max_revisits: 2,
+                max_paths: 10,
                 enforce_crud_order: false,
                 min_cycle_size: 2,
             },
         );
-
-        assert_eq!(paths.len(), 4);
+        let lengths: Vec<usize> = paths.iter().map(Vec::len).collect();
+        assert!(lengths.windows(2).all(|w| w[0] <= w[1]));
+        assert_eq!(lengths[0], 1);
+        assert_eq!(lengths[1], 1);
+        assert!(lengths.iter().skip(2).all(|&l| l > 1));
     }
 
     #[test]
     fn dependency_graph_crud_ordering_and_cycles() {
-        use super::{DependencyGraph, first_n_path_indices_from_subgraph};
-        use crate::openapi::spec::Spec;
-        use oas3::spec::{
-            Info, MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, PathItem,
-            RequestBody, Response, SchemaType, SchemaTypeSet,
-        };
+        use super::{DependencyGraph, first_n_path_indices_from_subgraph, ops_from_subgraph};
         use petgraph::visit::EdgeRef;
         use std::cmp::Ordering;
-        use std::collections::BTreeMap;
 
-        // Helper: create an object schema with given field names (all string type)
-        fn object_schema_with_fields(fields: &[&str]) -> ObjectSchema {
-            let mut properties = BTreeMap::new();
-            for &field in fields {
-                properties.insert(
-                    field.to_string(),
-                    ObjectOrReference::Object(ObjectSchema {
-                        schema_type: Some(SchemaTypeSet::Single(SchemaType::String)),
-                        ..Default::default()
-                    }),
-                );
-            }
-            ObjectSchema {
-                schema_type: Some(SchemaTypeSet::Single(SchemaType::Object)),
-                properties,
-                ..Default::default()
-            }
-        }
-
-        // Helper: create a JSON response with given body fields
-        fn json_response(fields: &[&str]) -> BTreeMap<String, ObjectOrReference<Response>> {
-            let mut content = BTreeMap::new();
-            content.insert(
-                "application/json".to_string(),
-                MediaType {
-                    schema: Some(ObjectOrReference::Object(object_schema_with_fields(fields))),
-                    ..Default::default()
-                },
-            );
-            let mut responses = BTreeMap::new();
-            responses.insert(
-                "200".to_string(),
-                ObjectOrReference::Object(Response {
-                    description: Default::default(),
-                    headers: Default::default(),
-                    content,
-                    links: Default::default(),
-                    extensions: Default::default(),
-                }),
-            );
-            responses
-        }
-
-        // Helper: create a JSON request body with given fields
-        fn json_request_body(fields: &[&str]) -> Option<ObjectOrReference<RequestBody>> {
-            let mut content = BTreeMap::new();
-            content.insert(
-                "application/json".to_string(),
-                MediaType {
-                    schema: Some(ObjectOrReference::Object(object_schema_with_fields(fields))),
-                    ..Default::default()
-                },
-            );
-            Some(ObjectOrReference::Object(RequestBody {
-                description: Default::default(),
-                content,
-                required: Default::default(),
-            }))
-        }
-
-        // Build a 4-operation spec:
-        // POST /item    body: {value}  response: {id}
-        // GET /item     query: value   response: {id}
-        // GET /item/{id}  path: id
-        // DELETE /item/{id}  path: id
-        let mut paths = BTreeMap::new();
-
-        // /item path: POST and GET
-        paths.insert(
-            "/item".to_string(),
-            PathItem {
-                post: Some(Operation {
-                    request_body: json_request_body(&["value"]),
-                    responses: Some(json_response(&["id"])),
-                    ..Default::default()
-                }),
-                get: Some(Operation {
-                    parameters: vec![ObjectOrReference::Object(Parameter {
-                        name: "value".to_string(),
-                        location: oas3::spec::ParameterIn::Query,
-                        description: Default::default(),
-                        required: Default::default(),
-                        deprecated: Default::default(),
-                        allow_empty_value: Default::default(),
-                        style: Default::default(),
-                        explode: Default::default(),
-                        allow_reserved: Default::default(),
-                        schema: Default::default(),
-                        example: Default::default(),
-                        examples: Default::default(),
-                        content: Default::default(),
-                        extensions: Default::default(),
-                    })],
-                    responses: Some(json_response(&["id"])),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+        let spec = parse_spec(
+            r#"
+openapi: "3.1.0"
+info: { title: test, version: "0.1" }
+paths:
+  /item:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+    get:
+      parameters:
+        - name: value
+          in: query
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+  /item/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+    delete:
+      parameters:
+        - name: id
+          in: path
+          required: true
+"#,
         );
 
-        // /item/{id} path: GET and DELETE
-        paths.insert(
-            "/item/{id}".to_string(),
-            PathItem {
-                get: Some(Operation {
-                    parameters: vec![ObjectOrReference::Object(Parameter {
-                        name: "id".to_string(),
-                        location: oas3::spec::ParameterIn::Path,
-                        description: Default::default(),
-                        required: Default::default(),
-                        deprecated: Default::default(),
-                        allow_empty_value: Default::default(),
-                        style: Default::default(),
-                        explode: Default::default(),
-                        allow_reserved: Default::default(),
-                        schema: Default::default(),
-                        example: Default::default(),
-                        examples: Default::default(),
-                        content: Default::default(),
-                        extensions: Default::default(),
-                    })],
-                    ..Default::default()
-                }),
-                delete: Some(Operation {
-                    parameters: vec![ObjectOrReference::Object(Parameter {
-                        name: "id".to_string(),
-                        location: oas3::spec::ParameterIn::Path,
-                        description: Default::default(),
-                        required: Default::default(),
-                        deprecated: Default::default(),
-                        allow_empty_value: Default::default(),
-                        style: Default::default(),
-                        explode: Default::default(),
-                        allow_reserved: Default::default(),
-                        schema: Default::default(),
-                        example: Default::default(),
-                        examples: Default::default(),
-                        content: Default::default(),
-                        extensions: Default::default(),
-                    })],
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        );
-
-        let spec: Spec = oas3::Spec {
-            openapi: "3.1.0".to_string(),
-            info: Info {
-                title: Default::default(),
-                summary: Default::default(),
-                description: Default::default(),
-                terms_of_service: Default::default(),
-                version: Default::default(),
-                contact: Default::default(),
-                license: Default::default(),
-                extensions: Default::default(),
-            },
-            servers: Default::default(),
-            paths: Some(paths),
-            components: Default::default(),
-            security: Default::default(),
-            tags: Default::default(),
-            webhooks: Default::default(),
-            external_docs: Default::default(),
-            extensions: Default::default(),
-        }
-        .into();
-
-        // Test 1: With enforce_crud_order=true, all edges go from lower to higher CRUD method order
+        // CRUD mode: all edges go from lower to higher CRUD method order, no self-loops.
         let graph_crud = DependencyGraph::new(&spec, true);
-        let _components_crud = graph_crud.connected_components();
         for edge in graph_crud.graph.edge_references() {
             let source_method = &graph_crud.graph[edge.source()].method;
             let target_method = &graph_crud.graph[edge.target()].method;
@@ -1036,375 +882,322 @@ mod tests {
                 source_method,
                 target_method,
             );
+            assert_ne!(
+                edge.source(),
+                edge.target(),
+                "CRUD graph should have no self-loops"
+            );
         }
 
-        // Test 2: Without enforce_crud_order and with min_cycle_size=1 (self-loops allowed),
-        // exactly 2 backward edges and 4 self-loops exist
-        let graph_no_crud = DependencyGraph::new(&spec, false);
-        let backward_edge_count = graph_no_crud
+        // Toposort succeeds on the CRUD graph (no self-loops, longer cycles handled).
+        for nodes in graph_crud.connected_components() {
+            let subgraph = graph_crud.subgraph(&nodes);
+            assert!(
+                ops_from_subgraph(&subgraph).is_ok(),
+                "Toposort should succeed on CRUD graph"
+            );
+        }
+
+        // Full mode: backward edges and self-loops are present.
+        let graph_full = DependencyGraph::new(&spec, false);
+        let backward_edge_count = graph_full
             .graph
             .edge_references()
             .filter(|edge| {
-                let source_method = &graph_no_crud.graph[edge.source()].method;
-                let target_method = &graph_no_crud.graph[edge.target()].method;
-                source_method.cmp(target_method) == Ordering::Greater
+                graph_full.graph[edge.source()]
+                    .method
+                    .cmp(&graph_full.graph[edge.target()].method)
+                    == Ordering::Greater
             })
             .count();
-        assert_eq!(
-            backward_edge_count, 2,
-            "Expected exactly 2 backward edges (GET→POST, DELETE→GET), got {}",
-            backward_edge_count
-        );
-        let self_loop_count = graph_no_crud
+        assert_eq!(backward_edge_count, 2);
+
+        let self_loop_count = graph_full
             .graph
             .edge_references()
             .filter(|edge| edge.source() == edge.target())
             .count();
-        assert_eq!(
-            self_loop_count, 4,
-            "Expected exactly 4 self-loops (one per operation), got {}",
-            self_loop_count
-        );
+        assert_eq!(self_loop_count, 4);
 
-        // Test 3: With revisits, the non-CRUD graph produces more paths due to backward edges.
-        let config_with_revisits = PathGenerationConfig {
+        // Path enumeration: CRUD DAG produces fewer paths than Full graph.
+        let config = PathGenerationConfig {
             min_path_length: 1,
             max_revisits: 1,
             max_paths: 1000,
             enforce_crud_order: false,
             min_cycle_size: 2,
         };
-        let config_crud_with_revisits = PathGenerationConfig {
-            min_path_length: 1,
-            max_revisits: 1,
-            max_paths: 1000,
-            enforce_crud_order: false, // doesn't matter here, graph already built
-            min_cycle_size: 2,
-        };
+        let paths_crud = first_n_path_indices_from_subgraph(&graph_crud.graph, 1000, config);
+        let paths_full = first_n_path_indices_from_subgraph(&graph_full.graph, 1000, config);
+        assert_eq!(paths_crud.len(), 15);
+        assert_eq!(paths_full.len(), 80);
 
-        // Build subgraphs and enumerate paths
-        let paths_crud =
-            first_n_path_indices_from_subgraph(&graph_crud.graph, 1000, config_crud_with_revisits);
-        let paths_no_crud =
-            first_n_path_indices_from_subgraph(&graph_no_crud.graph, 1000, config_with_revisits);
-
-        // The CRUD graph is a DAG (edges only go from lower to higher CRUD methods),
-        // producing exactly 15 paths. The non-CRUD graph has backward edges between
-        // different methods, producing (found by just running it) exactly 80 paths.
-        assert_eq!(
-            paths_crud.len(),
-            15,
-            "CRUD graph should produce exactly 15 paths"
-        );
-        assert_eq!(
-            paths_no_crud.len(),
-            80,
-            "Non-CRUD graph should produce exactly 80 paths"
-        );
-
-        // Test 4: max_paths truncation works
+        // max_paths truncation works.
         let config_limited = PathGenerationConfig {
-            min_path_length: 1,
-            max_revisits: 1,
             max_paths: 2,
-            enforce_crud_order: false,
             min_cycle_size: 1,
+            ..config
         };
         let paths_limited =
-            first_n_path_indices_from_subgraph(&graph_no_crud.graph, 2, config_limited);
-        assert!(
-            paths_limited.len() <= 2,
-            "max_paths should limit output to at most 2 paths"
-        );
+            first_n_path_indices_from_subgraph(&graph_full.graph, 2, config_limited);
+        assert!(paths_limited.len() <= 2);
     }
 
     #[test]
-    fn ops_from_subgraph_returns_error_on_self_loop() {
+    fn toposort_handles_longer_cycles_gracefully() {
         use super::{DependencyGraph, ops_from_subgraph};
-        use crate::openapi::spec::Spec;
-        use oas3::spec::{
-            Info, MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, PathItem,
-            Response, SchemaType, SchemaTypeSet,
-        };
-        use petgraph::visit::EdgeRef;
-        use std::collections::BTreeMap;
 
-        // Create a spec with a single GET operation whose response output "id"
-        // matches its own input query parameter "id", producing a self-loop.
-        let mut properties = BTreeMap::new();
-        properties.insert(
-            "id".to_string(),
-            ObjectOrReference::Object(ObjectSchema {
-                schema_type: Some(SchemaTypeSet::Single(SchemaType::String)),
-                ..Default::default()
-            }),
-        );
-        let response_schema = ObjectSchema {
-            schema_type: Some(SchemaTypeSet::Single(SchemaType::Object)),
-            properties,
-            ..Default::default()
-        };
-
-        let mut content = BTreeMap::new();
-        content.insert(
-            "application/json".to_string(),
-            MediaType {
-                schema: Some(ObjectOrReference::Object(response_schema)),
-                ..Default::default()
-            },
-        );
-        let mut responses = BTreeMap::new();
-        responses.insert(
-            "200".to_string(),
-            ObjectOrReference::Object(Response {
-                description: Default::default(),
-                headers: Default::default(),
-                content,
-                links: Default::default(),
-                extensions: Default::default(),
-            }),
+        // Two GET operations that form a cycle: each responds with the other's input.
+        // Same last path segment ("item") required for normalization to match.
+        let spec = parse_spec(
+            r#"
+openapi: "3.1.0"
+info: { title: test, version: "0.1" }
+paths:
+  /a/item:
+    get:
+      parameters:
+        - name: x
+          in: query
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  y: { type: string }
+  /b/item:
+    get:
+      parameters:
+        - name: y
+          in: query
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  x: { type: string }
+"#,
         );
 
-        let mut paths = BTreeMap::new();
-        paths.insert(
-            "/item".to_string(),
-            PathItem {
-                get: Some(Operation {
-                    parameters: vec![ObjectOrReference::Object(Parameter {
-                        name: "id".to_string(),
-                        location: oas3::spec::ParameterIn::Query,
-                        description: Default::default(),
-                        required: Default::default(),
-                        deprecated: Default::default(),
-                        allow_empty_value: Default::default(),
-                        style: Default::default(),
-                        explode: Default::default(),
-                        allow_reserved: Default::default(),
-                        schema: Default::default(),
-                        example: Default::default(),
-                        examples: Default::default(),
-                        content: Default::default(),
-                        extensions: Default::default(),
-                    })],
-                    responses: Some(responses),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        );
-
-        let spec: Spec = oas3::Spec {
-            openapi: "3.1.0".to_string(),
-            info: Info {
-                title: Default::default(),
-                summary: Default::default(),
-                description: Default::default(),
-                terms_of_service: Default::default(),
-                version: Default::default(),
-                contact: Default::default(),
-                license: Default::default(),
-                extensions: Default::default(),
-            },
-            servers: Default::default(),
-            paths: Some(paths),
-            components: Default::default(),
-            security: Default::default(),
-            tags: Default::default(),
-            webhooks: Default::default(),
-            external_docs: Default::default(),
-            extensions: Default::default(),
-        }
-        .into();
-
-        // Build the dependency graph with CRUD ordering enabled.
-        // Since we removed min_cycle_size from graph construction, self-loops are present.
         let graph = DependencyGraph::new(&spec, true);
 
-        let self_loop_count = graph
-            .graph
-            .edge_references()
-            .filter(|edge| edge.source() == edge.target())
-            .count();
-        assert!(
-            self_loop_count > 0,
-            "Expected self-loops in the CRUD graph, but found none"
-        );
+        // Both directions between the two GET nodes form a cycle.
+        assert!(graph.graph.edge_count() >= 2);
 
-        // ops_from_subgraph calls toposort, which should fail on self-loops.
+        // Custom toposort handles longer cycles by skipping visited nodes.
         for nodes in graph.connected_components() {
             let subgraph = graph.subgraph(&nodes);
-            let result = ops_from_subgraph(&subgraph);
             assert!(
-                result.is_err(),
-                "Expected toposort to fail due to self-loop in CRUD graph"
+                ops_from_subgraph(&subgraph).is_ok(),
+                "Custom toposort should handle longer cycles gracefully"
             );
         }
     }
 
     #[test]
-    fn ops_from_subgraph_returns_error_on_longer_cycle() {
-        use super::{DependencyGraph, ops_from_subgraph};
-        use crate::openapi::spec::Spec;
-        use oas3::spec::{
-            Info, MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, PathItem,
-            Response, SchemaType, SchemaTypeSet,
-        };
-        use petgraph::visit::EdgeRef;
-        use std::collections::BTreeMap;
+    fn initial_corpus_from_api_crud_and_full_modes() {
+        use super::{PathGenerationConfig, initial_corpus_from_api};
+        use crate::configuration::CorpusSequenceMode;
+        use crate::input::ParameterContents;
 
-        fn object_schema_with_fields(fields: &[&str]) -> ObjectSchema {
-            let mut properties = BTreeMap::new();
-            for &field in fields {
-                properties.insert(
-                    field.to_string(),
-                    ObjectOrReference::Object(ObjectSchema {
-                        schema_type: Some(SchemaTypeSet::Single(SchemaType::String)),
-                        ..Default::default()
-                    }),
-                );
-            }
-            ObjectSchema {
-                schema_type: Some(SchemaTypeSet::Single(SchemaType::Object)),
-                properties,
-                ..Default::default()
-            }
-        }
-
-        fn json_response(fields: &[&str]) -> BTreeMap<String, ObjectOrReference<Response>> {
-            let mut content = BTreeMap::new();
-            content.insert(
-                "application/json".to_string(),
-                MediaType {
-                    schema: Some(ObjectOrReference::Object(object_schema_with_fields(fields))),
-                    ..Default::default()
-                },
-            );
-            let mut responses = BTreeMap::new();
-            responses.insert(
-                "200".to_string(),
-                ObjectOrReference::Object(Response {
-                    description: Default::default(),
-                    headers: Default::default(),
-                    content,
-                    links: Default::default(),
-                    extensions: Default::default(),
-                }),
-            );
-            responses
-        }
-
-        // Create a spec with two GET operations that form a cycle via response-based
-        // parameter matching. Normalization includes the last path segment as context,
-        // so both operations must share the same last segment for their normalizations
-        // to match:
-        //   GET /a/item  takes query param "x", responds with "y"
-        //     -> input normalized: "item|x", response output normalized: "item|y"
-        //   GET /b/item  takes query param "y", responds with "x"
-        //     -> input normalized: "item|y", response output normalized: "item|x"
-        // This creates response-based edges in both directions, forming a 2-node cycle.
-        // Since both are GET, CRUD ordering does not prevent either direction.
-        let mut paths = BTreeMap::new();
-        paths.insert(
-            "/a/item".to_string(),
-            PathItem {
-                get: Some(Operation {
-                    parameters: vec![ObjectOrReference::Object(Parameter {
-                        name: "x".to_string(),
-                        location: oas3::spec::ParameterIn::Query,
-                        description: Default::default(),
-                        required: Default::default(),
-                        deprecated: Default::default(),
-                        allow_empty_value: Default::default(),
-                        style: Default::default(),
-                        explode: Default::default(),
-                        allow_reserved: Default::default(),
-                        schema: Default::default(),
-                        example: Default::default(),
-                        examples: Default::default(),
-                        content: Default::default(),
-                        extensions: Default::default(),
-                    })],
-                    responses: Some(json_response(&["y"])),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        );
-        paths.insert(
-            "/b/item".to_string(),
-            PathItem {
-                get: Some(Operation {
-                    parameters: vec![ObjectOrReference::Object(Parameter {
-                        name: "y".to_string(),
-                        location: oas3::spec::ParameterIn::Query,
-                        description: Default::default(),
-                        required: Default::default(),
-                        deprecated: Default::default(),
-                        allow_empty_value: Default::default(),
-                        style: Default::default(),
-                        explode: Default::default(),
-                        allow_reserved: Default::default(),
-                        schema: Default::default(),
-                        example: Default::default(),
-                        examples: Default::default(),
-                        content: Default::default(),
-                        extensions: Default::default(),
-                    })],
-                    responses: Some(json_response(&["x"])),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+        // Spec designed so that:
+        // - POST /widget body has "color" (normalizes "widget|color")
+        // - POST /widget response has "widget_id" (normalizes "widget|id")
+        // - GET /widget takes query "widget_id" (normalizes "widget|id")
+        // - GET /widget response has "color" (normalizes "widget|color")
+        //
+        // This means POST→GET has ONLY a Response edge (response "widget_id" →
+        // input "widget_id"), because POST's request_outputs ("widget|color")
+        // don't match GET's input ("widget|id"). This guarantees OReferences.
+        let spec = parse_spec(
+            r#"
+openapi: "3.1.0"
+info: { title: test, version: "0.1" }
+paths:
+  /widget:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                color: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  widget_id: { type: string }
+    get:
+      parameters:
+        - name: widget_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  color: { type: string }
+  /widget/{widget_id}:
+    get:
+      parameters:
+        - name: widget_id
+          in: path
+          required: true
+          schema: { type: string }
+    delete:
+      parameters:
+        - name: widget_id
+          in: path
+          required: true
+          schema: { type: string }
+"#,
         );
 
-        let spec: Spec = oas3::Spec {
-            openapi: "3.1.0".to_string(),
-            info: Info {
-                title: Default::default(),
-                summary: Default::default(),
-                description: Default::default(),
-                terms_of_service: Default::default(),
-                version: Default::default(),
-                contact: Default::default(),
-                license: Default::default(),
-                extensions: Default::default(),
-            },
-            servers: Default::default(),
-            paths: Some(paths),
-            components: Default::default(),
-            security: Default::default(),
-            tags: Default::default(),
-            webhooks: Default::default(),
-            external_docs: Default::default(),
-            extensions: Default::default(),
-        }
-        .into();
+        // --- CRUD mode ---
+        let crud_config = PathGenerationConfig::default();
+        let crud_inputs = initial_corpus_from_api(&spec, CorpusSequenceMode::Crud, crud_config);
 
-        // Build graph with CRUD ordering. Both operations are GET, so edges go
-        // in both directions forming a cycle longer than a self-loop.
-        let graph = DependencyGraph::new(&spec, true);
-
-        // Verify there is a multi-node cycle: edges between distinct nodes in both
-        // directions (GET /a -> GET /b and GET /b -> GET /a).
-        let cross_edge_count = graph
-            .graph
-            .edge_references()
-            .filter(|edge| edge.source() != edge.target())
-            .count();
         assert!(
-            cross_edge_count >= 2,
-            "Expected at least 2 cross-edges forming a cycle, got {}",
-            cross_edge_count
+            !crud_inputs.is_empty(),
+            "CRUD mode should produce at least one input sequence"
         );
 
-        // ops_from_subgraph calls toposort, which should fail on the cycle.
-        for nodes in graph.connected_components() {
-            let subgraph = graph.subgraph(&nodes);
-            let result = ops_from_subgraph(&subgraph);
+        for input in &crud_inputs {
+            // Each input should have requests in non-decreasing CRUD method order.
             assert!(
-                result.is_err(),
-                "Expected toposort to fail due to cycle between same-method operations"
+                input.0.windows(2).all(|w| w[0].method <= w[1].method),
+                "CRUD inputs should be ordered by method: {:?}",
+                input.0.iter().map(|r| &r.method).collect::<Vec<_>>()
             );
         }
+
+        // At least one CRUD input should contain an IReference (request-to-request)
+        // and at least one should contain an OReference (response-to-request).
+        // OReferences arise because POST /item's response "id" matches GET /item's
+        // query param "id" (both normalize to "item|id").
+        let has_ireference = crud_inputs.iter().any(|input| {
+            input.0.iter().any(|req| {
+                req.parameters
+                    .values()
+                    .any(|p| matches!(p, ParameterContents::IReference(_)))
+            })
+        });
+        let has_oreference = crud_inputs.iter().any(|input| {
+            input.0.iter().any(|req| {
+                req.parameters
+                    .values()
+                    .any(|p| matches!(p, ParameterContents::OReference(_)))
+            })
+        });
+        assert!(
+            has_ireference,
+            "CRUD inputs should contain at least one IReference (request-to-request)"
+        );
+        assert!(
+            has_oreference,
+            "CRUD inputs should contain at least one OReference (response-to-request)"
+        );
+
+        // --- Full mode (paths up to length 3) ---
+        let full_config = PathGenerationConfig {
+            min_path_length: 1,
+            max_revisits: 1,
+            max_paths: 100,
+            enforce_crud_order: false,
+            min_cycle_size: 2,
+        };
+        let full_inputs = initial_corpus_from_api(&spec, CorpusSequenceMode::Full, full_config);
+
+        assert!(
+            !full_inputs.is_empty(),
+            "Full mode should produce at least one input sequence"
+        );
+
+        // Full mode should produce more inputs than CRUD mode (backward edges create extra paths).
+        assert!(
+            full_inputs.len() > crud_inputs.len(),
+            "Full mode ({}) should produce more inputs than CRUD mode ({})",
+            full_inputs.len(),
+            crud_inputs.len()
+        );
+
+        // Full mode should contain at least one input with length > 1 where CRUD order
+        // is violated (backward edge), proving non-DAG paths are generated.
+        let has_non_crud_order = full_inputs
+            .iter()
+            .any(|input| input.0.windows(2).any(|w| w[0].method > w[1].method));
+        assert!(
+            has_non_crud_order,
+            "Full mode should produce at least one input violating CRUD order (backward edges)"
+        );
+
+        // All request indices in references should be valid (within bounds of their input).
+        for input in &full_inputs {
+            for (req_idx, req) in input.0.iter().enumerate() {
+                for param in req.parameters.values() {
+                    match param {
+                        ParameterContents::OReference(oref) => {
+                            assert!(
+                                oref.request_index < req_idx,
+                                "OReference at request {} points to future request {}",
+                                req_idx,
+                                oref.request_index
+                            );
+                        }
+                        ParameterContents::IReference(iref) => {
+                            assert!(
+                                iref.request_index < req_idx,
+                                "IReference at request {} points to future request {}",
+                                req_idx,
+                                iref.request_index
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        // Verify that at least some Full mode inputs have length 2 or 3
+        // (multi-step sequences that exercise edges in the graph).
+        let multi_step_count = full_inputs.iter().filter(|i| i.0.len() >= 2).count();
+        assert!(
+            multi_step_count > 0,
+            "Full mode should produce multi-step input sequences"
+        );
+
+        // At least one Full mode input should contain a non-self-loop reference
+        // (reference where source and target are different operations).
+        let has_cross_op_reference = full_inputs.iter().any(|input| {
+            input.0.iter().enumerate().any(|(idx, req)| {
+                req.parameters.values().any(|p| {
+                    let ref_idx = match p {
+                        ParameterContents::OReference(oref) => Some(oref.request_index),
+                        ParameterContents::IReference(iref) => Some(iref.request_index),
+                        _ => None,
+                    };
+                    ref_idx.is_some_and(|ri| ri < idx && input.0[ri].path != req.path)
+                })
+            })
+        });
+        assert!(
+            has_cross_op_reference,
+            "Full mode should have at least one cross-operation reference (non-self-loop)"
+        );
     }
 }

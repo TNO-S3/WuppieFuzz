@@ -283,7 +283,7 @@ impl ParameterAccess {
             }
             ParameterAccess::Response(response_parameter_access) => {
                 if let ResponseParameterAccess::Body(access_elements) = response_parameter_access {
-                    Self::request_body(access_elements.with_new_element(new_element))
+                    Self::response_body(access_elements.with_new_element(new_element))
                 } else {
                     panic!(
                         "Trying to add element to Response {self:?}, but with_new_element is only sensible for Body variants."
