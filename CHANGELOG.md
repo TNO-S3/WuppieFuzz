@@ -4,6 +4,8 @@
 
 ## Features
 
+- Store run metadata in database in [#329](https://github.com/TNO-S3/WuppieFuzz/pull/329)
+
 ## Fixes
 
 - Preserve integer values during YAML request deserialization in [#324](https://github.com/TNO-S3/WuppieFuzz/pull/324)
