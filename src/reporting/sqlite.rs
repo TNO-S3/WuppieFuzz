@@ -222,7 +222,7 @@ impl MySqLite {
                 ":config_file_contents": config_file_contents,
                 ":target": api.servers.first().map(|s| s.url.as_str()),
                 ":coverage_format": config.coverage_configuration.type_str(),
-                ":coverage_host": config.coverage_host.map(|h| h.to_string()),
+                ":coverage_host": effective_coverage_host(config).map(|h| h.to_string()),
                 ":timeout_secs": config.timeout.map(|t| t.get() as i64),
                 ":request_timeout_ms": config.request_timeout as i64,
                 ":power_schedule": format!("{:?}", config.power_schedule),
