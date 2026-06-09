@@ -21,6 +21,7 @@ pub const MAP_SIZE: usize = 4 * 8192;
 pub mod read_utilities;
 
 pub mod coverband;
+pub mod dotnet;
 pub mod dummy;
 pub mod endpoint;
 pub mod jacoco;
@@ -136,6 +137,21 @@ pub fn get_coverage_client<'c>(
                     .try_into()
                     .with_context(|| format!("Failed to parse the coverage_host URL: {url}"))
                     .context("Could not construct CoverbandCoverageClient")?,
+            ))
+        }
+        configuration::CoverageConfiguration::Dotnet {
+            ref namespace_filter,
+            ..
+        } => {
+            let socket = clargs
+                .coverage_host
+                .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6302));
+            let url = format!("http://{socket}")
+                .parse()
+                .context("Could not parse dotnet coverage agent URL")?;
+            Box::new(dotnet::DotnetCoverageClient::new(
+                url,
+                namespace_filter.clone(),
             ))
         }
         configuration::CoverageConfiguration::Endpoint => {
