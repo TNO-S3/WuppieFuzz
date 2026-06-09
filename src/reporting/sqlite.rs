@@ -173,7 +173,7 @@ impl MySqLite {
             [],
         )
         .context("Could not create `stats` table")?;
-      
+
         conn.execute(
             "CREATE TABLE IF NOT EXISTS run_configuration (
                 runid INTEGER PRIMARY KEY NOT NULL,
