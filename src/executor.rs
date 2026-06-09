@@ -160,7 +160,7 @@ where
 
             coverage_client,
             endpoint_client,
-            reporter: crate::reporting::sqlite::get_reporter(config)?,
+            reporter: crate::reporting::sqlite::get_reporter(config, api)?,
 
             manual_interrupt: setup_interrupt()?,
             maybe_timeout_secs: config.timeout.map(|t| Duration::from_secs(t.get())),

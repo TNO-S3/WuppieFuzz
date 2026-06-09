@@ -1,4 +1,8 @@
-use std::{cell::Cell, fs::create_dir_all, path::Path};
+use std::{
+    cell::Cell,
+    fs::{create_dir_all, read_to_string},
+    path::{Path, PathBuf},
+};
 
 use anyhow::Context;
 use chrono::SecondsFormat;
@@ -7,19 +11,25 @@ use rusqlite::{Connection, named_params};
 
 use crate::{
     configuration::Configuration,
+    coverage_clients::effective_coverage_host,
     input::OpenApiRequest,
-    openapi::{curl_request::CurlRequest, validate_response::Response},
+    openapi::{curl_request::CurlRequest, spec::Spec, validate_response::Response},
     reporting::{CampaignStats, Reporting},
     types::OpenApiFuzzerStateType,
+    wuppie_version::get_wuppie_version,
 };
 
 /// Instantiates a MySqLite reporter if desired by the configuration
-pub fn get_reporter(config: &Configuration) -> Result<Option<MySqLite>, anyhow::Error> {
+pub fn get_reporter(config: &Configuration, api: &Spec) -> Result<Option<MySqLite>, anyhow::Error> {
     if !config.report {
         return Ok(None);
     }
     create_dir_all("reports/grafana")?;
-    Ok(Some(MySqLite::new(Path::new("reports/grafana/report.db"))?))
+    Ok(Some(MySqLite::new(
+        Path::new("reports/grafana/report.db"),
+        config,
+        api,
+    )?))
 }
 
 /// Number of inserts between transaction commits. Each commit flushes the WAL
@@ -32,8 +42,37 @@ pub struct MySqLite {
     inserts_since_commit: Cell<u32>,
 }
 
+fn extract_config_file_arg(args: &[String]) -> Option<String> {
+    for (i, arg) in args.iter().enumerate() {
+        if arg == "--config" {
+            return args.get(i + 1).cloned();
+        }
+        if let Some(value) = arg.strip_prefix("--config=") {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+fn resolve_config_file_path_and_contents(args: &[String]) -> (Option<String>, Option<String>) {
+    let Some(config_file_arg) = extract_config_file_arg(args) else {
+        return (None, None);
+    };
+    let config_file_path = PathBuf::from(config_file_arg);
+    let absolute_path = if config_file_path.is_absolute() {
+        config_file_path
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(config_file_path.clone()))
+            .unwrap_or(config_file_path)
+    };
+    let resolved_path = std::fs::canonicalize(&absolute_path).unwrap_or(absolute_path);
+    let contents = read_to_string(&resolved_path).ok();
+    (Some(resolved_path.display().to_string()), contents)
+}
+
 impl MySqLite {
-    pub fn new(path: &Path) -> anyhow::Result<MySqLite> {
+    pub fn new(path: &Path, config: &Configuration, api: &Spec) -> anyhow::Result<MySqLite> {
         let conn = Connection::open(path).expect("Can not create database file for reporting");
 
         // Performance pragmas: WAL mode allows concurrent reads/writes and batches
@@ -134,6 +173,31 @@ impl MySqLite {
             [],
         )
         .context("Could not create `stats` table")?;
+      
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS run_configuration (
+                runid INTEGER PRIMARY KEY NOT NULL,
+                wuppiefuzz_version TEXT NOT NULL,
+                target_spec TEXT,
+                target_title TEXT NOT NULL,
+                target_version TEXT NOT NULL,
+                run_command_args TEXT NOT NULL,
+                config_file_path TEXT,
+                config_file_contents TEXT,
+                target TEXT,
+                coverage_format TEXT NOT NULL,
+                coverage_host TEXT,
+                timeout_secs INTEGER,
+                request_timeout_ms INTEGER NOT NULL,
+                power_schedule TEXT NOT NULL,
+                crash_criteria TEXT NOT NULL,
+                method_mutation_strategy TEXT NOT NULL,
+                output_format TEXT NOT NULL,
+                CONSTRAINT run_configuration_FK FOREIGN KEY (runid) REFERENCES runs(id)
+            )",
+            [],
+        )
+        .context("Could not create `run_configuration` table")?;
 
         info!("Created tables for the reporting");
 
@@ -146,6 +210,59 @@ impl MySqLite {
             .context("Could not create new run")?;
         // end borrow of connection
         drop(stmt);
+
+        let crash_criteria = config
+            .crash_criteria
+            .iter()
+            .map(|c| format!("{c:?}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let resolved_target_spec = config.openapi_spec.as_ref().map(|path| {
+            std::fs::canonicalize(path)
+                .unwrap_or_else(|_| path.clone())
+                .display()
+                .to_string()
+        });
+        let raw_args = std::env::args_os()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        let run_command_args = serde_json::to_string(&raw_args)
+            .context("Could not serialize run command arguments")?;
+        let (config_file_path, config_file_contents) =
+            resolve_config_file_path_and_contents(&raw_args);
+        conn.execute(
+            "INSERT INTO run_configuration (
+                runid, wuppiefuzz_version, target_spec, target_title, target_version,
+                run_command_args, config_file_path, config_file_contents,
+                target, coverage_format, coverage_host, timeout_secs, request_timeout_ms,
+                power_schedule, crash_criteria, method_mutation_strategy, output_format
+            ) VALUES (
+                :runid, :wuppiefuzz_version, :target_spec, :target_title, :target_version,
+                :run_command_args, :config_file_path, :config_file_contents,
+                :target, :coverage_format, :coverage_host, :timeout_secs, :request_timeout_ms,
+                :power_schedule, :crash_criteria, :method_mutation_strategy, :output_format
+            )",
+            named_params! {
+                ":runid": run_id,
+                ":wuppiefuzz_version": get_wuppie_version(),
+                ":target_spec": resolved_target_spec,
+                ":target_title": &api.info.title,
+                ":target_version": &api.info.version,
+                ":run_command_args": run_command_args,
+                ":config_file_path": config_file_path,
+                ":config_file_contents": config_file_contents,
+                ":target": api.servers.first().map(|s| s.url.as_str()),
+                ":coverage_format": config.coverage_configuration.type_str(),
+                ":coverage_host": effective_coverage_host(config).map(|h| h.to_string()),
+                ":timeout_secs": config.timeout.map(|t| t.get() as i64),
+                ":request_timeout_ms": config.request_timeout as i64,
+                ":power_schedule": format!("{:?}", config.power_schedule),
+                ":crash_criteria": crash_criteria,
+                ":method_mutation_strategy": format!("{:?}", config.method_mutation_strategy),
+                ":output_format": format!("{:?}", config.output_format),
+            },
+        )
+        .context("Could not insert run configuration")?;
 
         // Begin a long-running transaction. Individual inserts execute immediately
         // (so row IDs are available) but the disk flush is deferred until commit.
