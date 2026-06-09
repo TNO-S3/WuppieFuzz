@@ -4,6 +4,8 @@
 
 ## Features
 
+- Add more insights for use in dashboard in [#313](https://github.com/TNO-S3/WuppieFuzz/pull/313)
+
 ## Fixes
 
 - Preserve integer values during YAML request deserialization in [#324](https://github.com/TNO-S3/WuppieFuzz/pull/324)
