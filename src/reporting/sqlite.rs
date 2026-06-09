@@ -8,18 +8,23 @@ use rusqlite::{Connection, named_params};
 use crate::{
     configuration::Configuration,
     input::OpenApiRequest,
-    openapi::{curl_request::CurlRequest, validate_response::Response},
+    openapi::{curl_request::CurlRequest, spec::Spec, validate_response::Response},
     reporting::Reporting,
     types::OpenApiFuzzerStateType,
+    wuppie_version::get_wuppie_version,
 };
 
 /// Instantiates a MySqLite reporter if desired by the configuration
-pub fn get_reporter(config: &Configuration) -> Result<Option<MySqLite>, anyhow::Error> {
+pub fn get_reporter(config: &Configuration, api: &Spec) -> Result<Option<MySqLite>, anyhow::Error> {
     if !config.report {
         return Ok(None);
     }
     create_dir_all("reports/grafana")?;
-    Ok(Some(MySqLite::new(Path::new("reports/grafana/report.db"))?))
+    Ok(Some(MySqLite::new(
+        Path::new("reports/grafana/report.db"),
+        config,
+        api,
+    )?))
 }
 
 /// Number of inserts between transaction commits. Each commit flushes the WAL
@@ -33,7 +38,7 @@ pub struct MySqLite {
 }
 
 impl MySqLite {
-    pub fn new(path: &Path) -> anyhow::Result<MySqLite> {
+    pub fn new(path: &Path, config: &Configuration, api: &Spec) -> anyhow::Result<MySqLite> {
         let conn = Connection::open(path).expect("Can not create database file for reporting");
 
         // Performance pragmas: WAL mode allows concurrent reads/writes and batches
@@ -104,6 +109,28 @@ impl MySqLite {
         )
         .context("Could not create `coverage` table")?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS run_configuration (
+                runid INTEGER PRIMARY KEY NOT NULL,
+                wuppiefuzz_version TEXT NOT NULL,
+                target_spec TEXT,
+                target_title TEXT NOT NULL,
+                target_version TEXT NOT NULL,
+                target TEXT,
+                coverage_format TEXT NOT NULL,
+                coverage_host TEXT,
+                timeout_secs INTEGER,
+                request_timeout_ms INTEGER NOT NULL,
+                power_schedule TEXT NOT NULL,
+                crash_criteria TEXT NOT NULL,
+                method_mutation_strategy TEXT NOT NULL,
+                output_format TEXT NOT NULL,
+                CONSTRAINT run_configuration_FK FOREIGN KEY (runid) REFERENCES runs(id)
+            )",
+            [],
+        )
+        .context("Could not create `run_configuration` table")?;
+
         info!("Created tables for the reporting");
 
         let mut stmt = conn
@@ -115,6 +142,47 @@ impl MySqLite {
             .context("Could not create new run")?;
         // end borrow of connection
         drop(stmt);
+
+        let crash_criteria = config
+            .crash_criteria
+            .iter()
+            .map(|c| format!("{c:?}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let resolved_target_spec = config.openapi_spec.as_ref().map(|path| {
+            std::fs::canonicalize(path)
+                .unwrap_or_else(|_| path.clone())
+                .display()
+                .to_string()
+        });
+        conn.execute(
+            "INSERT INTO run_configuration (
+                runid, wuppiefuzz_version, target_spec, target_title, target_version,
+                target, coverage_format, coverage_host, timeout_secs, request_timeout_ms,
+                power_schedule, crash_criteria, method_mutation_strategy, output_format
+            ) VALUES (
+                :runid, :wuppiefuzz_version, :target_spec, :target_title, :target_version,
+                :target, :coverage_format, :coverage_host, :timeout_secs, :request_timeout_ms,
+                :power_schedule, :crash_criteria, :method_mutation_strategy, :output_format
+            )",
+            named_params! {
+                ":runid": run_id,
+                ":wuppiefuzz_version": get_wuppie_version(),
+                ":target_spec": resolved_target_spec,
+                ":target_title": &api.info.title,
+                ":target_version": &api.info.version,
+                ":target": api.servers.first().map(|s| s.url.as_str()),
+                ":coverage_format": config.coverage_configuration.type_str(),
+                ":coverage_host": config.coverage_host.map(|h| h.to_string()),
+                ":timeout_secs": config.timeout.map(|t| t.get() as i64),
+                ":request_timeout_ms": config.request_timeout as i64,
+                ":power_schedule": format!("{:?}", config.power_schedule),
+                ":crash_criteria": crash_criteria,
+                ":method_mutation_strategy": format!("{:?}", config.method_mutation_strategy),
+                ":output_format": format!("{:?}", config.output_format),
+            },
+        )
+        .context("Could not insert run configuration")?;
 
         // Begin a long-running transaction. Individual inserts execute immediately
         // (so row IDs are available) but the disk flush is deferred until commit.
