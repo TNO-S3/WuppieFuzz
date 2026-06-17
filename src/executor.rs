@@ -136,7 +136,7 @@ pub(crate) fn process_response(
 
 impl<OT> SequenceExecutor<OT>
 where
-    OT: for<'all> ObserversTuple<OpenApiInput, FuzzerState>,
+    OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     /// Create a new SequenceExecutor.
     pub fn new(
