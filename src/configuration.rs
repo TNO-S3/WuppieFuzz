@@ -125,6 +125,41 @@ pub enum Commands {
         #[arg(value_parser = clap::value_parser!(log::LevelFilter), long, value_enum, env = "LOG_LEVEL", ignore_case = true)]
         log_level: Option<log::LevelFilter>,
     },
+    /// Deduplicate crash files generated during an earlier fuzzing run
+    Dedup {
+        /// The path to a configuration file. If present, the configuration file is used
+        /// to configure the deduplication replay. Arguments given on the command line
+        /// take precedence over the configuration file.
+        #[arg(long, value_parser, value_name = "CONFIG_FILE.YAML")]
+        config: Option<PathBuf>,
+        /// The directory containing crash files to deduplicate
+        #[arg(value_name = "CRASH_DIRECTORY")]
+        crash_directory: PathBuf,
+        /// The directory to write deduplicated crash representatives to
+        #[arg(long, value_parser, value_name = "OUTPUT_DIRECTORY")]
+        output: PathBuf,
+        /// The OpenAPI specification of the program under test
+        #[arg(long, value_name = "OPENAPI_SPEC.YAML")]
+        openapi_spec: Option<PathBuf>,
+        /// The URL of the server to replay crashes against. This is usually specified in
+        /// the OpenAPI specification, but you can use this option to override it.
+        #[arg(value_parser=verify_url, long)]
+        target: Option<Url>,
+        /// How to log in to the API server. The value should be the name of a YAML file
+        /// that contains the login configuration. See login.md for information on how
+        /// to build one.
+        #[arg(long, value_parser, value_name = "AUTH.YAML")]
+        authentication: Option<PathBuf>,
+        /// Custom (static) headers that should be added to each replayed request.
+        #[arg(long, value_parser, value_name = "STATIC_HEADERS.YAML")]
+        header: Option<PathBuf>,
+        // Manually added possible values below, since automatically showing possible values of an external (remote) enum
+        // such as log::LevelFilter is not well supported.
+        // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
+        /// Log level to output. This flag takes precedence over the environment variable. [possible values: off, error, warn, debug, info, trace]
+        #[arg(value_parser = clap::value_parser!(log::LevelFilter), long, value_enum, env = "LOG_LEVEL", ignore_case = true)]
+        log_level: Option<log::LevelFilter>,
+    },
     /// Fuzz test an OpenAPI backend
     Fuzz {
         /// The path to a configuration file. If present, the configuration file is used
@@ -256,7 +291,8 @@ impl Commands {
         match self {
             Commands::VerifyAuth { config, .. }
             | Commands::Reproduce { config, .. }
-            | Commands::Fuzz { config, .. } => config.as_ref(),
+            | Commands::Fuzz { config, .. }
+            | Commands::Dedup { config, .. } => config.as_ref(),
             _ => None,
         }
     }
@@ -332,6 +368,21 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+            }),
+            Commands::Dedup {
+                openapi_spec,
+                target,
+                authentication,
+                header,
+                log_level,
+                ..
+            } => Ok(PartialConfiguration {
+                openapi_spec,
+                target,
+                authentication,
+                header,
+                log_level,
+                ..Default::default()
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,

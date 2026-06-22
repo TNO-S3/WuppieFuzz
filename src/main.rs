@@ -106,6 +106,11 @@ pub fn main() -> Result<()> {
             ))
         }
         Commands::Reproduce { crash_file, .. } => reproducer::reproduce(crash_file),
+        Commands::Dedup {
+            crash_directory,
+            output,
+            ..
+        } => crash_dedup::dedup_crashes(crash_directory, output),
         Commands::Fuzz { .. } => fuzzer::fuzz(),
     }
 }
