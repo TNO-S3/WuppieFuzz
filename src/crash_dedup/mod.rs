@@ -11,6 +11,7 @@ use anyhow::{Context, Result, anyhow};
 use libafl::inputs::Input;
 use serde::Serialize;
 use walkdir::WalkDir;
+use serde_json;
 
 use crate::{
     configuration::Configuration,
@@ -51,16 +52,42 @@ pub fn dedup_crashes(crash_directory: &Path, output_directory: &Path) -> Result<
         log_progress(index + 1, crash_files.len(), clusters.len(), non_reproducible.len(), skipped.len());
     }
 
-    log::info!(
-        "Dedup complete: {} crash files, {} unique clusters, {} non-reproducible, {} skipped. Output: {}",
-        crash_files.len(),
-        clusters.len(),
-        non_reproducible.len(),
-        skipped.len(),
-        output_directory.display()
-    );
+    copy_unique_representatives(&output_directory, &mut clusters)?;
+
+    let clusters: Vec<_> = clusters.into_values().collect();
+    let report = DedupReport {
+        summary: DedupSummary {
+            total_files: crash_files.len(),
+            reproduced: clusters.iter().map(|c| c.member_count).sum(),
+            unique_clusters: clusters.len(),
+            non_reproducible: non_reproducible.len(),
+            skipped: skipped.len(),
+        },
+        clusters,
+        non_reproducible,
+        skipped,
+    };
+    write_report(&output_directory, &report)?;
+    log_summary(&report.summary, &output_directory);
 
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct DedupReport {
+    summary: DedupSummary,
+    clusters: Vec<CrashCluster>,
+    non_reproducible: Vec<CrashFileResult>,
+    skipped: Vec<CrashFileResult>,
+}
+
+#[derive(Debug, Serialize)]
+struct DedupSummary {
+    total_files: usize,
+    reproduced: usize,
+    unique_clusters: usize,
+    non_reproducible: usize,
+    skipped: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -175,6 +202,59 @@ fn is_crash_input_file(path: &Path) -> bool {
         return false;
     };
     !file_name.starts_with('.') && !file_name.ends_with(".metadata")
+}
+
+fn copy_unique_representatives(
+    output_directory: &Path,
+    clusters: &mut BTreeMap<CrashClusterKey, CrashCluster>,
+) -> Result<()> {
+    let unique_directory = output_directory.join("unique");
+    fs::create_dir_all(&unique_directory).with_context(|| {
+        format!("Creating unique crash directory {}", unique_directory.display())
+    })?;
+
+    for (index, cluster) in clusters.values_mut().enumerate() {
+        let destination = unique_directory.join(unique_file_name(index, &cluster.representative_source));
+        fs::copy(&cluster.representative_source, &destination).with_context(|| {
+            format!(
+                "Copying representative {} to {}",
+                cluster.representative_source.display(),
+                destination.display()
+            )
+        })?;
+        cluster.representative = relative_string(output_directory, &destination);
+    }
+
+    Ok(())
+}
+
+fn unique_file_name(index: usize, source_path: &Path) -> String {
+    let file_name = source_path
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or("crash");
+    format!("{index:06}_{file_name}")
+}
+
+fn write_report(output_directory: &Path, report: &DedupReport) -> Result<()> {
+    let report_path = output_directory.join("clusters.json");
+    let file = fs::File::create(&report_path)
+        .with_context(|| format!("Creating dedup report {}", report_path.display()))?;
+    serde_json::to_writer_pretty(file, report)
+        .with_context(|| format!("Writing dedup report {}", report_path.display()))?;
+    Ok(())
+}
+
+fn log_summary(summary: &DedupSummary, output_directory: &Path) {
+    log::info!(
+        "Dedup complete: {} crash files, {} reproduced, {} unique clusters, {} non-reproducible, {} skipped. Output: {}",
+        summary.total_files,
+        summary.reproduced,
+        summary.unique_clusters,
+        summary.non_reproducible,
+        summary.skipped,
+        output_directory.display()
+    );
 }
 
 enum FileOutcome {
