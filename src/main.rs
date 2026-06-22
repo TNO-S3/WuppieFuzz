@@ -43,6 +43,7 @@ use oas3::spec::Server;
 
 mod authentication;
 mod configuration;
+mod crash_dedup;
 pub mod coverage_clients;
 pub mod executor;
 mod fuzzer;
