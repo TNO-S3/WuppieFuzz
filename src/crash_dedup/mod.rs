@@ -11,7 +11,6 @@ use anyhow::{Context, Result, anyhow};
 use libafl::inputs::Input;
 use serde::Serialize;
 use walkdir::WalkDir;
-use serde_json;
 
 use crate::{
     configuration::Configuration,
@@ -43,13 +42,25 @@ pub fn dedup_crashes(crash_directory: &Path, output_directory: &Path) -> Result<
                 add_to_clusters(&mut clusters, crash_file, source_path, size, crash);
             }
             FileOutcome::NonReproducible(reason) => {
-                non_reproducible.push(CrashFileResult { path: source_path, reason });
+                non_reproducible.push(CrashFileResult {
+                    path: source_path,
+                    reason,
+                });
             }
             FileOutcome::Skipped(reason) => {
-                skipped.push(CrashFileResult { path: source_path, reason });
+                skipped.push(CrashFileResult {
+                    path: source_path,
+                    reason,
+                });
             }
         }
-        log_progress(index + 1, crash_files.len(), clusters.len(), non_reproducible.len(), skipped.len());
+        log_progress(
+            index + 1,
+            crash_files.len(),
+            clusters.len(),
+            non_reproducible.len(),
+            skipped.len(),
+        );
     }
 
     copy_unique_representatives(&output_directory, &mut clusters)?;
@@ -136,10 +147,7 @@ struct CrashFileResult {
     reason: String,
 }
 
-fn prepare_output_directory(
-    crash_directory: &Path,
-    output_directory: &Path,
-) -> Result<PathBuf> {
+fn prepare_output_directory(crash_directory: &Path, output_directory: &Path) -> Result<PathBuf> {
     ensure_crash_directory(crash_directory)?;
 
     let crash_directory = std::path::absolute(crash_directory)?;
@@ -210,11 +218,15 @@ fn copy_unique_representatives(
 ) -> Result<()> {
     let unique_directory = output_directory.join("unique");
     fs::create_dir_all(&unique_directory).with_context(|| {
-        format!("Creating unique crash directory {}", unique_directory.display())
+        format!(
+            "Creating unique crash directory {}",
+            unique_directory.display()
+        )
     })?;
 
     for (index, cluster) in clusters.values_mut().enumerate() {
-        let destination = unique_directory.join(unique_file_name(index, &cluster.representative_source));
+        let destination =
+            unique_directory.join(unique_file_name(index, &cluster.representative_source));
         fs::copy(&cluster.representative_source, &destination).with_context(|| {
             format!(
                 "Copying representative {} to {}",
@@ -271,13 +283,22 @@ fn process_crash_file(crash_file: &Path, api: &Spec, config: &Configuration) -> 
 
     let crash = match replay_input(&input, api, config) {
         Ok(ReplayOutcome::Crash(crash)) => crash,
-        Ok(ReplayOutcome::Completed) => return FileOutcome::NonReproducible(String::from("Replay did not reproduce a crash")),
-        Ok(ReplayOutcome::Stopped(reason)) => return FileOutcome::NonReproducible(format!("Replay stopped: {reason}")),
-        Err(error) => return FileOutcome::Skipped(format!("Could not replay crash input: {error}")),
+        Ok(ReplayOutcome::Completed) => {
+            return FileOutcome::NonReproducible(String::from("Replay did not reproduce a crash"));
+        }
+        Ok(ReplayOutcome::Stopped(reason)) => {
+            return FileOutcome::NonReproducible(format!("Replay stopped: {reason}"));
+        }
+        Err(error) => {
+            return FileOutcome::Skipped(format!("Could not replay crash input: {error}"));
+        }
     };
 
     match fs::metadata(crash_file) {
-        Ok(metadata) => FileOutcome::Clustered { crash, size: metadata.len() },
+        Ok(metadata) => FileOutcome::Clustered {
+            crash,
+            size: metadata.len(),
+        },
         Err(error) => FileOutcome::Skipped(format!("Could not read crash input metadata: {error}")),
     }
 }
@@ -386,10 +407,28 @@ mod tests {
         let mut clusters = BTreeMap::new();
 
         // large first, then a smaller duplicate — representative should flip to smaller
-        add_to_clusters(&mut clusters, Path::new("large"), String::from("large"), 100, make_crash_with_index("GET /items", 2));
-        add_to_clusters(&mut clusters, Path::new("small"), String::from("small"), 10, make_crash_with_index("GET /items", 1));
+        add_to_clusters(
+            &mut clusters,
+            Path::new("large"),
+            String::from("large"),
+            100,
+            make_crash_with_index("GET /items", 2),
+        );
+        add_to_clusters(
+            &mut clusters,
+            Path::new("small"),
+            String::from("small"),
+            10,
+            make_crash_with_index("GET /items", 1),
+        );
         // different endpoint → second cluster
-        add_to_clusters(&mut clusters, Path::new("other"), String::from("other"), 10, make_crash("POST /items"));
+        add_to_clusters(
+            &mut clusters,
+            Path::new("other"),
+            String::from("other"),
+            10,
+            make_crash("POST /items"),
+        );
 
         assert_eq!(clusters.len(), 2);
         let get_cluster = clusters.values().next().unwrap();
@@ -405,7 +444,10 @@ mod tests {
         fs::create_dir(&crashes)?;
 
         let err = prepare_output_directory(&crashes, &crashes.join("out")).unwrap_err();
-        assert!(err.to_string().contains("must not be inside or equal to crash directory"));
+        assert!(
+            err.to_string()
+                .contains("must not be inside or equal to crash directory")
+        );
         Ok(())
     }
 }

@@ -82,11 +82,20 @@ fn transport_identity_parts(error: &reqwest::Error) -> (CrashKind, ResponseClass
     if error.is_timeout() {
         (CrashKind::TransportTimeout, ResponseClass::TransportTimeout)
     } else if error.is_connect() {
-        (CrashKind::TransportConnectionError, ResponseClass::TransportConnectionError)
+        (
+            CrashKind::TransportConnectionError,
+            ResponseClass::TransportConnectionError,
+        )
     } else if error.is_decode() {
-        (CrashKind::TransportDecodeError, ResponseClass::TransportDecodeError)
+        (
+            CrashKind::TransportDecodeError,
+            ResponseClass::TransportDecodeError,
+        )
     } else {
-        (CrashKind::TransportUnknownError, ResponseClass::TransportUnknownError)
+        (
+            CrashKind::TransportUnknownError,
+            ResponseClass::TransportUnknownError,
+        )
     }
 }
 
@@ -131,7 +140,8 @@ enum ReplayStep {
 }
 
 enum BuiltReplayRequest {
-    Request(reqwest::blocking::Request),
+    // Boxed to avoid a large size difference between variants (reqwest::blocking::Request is ~304 bytes).
+    Request(Box<reqwest::blocking::Request>),
     Skip,
     Stop(String),
 }
@@ -215,7 +225,7 @@ fn replay_request(
         request_timeout_ms,
         &request,
     )? {
-        BuiltReplayRequest::Request(request) => request,
+        BuiltReplayRequest::Request(request) => *request,
         BuiltReplayRequest::Skip => return Ok(ReplayStep::Continue),
         BuiltReplayRequest::Stop(reason) => return Ok(ReplayStep::Stop(reason)),
     };
@@ -275,7 +285,7 @@ fn build_replay_request(
         };
 
     match request_builder.build() {
-        Ok(request) => Ok(BuiltReplayRequest::Request(request)),
+        Ok(request) => Ok(BuiltReplayRequest::Request(Box::new(request))),
         Err(error) => {
             log::warn!("Reqwest failed to build replay request: {error}");
             Ok(BuiltReplayRequest::Stop(error.to_string()))
@@ -376,16 +386,17 @@ mod tests {
             method: Method::Get,
             path: "/items".into(),
             body: Body::Empty,
-            parameters: [(
-                (String::from("id"), ParameterKind::Query),
-                ParameterContents::OReference(OReference {
-                    request_index: 0,
-                    parameter_access: ParameterAccess::response_body(
-                        ParameterAccessElements::new(),
-                    ),
-                }),
-            )]
-            .into(),
+            parameters:
+                [(
+                    (String::from("id"), ParameterKind::Query),
+                    ParameterContents::OReference(OReference {
+                        request_index: 0,
+                        parameter_access: ParameterAccess::response_body(
+                            ParameterAccessElements::new(),
+                        ),
+                    }),
+                )]
+                .into(),
         }]);
 
         let outcome = replay_input_with_client(
