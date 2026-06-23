@@ -8,7 +8,7 @@ use std::{
 
 use clap::{Parser, Subcommand, ValueEnum, value_parser};
 use libafl::schedulers::powersched::BaseSchedule;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use strum::VariantArray;
 use url::Url;
 
@@ -21,6 +21,16 @@ const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 lazy_static! {
     static ref CONFIGURATION: Result<Configuration, anyhow::Error> =
         Configuration::try_from(PartialConfiguration::get()?);
+}
+
+/// Selects which reproduced crash inputs are minimized during deduplication.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, ValueEnum)]
+#[serde(rename_all = "snake_case")]
+pub enum MinimizationMode {
+    /// Minimize only the selected representative of each crash cluster.
+    Representative,
+    /// Minimize every reproduced crash file.
+    All,
 }
 
 /// Grey-box REST API Fuzzer written in Rust with LibAFL.
@@ -138,6 +148,9 @@ pub enum Commands {
         /// The directory to write deduplicated crash representatives to
         #[arg(long, value_parser, value_name = "OUTPUT_DIRECTORY")]
         output: PathBuf,
+        /// Minimize one representative per cluster, or every reproduced crash file.
+        #[arg(long, value_enum, value_name = "MODE", num_args = 0..=1, default_missing_value = "representative")]
+        minimize: Option<MinimizationMode>,
         /// The OpenAPI specification of the program under test
         #[arg(long, value_name = "OPENAPI_SPEC.YAML")]
         openapi_spec: Option<PathBuf>,
