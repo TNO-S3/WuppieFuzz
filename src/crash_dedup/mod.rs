@@ -17,7 +17,9 @@ use crate::{
     configuration::{Configuration, MinimizationMode},
     crash_dedup::{
         identity::{CrashClusterKey, CrashIdentity},
-        minimizer::{MinimizationReport, MinimizationResult, failed, minimize_with},
+        minimizer::{
+            MinimizationReport, MinimizationResult, MinimizationStatus, failed, minimize_with,
+        },
         replay::{ObservedCrash, ReplayOutcome, replay_input},
     },
     input::OpenApiInput,
@@ -69,7 +71,14 @@ pub fn dedup_crashes(
         );
     }
 
-    write_cluster_outputs(&output_directory, &mut clusters, &api, config, minimize)?;
+    write_cluster_outputs(
+        crash_directory,
+        &output_directory,
+        &mut clusters,
+        &api,
+        config,
+        minimize,
+    )?;
 
     let clusters: Vec<_> = clusters.into_values().collect();
     let report = DedupReport {
@@ -79,6 +88,7 @@ pub fn dedup_crashes(
             unique_clusters: clusters.len(),
             non_reproducible: non_reproducible.len(),
             skipped: skipped.len(),
+            minimization: minimization_summary(&clusters),
         },
         clusters,
         non_reproducible,
@@ -105,6 +115,15 @@ struct DedupSummary {
     unique_clusters: usize,
     non_reproducible: usize,
     skipped: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    minimization: Option<MinimizationSummary>,
+}
+
+#[derive(Debug, Serialize)]
+struct MinimizationSummary {
+    minimized: usize,
+    unchanged: usize,
+    failed: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -255,6 +274,7 @@ fn copy_unique_representatives(
 }
 
 fn write_cluster_outputs(
+    crash_directory: &Path,
     output_directory: &Path,
     clusters: &mut BTreeMap<CrashClusterKey, CrashCluster>,
     api: &Spec,
@@ -274,25 +294,65 @@ fn write_cluster_outputs(
     })?;
 
     let total = clusters.len();
+    let minimized_directory = output_directory.join("minimized");
     log::info!("Starting crash minimization ({mode:?}): {total} clusters");
 
     for (index, (cluster_key, cluster)) in clusters.iter_mut().enumerate() {
-        let destination =
+        let unique_destination =
             unique_directory.join(unique_file_name(index, &cluster.representative_source));
         let representative_member = cluster.representative.clone();
-
-        let mut result = minimize_source(&cluster.representative_source, cluster_key, api, config);
-        write_minimization_output(&cluster.representative_source, &destination, &mut result)?;
-        if let Some(idx) = result.crashing_request_index {
-            cluster.representative_crashing_request_index = idx;
-        }
-        result.report.output = Some(relative_string(output_directory, &destination));
-        cluster.representative = relative_string(output_directory, &destination);
-
         let mut files = BTreeMap::new();
-        files.insert(representative_member, result.report);
-        cluster.minimization = Some(ClusterMinimizationReport { mode, files });
 
+        match mode {
+            MinimizationMode::Representative => {
+                let mut result =
+                    minimize_source(&cluster.representative_source, cluster_key, api, config);
+                write_minimization_output(
+                    &cluster.representative_source,
+                    &unique_destination,
+                    &mut result,
+                )?;
+                if let Some(idx) = result.crashing_request_index {
+                    cluster.representative_crashing_request_index = idx;
+                }
+                result.report.output = Some(relative_string(output_directory, &unique_destination));
+                files.insert(representative_member, result.report);
+            }
+            MinimizationMode::All => {
+                let mut representative_minimized = None;
+
+                for member in &cluster.members {
+                    let source = crash_directory.join(member);
+                    let dest = minimized_directory.join(member);
+                    let mut result = minimize_source(&source, cluster_key, api, config);
+                    write_minimization_output(&source, &dest, &mut result)?;
+                    if member == &representative_member {
+                        representative_minimized = Some(dest.clone());
+                        if let Some(idx) = result.crashing_request_index {
+                            cluster.representative_crashing_request_index = idx;
+                        }
+                    }
+                    result.report.output = Some(relative_string(output_directory, &dest));
+                    files.insert(member.clone(), result.report);
+                }
+
+                let rep = representative_minimized.with_context(|| {
+                    format!(
+                        "Locating minimized representative for cluster {}",
+                        cluster.key
+                    )
+                })?;
+                fs::copy(&rep, &unique_destination).with_context(|| {
+                    format!(
+                        "Copying minimized representative to {}",
+                        unique_destination.display()
+                    )
+                })?;
+            }
+        }
+
+        cluster.representative = relative_string(output_directory, &unique_destination);
+        cluster.minimization = Some(ClusterMinimizationReport { mode, files });
         log::info!(
             "Crash minimization progress: {}/{total} clusters processed",
             index + 1
@@ -353,6 +413,28 @@ fn write_report(output_directory: &Path, report: &DedupReport) -> Result<()> {
     Ok(())
 }
 
+fn minimization_summary(clusters: &[CrashCluster]) -> Option<MinimizationSummary> {
+    let mut reports = clusters
+        .iter()
+        .filter_map(|c| c.minimization.as_ref())
+        .flat_map(|m| m.files.values())
+        .peekable();
+    reports.peek()?;
+    let mut summary = MinimizationSummary {
+        minimized: 0,
+        unchanged: 0,
+        failed: 0,
+    };
+    for report in reports {
+        match report.status {
+            MinimizationStatus::Minimized => summary.minimized += 1,
+            MinimizationStatus::Unchanged => summary.unchanged += 1,
+            MinimizationStatus::Failed => summary.failed += 1,
+        }
+    }
+    Some(summary)
+}
+
 fn log_summary(summary: &DedupSummary, output_directory: &Path) {
     log::info!(
         "Dedup complete: {} crash files, {} reproduced, {} unique clusters, {} non-reproducible, {} skipped. Output: {}",
@@ -363,6 +445,14 @@ fn log_summary(summary: &DedupSummary, output_directory: &Path) {
         summary.skipped,
         output_directory.display()
     );
+    if let Some(m) = &summary.minimization {
+        log::info!(
+            "Minimization: {} minimized, {} unchanged, {} failed",
+            m.minimized,
+            m.unchanged,
+            m.failed
+        );
+    }
 }
 
 enum FileOutcome {
@@ -545,6 +635,42 @@ mod tests {
             err.to_string()
                 .contains("must not be inside or equal to crash directory")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn copy_unique_representatives_names_and_updates_paths() -> Result<()> {
+        let dir = TempDir::new()?;
+        let crash_a = dir.path().join("a-crash");
+        let crash_b = dir.path().join("b-crash");
+        fs::write(&crash_a, b"aaa")?;
+        fs::write(&crash_b, b"bbb")?;
+
+        let output = dir.path().join("out");
+        let mut clusters = BTreeMap::new();
+        add_to_clusters(
+            &mut clusters,
+            &crash_a,
+            String::from("a-crash"),
+            3,
+            make_crash("GET /a"),
+        );
+        add_to_clusters(
+            &mut clusters,
+            &crash_b,
+            String::from("b-crash"),
+            3,
+            make_crash("POST /b"),
+        );
+        copy_unique_representatives(&output, &mut clusters)?;
+
+        let reps: Vec<_> = clusters
+            .values()
+            .map(|c| c.representative.as_str())
+            .collect();
+        assert_eq!(reps, ["unique/000000_a-crash", "unique/000001_b-crash"]);
+        assert_eq!(fs::read(output.join("unique/000000_a-crash"))?, b"aaa");
+        assert_eq!(fs::read(output.join("unique/000001_b-crash"))?, b"bbb");
         Ok(())
     }
 }

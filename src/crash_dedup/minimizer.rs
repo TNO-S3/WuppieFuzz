@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::{
     crash_dedup::{identity::CrashClusterKey, replay::ReplayOutcome},
-    input::{Body, OpenApiInput, OpenApiRequest, ParameterContents},
+    input::{OpenApiInput, OpenApiRequest, ParameterContents},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -241,7 +241,7 @@ mod tests {
             identity::{CrashIdentity, CrashKind, ObservedExitKind, ResponseClass},
             replay::ObservedCrash,
         },
-        input::Method,
+        input::{Body, Method},
     };
 
     fn request(path: &str) -> OpenApiRequest {
