@@ -67,26 +67,6 @@ where
     }
 }
 
-fn field_names(api: &Spec, request_body: &RequestBody) -> Option<Vec<String>> {
-    let schema = request_body
-        .content
-        .get_json_content()?
-        .schema
-        .as_ref()?
-        .resolve(api)
-        .ok()?;
-
-    let object_schema = match schema {
-        oas3::spec::Schema::Boolean(_) => return None,
-        oas3::spec::Schema::Object(object_or_reference) => match *object_or_reference {
-            oas3::spec::ObjectOrReference::Object(object_schema) => object_schema,
-            oas3::spec::ObjectOrReference::Ref { .. } => return None,
-        },
-    };
-
-    Some(object_schema.properties.keys().cloned().collect())
-}
-
 #[cfg(test)]
 mod test {
     use libafl::mutators::{MutationResult, Mutator};
