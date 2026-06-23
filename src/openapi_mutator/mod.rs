@@ -44,12 +44,15 @@ pub mod establish_link;
 use establish_link::EstablishLinkMutator;
 pub mod string_interesting;
 use string_interesting::StringInterestingMutator;
+pub mod splice_requests;
+use splice_requests::SpliceRequestsMutator;
 
 #[cfg(test)]
 pub mod test_helpers;
 
 /// Creates a tuple list containing all available mutators from this module.
 pub fn havoc_mutations_openapi() -> tuple_list_type!(
+    OpenApiMutator<OpenApiFuzzerStateType>,
     OpenApiMutator<OpenApiFuzzerStateType>,
     OpenApiMutator<OpenApiFuzzerStateType>,
     OpenApiMutator<OpenApiFuzzerStateType>,
@@ -114,6 +117,7 @@ pub fn havoc_mutations_openapi() -> tuple_list_type!(
         OpenApiMutator::from_series_mutator(Box::new(RemoveRequestMutator::new())),
         OpenApiMutator::from_series_mutator(Box::new(BreakLinkMutator::new())),
         OpenApiMutator::from_series_mutator(Box::new(EstablishLinkMutator::new())),
+        OpenApiMutator::from_series_mutator(Box::new(SpliceRequestsMutator::new())),
     )
 }
 
