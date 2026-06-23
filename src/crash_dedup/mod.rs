@@ -14,9 +14,10 @@ use serde::Serialize;
 use walkdir::WalkDir;
 
 use crate::{
-    configuration::Configuration,
+    configuration::{Configuration, MinimizationMode},
     crash_dedup::{
         identity::{CrashClusterKey, CrashIdentity},
+        minimizer::{MinimizationReport, MinimizationResult, failed, minimize_with},
         replay::{ObservedCrash, ReplayOutcome, replay_input},
     },
     input::OpenApiInput,
@@ -25,7 +26,11 @@ use crate::{
 
 const DEDUP_PROGRESS_INTERVAL: usize = 100;
 
-pub fn dedup_crashes(crash_directory: &Path, output_directory: &Path) -> Result<()> {
+pub fn dedup_crashes(
+    crash_directory: &Path,
+    output_directory: &Path,
+    minimize: Option<MinimizationMode>,
+) -> Result<()> {
     let output_directory = prepare_output_directory(crash_directory, output_directory)?;
     let config = Configuration::get().map_err(anyhow::Error::msg)?;
     crate::setup_logging(config);
@@ -64,7 +69,7 @@ pub fn dedup_crashes(crash_directory: &Path, output_directory: &Path) -> Result<
         );
     }
 
-    copy_unique_representatives(&output_directory, &mut clusters)?;
+    write_cluster_outputs(&output_directory, &mut clusters, &api, config, minimize)?;
 
     let clusters: Vec<_> = clusters.into_values().collect();
     let report = DedupReport {
@@ -114,6 +119,14 @@ struct CrashCluster {
     member_count: usize,
     representative_crashing_request_index: usize,
     identity: SerializableCrashIdentity,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    minimization: Option<ClusterMinimizationReport>,
+}
+
+#[derive(Debug, Serialize)]
+struct ClusterMinimizationReport {
+    mode: MinimizationMode,
+    files: BTreeMap<String, MinimizationReport>,
 }
 
 #[derive(Debug, Serialize)]
@@ -241,6 +254,88 @@ fn copy_unique_representatives(
     Ok(())
 }
 
+fn write_cluster_outputs(
+    output_directory: &Path,
+    clusters: &mut BTreeMap<CrashClusterKey, CrashCluster>,
+    api: &Spec,
+    config: &Configuration,
+    mode: Option<MinimizationMode>,
+) -> Result<()> {
+    let Some(mode) = mode else {
+        return copy_unique_representatives(output_directory, clusters);
+    };
+
+    let unique_directory = output_directory.join("unique");
+    fs::create_dir_all(&unique_directory).with_context(|| {
+        format!(
+            "Creating unique crash directory {}",
+            unique_directory.display()
+        )
+    })?;
+
+    let total = clusters.len();
+    log::info!("Starting crash minimization ({mode:?}): {total} clusters");
+
+    for (index, (cluster_key, cluster)) in clusters.iter_mut().enumerate() {
+        let destination =
+            unique_directory.join(unique_file_name(index, &cluster.representative_source));
+        let representative_member = cluster.representative.clone();
+
+        let mut result = minimize_source(&cluster.representative_source, cluster_key, api, config);
+        write_minimization_output(&cluster.representative_source, &destination, &mut result)?;
+        if let Some(idx) = result.crashing_request_index {
+            cluster.representative_crashing_request_index = idx;
+        }
+        result.report.output = Some(relative_string(output_directory, &destination));
+        cluster.representative = relative_string(output_directory, &destination);
+
+        let mut files = BTreeMap::new();
+        files.insert(representative_member, result.report);
+        cluster.minimization = Some(ClusterMinimizationReport { mode, files });
+
+        log::info!(
+            "Crash minimization progress: {}/{total} clusters processed",
+            index + 1
+        );
+    }
+
+    Ok(())
+}
+
+fn minimize_source(
+    source: &Path,
+    cluster_key: &CrashClusterKey,
+    api: &Spec,
+    config: &Configuration,
+) -> MinimizationResult {
+    let input = match OpenApiInput::from_file(source) {
+        Ok(input) => input,
+        Err(error) => return failed(0, 0, format!("Could not read crash input: {error}")),
+    };
+    minimize_with(input, cluster_key, |candidate| {
+        replay_input(candidate, api, config)
+    })
+}
+
+fn write_minimization_output(
+    source: &Path,
+    destination: &Path,
+    result: &mut MinimizationResult,
+) -> Result<()> {
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Creating directory {}", parent.display()))?;
+    }
+    if let Some(input) = result.input.take() {
+        input.to_file(destination).map_err(anyhow::Error::msg)?;
+    } else {
+        fs::copy(source, destination).with_context(|| {
+            format!("Copying {} to {}", source.display(), destination.display())
+        })?;
+    }
+    Ok(())
+}
+
 fn unique_file_name(index: usize, source_path: &Path) -> String {
     let file_name = source_path
         .file_name()
@@ -336,6 +431,7 @@ fn add_to_clusters(
                     member_count: 1,
                     representative_crashing_request_index: observed_crash.crashing_request_index,
                     identity: SerializableCrashIdentity::from(&observed_crash.identity),
+                    minimization: None,
                 },
             );
         }

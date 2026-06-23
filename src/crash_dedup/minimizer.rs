@@ -23,6 +23,8 @@ pub struct MinimizationReport {
     pub removed_request_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub failure_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
 }
 
 pub struct MinimizationResult {
@@ -122,6 +124,7 @@ where
             candidate_replays,
             removed_request_count,
             failure_reason: None,
+            output: None,
         },
     }
 }
@@ -141,6 +144,7 @@ pub fn failed(
             candidate_replays,
             removed_request_count: 0,
             failure_reason: Some(failure_reason),
+            output: None,
         },
     }
 }
