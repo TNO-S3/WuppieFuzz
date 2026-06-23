@@ -413,14 +413,14 @@ impl OpenApiInput {
             F: Fn(&&'a mut ParameterContents) -> bool + 'a,
         {
             match contents {
-                ParameterContents::Object(obj) => {
-                    Box::new(obj.values_mut().flat_map(move |value| {
-                        parameter_contents_filter(value, filter)
-                    }))
-                }
-                ParameterContents::Array(arr) => Box::new(arr.iter_mut().flat_map(move |value| {
-                    parameter_contents_filter(value, filter)
-                })),
+                ParameterContents::Object(obj) => Box::new(
+                    obj.values_mut()
+                        .flat_map(move |value| parameter_contents_filter(value, filter)),
+                ),
+                ParameterContents::Array(arr) => Box::new(
+                    arr.iter_mut()
+                        .flat_map(move |value| parameter_contents_filter(value, filter)),
+                ),
                 _ if filter(&contents) => Box::new(std::iter::once(contents)),
                 _ => Box::new(std::iter::empty()),
             }
@@ -434,19 +434,18 @@ impl OpenApiInput {
                 // recurse into nested objects and arrays.
                 let body_contents = match &mut openapi_request.body {
                     Body::Empty => ParamContentsAtLevel0Wrapper::SimpleOption(None),
-                    Body::TextPlain(text) => {
-                        ParamContentsAtLevel0Wrapper::SimpleOption(Some(text))
+                    Body::TextPlain(text) => ParamContentsAtLevel0Wrapper::SimpleOption(Some(text)),
+                    Body::ApplicationJson(parameters) | Body::XWwwFormUrlencoded(parameters) => {
+                        match parameters {
+                            ParameterContents::Object(obj_param) => {
+                                ParamContentsAtLevel0Wrapper::InObject(obj_param.values_mut())
+                            }
+                            ParameterContents::Array(arr) => {
+                                ParamContentsAtLevel0Wrapper::InArray(arr.iter_mut())
+                            }
+                            _ => ParamContentsAtLevel0Wrapper::SimpleOption(Some(parameters)),
+                        }
                     }
-                    Body::ApplicationJson(parameters)
-                    | Body::XWwwFormUrlencoded(parameters) => match parameters {
-                        ParameterContents::Object(obj_param) => {
-                            ParamContentsAtLevel0Wrapper::InObject(obj_param.values_mut())
-                        }
-                        ParameterContents::Array(arr) => {
-                            ParamContentsAtLevel0Wrapper::InArray(arr.iter_mut())
-                        }
-                        _ => ParamContentsAtLevel0Wrapper::SimpleOption(Some(parameters)),
-                    },
                 };
 
                 openapi_request
