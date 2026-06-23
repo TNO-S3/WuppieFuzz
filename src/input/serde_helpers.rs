@@ -73,6 +73,10 @@ mod body_serde {
         value_to_body(value).map_err(D::Error::custom)
     }
 
+    /// Convert YAML `Value` to `Body` enum.
+    ///
+    /// Accepts either tagged values (`!ApplicationJson`) or singleton maps (`ApplicationJson: {...}`).
+    /// Strips `!` prefix from tags, extracts variant + inner value, then dispatches to `body_from_variant`.
     fn value_to_body(value: Value) -> Result<Body, serde_yaml::Error> {
         match value {
             Value::Tagged(tagged) => {
@@ -94,6 +98,10 @@ mod body_serde {
         }
     }
 
+    /// Map variant name to `Body` constructor, deserialize inner value.
+    ///
+    /// Valid variants: `Empty`, `TextPlain`, `ApplicationJson`, `XWwwFormUrlencoded`.
+    /// Each (except `Empty`) deserializes its paired `Value` using `serde_yaml::from_value`.
     fn body_from_variant(variant: &str, value: Value) -> Result<Body, serde_yaml::Error> {
         match variant {
             "Empty" => Ok(Body::Empty),
