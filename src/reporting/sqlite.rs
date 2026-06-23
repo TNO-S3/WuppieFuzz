@@ -1,4 +1,8 @@
-use std::{cell::Cell, fs::create_dir_all, path::Path};
+use std::{
+    cell::Cell,
+    fs::{create_dir_all, read_to_string},
+    path::{Path, PathBuf},
+};
 
 use anyhow::Context;
 use chrono::SecondsFormat;
@@ -7,19 +11,25 @@ use rusqlite::{Connection, named_params};
 
 use crate::{
     configuration::Configuration,
+    coverage_clients::effective_coverage_host,
     input::OpenApiRequest,
-    openapi::{curl_request::CurlRequest, validate_response::Response},
-    reporting::Reporting,
+    openapi::{curl_request::CurlRequest, spec::Spec, validate_response::Response},
+    reporting::{CampaignStats, Reporting},
     types::OpenApiFuzzerStateType,
+    wuppie_version::get_wuppie_version,
 };
 
 /// Instantiates a MySqLite reporter if desired by the configuration
-pub fn get_reporter(config: &Configuration) -> Result<Option<MySqLite>, anyhow::Error> {
+pub fn get_reporter(config: &Configuration, api: &Spec) -> Result<Option<MySqLite>, anyhow::Error> {
     if !config.report {
         return Ok(None);
     }
     create_dir_all("reports/grafana")?;
-    Ok(Some(MySqLite::new(Path::new("reports/grafana/report.db"))?))
+    Ok(Some(MySqLite::new(
+        Path::new("reports/grafana/report.db"),
+        config,
+        api,
+    )?))
 }
 
 /// Number of inserts between transaction commits. Each commit flushes the WAL
@@ -32,8 +42,37 @@ pub struct MySqLite {
     inserts_since_commit: Cell<u32>,
 }
 
+fn extract_config_file_arg(args: &[String]) -> Option<String> {
+    for (i, arg) in args.iter().enumerate() {
+        if arg == "--config" {
+            return args.get(i + 1).cloned();
+        }
+        if let Some(value) = arg.strip_prefix("--config=") {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+fn resolve_config_file_path_and_contents(args: &[String]) -> (Option<String>, Option<String>) {
+    let Some(config_file_arg) = extract_config_file_arg(args) else {
+        return (None, None);
+    };
+    let config_file_path = PathBuf::from(config_file_arg);
+    let absolute_path = if config_file_path.is_absolute() {
+        config_file_path
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(config_file_path.clone()))
+            .unwrap_or(config_file_path)
+    };
+    let resolved_path = std::fs::canonicalize(&absolute_path).unwrap_or(absolute_path);
+    let contents = read_to_string(&resolved_path).ok();
+    (Some(resolved_path.display().to_string()), contents)
+}
+
 impl MySqLite {
-    pub fn new(path: &Path) -> anyhow::Result<MySqLite> {
+    pub fn new(path: &Path, config: &Configuration, api: &Spec) -> anyhow::Result<MySqLite> {
         let conn = Connection::open(path).expect("Can not create database file for reporting");
 
         // Performance pragmas: WAL mode allows concurrent reads/writes and batches
@@ -104,6 +143,62 @@ impl MySqLite {
         )
         .context("Could not create `coverage` table")?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `timestamp` DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                `seq_per_sec` REAL NOT NULL,
+                `req_per_sec` REAL NOT NULL,
+                `requests_completed_total` INTEGER NOT NULL DEFAULT 0,
+                `corpus_size` INTEGER NOT NULL,
+                `objectives` INTEGER NOT NULL,
+                `sequences_completed_total` INTEGER NOT NULL DEFAULT 0,
+                `sequences_missing_backreference_total` INTEGER NOT NULL DEFAULT 0,
+                `sequences_request_build_error_total` INTEGER NOT NULL DEFAULT 0,
+                `sequences_crash_or_validation_total` INTEGER NOT NULL DEFAULT 0,
+                `sequences_transport_error_total` INTEGER NOT NULL DEFAULT 0,
+                `resolve_backreference_us_total` INTEGER NOT NULL DEFAULT 0,
+                `build_request_us_total` INTEGER NOT NULL DEFAULT 0,
+                `report_request_us_total` INTEGER NOT NULL DEFAULT 0,
+                `http_execute_us_total` INTEGER NOT NULL DEFAULT 0,
+                `report_response_us_total` INTEGER NOT NULL DEFAULT 0,
+                `process_response_us_total` INTEGER NOT NULL DEFAULT 0,
+                `endpoint_cover_us_total` INTEGER NOT NULL DEFAULT 0,
+                `code_coverage_phase_us_total` INTEGER NOT NULL DEFAULT 0,
+                `endpoint_coverage_phase_us_total` INTEGER NOT NULL DEFAULT 0,
+                `post_exec_reporting_us_total` INTEGER NOT NULL DEFAULT 0,
+                `runid` INTEGER NOT NULL,
+                CONSTRAINT run_FK FOREIGN KEY (runid) REFERENCES runs(id)
+            )",
+            [],
+        )
+        .context("Could not create `stats` table")?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS run_configuration (
+                runid INTEGER PRIMARY KEY NOT NULL,
+                wuppiefuzz_version TEXT NOT NULL,
+                target_spec TEXT,
+                target_title TEXT NOT NULL,
+                target_version TEXT NOT NULL,
+                run_command_args TEXT NOT NULL,
+                config_file_path TEXT,
+                config_file_contents TEXT,
+                target TEXT,
+                coverage_format TEXT NOT NULL,
+                coverage_host TEXT,
+                timeout_secs INTEGER,
+                request_timeout_ms INTEGER NOT NULL,
+                power_schedule TEXT NOT NULL,
+                crash_criteria TEXT NOT NULL,
+                method_mutation_strategy TEXT NOT NULL,
+                output_format TEXT NOT NULL,
+                CONSTRAINT run_configuration_FK FOREIGN KEY (runid) REFERENCES runs(id)
+            )",
+            [],
+        )
+        .context("Could not create `run_configuration` table")?;
+
         info!("Created tables for the reporting");
 
         let mut stmt = conn
@@ -115,6 +210,59 @@ impl MySqLite {
             .context("Could not create new run")?;
         // end borrow of connection
         drop(stmt);
+
+        let crash_criteria = config
+            .crash_criteria
+            .iter()
+            .map(|c| format!("{c:?}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let resolved_target_spec = config.openapi_spec.as_ref().map(|path| {
+            std::fs::canonicalize(path)
+                .unwrap_or_else(|_| path.clone())
+                .display()
+                .to_string()
+        });
+        let raw_args = std::env::args_os()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        let run_command_args = serde_json::to_string(&raw_args)
+            .context("Could not serialize run command arguments")?;
+        let (config_file_path, config_file_contents) =
+            resolve_config_file_path_and_contents(&raw_args);
+        conn.execute(
+            "INSERT INTO run_configuration (
+                runid, wuppiefuzz_version, target_spec, target_title, target_version,
+                run_command_args, config_file_path, config_file_contents,
+                target, coverage_format, coverage_host, timeout_secs, request_timeout_ms,
+                power_schedule, crash_criteria, method_mutation_strategy, output_format
+            ) VALUES (
+                :runid, :wuppiefuzz_version, :target_spec, :target_title, :target_version,
+                :run_command_args, :config_file_path, :config_file_contents,
+                :target, :coverage_format, :coverage_host, :timeout_secs, :request_timeout_ms,
+                :power_schedule, :crash_criteria, :method_mutation_strategy, :output_format
+            )",
+            named_params! {
+                ":runid": run_id,
+                ":wuppiefuzz_version": get_wuppie_version(),
+                ":target_spec": resolved_target_spec,
+                ":target_title": &api.info.title,
+                ":target_version": &api.info.version,
+                ":run_command_args": run_command_args,
+                ":config_file_path": config_file_path,
+                ":config_file_contents": config_file_contents,
+                ":target": api.servers.first().map(|s| s.url.as_str()),
+                ":coverage_format": config.coverage_configuration.type_str(),
+                ":coverage_host": effective_coverage_host(config).map(|h| h.to_string()),
+                ":timeout_secs": config.timeout.map(|t| t.get() as i64),
+                ":request_timeout_ms": config.request_timeout as i64,
+                ":power_schedule": format!("{:?}", config.power_schedule),
+                ":crash_criteria": crash_criteria,
+                ":method_mutation_strategy": format!("{:?}", config.method_mutation_strategy),
+                ":output_format": format!("{:?}", config.output_format),
+            },
+        )
+        .context("Could not insert run configuration")?;
 
         // Begin a long-running transaction. Individual inserts execute immediately
         // (so row IDs are available) but the disk flush is deferred until commit.
@@ -239,5 +387,83 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
             ))
             .expect("Could not insert coverage into database");
         self.maybe_commit_batch();
+    }
+
+    fn report_stats(&self, stats: CampaignStats) {
+        let mut insert_stmt = self
+            .conn
+            .prepare_cached(
+                "INSERT INTO stats (
+                    seq_per_sec,
+                    req_per_sec,
+                    requests_completed_total,
+                    corpus_size,
+                    objectives,
+                    sequences_completed_total,
+                    sequences_missing_backreference_total,
+                    sequences_request_build_error_total,
+                    sequences_crash_or_validation_total,
+                    sequences_transport_error_total,
+                    resolve_backreference_us_total,
+                    build_request_us_total,
+                    report_request_us_total,
+                    http_execute_us_total,
+                    report_response_us_total,
+                    process_response_us_total,
+                    endpoint_cover_us_total,
+                    code_coverage_phase_us_total,
+                    endpoint_coverage_phase_us_total,
+                    post_exec_reporting_us_total,
+                    runid
+                ) VALUES (
+                    :seq_per_sec,
+                    :req_per_sec,
+                    :requests_completed_total,
+                    :corpus_size,
+                    :objectives,
+                    :sequences_completed_total,
+                    :sequences_missing_backreference_total,
+                    :sequences_request_build_error_total,
+                    :sequences_crash_or_validation_total,
+                    :sequences_transport_error_total,
+                    :resolve_backreference_us_total,
+                    :build_request_us_total,
+                    :report_request_us_total,
+                    :http_execute_us_total,
+                    :report_response_us_total,
+                    :process_response_us_total,
+                    :endpoint_cover_us_total,
+                    :code_coverage_phase_us_total,
+                    :endpoint_coverage_phase_us_total,
+                    :post_exec_reporting_us_total,
+                    :runid
+                )",
+            )
+            .expect("Could not prepare insert statement for stats");
+        insert_stmt
+            .insert(named_params! {
+                ":seq_per_sec": stats.seq_per_sec,
+                ":req_per_sec": stats.req_per_sec,
+                ":requests_completed_total": i64::try_from(stats.requests_completed_total).unwrap_or(i64::MAX),
+                ":corpus_size": stats.corpus_size,
+                ":objectives": stats.objectives,
+                ":sequences_completed_total": i64::try_from(stats.sequence_stop_stats.completed).unwrap_or(i64::MAX),
+                ":sequences_missing_backreference_total": i64::try_from(stats.sequence_stop_stats.missing_backreference).unwrap_or(i64::MAX),
+                ":sequences_request_build_error_total": i64::try_from(stats.sequence_stop_stats.request_build_error).unwrap_or(i64::MAX),
+                ":sequences_crash_or_validation_total": i64::try_from(stats.sequence_stop_stats.crash_or_validation).unwrap_or(i64::MAX),
+                ":sequences_transport_error_total": i64::try_from(stats.sequence_stop_stats.transport_error).unwrap_or(i64::MAX),
+                ":resolve_backreference_us_total": i64::try_from(stats.sequence_timing_stats.resolve_backreference_us).unwrap_or(i64::MAX),
+                ":build_request_us_total": i64::try_from(stats.sequence_timing_stats.build_request_us).unwrap_or(i64::MAX),
+                ":report_request_us_total": i64::try_from(stats.sequence_timing_stats.report_request_us).unwrap_or(i64::MAX),
+                ":http_execute_us_total": i64::try_from(stats.sequence_timing_stats.http_execute_us).unwrap_or(i64::MAX),
+                ":report_response_us_total": i64::try_from(stats.sequence_timing_stats.report_response_us).unwrap_or(i64::MAX),
+                ":process_response_us_total": i64::try_from(stats.sequence_timing_stats.process_response_us).unwrap_or(i64::MAX),
+                ":endpoint_cover_us_total": i64::try_from(stats.sequence_timing_stats.endpoint_cover_us).unwrap_or(i64::MAX),
+                ":code_coverage_phase_us_total": i64::try_from(stats.sequence_timing_stats.code_coverage_phase_us).unwrap_or(i64::MAX),
+                ":endpoint_coverage_phase_us_total": i64::try_from(stats.sequence_timing_stats.endpoint_coverage_phase_us).unwrap_or(i64::MAX),
+                ":post_exec_reporting_us_total": i64::try_from(stats.sequence_timing_stats.post_exec_reporting_us).unwrap_or(i64::MAX),
+                ":runid": self.run_id,
+            })
+            .expect("Could not insert stats into database");
     }
 }
