@@ -6,6 +6,7 @@
 
 ## Fixes
 
+- Corpus format extended support for nested enums in body in [#328](https://github.com/TNO-S3/WuppieFuzz/pull/328)
 - Preserve integer values during YAML request deserialization in [#324](https://github.com/TNO-S3/WuppieFuzz/pull/324)
 
 # v1.5.1 (2026-05-19)
