@@ -1,3 +1,9 @@
+//! Crash identity model used by dedup and minimization.
+//!
+//! This module defines coarse crash dimensions (exit kind, crash kind, status,
+//! endpoint, response class) and converts them into stable, orderable keys for
+//! cluster grouping.
+
 use crate::openapi::validate_response::ValidationErrorDiscriminants;
 
 /// Coarse category of failure observed while replaying a crash input.
@@ -133,6 +139,9 @@ pub struct CrashIdentity {
 
 impl CrashIdentity {
     /// Returns the full key used for crash clustering.
+    ///
+    /// Nice to know: key intentionally stores stringified fields so serialized
+    /// report output and map ordering stay stable across runs.
     pub fn cluster_key(&self) -> CrashClusterKey {
         CrashClusterKey {
             exit_kind: self.exit_kind.to_string(),

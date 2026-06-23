@@ -1,3 +1,9 @@
+//! Crash replay engine used by dedup and minimization.
+//!
+//! Given an `OpenApiInput`, this module rebuilds and executes requests in order,
+//! tracks parameter feedback/backreferences, and reports whether replay crashed,
+//! completed, or stopped early.
+
 use std::time::Duration;
 
 use anyhow::Result;
@@ -33,6 +39,10 @@ pub enum ReplayOutcome {
     Stopped(String),
 }
 
+/// Classify response payload into broad buckets used for crash identity keys.
+///
+/// Nice to know: this operates on buffered response wrapper, so body reads here
+/// do not consume data needed later by validation.
 fn coarse_response_class(response: &Response) -> ResponseClass {
     // Uses WuppieFuzz's buffered Response wrapper, so reading the body here
     // does not consume it for later validation or status access.
@@ -59,6 +69,7 @@ fn coarse_response_class(response: &Response) -> ResponseClass {
     }
 }
 
+/// Classify textual body as HTML using lightweight heuristics.
 fn looks_like_html(text: &str) -> bool {
     let trimmed = text.trim_start().to_ascii_lowercase();
     trimmed.starts_with("<!doctype html>")
@@ -66,6 +77,9 @@ fn looks_like_html(text: &str) -> bool {
         || trimmed.contains("<body")
 }
 
+/// Compute crash kind for a crashing HTTP response.
+///
+/// 5xx status takes precedence over validation-based crash classification.
 fn response_crash_kind(
     status: StatusCode,
     validation_error: Option<&ValidationError>,
@@ -78,6 +92,7 @@ fn response_crash_kind(
         .unwrap_or(CrashKind::HttpResponseCrash)
 }
 
+/// Map reqwest transport error to coarse crash and response classes.
 fn transport_identity_parts(error: &reqwest::Error) -> (CrashKind, ResponseClass) {
     if error.is_timeout() {
         (CrashKind::TransportTimeout, ResponseClass::TransportTimeout)
@@ -99,6 +114,7 @@ fn transport_identity_parts(error: &reqwest::Error) -> (CrashKind, ResponseClass
     }
 }
 
+/// Build crash identity for response-based crashes.
 fn observed_response_identity(
     status: StatusCode,
     validation_error: Option<&ValidationError>,
@@ -115,6 +131,7 @@ fn observed_response_identity(
     }
 }
 
+/// Build crash identity for transport-layer failures.
 fn observed_transport_identity(error: &reqwest::Error, endpoint: Option<String>) -> CrashIdentity {
     let (crash_kind, response_class) = transport_identity_parts(error);
     CrashIdentity {
@@ -129,6 +146,7 @@ fn observed_transport_identity(error: &reqwest::Error, endpoint: Option<String>)
     }
 }
 
+/// Render endpoint as `METHOD /path` for report/debug identity fields.
 fn endpoint_string(request: &OpenApiRequest) -> String {
     format!("{} {}", request.method, request.path)
 }
@@ -146,6 +164,10 @@ enum BuiltReplayRequest {
     Stop(String),
 }
 
+/// Replay input with default authenticated client built from spec/config.
+///
+/// Returns first observed crash, `Completed` if all requests execute without
+/// crash criteria, or `Stopped` when replay cannot continue safely.
 pub fn replay_input(
     input: &OpenApiInput,
     api: &Spec,
@@ -172,6 +194,10 @@ struct ReplayContext<'a> {
     cookie_store: &'a std::sync::Arc<reqwest_cookie_store::CookieStoreMutex>,
 }
 
+/// Replay complete input sequence with caller-provided HTTP client state.
+///
+/// This variant is used by tests and internal callers that want explicit client,
+/// auth, timeout, and cookie-store control.
 fn replay_input_with_client(
     input: &OpenApiInput,
     api: &Spec,
@@ -206,6 +232,11 @@ fn replay_input_with_client(
     Ok(ReplayOutcome::Completed)
 }
 
+/// Replay one request and return whether replay should continue, stop, or crash.
+///
+/// Preconditions:
+/// - `parameter_feedback` must reflect all successfully replayed previous requests.
+/// - `request_index` must match request position in original input ordering.
 fn replay_request(
     request_index: usize,
     request: &OpenApiRequest,
@@ -274,6 +305,12 @@ fn replay_request(
     }
 }
 
+/// Build concrete reqwest request for replay.
+///
+/// Returns:
+/// - `Request` when build succeeds.
+/// - `Skip` when request cannot be instantiated from API/input.
+/// - `Stop` when reqwest rejects built request.
 fn build_replay_request(
     client: &reqwest::blocking::Client,
     authentication: &mut Authentication,

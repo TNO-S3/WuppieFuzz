@@ -1,3 +1,20 @@
+//! Crash deduplication and optional minimization pipeline.
+//!
+//! This module powers `wuppiefuzz dedup`.
+//! High-level flow:
+//! 1. Discover crash files in input directory.
+//! 2. Replay each file and derive a crash identity key.
+//! 3. Group files by key into clusters and pick smallest representative.
+//! 4. Write one representative per cluster to `output/unique`.
+//! 5. Optionally minimize representatives (or all members) while preserving cluster key.
+//! 6. Emit `clusters.json` with summary counts and per-cluster details.
+//!
+//! Where to find things:
+//! - [`dedup_crashes`] orchestrates end-to-end command behavior.
+//! - `identity` defines crash identity dimensions and cluster keys.
+//! - `replay` replays an input and reports observed crash identity.
+//! - `minimizer` performs delta-debugging minimization.
+
 mod identity;
 pub mod minimizer;
 pub mod replay;
@@ -28,6 +45,12 @@ use crate::{
 
 const DEDUP_PROGRESS_INTERVAL: usize = 100;
 
+/// Deduplicate crash files by replayed crash identity and optionally minimize outputs.
+///
+/// Preconditions:
+/// - `crash_directory` must exist and be a directory.
+/// - `output_directory` must not be equal to, or nested under, `crash_directory`.
+/// - Global configuration must already be loadable via [`Configuration::get`].
 pub fn dedup_crashes(
     crash_directory: &Path,
     output_directory: &Path,
@@ -180,6 +203,9 @@ struct CrashFileResult {
     reason: String,
 }
 
+/// Validate crash/output directories and return normalized absolute output path.
+///
+/// Rejects output paths inside crash directory to avoid recursively reprocessing generated output.
 fn prepare_output_directory(crash_directory: &Path, output_directory: &Path) -> Result<PathBuf> {
     ensure_crash_directory(crash_directory)?;
 
@@ -203,6 +229,9 @@ fn prepare_output_directory(crash_directory: &Path, output_directory: &Path) -> 
     Ok(output_directory)
 }
 
+/// Recursively collect candidate crash input files from `crash_directory`.
+///
+/// Hidden files and `.metadata` sidecars are skipped.
 fn get_crash_files(crash_directory: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for entry in WalkDir::new(crash_directory).min_depth(1) {
@@ -222,6 +251,7 @@ fn get_crash_files(crash_directory: &Path) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
+/// Validate that crash input root exists and is a directory.
 fn ensure_crash_directory(crash_directory: &Path) -> Result<()> {
     if !crash_directory.exists() {
         return Err(anyhow!(
@@ -238,6 +268,9 @@ fn ensure_crash_directory(crash_directory: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Return `true` for replayable crash input files.
+///
+/// Current filter excludes hidden files and `.metadata` files.
 fn is_crash_input_file(path: &Path) -> bool {
     let Some(file_name) = path.file_name().and_then(|f| f.to_str()) else {
         return false;
@@ -245,6 +278,9 @@ fn is_crash_input_file(path: &Path) -> bool {
     !file_name.starts_with('.') && !file_name.ends_with(".metadata")
 }
 
+/// Copy one representative input per cluster to `output_directory/unique`.
+///
+/// Updates each cluster's `representative` field to its output-relative destination path.
 fn copy_unique_representatives(
     output_directory: &Path,
     clusters: &mut BTreeMap<CrashClusterKey, CrashCluster>,
@@ -273,6 +309,10 @@ fn copy_unique_representatives(
     Ok(())
 }
 
+/// Write per-cluster outputs according to minimization mode.
+///
+/// With no mode, this copies representatives only. With minimization enabled, it writes
+/// minimized files and records per-file minimization reports.
 fn write_cluster_outputs(
     crash_directory: &Path,
     output_directory: &Path,
@@ -362,6 +402,9 @@ fn write_cluster_outputs(
     Ok(())
 }
 
+/// Load one crash input file and run delta-debugging minimization against expected cluster key.
+///
+/// If input cannot be read, returns a failed minimization result instead of bubbling error.
 fn minimize_source(
     source: &Path,
     cluster_key: &CrashClusterKey,
@@ -377,6 +420,9 @@ fn minimize_source(
     })
 }
 
+/// Persist minimization output for one source file.
+///
+/// Writes minimized input when available; otherwise copies original source unchanged.
 fn write_minimization_output(
     source: &Path,
     destination: &Path,
@@ -396,6 +442,7 @@ fn write_minimization_output(
     Ok(())
 }
 
+/// Build deterministic output file name for unique representatives.
 fn unique_file_name(index: usize, source_path: &Path) -> String {
     let file_name = source_path
         .file_name()
@@ -404,6 +451,7 @@ fn unique_file_name(index: usize, source_path: &Path) -> String {
     format!("{index:06}_{file_name}")
 }
 
+/// Write final dedup report to `clusters.json` under output directory.
 fn write_report(output_directory: &Path, report: &DedupReport) -> Result<()> {
     let report_path = output_directory.join("clusters.json");
     let file = fs::File::create(&report_path)
@@ -413,6 +461,9 @@ fn write_report(output_directory: &Path, report: &DedupReport) -> Result<()> {
     Ok(())
 }
 
+/// Aggregate per-file minimization statuses into top-level summary counts.
+///
+/// Returns `None` when no minimization data exists.
 fn minimization_summary(clusters: &[CrashCluster]) -> Option<MinimizationSummary> {
     let mut reports = clusters
         .iter()
@@ -435,6 +486,7 @@ fn minimization_summary(clusters: &[CrashCluster]) -> Option<MinimizationSummary
     Some(summary)
 }
 
+/// Log end-of-run counts and optional minimization breakdown.
 fn log_summary(summary: &DedupSummary, output_directory: &Path) {
     log::info!(
         "Dedup complete: {} crash files, {} reproduced, {} unique clusters, {} non-reproducible, {} skipped. Output: {}",
@@ -461,6 +513,12 @@ enum FileOutcome {
     Skipped(String),
 }
 
+/// Replay one crash file and classify outcome for dedup accounting.
+///
+/// Returns:
+/// - `Clustered` when replay reproduces crash and metadata can be read.
+/// - `NonReproducible` when replay completes or stops without crash.
+/// - `Skipped` for unreadable inputs or replay/metadata errors.
 fn process_crash_file(crash_file: &Path, api: &Spec, config: &Configuration) -> FileOutcome {
     let input = match OpenApiInput::from_file(crash_file) {
         Ok(input) => input,
@@ -489,6 +547,9 @@ fn process_crash_file(crash_file: &Path, api: &Spec, config: &Configuration) -> 
     }
 }
 
+/// Insert crash into cluster map and update representative selection.
+///
+/// Smallest source file per key is kept as representative.
 fn add_to_clusters(
     clusters: &mut BTreeMap<CrashClusterKey, CrashCluster>,
     source_file: &Path,
@@ -528,6 +589,9 @@ fn add_to_clusters(
     }
 }
 
+/// Emit periodic progress logs while scanning crash files.
+///
+/// Logs every [`DEDUP_PROGRESS_INTERVAL`] files, excluding final summary.
 fn log_progress(
     processed: usize,
     total: usize,
@@ -542,6 +606,7 @@ fn log_progress(
     }
 }
 
+/// Convert `path` to slash-normalized string relative to `base` when possible.
 fn relative_string(base: &Path, path: &Path) -> String {
     path.strip_prefix(base)
         .unwrap_or(path)
@@ -608,7 +673,7 @@ mod tests {
             10,
             make_crash_with_index("GET /items", 1),
         );
-        // different endpoint → second cluster
+        // different endpoint -> second cluster
         add_to_clusters(
             &mut clusters,
             Path::new("other"),

@@ -1,3 +1,9 @@
+//! Delta-debugging minimizer for replayable crash inputs.
+//!
+//! The minimizer removes one request at a time and accepts a candidate only when
+//! replay still crashes with same cluster key. Requests referenced by other
+//! requests are protected from removal.
+
 use anyhow::{Context, Result};
 use serde::Serialize;
 
@@ -33,6 +39,14 @@ pub struct MinimizationResult {
     pub report: MinimizationReport,
 }
 
+/// Minimize `input` while preserving `expected_cluster_key`.
+///
+/// Preconditions:
+/// - `replay` must be deterministic enough for identity comparison.
+/// - Baseline replay of input must produce a crash for requested key.
+///
+/// Returns failed result when baseline does not crash, crashes with different
+/// identity, or replay returns an error.
 pub fn minimize_with<Replay>(
     input: OpenApiInput,
     expected_cluster_key: &CrashClusterKey,
@@ -129,6 +143,7 @@ where
     }
 }
 
+/// Build a failed minimization result with structured report fields.
 pub fn failed(
     original_request_count: usize,
     candidate_replays: usize,
@@ -149,6 +164,10 @@ pub fn failed(
     }
 }
 
+/// Return cloned input with one request removed when safe.
+///
+/// Returns `None` when index is out of bounds, sequence has one request only,
+/// or another request contains a backreference to removed index.
 fn without_request(input: &OpenApiInput, request_index: usize) -> Option<OpenApiInput> {
     if input.0.len() <= 1 || request_index >= input.0.len() {
         return None;
@@ -167,6 +186,7 @@ fn without_request(input: &OpenApiInput, request_index: usize) -> Option<OpenApi
     Some(candidate)
 }
 
+/// Check whether request references request at `request_index`.
 fn request_references_index(request: &OpenApiRequest, request_index: usize) -> bool {
     request
         .parameters
@@ -178,6 +198,7 @@ fn request_references_index(request: &OpenApiRequest, request_index: usize) -> b
             .is_some_and(|body| parameter_references_index(body, request_index))
 }
 
+/// Recursively check whether parameter tree references request index.
 fn parameter_references_index(parameter: &ParameterContents, request_index: usize) -> bool {
     match parameter {
         ParameterContents::Object(values) => values
@@ -192,6 +213,7 @@ fn parameter_references_index(parameter: &ParameterContents, request_index: usiz
     }
 }
 
+/// Rewrite request backreference indexes after removing earlier request.
 fn rewrite_request_references_after_removal(
     request: &mut OpenApiRequest,
     removed_request_index: usize,
@@ -204,6 +226,7 @@ fn rewrite_request_references_after_removal(
     }
 }
 
+/// Recursively decrement backreference indexes greater than removed index.
 fn rewrite_parameter_references_after_removal(
     parameter: &mut ParameterContents,
     removed_request_index: usize,
