@@ -1,4 +1,5 @@
 mod identity;
+pub mod minimizer;
 pub mod replay;
 
 use std::{
