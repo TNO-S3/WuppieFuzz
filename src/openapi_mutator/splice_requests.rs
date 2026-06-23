@@ -143,6 +143,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use libafl::{
         corpus::{Corpus, CorpusId, HasCurrentCorpusId, InMemoryCorpus, Testcase},
         mutators::{MutationResult, Mutator},
@@ -153,7 +155,7 @@ mod tests {
     use super::SpliceRequestsMutator;
     use crate::{
         input::{
-            Method, OpenApiInput, OpenApiRequest, ParameterContents,
+            Body, Method, OpenApiInput, OpenApiRequest, ParameterContents,
             parameter::{OReference, ParameterKind},
         },
         openapi_mutator::test_helpers::{linked_requests, simple_request},
@@ -288,6 +290,48 @@ mod tests {
         };
 
         OpenApiInput(vec![req0, req1, req2, req3])
+    }
+
+    fn donor_with_nested_reference_in_tail() -> OpenApiInput {
+        let mut head_body_fields = BTreeMap::new();
+        head_body_fields.insert(
+            "id".to_string(),
+            ParameterContents::LeafValue(crate::input::parameter::SimpleValue::String(
+                "donor-head".to_string(),
+            )),
+        );
+
+        let head = OpenApiRequest {
+            method: Method::Get,
+            path: "/donor-head".to_string(),
+            body: Body::ApplicationJson(ParameterContents::Object(head_body_fields)),
+            parameters: BTreeMap::new(),
+        };
+
+        let mut nested_inner = BTreeMap::new();
+        nested_inner.insert(
+            "id".to_string(),
+            ParameterContents::OReference(OReference {
+                request_index: 0,
+                parameter_access: crate::parameter_access::ParameterAccess::request_body(
+                    crate::parameter_access::ParameterAccessElements::from_elements(&["id"
+                        .to_string()
+                        .into()]),
+                ),
+            }),
+        );
+
+        let mut nested_outer = BTreeMap::new();
+        nested_outer.insert("inner".to_string(), ParameterContents::Object(nested_inner));
+
+        let tail = OpenApiRequest {
+            method: Method::Post,
+            path: "/donor-tail".to_string(),
+            body: Body::ApplicationJson(ParameterContents::Object(nested_outer)),
+            parameters: BTreeMap::new(),
+        };
+
+        OpenApiInput(vec![head, tail])
     }
 
     // ---------------------------------------------------------------------------
@@ -428,6 +472,46 @@ mod tests {
             "expected to observe a preserved+remapped tail reference at least once"
         );
         Ok(())
+    }
+
+    /// Nested references inside donor tail bodies must also be fixed up after splicing.
+    #[test]
+    fn splice_breaks_nested_reference_in_tail_body() -> anyhow::Result<()> {
+        for _ in 0..50 {
+            let mut state = SpliceTestState::new();
+            state.add(donor_with_nested_reference_in_tail());
+            let cur_id = state.add(three_requests());
+            state.set_current(cur_id);
+
+            let mut input = three_requests();
+            let result = SpliceRequestsMutator::new().mutate(&mut state, &mut input)?;
+            if result == MutationResult::Skipped {
+                continue;
+            }
+
+            let tail_request = input
+                .0
+                .iter()
+                .find(|request| request.path == "/donor-tail")
+                .expect("spliced donor tail request missing");
+
+            let Body::ApplicationJson(ParameterContents::Object(outer)) = &tail_request.body else {
+                panic!("donor tail body changed shape");
+            };
+            let ParameterContents::Object(inner) =
+                outer.get("inner").expect("missing nested object")
+            else {
+                panic!("nested object missing");
+            };
+            let nested = inner.get("id").expect("missing nested reference");
+            assert!(
+                !nested.is_reference(),
+                "nested reference in donor tail body must be broken after splice"
+            );
+            return Ok(());
+        }
+
+        panic!("expected splice mutation to succeed at least once");
     }
 
     /// With independent split points, even identical inputs can produce different
