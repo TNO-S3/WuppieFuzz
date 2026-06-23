@@ -10,3 +10,6 @@
 [submodule "dashboard"]
 	path = dashboard
 	url = ../../TNO-S3/WuppieFuzz-dashboard.git
+[submodule "coverage_agents/dotnet"]
+	path = coverage_agents/dotnet
+	url = git@github.com:TNO-S3/WuppieFuzz-DotNet.git
