@@ -164,6 +164,14 @@ pub fn replay_input(
     )
 }
 
+struct ReplayContext<'a> {
+    api: &'a Spec,
+    request_timeout_ms: u64,
+    crash_criteria: &'a [ValidationErrorDiscriminants],
+    client: &'a reqwest::blocking::Client,
+    cookie_store: &'a std::sync::Arc<reqwest_cookie_store::CookieStoreMutex>,
+}
+
 fn replay_input_with_client(
     input: &OpenApiInput,
     api: &Spec,
@@ -173,17 +181,20 @@ fn replay_input_with_client(
     authentication: &mut Authentication,
     cookie_store: &std::sync::Arc<reqwest_cookie_store::CookieStoreMutex>,
 ) -> Result<ReplayOutcome> {
+    let ctx = ReplayContext {
+        api,
+        request_timeout_ms,
+        crash_criteria,
+        client,
+        cookie_store,
+    };
     let mut parameter_feedback = ParameterFeedback::new(input.len());
     for (request_index, request) in input.0.iter().enumerate() {
         match replay_request(
             request_index,
             request,
-            api,
-            request_timeout_ms,
-            crash_criteria,
-            client,
+            &ctx,
             authentication,
-            cookie_store,
             &mut parameter_feedback,
         )? {
             ReplayStep::Continue => {}
@@ -198,12 +209,8 @@ fn replay_input_with_client(
 fn replay_request(
     request_index: usize,
     request: &OpenApiRequest,
-    api: &Spec,
-    request_timeout_ms: u64,
-    crash_criteria: &[ValidationErrorDiscriminants],
-    client: &reqwest::blocking::Client,
+    ctx: &ReplayContext<'_>,
     authentication: &mut Authentication,
-    cookie_store: &std::sync::Arc<reqwest_cookie_store::CookieStoreMutex>,
     parameter_feedback: &mut ParameterFeedback,
 ) -> Result<ReplayStep> {
     let mut request = request.clone();
@@ -218,11 +225,11 @@ fn replay_request(
     parameter_feedback.process_request(request_index, &request);
 
     let request_built = match build_replay_request(
-        client,
+        ctx.client,
         authentication,
-        cookie_store,
-        api,
-        request_timeout_ms,
+        ctx.cookie_store,
+        ctx.api,
+        ctx.request_timeout_ms,
         &request,
     )? {
         BuiltReplayRequest::Request(request) => *request,
@@ -230,7 +237,7 @@ fn replay_request(
         BuiltReplayRequest::Stop(reason) => return Ok(ReplayStep::Stop(reason)),
     };
 
-    match client.execute(request_built) {
+    match ctx.client.execute(request_built) {
         Ok(response) => {
             let response: Response = response.into();
             let response_class = coarse_response_class(&response);
@@ -240,8 +247,8 @@ fn replay_request(
                 request_index,
                 &request,
                 &response,
-                api,
-                crash_criteria,
+                ctx.api,
+                ctx.crash_criteria,
                 &mut exit_kind,
                 parameter_feedback,
             );
