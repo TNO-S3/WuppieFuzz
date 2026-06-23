@@ -12,11 +12,12 @@ use std::{
 };
 
 use libafl::{
+    corpus::Corpus,
     events::{Event, EventFirer, EventRestarter, EventWithStats, ExecStats, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
-    state::{HasExecutions, Stoppable},
+    state::{HasCorpus, HasExecutions, HasSolutions, Stoppable},
 };
 use libafl_bolts::{current_time, prelude::RefIndexable};
 use reqwest::blocking::Client;
@@ -37,11 +38,30 @@ use crate::{
         },
     },
     parameter_feedback::ParameterFeedback,
-    reporting::{Reporting, sqlite::MySqLite},
+    reporting::{
+        CampaignStats, Reporting, SequenceStopStats, SequenceTimingStats, sqlite::MySqLite,
+    },
 };
 
 /// How often to print a new log line
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5;
+
+/// Collect detailed per-sequence diagnostic stats only when explicitly enabled
+/// for dev profile builds.
+const COLLECT_SEQUENCE_DIAGNOSTIC_STATS: bool = cfg!(feature = "sequence-diagnostics");
+
+#[derive(Clone, Copy, Debug)]
+enum SequenceStopReason {
+    Completed,
+    MissingBackreference,
+    RequestBuildError,
+    CrashOrValidation,
+    TransportError,
+}
+
+fn duration_as_us(start: Instant) -> u64 {
+    start.elapsed().as_micros().try_into().unwrap_or(u64::MAX)
+}
 
 type FuzzerState = crate::state::OpenApiFuzzerState<OpenApiInput>;
 
@@ -75,6 +95,10 @@ where
     last_window_time: Instant,
     last_covered: u64,
     last_endpoint_covered: u64,
+    last_window_seqs: usize,
+    last_window_reqs: u64,
+    sequence_stop_stats: SequenceStopStats,
+    sequence_timing_stats: SequenceTimingStats,
 }
 
 pub(crate) fn process_response(
@@ -112,7 +136,7 @@ pub(crate) fn process_response(
 
 impl<OT> SequenceExecutor<OT>
 where
-    OT: for<'all> ObserversTuple<OpenApiInput, FuzzerState>,
+    OT: ObserversTuple<OpenApiInput, FuzzerState>,
 {
     /// Create a new SequenceExecutor.
     pub fn new(
@@ -136,7 +160,7 @@ where
 
             coverage_client,
             endpoint_client,
-            reporter: crate::reporting::sqlite::get_reporter(config)?,
+            reporter: crate::reporting::sqlite::get_reporter(config, api)?,
 
             manual_interrupt: setup_interrupt()?,
             maybe_timeout_secs: config.timeout.map(|t| Duration::from_secs(t.get())),
@@ -147,7 +171,36 @@ where
             last_window_time: Instant::now(),
             last_covered: 0,
             last_endpoint_covered: 0,
+            last_window_seqs: 0,
+            last_window_reqs: 0,
+            sequence_stop_stats: SequenceStopStats::default(),
+            sequence_timing_stats: SequenceTimingStats::default(),
         })
+    }
+
+    fn record_sequence_stop_reason(&mut self, reason: SequenceStopReason) {
+        if !COLLECT_SEQUENCE_DIAGNOSTIC_STATS {
+            return;
+        }
+        match reason {
+            SequenceStopReason::Completed => self.sequence_stop_stats.completed += 1,
+            SequenceStopReason::MissingBackreference => {
+                self.sequence_stop_stats.missing_backreference += 1
+            }
+            SequenceStopReason::RequestBuildError => {
+                self.sequence_stop_stats.request_build_error += 1
+            }
+            SequenceStopReason::CrashOrValidation => {
+                self.sequence_stop_stats.crash_or_validation += 1
+            }
+            SequenceStopReason::TransportError => self.sequence_stop_stats.transport_error += 1,
+        }
+    }
+
+    fn add_timing(total: &mut u64, start: Instant) {
+        if COLLECT_SEQUENCE_DIAGNOSTIC_STATS {
+            *total = total.saturating_add(duration_as_us(start));
+        }
     }
 
     /// Executes the given input, tracking and using response parameters and verifying responses.
@@ -157,19 +210,31 @@ where
         let mut exit_kind = ExitKind::Ok;
         self.inputs_tested += 1;
         let mut performed_requests = 0;
+        let mut stop_reason = SequenceStopReason::Completed;
 
         let mut parameter_feedback = ParameterFeedback::new(inputs.0.len());
         log::debug!("Sending {} requests", inputs.0.len());
         'chain: for (request_index, request) in inputs.0.iter().enumerate() {
             let mut request = request.clone();
             log::trace!("OpenAPI request:\n{request:#?}");
+            let resolve_start = Instant::now();
             if let Err(error) = request.resolve_parameter_references(&parameter_feedback) {
+                Self::add_timing(
+                    &mut self.sequence_timing_stats.resolve_backreference_us,
+                    resolve_start,
+                );
                 log::debug!(
                     "Cannot instantiate request: missing value for backreferenced parameter: {error}. Maybe the earlier request crashed?"
                 );
+                stop_reason = SequenceStopReason::MissingBackreference;
                 break 'chain;
             };
+            Self::add_timing(
+                &mut self.sequence_timing_stats.resolve_backreference_us,
+                resolve_start,
+            );
             parameter_feedback.process_request(request_index, &request);
+            let build_request_start = Instant::now();
             let request_builder = match build_request_from_input(
                 &self.http_client,
                 &mut self.authentication,
@@ -178,6 +243,10 @@ where
                 &request,
             ) {
                 Err(err) => {
+                    Self::add_timing(
+                        &mut self.sequence_timing_stats.build_request_us,
+                        build_request_start,
+                    );
                     log::error!("Error building request: {err}");
                     continue;
                 }
@@ -187,14 +256,24 @@ where
             let request_built = match request_builder.build() {
                 Ok(request) => request,
                 Err(err) => {
+                    Self::add_timing(
+                        &mut self.sequence_timing_stats.build_request_us,
+                        build_request_start,
+                    );
                     // We don't expect errors to occur in the reqwest builder. If one occurs,
                     // it's not the target's fault, so we don't set ExitKind::Crash or Timeout.
                     log::error!("Error building request: {err}");
+                    stop_reason = SequenceStopReason::RequestBuildError;
                     break;
                 }
             };
+            Self::add_timing(
+                &mut self.sequence_timing_stats.build_request_us,
+                build_request_start,
+            );
 
             let curl_request = CurlRequest(&request_built, &self.authentication);
+            let report_request_start = Instant::now();
             let reporter_request_id = self.reporter.report_request(
                 &request,
                 &curl_request,
@@ -202,13 +281,28 @@ where
                 self.inputs_tested.try_into().unwrap_or(u32::MAX),
             );
             let curl_request = curl_request.to_string();
+            Self::add_timing(
+                &mut self.sequence_timing_stats.report_request_us,
+                report_request_start,
+            );
+            let http_execute_start = Instant::now();
             match self.http_client.execute(request_built) {
                 Ok(response) => {
+                    Self::add_timing(
+                        &mut self.sequence_timing_stats.http_execute_us,
+                        http_execute_start,
+                    );
                     performed_requests += 1;
                     let response: Response = response.into();
+                    let report_response_start = Instant::now();
                     self.reporter
                         .report_response(&response, reporter_request_id);
+                    Self::add_timing(
+                        &mut self.sequence_timing_stats.report_response_us,
+                        report_response_start,
+                    );
                     log::trace!("Got response {}", response.status());
+                    let process_response_start = Instant::now();
                     let validation_error = process_response(
                         request_index,
                         &request,
@@ -218,6 +312,11 @@ where
                         &mut exit_kind,
                         &mut parameter_feedback,
                     );
+                    Self::add_timing(
+                        &mut self.sequence_timing_stats.process_response_us,
+                        process_response_start,
+                    );
+                    let endpoint_cover_start = Instant::now();
                     self.endpoint_client.lock().unwrap().cover(
                         request.method,
                         request.path.clone(),
@@ -228,15 +327,30 @@ where
                         }),
                         validation_error,
                     );
+                    Self::add_timing(
+                        &mut self.sequence_timing_stats.endpoint_cover_us,
+                        endpoint_cover_start,
+                    );
                     if exit_kind == ExitKind::Crash {
+                        stop_reason = SequenceStopReason::CrashOrValidation;
                         break 'chain;
                     }
                 }
                 Err(transport_error) => {
+                    Self::add_timing(
+                        &mut self.sequence_timing_stats.http_execute_us,
+                        http_execute_start,
+                    );
+                    let report_response_start = Instant::now();
                     self.reporter
                         .report_response_error(&transport_error.to_string(), reporter_request_id);
+                    Self::add_timing(
+                        &mut self.sequence_timing_stats.report_response_us,
+                        report_response_start,
+                    );
                     // We set exit_kind to timeout even if some other transport error occurs as that is the most fitting one within LibAFL
                     exit_kind = ExitKind::Timeout;
+                    stop_reason = SequenceStopReason::TransportError;
                     if transport_error.is_timeout() {
                         log::error!(
                             "Time-out occurred during communication with the API under test: {transport_error}"
@@ -267,6 +381,7 @@ where
                 }
             };
         }
+        self.record_sequence_stop_reason(stop_reason);
         (exit_kind, performed_requests)
     }
 
@@ -295,10 +410,23 @@ where
     ) where
         EM: EventFirer<OpenApiInput, FuzzerState> + EventRestarter<FuzzerState>,
     {
+        let code_coverage_phase_start = Instant::now();
         self.coverage_client.fetch_coverage(true);
         let (covered, total) = self.coverage_client.max_coverage_ratio();
+        Self::add_timing(
+            &mut self.sequence_timing_stats.code_coverage_phase_us,
+            code_coverage_phase_start,
+        );
+
+        let endpoint_coverage_phase_start = Instant::now();
         self.endpoint_client.fetch_coverage(true);
         let (e_covered, e_total) = self.endpoint_client.max_coverage_ratio();
+        Self::add_timing(
+            &mut self.sequence_timing_stats.endpoint_coverage_phase_us,
+            endpoint_coverage_phase_start,
+        );
+
+        let post_exec_reporting_start = Instant::now();
 
         // Add own user stats
         if covered != self.last_covered {
@@ -336,6 +464,20 @@ where
                 "requests",
                 UserStatsValue::Number(self.performed_requests),
             );
+
+            let seq_delta = self.inputs_tested - self.last_window_seqs;
+            let req_delta = self.performed_requests - self.last_window_reqs;
+            self.reporter.report_stats(CampaignStats {
+                seq_per_sec: seq_delta as f64 / diff as f64,
+                req_per_sec: req_delta as f64 / diff as f64,
+                requests_completed_total: self.performed_requests,
+                corpus_size: state.corpus().count().try_into().unwrap_or(u32::MAX),
+                objectives: state.solutions().count().try_into().unwrap_or(u32::MAX),
+                sequence_stop_stats: self.sequence_stop_stats,
+                sequence_timing_stats: self.sequence_timing_stats,
+            });
+            self.last_window_seqs = self.inputs_tested;
+            self.last_window_reqs = self.performed_requests;
         }
 
         self.reporter.report_coverage(
@@ -364,6 +506,11 @@ where
             }
             state.request_stop();
         }
+
+        Self::add_timing(
+            &mut self.sequence_timing_stats.post_exec_reporting_us,
+            post_exec_reporting_start,
+        );
     }
 
     /// Uses the embedded coverage clients to generate a coverage report

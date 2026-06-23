@@ -4,6 +4,9 @@
 
 ## Features
 
+- Add more insights for use in dashboard in [#313](https://github.com/TNO-S3/WuppieFuzz/pull/313)
+- Store run metadata in database in [#329](https://github.com/TNO-S3/WuppieFuzz/pull/329)
+
 ## Fixes
 
 - Fix AddRequestMutator to generate typed parameter/body contents instead of raw bytes in [#317](https://github.com/TNO-S3/WuppieFuzz/pull/317)
