@@ -209,7 +209,7 @@ struct CrashFileResult {
 fn prepare_output_directory(crash_directory: &Path, output_directory: &Path) -> Result<PathBuf> {
     ensure_crash_directory(crash_directory)?;
 
-    fs::create_dir_all(&output_directory)?;
+    fs::create_dir_all(output_directory)?;
 
     let crash_directory = std::fs::canonicalize(crash_directory)?;
     let output_directory = std::fs::canonicalize(output_directory)?;
