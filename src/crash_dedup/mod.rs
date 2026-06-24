@@ -209,8 +209,10 @@ struct CrashFileResult {
 fn prepare_output_directory(crash_directory: &Path, output_directory: &Path) -> Result<PathBuf> {
     ensure_crash_directory(crash_directory)?;
 
-    let crash_directory = std::path::absolute(crash_directory)?;
-    let output_directory = std::path::absolute(output_directory)?;
+    fs::create_dir_all(&output_directory)?;
+
+    let crash_directory = std::fs::canonicalize(crash_directory)?;
+    let output_directory = std::fs::canonicalize(output_directory)?;
     if output_directory.starts_with(&crash_directory) {
         return Err(anyhow!(
             "Output directory {} must not be inside or equal to crash directory {} because crash collection is recursive",
@@ -225,7 +227,6 @@ fn prepare_output_directory(crash_directory: &Path, output_directory: &Path) -> 
         ));
     }
 
-    fs::create_dir_all(&output_directory)?;
     Ok(output_directory)
 }
 
