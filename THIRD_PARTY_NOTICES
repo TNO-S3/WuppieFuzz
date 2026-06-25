@@ -63,6 +63,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Components:
 
+- aws-lc-sys
 - encoding_rs
 - subtle
 
@@ -144,6 +145,7 @@ THIS SOFTWARE.
 
 Components:
 
+- aws-lc-sys
 - ring
 - rustls-webpki
 - untrusted
@@ -235,8 +237,12 @@ SOFTWARE.
 
 Components:
 
+- adler2
+- aho-corasick
+- aws-lc-sys
 - block2
 - build_html
+- byteorder
 - bytes
 - combine
 - console
@@ -249,10 +255,13 @@ Components:
 - hyper
 - hyper-util
 - indicatif
+- jiff
+- jiff-static
 - json_env_logger2
 - libm
 - libsqlite3-sys
 - libyaml-rs
+- memchr
 - memoffset
 - mio
 - nix
@@ -269,6 +278,7 @@ Components:
 - simd-adler32
 - slab
 - sqlite-wasm-rs
+- same-file
 - strsim
 - strum
 - tokio
@@ -284,7 +294,9 @@ Components:
 - unit-prefix
 - unsafe-libyaml
 - urlencoding
+- walkdir
 - want
+- winapi-util
 - z3
 - z3-sys
 - zmij
