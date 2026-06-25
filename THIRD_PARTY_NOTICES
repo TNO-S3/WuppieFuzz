@@ -63,6 +63,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Components:
 
+- aws-lc-sys
 - encoding_rs
 - subtle
 
@@ -144,6 +145,7 @@ THIS SOFTWARE.
 
 Components:
 
+- aws-lc-sys
 - ring
 - rustls-webpki
 - untrusted
@@ -210,5 +212,154 @@ Components:
 - zerotrie
 - zerovec
 - zerovec-derive
+
+===============================================================================
+
+MIT LICENSE NOTICE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Components:
+
+- adler2
+- aho-corasick
+- aws-lc-sys
+- block2
+- build_html
+- byteorder
+- bytes
+- combine
+- console
+- derive_more
+- derive_more-impl
+- h2
+- hostname
+- http-body
+- http-body-util
+- hyper
+- hyper-util
+- indicatif
+- jiff
+- jiff-static
+- json_env_logger2
+- libm
+- libsqlite3-sys
+- libyaml-rs
+- memchr
+- memoffset
+- mio
+- nix
+- oas3
+- objc2
+- objc2-encode
+- openssl-sys
+- rand_regex
+- redox_syscall
+- rsqlite-vfs
+- rusqlite
+- schannel
+- serial_test
+- simd-adler32
+- slab
+- sqlite-wasm-rs
+- same-file
+- strsim
+- strum
+- tokio
+- tokio-util
+- tower
+- tower-http
+- tower-layer
+- tower-service
+- tracing
+- tracing-core
+- try-lock
+- tuple_list
+- unit-prefix
+- unsafe-libyaml
+- urlencoding
+- walkdir
+- want
+- winapi-util
+- z3
+- z3-sys
+- zmij
+
+===============================================================================
+
+MPL-2.0 LICENSE NOTICE
+
+This product includes software licensed under the Mozilla Public License 2.0.
+You may obtain a copy of the License at:
+
+https://www.mozilla.org/en-US/MPL/2.0/
+
+Components:
+
+- porter-stemmer
+
+===============================================================================
+
+CDLA-Permissive-2.0 LICENSE NOTICE
+
+This product includes software licensed under the Community Data License
+Agreement - Permissive - Version 2.0. You may obtain a copy of the License at:
+
+https://cdla.dev/permissive-2-0/
+
+Components:
+
+- webpki-root-certs
+- webpki-roots
+
+===============================================================================
+
+LGPL-2.1-or-later LICENSE NOTICE
+
+This product includes software that is available under the GNU Lesser General
+Public License, version 2.1 or (at your option) any later version.
+You may obtain a copy of the GNU LGPL from:
+
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+
+Components:
+
+- r-efi
+
+===============================================================================
+
+Apache-2.0 WITH LLVM-exception LICENSE NOTICE
+
+This product includes software distributed under Apache License 2.0 with the
+LLVM Exception.
+
+The Apache License 2.0 text is provided in the repository LICENSE file.
+The LLVM Exception text can be found at:
+
+https://spdx.org/licenses/LLVM-exception.html
+
+Components:
+
+- linux-raw-sys
+- rustix
+- wasi
+- wasip2
+- wit-bindgen
 
 ===============================================================================

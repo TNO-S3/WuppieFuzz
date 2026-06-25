@@ -4,6 +4,16 @@
 
 ## Features
 
+## Fixes
+
+# v1.6.0 (2026-06-25)
+
+## Highlights
+
+Improved mutation quality and request typing, including a new splice mutator and typed parameter/body generation. Better campaign observability through richer dashboard insights and persisted run metadata in the reporting database. More reliable reproduction and corpus handling via crash-criteria support in `reproduce`, nested enum body support, and integer-preserving YAML deserialization.
+
+## Features
+
 - Introduce splice mutator in [#322](https://github.com/TNO-S3/WuppieFuzz/pull/322)
 - Add more insights for use in dashboard in [#313](https://github.com/TNO-S3/WuppieFuzz/pull/313)
 - Store run metadata in database in [#329](https://github.com/TNO-S3/WuppieFuzz/pull/329)
