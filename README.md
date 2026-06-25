@@ -36,6 +36,11 @@ In *Proceedings of the 12th International Conference on Information Systems
 Security and Privacy (ICISSP), Volume 2*, 221-231. SciTePress.
 https://doi.org/10.5220/0000217100004061
 
+## License
+
+WuppieFuzz is licensed under Apache-2.0; see [LICENSE](LICENSE).  
+Third-party license notices are listed in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+
 ## Quick install
 
 For quick installation of WuppieFuzz for popular operating systems (MacOS,
