@@ -310,7 +310,7 @@ Components:
 
 ===============================================================================
 
-UNLICENSE NOTICE
+Unlicense LICENSE NOTICE
 
 This software is released into the public domain.
 
@@ -381,7 +381,7 @@ Components:
 
 ===============================================================================
 
-CDLA-PERMISSIVE-2.0 LICENSE NOTICE
+CDLA-Permissive-2.0 LICENSE NOTICE
 
 This product includes software licensed under the Community Data License
 Agreement - Permissive - Version 2.0. You may obtain a copy of the License at:
@@ -395,7 +395,7 @@ Components:
 
 ===============================================================================
 
-LGPL-2.1-OR-LATER LICENSE NOTICE
+LGPL-2.1-or-later LICENSE NOTICE
 
 This product includes software that is available under the GNU Lesser General
 Public License, version 2.1 or (at your option) any later version.
@@ -409,7 +409,7 @@ Components:
 
 ===============================================================================
 
-APACHE-2.0 WITH LLVM-EXCEPTION NOTICE
+Apache-2.0 WITH LLVM-exception LICENSE NOTICE
 
 This product includes software distributed under Apache License 2.0 with the
 LLVM Exception.
