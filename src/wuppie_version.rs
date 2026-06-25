@@ -18,7 +18,7 @@ pub fn print_license() {
     \n{}\n{}\n\
     ===============================================================================",
         include_str!("../LICENSE"),
-        include_str!("../LICENSE.THIRDPARTY")
+        include_str!("../THIRD_PARTY_NOTICES")
     )
 }
 
