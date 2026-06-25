@@ -94,20 +94,45 @@ pub trait CoverageClient {
     fn generate_coverage_report(&self, report_path: &Path);
 }
 
+/// Returns the effective coverage host for the configured coverage format,
+/// including the default fallback when `coverage_host` is not explicitly set.
+pub fn effective_coverage_host(config: &Configuration) -> Option<SocketAddr> {
+    match config.coverage_configuration {
+        configuration::CoverageConfiguration::Jacoco { .. } => Some(
+            config
+                .coverage_host
+                .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6300)),
+        ),
+        configuration::CoverageConfiguration::Dotnet { .. } => Some(
+            config
+                .coverage_host
+                .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6302)),
+        ),
+        configuration::CoverageConfiguration::Lcov { .. }
+        | configuration::CoverageConfiguration::Coverband { .. } => Some(
+            config
+                .coverage_host
+                .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 3001)),
+        ),
+        configuration::CoverageConfiguration::Endpoint => None,
+    }
+}
+
 /// Produces a coverage client corresponding to the given configuration
 pub fn get_coverage_client<'c>(
     clargs: &'c Configuration,
     report_path: &Option<PathBuf>,
 ) -> Result<Box<dyn CoverageClient + 'c>, anyhow::Error> {
+    let coverage_host = effective_coverage_host(clargs);
+
     Ok(match clargs.coverage_configuration {
         configuration::CoverageConfiguration::Jacoco {
             ref jacoco_class_prefix,
             ..
         } => Box::new(
             jacoco::JacocoCoverageClient::new(
-                &clargs
-                    .coverage_host
-                    .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6300)),
+                // effective_coverage_host always returns Some for Jacoco
+                &coverage_host.unwrap(),
                 report_path
                     .clone()
                     .map(|report_path| report_path.as_path().join("jacoco_exec")),
@@ -117,9 +142,8 @@ pub fn get_coverage_client<'c>(
         ),
         configuration::CoverageConfiguration::Lcov { .. } => Box::new(
             lcov_client::LcovCoverageClient::new(
-                &clargs
-                    .coverage_host
-                    .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 3001)),
+                // effective_coverage_host always returns Some for Lcov
+                &coverage_host.unwrap(),
                 report_path
                     .clone()
                     .map(|report_path| report_path.as_path().join("lcov_exec")),
@@ -127,10 +151,8 @@ pub fn get_coverage_client<'c>(
             .context("Could not construct LcovCoverageClient")?,
         ),
         configuration::CoverageConfiguration::Coverband { .. } => {
-            let mut url = clargs
-                .coverage_host
-                .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 3001))
-                .to_string();
+            // effective_coverage_host always returns Some for Coverband
+            let mut url = coverage_host.unwrap().to_string();
             url.insert_str(0, "https://");
             Box::new(coverband::CoverbandCoverageClient::new(
                 url.as_str()

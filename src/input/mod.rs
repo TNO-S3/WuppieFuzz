@@ -395,9 +395,9 @@ impl<'a> Iterator for ParamContentsAtLevel0Wrapper<'a> {
 
 impl OpenApiInput {
     /// Returns an iterator that yields all `ParameterContents` for which `filter`
-    /// is true, from all requests in the series. Each item is accompanied by
-    /// the index of the request it appears in.
-    // TODO: filter nested parameters too!
+    /// is true, from all requests in the series, including nested parameter
+    /// contents in object and array bodies. Each item is accompanied by the index
+    /// of the request it appears in.
     pub fn parameter_filter<'a, F>(
         &'a mut self,
         filter: &'a F,
@@ -405,23 +405,38 @@ impl OpenApiInput {
     where
         F: Fn(&&'a mut ParameterContents) -> bool + 'a,
     {
+        fn parameter_contents_filter<'a, F>(
+            contents: &'a mut ParameterContents,
+            filter: &'a F,
+        ) -> Box<dyn Iterator<Item = &'a mut ParameterContents> + 'a>
+        where
+            F: Fn(&&'a mut ParameterContents) -> bool + 'a,
+        {
+            match contents {
+                ParameterContents::Object(obj) => Box::new(
+                    obj.values_mut()
+                        .flat_map(move |value| parameter_contents_filter(value, filter)),
+                ),
+                ParameterContents::Array(arr) => Box::new(
+                    arr.iter_mut()
+                        .flat_map(move |value| parameter_contents_filter(value, filter)),
+                ),
+                _ if filter(&contents) => Box::new(std::iter::once(contents)),
+                _ => Box::new(std::iter::empty()),
+            }
+        }
+
         self.0
             .iter_mut()
             .enumerate()
             .flat_map(move |(request_idx, openapi_request)| {
-                // For each input, collect any named parameters ...
-                openapi_request
-                    .parameters
-                    .iter_mut()
-                    .map(|(_, v)| v)
-                    // .. then add any fields from the body as well ..
-                    .chain(match &mut openapi_request.body {
-                        Body::Empty => ParamContentsAtLevel0Wrapper::SimpleOption(None),
-                        Body::TextPlain(text) => {
-                            ParamContentsAtLevel0Wrapper::SimpleOption(Some(text))
-                        }
-                        Body::ApplicationJson(parameters)
-                        | Body::XWwwFormUrlencoded(parameters) => match parameters {
+                // For each input, collect named parameters and body contents, then
+                // recurse into nested objects and arrays.
+                let body_contents = match &mut openapi_request.body {
+                    Body::Empty => ParamContentsAtLevel0Wrapper::SimpleOption(None),
+                    Body::TextPlain(text) => ParamContentsAtLevel0Wrapper::SimpleOption(Some(text)),
+                    Body::ApplicationJson(parameters) | Body::XWwwFormUrlencoded(parameters) => {
+                        match parameters {
                             ParameterContents::Object(obj_param) => {
                                 ParamContentsAtLevel0Wrapper::InObject(obj_param.values_mut())
                             }
@@ -429,10 +444,15 @@ impl OpenApiInput {
                                 ParamContentsAtLevel0Wrapper::InArray(arr.iter_mut())
                             }
                             _ => ParamContentsAtLevel0Wrapper::SimpleOption(Some(parameters)),
-                        },
-                    })
-                    // .. then only return filtered ones with the request index
-                    .filter(filter)
+                        }
+                    }
+                };
+
+                openapi_request
+                    .parameters
+                    .values_mut()
+                    .chain(body_contents)
+                    .flat_map(move |v| parameter_contents_filter(v, filter))
                     .map(move |v| (request_idx, v))
             })
     }

@@ -9,10 +9,9 @@
 //! later refers to an 'artist_id', there is an opportunity to match it to the 'id' found
 //! earlier.
 
-use std::collections::BTreeMap;
-
-use oas3::spec::{
-    MediaType, ObjectOrReference, ObjectSchema, Operation, Parameter, RequestBody, Response,
+use oas3::{
+    Map,
+    spec::{MediaType, Operation, Parameter, RequestBody, Response, Schema},
 };
 
 use crate::{
@@ -276,7 +275,7 @@ fn normalization_recursion_limit_exceeded(recursion_depth: usize) -> bool {
 /// names in a schema if it contains an object or an array of objects.
 fn normalize_schema(
     api: &Spec,
-    schema: ObjectSchema,
+    schema: &Schema,
     path: Vec<String>,
     access: ParameterAccess,
     recursion_depth: usize,
@@ -300,65 +299,47 @@ fn normalize_schema(
     if normalization_recursion_limit_exceeded(recursion_depth) {
         return None;
     }
+    let resolved = schema.resolve(api).ok()?;
+    let object_schema = match resolved {
+        Schema::Boolean(_) => return None,
+        Schema::Object(object_or_reference) => match *object_or_reference {
+            oas3::spec::ObjectOrReference::Object(object_schema) => object_schema,
+            oas3::spec::ObjectOrReference::Ref { .. } => return None,
+        },
+    };
+
     let result;
-    if schema.all_of.len() == 1 {
+    if object_schema.all_of.len() == 1 {
         // Normalize the single schema in this all_of.
         result = normalize_schema(
             api,
-            schema.all_of[0]
-                .resolve(api)
-                .expect("Could not resolve schema reference."),
+            &object_schema.all_of[0],
             path,
             access,
             recursion_depth + 1,
         )
-    } else if schema.one_of.len() == 1 {
+    } else if object_schema.one_of.len() == 1 {
         // Normalize the single schema in this one_of.
         result = normalize_schema(
             api,
-            schema.one_of[0]
-                .resolve(api)
-                .expect("Could not resolve schema reference."),
+            &object_schema.one_of[0],
             path,
             access,
             recursion_depth + 1,
         )
     } else {
-        result = match &schema.schema_type {
+        result = match &object_schema.schema_type {
             Some(type_set) => match type_set {
                 oas3::spec::SchemaTypeSet::Single(schema_type) => match schema_type {
-                    oas3::spec::SchemaType::Array => {
-                        // let inner_schema = a.items.as_ref()?.resolve(api);
-                        let inner_schema = schema.items;
-                        // SchemaKind::Type(openapiv3::Type::Object(ref o)) => {
-                        //     Some(normalize_object_type(api, o, path, access))
-                        // }
-                        // No support for nested arrays - semantic meaning not obvious
-                        // _ => None,
-                        match inner_schema {
-                            Some(inner_schema) => match *inner_schema {
-                                oas3::spec::Schema::Boolean(_boolean_schema) => todo!(
-                                    "Boolean type items for interaction with prefixItems are not yet implemented."
-                                ),
-                                oas3::spec::Schema::Object(object_or_reference) => {
-                                    let object_schema = object_or_reference
-                                        .resolve(api)
-                                        .expect("Could not resolve schema reference.");
-                                    Some(normalize_object_type(
-                                        api,
-                                        &object_schema.properties,
-                                        path,
-                                        access,
-                                        recursion_depth + 1,
-                                    ))
-                                }
-                            },
-                            None => None,
+                    oas3::spec::SchemaType::Array => match object_schema.items.as_ref() {
+                        Some(inner_schema) => {
+                            normalize_schema(api, inner_schema, path, access, recursion_depth + 1)
                         }
-                    }
+                        None => None,
+                    },
                     oas3::spec::SchemaType::Object => Some(normalize_object_type(
                         api,
-                        &schema.properties,
+                        &object_schema.properties,
                         path,
                         access,
                         recursion_depth + 1,
@@ -366,11 +347,6 @@ fn normalize_schema(
                     // Other types do not have a name, return an empty vec so their key in the
                     // enclosing object/array is still included.
                     _ => Some(vec![]),
-                    // oas3::spec::SchemaType::Boolean => todo!(),
-                    // oas3::spec::SchemaType::Integer => todo!(),
-                    // oas3::spec::SchemaType::Number => todo!(),
-                    // oas3::spec::SchemaType::String => todo!(),
-                    // oas3::spec::SchemaType::Null => todo!(),
                 },
                 oas3::spec::SchemaTypeSet::Multiple(_schema_types) => {
                     todo!("Sets of multiple schemas are not yet supported.")
@@ -394,7 +370,7 @@ fn normalize_media_type<'a>(
     if normalization_recursion_limit_exceeded(recursion_depth) {
         return None;
     }
-    let schema = media_type.schema.as_ref()?.resolve(api).ok()?;
+    let schema = media_type.schema.as_ref()?;
     let access = match req_or_resp {
         ReqResp::Req => ParameterAccess::request_body(ParameterAccessElements::new()),
         ReqResp::Resp => ParameterAccess::response_body(ParameterAccessElements::new()),
@@ -405,7 +381,7 @@ fn normalize_media_type<'a>(
 /// Returns ParameterNormalizations for all fields in the object.
 fn normalize_object_type<'a>(
     api: &'a Spec,
-    object_properties: &'a BTreeMap<String, ObjectOrReference<ObjectSchema>>,
+    object_properties: &'a Map<String, Schema>,
     path: Vec<String>,
     parameter_access: ParameterAccess,
     recursion_depth: usize,
@@ -430,9 +406,9 @@ fn normalize_object_type<'a>(
                 new_parameter_access.clone(),
                 path.clone(),
             )];
-            let nested_schema = object_properties[key]
-                .resolve(api)
-                .unwrap_or_else(|_| panic!("Could not resolve nested schema {}", key));
+            let nested_schema = object_properties
+                .get(key)
+                .unwrap_or_else(|| panic!("Could not resolve nested schema {}", key));
             let nested_params = normalize_schema(
                 api,
                 nested_schema,

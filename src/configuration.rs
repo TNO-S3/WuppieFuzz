@@ -118,6 +118,12 @@ pub enum Commands {
         /// passed through an API specification.
         #[arg(long, value_parser, value_name = "STATIC_HEADERS.YAML")]
         header: Option<PathBuf>,
+        /// Which errors should be considered a bug while replaying this input.
+        /// See help for the `fuzz` command for a list of possible values.
+        ///
+        /// By default, all validation error variants are considered crashes.
+        #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
+        crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
         // Manually added possible values below, since automatically showing possible values of an external (remote) enum
         // such as log::LevelFilter is not well supported.
         // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
@@ -288,6 +294,7 @@ impl Commands {
                 target,
                 authentication,
                 header,
+                crash_criteria,
                 log_level,
                 ..
             } => Ok(PartialConfiguration {
@@ -295,6 +302,7 @@ impl Commands {
                 target,
                 authentication,
                 header,
+                crash_criteria,
                 log_level,
                 ..Default::default()
             }),
