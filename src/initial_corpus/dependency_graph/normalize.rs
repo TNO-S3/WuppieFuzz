@@ -308,10 +308,10 @@ fn normalize_schema(
         },
     };
 
-    let result;
-    if object_schema.all_of.len() == 1 {
+    
+    let result = if object_schema.all_of.len() == 1 {
         // Normalize the single schema in this all_of.
-        result = normalize_schema(
+        normalize_schema(
             api,
             &object_schema.all_of[0],
             path,
@@ -320,7 +320,7 @@ fn normalize_schema(
         )
     } else if object_schema.one_of.len() == 1 {
         // Normalize the single schema in this one_of.
-        result = normalize_schema(
+        normalize_schema(
             api,
             &object_schema.one_of[0],
             path,
@@ -328,7 +328,7 @@ fn normalize_schema(
             recursion_depth + 1,
         )
     } else {
-        result = match &object_schema.schema_type {
+        match &object_schema.schema_type {
             Some(type_set) => match type_set {
                 oas3::spec::SchemaTypeSet::Single(schema_type) => match schema_type {
                     oas3::spec::SchemaType::Array => match object_schema.items.as_ref() {
@@ -353,8 +353,8 @@ fn normalize_schema(
                 }
             },
             None => None,
-        };
-    }
+        }
+    };
     result
 }
 
