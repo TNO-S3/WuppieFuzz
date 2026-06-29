@@ -59,7 +59,7 @@ env_logger = "0.11.9"
 indexmap = { version = "2.13.1", features = ["serde"] }
 indicatif = "0.18.4"
 iter-read = "1.1.0"
-itertools = "0.14.0"
+itertools = "0.15.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.5.0"
 lcov = "0.8"
