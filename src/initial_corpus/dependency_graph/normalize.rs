@@ -308,8 +308,7 @@ fn normalize_schema(
         },
     };
 
-    
-    let result = if object_schema.all_of.len() == 1 {
+    if object_schema.all_of.len() == 1 {
         // Normalize the single schema in this all_of.
         normalize_schema(
             api,
@@ -354,8 +353,7 @@ fn normalize_schema(
             },
             None => None,
         }
-    };
-    result
+    }
 }
 
 /// MediaType is the internal type used for objects, both input (POST) and
