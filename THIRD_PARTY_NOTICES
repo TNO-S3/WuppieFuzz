@@ -32,6 +32,7 @@ Components:
 - konst
 - konst_macro_rules
 - typewit
+- zlib-rs
 
 ===============================================================================
 BSD-3-Clause LICENSE NOTICE
@@ -124,6 +125,7 @@ OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Components:
 
+- ryu
 - xxhash-rust
 
 ===============================================================================
@@ -145,6 +147,7 @@ THIS SOFTWARE.
 
 Components:
 
+- aws-lc-rs
 - aws-lc-sys
 - ring
 - rustls-webpki
@@ -215,6 +218,27 @@ Components:
 
 ===============================================================================
 
+Apache-2.0 LICENSE NOTICE
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at:
+
+https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+Components:
+
+- openssl
+- sync_wrapper
+- zopfli
+
+===============================================================================
+
 MIT LICENSE NOTICE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -236,51 +260,231 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 Components:
-
+- addr2line
+- aes
+- ahash
 - adler2
+- android_system_properties
+- anstream
+- anstyle-parse
+- anstyle-query
+- anstyle-wincon
+- anyhow
+- arbitrary
+- atomic-waker
 - aho-corasick
+- backtrace
+- base64
+- bitflags
+- block-buffer
 - aws-lc-sys
 - block2
+- bumpalo
+- bytemuck
 - build_html
 - byteorder
+- bzip2
+- bzip2-sys
+- cesu8
+- cfg-if
+- chacha20
+- chrono
+- cipher
+- clap
+- clap_builder
+- clap_lex
+- cobs
+- colorchoice
 - bytes
 - combine
+- cookie
+- cookie_store
+- core-foundation
+- core-foundation-sys
+- cpufeatures
+- crc
+- crc-catalog
+- crc32fast
+- crossbeam-utils
+- crypto-common
+- ctor
+- ctor-proc-macro
+- ctrlc
+- deflate64
+- defmt-macros
+- deranged
 - console
 - derive_more
+- digest
+- dispatch2
+- document-features
+- dtor
+- dtor-proc-macro
+- either
+- embedded-io
+- encode_unicode
+- env_filter
+- equivalent
+- erased-serde
+- errno
+- fallible-iterator
+- fallible-streaming-iterator
+- fastbloom
+- fixedbitset
+- flate2
+- fnv
+- foreign-types
+- foreign-types-shared
+- form_urlencoded
+- fs2
+- futures-channel
+- futures-core
+- futures-io
+- futures-sink
+- futures-task
+- futures-util
+- generic-array
+- getrandom
+- gimli
 - derive_more-impl
+- hashbrown
+- hashlink
+- hmac
 - h2
+- http
 - hostname
 - http-body
+- httparse
+- httpdate
 - http-body-util
+- hyper-rustls
 - hyper
+- iana-time-zone
+- iana-time-zone-haiku
+- idna
+- idna_adapter
+- indexmap
 - hyper-util
+- inout
+- ipnet
+- is_terminal_polyfill
+- iter-read
+- itoa
 - indicatif
 - jiff
+- jni
+- jni-macros
+- jni-sys
+- jni-sys-macros
+- js-sys
 - jiff-static
+- kv-log-macro
+- lazy_static
+- lcov
+- libafl
+- libafl_bolts
 - json_env_logger2
 - libm
 - libsqlite3-sys
+- lock_api
+- log
+- lru-slab
+- lzma-rs
+- lzma-sys
+- mach2
 - libyaml-rs
+- meminterval
 - memchr
+- mime
+- miniz_oxide
 - memoffset
 - mio
+- num-bigint
+- num-complex
+- num-derive
+- num-integer
+- num-iter
+- num-rational
+- num_enum
 - nix
 - oas3
 - objc2
+- object
+- once_cell
+- once_cell_polyfill
+- openapiv3-extended
+- openssl-macros
+- openssl-probe
 - objc2-encode
+- parking_lot
+- parking_lot_core
+- pbkdf2
+- percent-encoding
+- petgraph
+- pin-project-lite
+- portable-atomic
+- portable-atomic-util
+- postcard
+- powerfmt
+- ppv-lite86
+- proc-macro-error-attr2
+- psl-types
+- publicsuffix
+- quick-xml
+- quinn
+- quinn-proto
+- quinn-udp
+- rand
+- rand_chacha
+- rand_core
 - openssl-sys
 - rand_regex
+- regex
+- regex-automata
+- regex-syntax
+- reqwest
+- reqwest_cookie_store
 - redox_syscall
 - rsqlite-vfs
+- rustc-demangle
+- rustc-hash
+- rustls
+- rustls-native-certs
+- rustls-pki-types
+- rustls-platform-verifier
+- rustls-platform-verifier-android
+- safe_arch
 - rusqlite
 - schannel
+- scopeguard
+- security-framework
+- security-framework-sys
+- semver
+- serde_core
+- serde_urlencoded
+- serde_yaml
 - serial_test
+- sha1
 - simd-adler32
+- simdutf8
+- siphasher
 - slab
+- smallvec
+- socket2
 - sqlite-wasm-rs
+- stable_deref_trait
 - same-file
 - strsim
+- system-configuration
+- system-configuration-sys
+- tempfile
+- thiserror-impl
+- time
+- time-macros
+- tinyvec
+- tinyvec_macros
 - strum
+- tokio-rustls
 - tokio
 - tokio-util
 - tower
@@ -290,15 +494,71 @@ Components:
 - tracing
 - tracing-core
 - try-lock
+- typed-builder
+- typed-builder-macro
+- typeid
+- typenum
+- uds
+- unicode-segmentation
+- unicode-truncate
+- unicode-width
 - tuple_list
 - unit-prefix
+- unty
+- url
 - unsafe-libyaml
+- utf8_iter
+- utf8parse
+- uuid
+- value-bag
+- wait-timeout
 - urlencoding
 - walkdir
+- wasm-bindgen
+- wasm-bindgen-futures
+- wasm-bindgen-macro
+- wasm-bindgen-shared
+- web-sys
+- web-time
+- wide
+- winapi
+- winapi-i686-pc-windows-gnu
 - want
+- winapi-x86_64-pc-windows-gnu
+- windows
+- windows-collections
+- windows-core
+- windows-future
+- windows-implement
+- windows-interface
+- windows-link
+- windows-numerics
+- windows-registry
+- windows-result
+- windows-strings
+- windows-sys
+- windows-targets
+- windows-threading
+- windows_aarch64_gnullvm
+- windows_aarch64_msvc
+- windows_i686_gnu
+- windows_i686_gnullvm
+- windows_i686_msvc
+- windows_x86_64_gnu
+- windows_x86_64_gnullvm
+- windows_x86_64_msvc
+- xz2
+- yaml_serde
 - winapi-util
 - z3
+- zerocopy
+- zerocopy-derive
+- zeroize
+- zip
 - z3-sys
+- zstd
+- zstd-safe
+- zstd-sys
 - zmij
 
 ===============================================================================
