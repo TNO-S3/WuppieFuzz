@@ -344,6 +344,19 @@ Components:
 
 ===============================================================================
 
+CC0-1.0 LICENSE NOTICE
+
+This product includes software made available under CC0 1.0 Universal.
+You may obtain a copy of the dedication at:
+
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Components:
+
+- constant_time_eq
+
+===============================================================================
+
 Apache-2.0 WITH LLVM-exception LICENSE NOTICE
 
 This product includes software distributed under Apache License 2.0 with the
