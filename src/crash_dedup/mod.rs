@@ -9,6 +9,11 @@
 //! 5. Optionally minimize representatives (or all members) while preserving cluster key.
 //! 6. Emit `clusters.json` with summary counts and per-cluster details.
 //!
+//! Replay classifies crashes using the configured crash criteria (`--crash-criteria`
+//! or the config file's `crash_criteria`). This should match the value used during the
+//! fuzzing run that produced the crash files; otherwise crash files may be reported as
+//! non-reproducible.
+//!
 //! Where to find things:
 //! - [`dedup_crashes`] orchestrates end-to-end command behavior.
 //! - `identity` defines crash identity dimensions and cluster keys.

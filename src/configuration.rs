@@ -151,6 +151,23 @@ pub enum Commands {
         /// Minimize one representative per cluster, or every reproduced crash file.
         #[arg(long, value_enum, value_name = "MODE", num_args = 0..=1, default_missing_value = "representative")]
         minimize: Option<MinimizationMode>,
+        /// Which errors are considered a bug when replaying crash files.
+        ///
+        /// Accepts the same values as `wuppiefuzz fuzz --crash-criteria` (see that command's
+        /// help for a description of each error). This should match the crash criteria used
+        /// during the fuzzing run that produced the crash files; with a different (narrower)
+        /// criteria set, crash files may be reported as non-reproducible.
+        ///
+        /// By default, all error types are considered bugs.
+        #[arg(
+            value_parser,
+            long,
+            value_enum,
+            required = false,
+            ignore_case = true,
+            verbatim_doc_comment
+        )]
+        crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
         /// The OpenAPI specification of the program under test
         #[arg(long, value_name = "OPENAPI_SPEC.YAML")]
         openapi_spec: Option<PathBuf>,
@@ -388,6 +405,7 @@ impl Commands {
                 authentication,
                 header,
                 log_level,
+                crash_criteria,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -395,6 +413,7 @@ impl Commands {
                 authentication,
                 header,
                 log_level,
+                crash_criteria,
                 ..Default::default()
             }),
             Commands::OutputCorpus {
