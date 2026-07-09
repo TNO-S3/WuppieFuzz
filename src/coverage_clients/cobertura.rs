@@ -119,7 +119,26 @@ impl CoberturaCoverageClient {
             first_unused_idx: 0,
             max_ratio: (0, 0),
             url,
-            client: Client::new(),
+            // Disable HTTP keep-alive connection reuse for this client. The
+            // .NET agent's HttpListener writes response headers and body as
+            // two separate socket writes without setting TCP_NODELAY. On a
+            // *reused* keep-alive connection this triggers the classic
+            // Nagle/delayed-ACK interaction: the agent's second write waits
+            // for our ACK of the first, and our TCP stack delays that ACK by
+            // up to ~40ms since we have no outgoing data to piggy-back it on.
+            // A fresh connection's first write is never held back this way
+            // (confirmed empirically: reused-connection fetches averaged
+            // ~50ms for a larger instrumented app vs. ~6-10ms with a new
+            // connection per request). Forcing a new connection per request
+            // costs a negligible local TCP handshake but avoids the stall
+            // entirely. This client talks only to the local coverage agent,
+            // never the fuzzing target, so this has no effect on request
+            // throughput against the target under test.
+            client: Client::builder()
+                .tcp_nodelay(true)
+                .pool_max_idle_per_host(0)
+                .build()
+                .unwrap_or_else(|_| Client::new()),
             namespace_filter,
         }
     }
