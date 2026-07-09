@@ -11,7 +11,6 @@ use std::{
     path::Path,
 };
 
-use log::trace;
 use quick_xml::de as xml_de;
 use reqwest::{
     Url,
@@ -111,7 +110,7 @@ impl DotnetCoverageClient {
             Entry::Vacant(e) => {
                 let idx = self.first_unused_idx;
                 if idx >= MAP_SIZE * 8 {
-                    log::warn!("Coverage map full, cannot track line {line} in {filename}");
+                    log::error!("Coverage map full, cannot track line {line} in {filename}");
                     return None;
                 }
                 self.first_unused_idx += 1;
@@ -127,7 +126,7 @@ impl DotnetCoverageClient {
                 if filename.contains(filter.as_str()) {
                     return true;
                 }
-                trace!("Skipping class {filename}");
+                log::trace!("Skipping class {filename}");
                 false
             }
         }

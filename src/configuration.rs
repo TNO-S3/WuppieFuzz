@@ -609,7 +609,7 @@ impl CoverageConfiguration {
             Self::Lcov { .. } => "LCOV",
             Self::Jacoco { .. } => "JaCoCo",
             Self::Coverband { .. } => "Coverband",
-            Self::Dotnet { .. } => "dotnet-coverage",
+            Self::Dotnet { .. } => ".NET",
         }
     }
 }
