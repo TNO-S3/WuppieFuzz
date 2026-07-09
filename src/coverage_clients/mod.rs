@@ -21,7 +21,7 @@ pub const MAP_SIZE: usize = 4 * 8192;
 pub mod read_utilities;
 
 pub mod coverband;
-pub mod dotnet;
+pub mod cobertura;
 pub mod dummy;
 pub mod endpoint;
 pub mod jacoco;
@@ -103,9 +103,11 @@ pub fn effective_coverage_host(config: &Configuration) -> Option<SocketAddr> {
                 .coverage_host
                 .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6300)),
         ),
-        configuration::CoverageConfiguration::Dotnet { .. } => Some(
+        configuration::CoverageConfiguration::Cobertura { .. } => Some(
             config
                 .coverage_host
+                // Port 6302 is arbitrary — Cobertura is a report format, not a protocol,
+                // and has no registered or conventional port. Change freely.
                 .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6302)),
         ),
         configuration::CoverageConfiguration::Lcov { .. }
@@ -161,17 +163,19 @@ pub fn get_coverage_client<'c>(
                     .context("Could not construct CoverbandCoverageClient")?,
             ))
         }
-        configuration::CoverageConfiguration::Dotnet {
+        configuration::CoverageConfiguration::Cobertura {
             ref namespace_filter,
             ..
         } => {
             let socket = clargs
                 .coverage_host
+                // Port 6302 is arbitrary — Cobertura is a report format, not a protocol,
+                // and has no registered or conventional port. Change freely.
                 .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6302));
             let url = format!("http://{socket}")
                 .parse()
-                .context("Could not parse dotnet coverage agent URL")?;
-            Box::new(dotnet::DotnetCoverageClient::new(
+                .context("Could not parse Cobertura coverage agent URL")?;
+            Box::new(cobertura::CoberturaCoverageClient::new(
                 url,
                 namespace_filter.clone(),
             ))

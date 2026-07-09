@@ -255,10 +255,10 @@ pub enum Commands {
         #[arg(value_parser, long)]
         jacoco_class_prefix: Option<String>,
 
-        /// Namespace or path filter for dotnet coverage. Only classes whose filename contains this
-        /// string will contribute to the coverage map. Example: "MyApp.Controllers".
+        /// Filename substring filter for Cobertura coverage. Only classes whose filename contains
+        /// this string will contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
         #[arg(value_parser, long)]
-        dotnet_namespace_filter: Option<String>,
+        cobertura_class_filter: Option<String>,
     },
 }
 
@@ -325,7 +325,7 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
-                dotnet_namespace_filter,
+                cobertura_class_filter,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -346,7 +346,7 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
-                dotnet_namespace_filter,
+                cobertura_class_filter,
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,
@@ -471,10 +471,11 @@ struct PartialConfiguration {
     #[clap(value_parser, long)]
     pub jacoco_class_prefix: Option<String>,
 
-    /// Namespace or path filter for dotnet coverage. Only classes whose filename contains this
-    /// string will contribute to the coverage map. Example: "MyApp.Controllers".
+    /// Filename substring filter for Cobertura coverage. Only classes whose filename contains
+    /// this string contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
+    #[serde(alias = "dotnet_namespace_filter")]
     #[clap(value_parser, long)]
-    pub dotnet_namespace_filter: Option<String>,
+    pub cobertura_class_filter: Option<String>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -485,8 +486,8 @@ pub enum CoverageFormat {
     Lcov,
     #[serde(alias = "coverband")]
     Coverband,
-    #[serde(alias = "dotnet")]
-    Dotnet,
+    #[serde(alias = "cobertura")]
+    Cobertura,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -593,8 +594,10 @@ pub enum CoverageConfiguration {
     },
     /// Coverband coverage. Requires a source directory if a report needs to be generated.
     Coverband { source_dir: Option<PathBuf> },
-    /// dotnet-coverage based coverage for .NET targets.
-    Dotnet {
+    /// Cobertura-over-HTTP coverage. Compatible with any agent serving the WuppieFuzz
+    /// Cobertura HTTP protocol. The bundled .NET agent (`coverage_agents/dotnet/`) is
+    /// the reference implementation.
+    Cobertura {
         /// Source directory, used for report generation if provided.
         source_dir: Option<PathBuf>,
         /// Optional filter: only include classes whose filename contains this string.
@@ -609,7 +612,7 @@ impl CoverageConfiguration {
             Self::Lcov { .. } => "LCOV",
             Self::Jacoco { .. } => "JaCoCo",
             Self::Coverband { .. } => "Coverband",
-            Self::Dotnet { .. } => ".NET",
+            Self::Cobertura { .. } => "Cobertura (HTTP)",
         }
     }
 }
@@ -640,7 +643,7 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 );
             }
             if value.coverage_format.is_some()
-                && value.coverage_format != Some(CoverageFormat::Dotnet)
+                && value.coverage_format != Some(CoverageFormat::Cobertura)
                 && value.source_dir.is_none()
             {
                 bail!(
@@ -670,9 +673,9 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 Some(CoverageFormat::Coverband) => CoverageConfiguration::Coverband {
                     source_dir: value.source_dir,
                 },
-                Some(CoverageFormat::Dotnet) => CoverageConfiguration::Dotnet {
+                Some(CoverageFormat::Cobertura) => CoverageConfiguration::Cobertura {
                     source_dir: value.source_dir,
-                    namespace_filter: value.dotnet_namespace_filter,
+                    namespace_filter: value.cobertura_class_filter,
                 },
                 None => CoverageConfiguration::Endpoint,
             },
@@ -744,9 +747,9 @@ impl PartialConfiguration {
             jacoco_class_prefix: other
                 .jacoco_class_prefix
                 .or_else(|| self.jacoco_class_prefix.take()),
-            dotnet_namespace_filter: other
-                .dotnet_namespace_filter
-                .or_else(|| self.dotnet_namespace_filter.take()),
+            cobertura_class_filter: other
+                .cobertura_class_filter
+                .or_else(|| self.cobertura_class_filter.take()),
         };
     }
 }

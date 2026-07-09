@@ -1,8 +1,12 @@
-//! Coverage client for .NET targets using the WuppieFuzz dotnet coverage agent.
+//! Generic Cobertura-over-HTTP coverage client.
 //!
-//! The agent wraps the `dotnet-coverage` tool to provide on-demand coverage snapshots
-//! with reset support, which is required for iterative fuzzing guidance.
-//! See `coverage_agents/dotnet/` for the agent that must run alongside the target.
+//! Any coverage agent that speaks the WuppieFuzz Cobertura HTTP protocol
+//! (GET `/coverage[?reset=true]` → Cobertura XML, optional GET `/report` → ZIP)
+//! can be used with this client.
+//!
+//! The bundled .NET agent (`coverage_agents/dotnet/`) is the reference implementation:
+//! it wraps Microsoft's `dotnet-coverage` tool and converts binary `.coverage` snapshots
+//! to Cobertura XML on demand. Other language agents may implement the same HTTP contract.
 
 use std::{
     collections::{HashMap, hash_map::Entry},
@@ -71,8 +75,12 @@ struct CoberturaLine {
 
 // --- Coverage client ---
 
-/// Coverage client for .NET targets, communicating with the WuppieFuzz dotnet coverage agent.
-pub struct DotnetCoverageClient {
+/// Generic coverage client for agents that serve Cobertura XML over HTTP.
+///
+/// Communicates with any WuppieFuzz-compatible Cobertura agent via:
+/// - `GET /coverage[?reset=true]` — returns a Cobertura XML snapshot
+/// - `GET /report` — returns an HTML report as a ZIP archive (optional; agents may omit this)
+pub struct CoberturaCoverageClient {
     /// Coverage bitmap for the current fuzzing iteration.
     cov_map: [u8; MAP_SIZE],
     /// Cumulative coverage bitmap across all iterations (OR of all cov_maps).
@@ -88,8 +96,12 @@ pub struct DotnetCoverageClient {
     namespace_filter: Option<String>,
 }
 
-impl DotnetCoverageClient {
-    /// Create a new DotnetCoverageClient with the given agent URL and optional namespace filter.
+impl CoberturaCoverageClient {
+    /// Create a new `CoberturaCoverageClient` pointed at the given agent URL.
+    ///
+    /// `namespace_filter`, when set, restricts coverage to classes whose filename
+    /// contains the given substring (e.g. `"Controllers"` or `"MyApp"`). Useful
+    /// for excluding third-party or generated code from the coverage map.
     pub fn new(url: Url, namespace_filter: Option<String>) -> Self {
         Self {
             cov_map: [0; MAP_SIZE],
@@ -174,7 +186,7 @@ impl DotnetCoverageClient {
     }
 }
 
-impl CoverageClient for DotnetCoverageClient {
+impl CoverageClient for CoberturaCoverageClient {
     fn fetch_coverage(&mut self, reset: bool) {
         let mut url = self.url.clone();
         url.set_path("/coverage");
@@ -331,7 +343,7 @@ mod tests {
 
     #[test]
     fn namespace_filter_match() {
-        let client = DotnetCoverageClient::new(
+        let client = CoberturaCoverageClient::new(
             "http://localhost:6302".parse().unwrap(),
             Some("Controllers".to_owned()),
         );
@@ -341,14 +353,15 @@ mod tests {
 
     #[test]
     fn namespace_filter_none_matches_all() {
-        let client = DotnetCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
+        let client = CoberturaCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
         assert!(client.class_matches_filter("Controllers/HomeController.cs"));
         assert!(client.class_matches_filter("Other/Helper.cs"));
     }
 
     #[test]
     fn bitmap_set_correct_bits() {
-        let mut client = DotnetCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
+        let mut client =
+            CoberturaCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
         let report: CoberturaCoverage = xml_de::from_str(SAMPLE_COBERTURA).unwrap();
         client.process_coverage(report);
 
