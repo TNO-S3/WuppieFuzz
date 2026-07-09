@@ -92,7 +92,10 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
-    use crate::input::{Method, parameter::ParameterKind, parameter::SimpleValue};
+    use crate::input::{
+        Method,
+        parameter::{ParameterKind, SimpleValue},
+    };
 
     fn request(params: usize) -> OpenApiRequest {
         let mut parameters = BTreeMap::new();
