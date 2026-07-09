@@ -20,8 +20,8 @@ pub const MAP_SIZE: usize = 4 * 8192;
 
 pub mod read_utilities;
 
-pub mod coverband;
 pub mod cobertura;
+pub mod coverband;
 pub mod dummy;
 pub mod endpoint;
 pub mod jacoco;
