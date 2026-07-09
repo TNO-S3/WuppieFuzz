@@ -598,8 +598,6 @@ pub enum CoverageConfiguration {
     /// Cobertura HTTP protocol. The bundled .NET agent (`coverage_agents/dotnet/`) is
     /// the reference implementation.
     Cobertura {
-        /// Source directory, used for report generation if provided.
-        source_dir: Option<PathBuf>,
         /// Optional filter: only include classes whose filename contains this string.
         namespace_filter: Option<String>,
     },
@@ -674,7 +672,6 @@ impl TryFrom<PartialConfiguration> for Configuration {
                     source_dir: value.source_dir,
                 },
                 Some(CoverageFormat::Cobertura) => CoverageConfiguration::Cobertura {
-                    source_dir: value.source_dir,
                     namespace_filter: value.cobertura_class_filter,
                 },
                 None => CoverageConfiguration::Endpoint,
