@@ -196,9 +196,11 @@ impl CoverageClient for CoberturaCoverageClient {
         match self.client.get(url).send().and_then(Response::text) {
             Ok(xml) => match xml_de::from_str::<CoberturaCoverage>(&xml) {
                 Ok(report) => self.process_coverage(report),
-                Err(err) => log::error!("Failed to parse cobertura XML from dotnet agent: {err}"),
+                Err(err) => {
+                    log::error!("Failed to parse cobertura XML from cobertura agent: {err}")
+                }
             },
-            Err(err) => log::error!("Failed to fetch coverage from dotnet agent: {err}"),
+            Err(err) => log::error!("Failed to fetch coverage from cobertura agent: {err}"),
         }
     }
 
@@ -219,7 +221,7 @@ impl CoverageClient for CoberturaCoverageClient {
         let response = match self.client.get(url).send() {
             Ok(r) => r,
             Err(err) => {
-                log::error!("Failed to request report from dotnet agent: {err}");
+                log::error!("Failed to request report from cobertura agent: {err}");
                 return;
             }
         };
@@ -232,21 +234,21 @@ impl CoverageClient for CoberturaCoverageClient {
             .to_owned();
 
         match response.bytes() {
-            Err(err) => log::error!("Failed to read report response from dotnet agent: {err}"),
+            Err(err) => log::error!("Failed to read report response from cobertura agent: {err}"),
             Ok(bytes) => {
                 if content_type.contains("zip") {
                     unpack_report_zip(&bytes, report_path);
                 } else {
                     // Fallback: agent returned cobertura XML (no reportgenerator installed)
-                    let dest = report_path.join("dotnet");
+                    let dest = report_path.join("cobertura");
                     let xml_path = dest.join("coverage.xml");
                     if let Err(err) = fs::create_dir_all(&dest) {
-                        log::error!("Cannot create dotnet report dir: {err}");
+                        log::error!("Cannot create cobertura report dir: {err}");
                         return;
                     }
                     match fs::write(&xml_path, &bytes) {
-                        Ok(()) => log::info!("Dotnet coverage XML written to {xml_path:?}"),
-                        Err(err) => log::error!("Failed to write coverage XML: {err}"),
+                        Ok(()) => log::info!("Cobertura coverage XML written to {xml_path:?}"),
+                        Err(err) => log::error!("Failed to write cobertura coverage XML: {err}"),
                     }
                 }
             }
@@ -254,17 +256,17 @@ impl CoverageClient for CoberturaCoverageClient {
     }
 }
 
-/// Unpacks the ZIP archive received from the agent into `report_path/dotnet/`.
+/// Unpacks the ZIP archive received from the agent into `report_path/cobertura/`.
 fn unpack_report_zip(bytes: &[u8], report_path: &Path) {
-    let dest = report_path.join("dotnet");
+    let dest = report_path.join("cobertura");
     if let Err(err) = fs::create_dir_all(&dest) {
-        log::error!("Cannot create dotnet report dir: {err}");
+        log::error!("Cannot create cobertura report dir: {err}");
         return;
     }
     let mut archive = match ZipArchive::new(Cursor::new(bytes)) {
         Ok(a) => a,
         Err(err) => {
-            log::error!("Failed to open report ZIP from dotnet agent: {err}");
+            log::error!("Failed to open report ZIP from cobertura agent: {err}");
             return;
         }
     };
@@ -298,7 +300,7 @@ fn unpack_report_zip(bytes: &[u8], report_path: &Path) {
             }
         }
     }
-    log::info!("Dotnet coverage report extracted to {dest:?}");
+    log::info!("Cobertura coverage report extracted to {dest:?}");
 }
 
 #[cfg(test)]
