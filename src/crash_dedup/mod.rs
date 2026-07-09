@@ -23,6 +23,7 @@
 mod identity;
 pub mod minimizer;
 pub mod replay;
+pub mod scoring;
 
 use std::{
     collections::BTreeMap,
@@ -74,8 +75,8 @@ pub fn dedup_crashes(
     for (index, crash_file) in crash_files.iter().enumerate() {
         let source_path = relative_string(crash_directory, crash_file);
         match process_crash_file(crash_file, &api, config) {
-            FileOutcome::Clustered { crash, size } => {
-                add_to_clusters(&mut clusters, crash_file, source_path, size, crash);
+            FileOutcome::Clustered { crash, score } => {
+                add_to_clusters(&mut clusters, crash_file, source_path, score, crash);
             }
             FileOutcome::NonReproducible(reason) => {
                 non_reproducible.push(CrashFileResult {
@@ -159,8 +160,9 @@ struct CrashCluster {
     key: String,
     #[serde(skip)]
     representative_source: PathBuf,
-    #[serde(skip)]
-    representative_size: u64,
+    /// Complexity score of the representative's effective (pre-crash) request prefix;
+    /// lower means simpler to read and reproduce. See [`crate::crash_dedup::scoring`].
+    representative_score: f64,
     representative: String,
     members: Vec<String>,
     member_count: usize,
@@ -514,7 +516,7 @@ fn log_summary(summary: &DedupSummary, output_directory: &Path) {
 }
 
 enum FileOutcome {
-    Clustered { crash: ObservedCrash, size: u64 },
+    Clustered { crash: ObservedCrash, score: f64 },
     NonReproducible(String),
     Skipped(String),
 }
@@ -522,9 +524,11 @@ enum FileOutcome {
 /// Replay one crash file and classify outcome for dedup accounting.
 ///
 /// Returns:
-/// - `Clustered` when replay reproduces crash and metadata can be read.
+/// - `Clustered` when replay reproduces crash; carries a complexity score of the
+///   effective (pre-crash) request prefix, used to pick the simplest cluster
+///   representative (see [`scoring::score_effective_prefix`]).
 /// - `NonReproducible` when replay completes or stops without crash.
-/// - `Skipped` for unreadable inputs or replay/metadata errors.
+/// - `Skipped` for unreadable inputs or replay errors.
 fn process_crash_file(crash_file: &Path, api: &Spec, config: &Configuration) -> FileOutcome {
     let input = match OpenApiInput::from_file(crash_file) {
         Ok(input) => input,
@@ -544,23 +548,20 @@ fn process_crash_file(crash_file: &Path, api: &Spec, config: &Configuration) -> 
         }
     };
 
-    match fs::metadata(crash_file) {
-        Ok(metadata) => FileOutcome::Clustered {
-            crash,
-            size: metadata.len(),
-        },
-        Err(error) => FileOutcome::Skipped(format!("Could not read crash input metadata: {error}")),
-    }
+    let score = scoring::score_effective_prefix(&input.0, crash.crashing_request_index);
+    FileOutcome::Clustered { crash, score }
 }
 
 /// Insert crash into cluster map and update representative selection.
 ///
-/// Smallest source file per key is kept as representative.
+/// The representative with the lowest [`scoring::crash_score`] per cluster key is kept,
+/// i.e. the reproducer that is shortest, has fewest parameters and back-references, and
+/// has the smallest average body — not merely the smallest serialized file.
 fn add_to_clusters(
     clusters: &mut BTreeMap<CrashClusterKey, CrashCluster>,
     source_file: &Path,
     source_path: String,
-    source_size: u64,
+    source_score: f64,
     observed_crash: ObservedCrash,
 ) {
     let key = observed_crash.identity.cluster_key();
@@ -568,9 +569,9 @@ fn add_to_clusters(
         Some(cluster) => {
             cluster.members.push(source_path.clone());
             cluster.member_count = cluster.members.len();
-            if source_size < cluster.representative_size {
+            if source_score < cluster.representative_score {
                 cluster.representative_source = source_file.to_path_buf();
-                cluster.representative_size = source_size;
+                cluster.representative_score = source_score;
                 cluster.representative = source_path;
                 cluster.representative_crashing_request_index =
                     observed_crash.crashing_request_index;
@@ -582,7 +583,7 @@ fn add_to_clusters(
                 CrashCluster {
                     key: key.to_string(),
                     representative_source: source_file.to_path_buf(),
-                    representative_size: source_size,
+                    representative_score: source_score,
                     representative: source_path.clone(),
                     members: vec![source_path],
                     member_count: 1,
@@ -661,22 +662,23 @@ mod tests {
     }
 
     #[test]
-    fn add_to_clusters_groups_deduplicates_and_prefers_smaller_representative() {
+    fn add_to_clusters_groups_deduplicates_and_prefers_lower_scoring_representative() {
         let mut clusters = BTreeMap::new();
 
-        // large first, then a smaller duplicate — representative should flip to smaller
+        // high score (more complex) first, then a lower-scoring duplicate — representative
+        // should flip to the simpler one.
         add_to_clusters(
             &mut clusters,
-            Path::new("large"),
-            String::from("large"),
-            100,
+            Path::new("complex"),
+            String::from("complex"),
+            100.0,
             make_crash_with_index("GET /items", 2),
         );
         add_to_clusters(
             &mut clusters,
-            Path::new("small"),
-            String::from("small"),
-            10,
+            Path::new("simple"),
+            String::from("simple"),
+            10.0,
             make_crash_with_index("GET /items", 1),
         );
         // different endpoint -> second cluster
@@ -684,14 +686,14 @@ mod tests {
             &mut clusters,
             Path::new("other"),
             String::from("other"),
-            10,
+            10.0,
             make_crash("POST /items"),
         );
 
         assert_eq!(clusters.len(), 2);
         let get_cluster = clusters.values().next().unwrap();
         assert_eq!(get_cluster.member_count, 2);
-        assert_eq!(get_cluster.representative, "small");
+        assert_eq!(get_cluster.representative, "simple");
         assert_eq!(get_cluster.representative_crashing_request_index, 1);
     }
 
@@ -723,14 +725,14 @@ mod tests {
             &mut clusters,
             &crash_a,
             String::from("a-crash"),
-            3,
+            3.0,
             make_crash("GET /a"),
         );
         add_to_clusters(
             &mut clusters,
             &crash_b,
             String::from("b-crash"),
-            3,
+            3.0,
             make_crash("POST /b"),
         );
         copy_unique_representatives(&output, &mut clusters)?;
