@@ -23,8 +23,10 @@
 use std::{
     collections::{HashMap, hash_map::Entry},
     fs,
-    io::Cursor,
+    io::{Cursor, Read, Write},
+    net::{TcpStream, ToSocketAddrs},
     path::Path,
+    time::Duration,
 };
 
 use quick_xml::de as xml_de;
@@ -103,6 +105,25 @@ pub struct CoberturaCoverageClient {
     client: Client,
     /// Only include classes whose filename contains this string. `None` means include all.
     namespace_filter: Option<String>,
+    /// Persistent raw-protocol connection used for the hot `fetch_coverage` path
+    /// (see `RawCoverageServerLoop` in the .NET agent's `Program.cs` for the wire
+    /// format and the rationale). `None` if the agent doesn't expose this port,
+    /// or once any I/O error occurs on it — the client then falls back to the
+    /// plain HTTP path (`fetch_coverage_internal`) for the rest of the run.
+    raw_stream: Option<TcpStream>,
+}
+
+/// Connects to the agent's raw fast-path port (`coverage_host`'s port + 1) with
+/// a short timeout, so we don't stall startup if an agent doesn't implement it.
+/// Sets `TCP_NODELAY`, though since every response is written as a single
+/// buffer server-side, Nagle's algorithm shouldn't be able to bite us anyway.
+fn connect_raw(url: &Url) -> Option<TcpStream> {
+    let host = url.host_str()?;
+    let port = url.port()?.checked_add(1)?;
+    let addr = (host, port).to_socket_addrs().ok()?.next()?;
+    let stream = TcpStream::connect_timeout(&addr, Duration::from_millis(200)).ok()?;
+    stream.set_nodelay(true).ok();
+    Some(stream)
 }
 
 impl CoberturaCoverageClient {
@@ -112,6 +133,14 @@ impl CoberturaCoverageClient {
     /// contains the given substring (e.g. `"Controllers"` or `"MyApp"`). Useful
     /// for excluding third-party or generated code from the coverage map.
     pub fn new(url: Url, namespace_filter: Option<String>) -> Self {
+        let raw_stream = connect_raw(&url);
+        if raw_stream.is_some() {
+            log::debug!("Connected to cobertura agent's raw fast-path port");
+        } else {
+            log::debug!(
+                "Cobertura agent's raw fast-path port unavailable, using HTTP for /coverage"
+            );
+        }
         Self {
             cov_map: [0; MAP_SIZE],
             cov_map_total: [0; MAP_SIZE],
@@ -134,12 +163,19 @@ impl CoberturaCoverageClient {
             // entirely. This client talks only to the local coverage agent,
             // never the fuzzing target, so this has no effect on request
             // throughput against the target under test.
+            //
+            // Note: when `raw_stream` above is available, none of this
+            // matters for `fetch_coverage` any more, since that hot path uses
+            // the persistent raw connection instead of HTTP. This client is
+            // still used for `generate_coverage_report`, which only runs once
+            // at the end of a campaign, so its performance is not important.
             client: Client::builder()
                 .tcp_nodelay(true)
                 .pool_max_idle_per_host(0)
                 .build()
                 .unwrap_or_else(|_| Client::new()),
             namespace_filter,
+            raw_stream,
         }
     }
 
@@ -240,6 +276,31 @@ impl CoberturaCoverageClient {
         }
     }
 
+    /// Fetches a coverage snapshot over the persistent raw connection, if one
+    /// is open. Returns `None` (and permanently drops `raw_stream`, falling
+    /// back to HTTP for the rest of the run) on any I/O or protocol error.
+    ///
+    /// Wire format (see `RawCoverageServerLoop` in the .NET agent's
+    /// `Program.cs`): write a single byte (0 = fetch, 1 = fetch-and-reset),
+    /// then read a 4-byte little-endian length prefix followed by that many
+    /// bytes of UTF-8 payload in the same tab-separated format as the HTTP
+    /// fast path.
+    fn fetch_coverage_raw_once(&mut self, reset: bool) -> std::io::Result<String> {
+        let stream = self
+            .raw_stream
+            .as_mut()
+            .expect("fetch_coverage_raw_once called without a raw_stream");
+        stream.write_all(&[reset as u8])?;
+        stream.flush()?;
+        let mut len_buf = [0u8; 4];
+        stream.read_exact(&mut len_buf)?;
+        let len = u32::from_le_bytes(len_buf) as usize;
+        let mut body_buf = vec![0u8; len];
+        stream.read_exact(&mut body_buf)?;
+        String::from_utf8(body_buf)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+    }
+
     fn coverage_ratio(&self) -> (u64, u64) {
         let total = self.first_unused_idx as u64;
         let full_bytes = self.first_unused_idx / 8;
@@ -257,6 +318,22 @@ impl CoberturaCoverageClient {
 
 impl CoverageClient for CoberturaCoverageClient {
     fn fetch_coverage(&mut self, reset: bool) {
+        if self.raw_stream.is_some() {
+            match self.fetch_coverage_raw_once(reset) {
+                Ok(body) => {
+                    self.process_fast_lines(&body);
+                    return;
+                }
+                Err(err) => {
+                    log::warn!(
+                        "Raw fast-path coverage connection failed ({err}), \
+                        falling back to HTTP for the rest of the run"
+                    );
+                    self.raw_stream = None;
+                }
+            }
+        }
+
         let mut url = self.url.clone();
         url.set_path("/coverage");
         if reset {
