@@ -497,9 +497,17 @@ mod tests {
 
         assert_eq!(client.first_unused_idx, 4);
         assert_ne!(client.cov_map[0] & 0b_1000_0000, 0, "line 10 must be set");
-        assert_eq!(client.cov_map[0] & 0b_0100_0000, 0, "line 11 must not be set");
+        assert_eq!(
+            client.cov_map[0] & 0b_0100_0000,
+            0,
+            "line 11 must not be set"
+        );
         assert_ne!(client.cov_map[0] & 0b_0010_0000, 0, "line 15 must be set");
-        assert_eq!(client.cov_map[0] & 0b_0001_0000, 0, "line 5 must not be set");
+        assert_eq!(
+            client.cov_map[0] & 0b_0001_0000,
+            0,
+            "line 5 must not be set"
+        );
 
         let (ones, total) = client.coverage_ratio();
         assert_eq!(total, 4);
