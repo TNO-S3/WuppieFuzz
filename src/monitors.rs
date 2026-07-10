@@ -66,7 +66,10 @@ where
         _sender_id: ClientId,
     ) -> Result<(), Error> {
         let config = Configuration::must_get();
-        let total_time = current_time() - self.start_time;
+        // `current_time()` is wall-clock (`SystemTime`), not monotonic, so it can
+        // occasionally go backwards relative to `start_time` (e.g. NTP or VM clock
+        // corrections). Use `saturating_sub` to avoid panicking on underflow.
+        let total_time = current_time().saturating_sub(self.start_time);
 
         let global_stats = client_stats_mgr.global_stats();
         let objective_size = global_stats.objective_size;
@@ -78,7 +81,7 @@ where
         let output_string = match config.output_format {
             OutputFormat::Json => json!({
                 "event_msg": event_msg,
-                "run_time": format_duration(&(current_time() - self.start_time)),
+                "run_time": format_duration(&total_time),
                 "objectives": objective_size,
                 "executed_sequences": total_execs,
                 "sequences_per_sec": self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
@@ -93,7 +96,7 @@ where
                 format!(
                     "[{}] New 'crash' observed! After run time: {}, total number of objectives reached: {}",
                     event_msg,
-                    format_duration(&(current_time() - self.start_time)),
+                    format_duration(&total_time),
                     objective_size,
                 )
             } else if event_msg == "Testcase" {
@@ -103,7 +106,7 @@ where
                         ),
                     _ => format!(
                             "[{event_msg}] The testing corpus expanded! After run time: {}, total corpus size: {corpus_size}",
-                            format_duration(&(current_time() - self.start_time)),
+                            format_duration(&total_time),
                         ),
                 }
             } else if event_msg == "UserStats" {
