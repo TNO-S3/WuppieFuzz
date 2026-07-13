@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Occassional panic when duration is negative due to time corrections in [#346](https://github.com/TNO-S3/WuppieFuzz/pull/346)
+
 # v1.6.0 (2026-06-25)
 
 ## Highlights
