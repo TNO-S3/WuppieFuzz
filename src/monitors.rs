@@ -1,8 +1,7 @@
 //! Coverage monitor for Wuppiefuzz. It defines how statistics are printed to the terminal
 //! while fuzzing, and tracks the time consumed.
 
-use core::{time, time::Duration};
-use std::{borrow::Cow, fmt};
+use std::{borrow::Cow, fmt, time::Instant};
 
 use libafl::{
     alloc::fmt::Debug,
@@ -12,7 +11,7 @@ use libafl::{
         stats::{AggregatorOps, ClientStats, ClientStatsManager, UserStats, UserStatsValue},
     },
 };
-use libafl_bolts::{ClientId, Error, current_time, format_duration};
+use libafl_bolts::{ClientId, Error, format_duration};
 use serde_json::json;
 
 use crate::{
@@ -37,7 +36,7 @@ where
     F: FnMut(String),
 {
     print_fn: F,
-    start_time: Duration,
+    start_time: Instant,
     client_stats: Vec<ClientStats>,
     execs_per_sec: String,
     last_execs: u64,
@@ -66,7 +65,8 @@ where
         _sender_id: ClientId,
     ) -> Result<(), Error> {
         let config = Configuration::must_get();
-        let total_time = current_time() - self.start_time;
+        // `Instant` is monotonic, so it won't go backwards relative to `start_time`.
+        let total_time = Instant::now().duration_since(self.start_time);
 
         let global_stats = client_stats_mgr.global_stats();
         let objective_size = global_stats.objective_size;
@@ -78,7 +78,7 @@ where
         let output_string = match config.output_format {
             OutputFormat::Json => json!({
                 "event_msg": event_msg,
-                "run_time": format_duration(&(current_time() - self.start_time)),
+                "run_time": format_duration(&total_time),
                 "objectives": objective_size,
                 "executed_sequences": total_execs,
                 "sequences_per_sec": self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
@@ -93,7 +93,7 @@ where
                 format!(
                     "[{}] New 'crash' observed! After run time: {}, total number of objectives reached: {}",
                     event_msg,
-                    format_duration(&(current_time() - self.start_time)),
+                    format_duration(&total_time),
                     objective_size,
                 )
             } else if event_msg == "Testcase" {
@@ -103,7 +103,7 @@ where
                         ),
                     _ => format!(
                             "[{event_msg}] The testing corpus expanded! After run time: {}, total corpus size: {corpus_size}",
-                            format_duration(&(current_time() - self.start_time)),
+                            format_duration(&total_time),
                         ),
                 }
             } else if event_msg == "UserStats" {
@@ -137,7 +137,7 @@ where
     pub fn new(print_fn: F) -> Self {
         Self {
             print_fn,
-            start_time: current_time(),
+            start_time: Instant::now(),
             client_stats: vec![],
             execs_per_sec: "NaN".to_string(),
             last_execs: 0,
@@ -145,7 +145,7 @@ where
     }
 
     /// Creates the monitor with a given `start_time`.
-    pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
+    pub fn with_time(print_fn: F, start_time: Instant) -> Self {
         Self {
             print_fn,
             start_time,
