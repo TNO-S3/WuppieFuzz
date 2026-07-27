@@ -25,7 +25,7 @@ anstyle-query 1.1.5
 anstyle-wincon 3.0.11
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-anyhow 1.0.103
+anyhow 1.0.104
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 atomic-waker 1.1.2
@@ -79,10 +79,10 @@ chacha20 0.10.1
 chrono 0.4.45
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.6.1
+clap 4.6.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.6.0
+clap_builder 4.6.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 1.1.0
@@ -220,19 +220,19 @@ fs2 0.4.3
 futures-channel 0.3.32
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-core 0.3.32
+futures-core 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-io 0.3.32
+futures-io 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-sink 0.3.32
+futures-sink 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-task 0.3.32
+futures-task 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-util 0.3.32
+futures-util 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 getrandom 0.2.17
@@ -268,10 +268,10 @@ hostname 0.4.2
 http 1.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
-http-body 1.0.1
+http-body 1.1.0
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Lucio Franco <luciofranco14@gmail.com>|Sean McArthur <sean@seanmonstar.com>
-http-body-util 0.1.3
+http-body-util 0.1.4
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Lucio Franco <luciofranco14@gmail.com>|Sean McArthur <sean@seanmonstar.com>
 httparse 1.10.1
@@ -427,7 +427,7 @@ mime 0.3.17
 miniz_oxide 0.8.9
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Frommi <daniil.liferenko@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>|Rich Geldreich richgel99@gmail.com
-mio 1.2.1
+mio 1.2.2
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>|Tokio Contributors <team@tokio.rs>
 nix 0.30.1
@@ -505,7 +505,7 @@ petgraph 0.8.3
 pin-project-lite 0.2.17
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-portable-atomic 1.13.1
+portable-atomic 1.14.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 portable-atomic-util 0.2.7
@@ -562,7 +562,7 @@ rand_regex 0.19.0
 redox_syscall 0.5.18
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
-regex 1.13.0
+regex 1.13.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
 regex-automata 0.4.16
@@ -595,7 +595,7 @@ rustc-hash 2.1.3
 rustix 1.1.4
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>|Jakub Konka <kubkon@jakubkonka.com>
-rustls 0.23.41
+rustls 0.23.42
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
 rustls-native-certs 0.8.4
@@ -637,7 +637,7 @@ security-framework-sys 2.17.0
 semver 1.0.28
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-serde_core 1.0.228
+serde_core 1.0.229
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
 serde_urlencoded 0.7.1
@@ -649,7 +649,7 @@ serde_yaml 0.9.34+deprecated
 serial_test 3.5.0
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
-simd-adler32 0.3.9
+simd-adler32 0.3.10
 	licensed under "MIT"
 	by Marvin Countryman <me@maar.vin>
 simdutf8 0.1.5
@@ -664,7 +664,7 @@ slab 0.4.12
 smallvec 1.15.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
-socket2 0.6.4
+socket2 0.6.5
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>
 sqlite-wasm-rs 0.5.5
@@ -694,7 +694,7 @@ system-configuration-sys 0.6.0
 tempfile 3.27.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
-thiserror-impl 2.0.18
+thiserror-impl 2.0.19
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 time 0.3.53
@@ -712,7 +712,7 @@ tinyvec 1.12.0
 tinyvec_macros 0.1.1
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Soveu <marx.tomasz@gmail.com>
-tokio 1.52.3
+tokio 1.53.1
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
 tokio-rustls 0.26.4
@@ -835,10 +835,10 @@ web-sys 0.3.103
 web-time 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-webpki-root-certs 1.0.8
+webpki-root-certs 1.0.9
 	licensed under "CDLA-Permissive-2.0"
 	by unspecified authors
-webpki-roots 1.0.8
+webpki-roots 1.0.9
 	licensed under "CDLA-Permissive-2.0"
 	by unspecified authors
 wide 0.7.33
