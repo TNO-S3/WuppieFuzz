@@ -44,6 +44,7 @@ use oas3::spec::Server;
 mod authentication;
 mod configuration;
 pub mod coverage_clients;
+mod crash_dedup;
 pub mod executor;
 mod fuzzer;
 pub mod header;
@@ -105,6 +106,12 @@ pub fn main() -> Result<()> {
             ))
         }
         Commands::Reproduce { crash_file, .. } => reproducer::reproduce(crash_file),
+        Commands::Dedup {
+            crash_directory,
+            output,
+            minimize,
+            ..
+        } => crash_dedup::dedup_crashes(crash_directory, output, *minimize),
         Commands::Fuzz { .. } => fuzzer::fuzz(),
     }
 }

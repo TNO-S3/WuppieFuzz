@@ -150,6 +150,20 @@ impl Body {
     pub fn is_empty(&self) -> bool {
         matches!(self, Body::Empty)
     }
+
+    pub fn contents(&self) -> Option<&ParameterContents> {
+        match self {
+            Body::Empty => None,
+            Body::TextPlain(c) | Body::ApplicationJson(c) | Body::XWwwFormUrlencoded(c) => Some(c),
+        }
+    }
+
+    pub fn contents_mut(&mut self) -> Option<&mut ParameterContents> {
+        match self {
+            Body::Empty => None,
+            Body::TextPlain(c) | Body::ApplicationJson(c) | Body::XWwwFormUrlencoded(c) => Some(c),
+        }
+    }
 }
 
 impl OpenApiRequest {
