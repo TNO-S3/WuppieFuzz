@@ -210,6 +210,32 @@ impl ParameterContents {
         }
     }
 
+    /// Recursively collects all string-ish values contained in this `ParameterContents`
+    /// (i.e. as it would be sent to the target). Used by injection-signature detection
+    /// to check whether an injected payload was reflected back verbatim in a response.
+    /// References are skipped, since they should already have been resolved to concrete
+    /// values by the time a request is sent.
+    pub fn string_leaves(&self, out: &mut Vec<String>) {
+        match self {
+            ParameterContents::Object(map) => {
+                for value in map.values() {
+                    value.string_leaves(out);
+                }
+            }
+            ParameterContents::Array(arr) => {
+                for value in arr {
+                    value.string_leaves(out);
+                }
+            }
+            ParameterContents::LeafValue(SimpleValue::String(string)) => out.push(string.clone()),
+            ParameterContents::LeafValue(_) => (),
+            ParameterContents::Bytes(bytes) => {
+                out.push(String::from_utf8_lossy(bytes).into_owned())
+            }
+            ParameterContents::OReference(_) | ParameterContents::IReference(_) => (),
+        }
+    }
+
     /// Returns the parameter value for use in a URL.
     pub fn to_url_string(&self) -> Cow<'_, str> {
         match self {

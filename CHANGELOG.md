@@ -7,6 +7,8 @@
 - Update to LibAFL 0.16.1 (and bump `z3` to 0.20.2 to match its new requirement) in [#356](https://github.com/TNO-S3/WuppieFuzz/issues/356)
 - Show a summary of the request sequence currently being fuzzed (`current_sequence`) in the monitor output, inspired by LibAFL's TUI monitor in [#356](https://github.com/TNO-S3/WuppieFuzz/issues/356)
 - Add `GrammarInterestingMutator`, generating varied injection payloads (SQLi, XSS, SSTI, command/LDAP/NoSQL injection, path traversal, XXE, format strings) from small regex grammars instead of a fixed wordlist, inspired by LibAFL's Nautilus grammar mutator
+- Treat request timeouts as a fuzzing objective alongside crashes, so time-based blind injection findings (e.g. `SLEEP`/`WAITFOR DELAY` payloads) are now saved as solutions instead of only being logged
+- Add content-based detection of injection side-effects: responses are now also checked for known database/LDAP/NoSQL error signatures and for verbatim reflection of suspicious payload values (e.g. unescaped `<script>`), surfaced as a new `PossibleInjectionSignature` crash criterion
 
 ## Fixes
 
