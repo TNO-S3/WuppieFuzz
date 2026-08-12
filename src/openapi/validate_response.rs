@@ -309,7 +309,10 @@ const SUSPICIOUS_PAYLOAD_MARKERS: &[&str] = &[
 fn is_suspicious_payload(value: &str) -> bool {
     // Very short values are too likely to occur "naturally" in a response to be a
     // meaningful signal, even if they happen to match one of our markers.
-    value.len() >= 4 && SUSPICIOUS_PAYLOAD_MARKERS.iter().any(|marker| value.contains(marker))
+    value.len() >= 4
+        && SUSPICIOUS_PAYLOAD_MARKERS
+            .iter()
+            .any(|marker| value.contains(marker))
 }
 
 /// Looks for content-based evidence that an injected payload had an effect on the
