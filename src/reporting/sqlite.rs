@@ -36,6 +36,63 @@ pub fn get_reporter(config: &Configuration, api: &Spec) -> Result<Option<MySqLit
 /// to disk, so batching amortises that cost across many writes.
 const BATCH_SIZE: u32 = 4096;
 
+const OTEL_STATS_COLUMNS: &[&str] = &[
+    "otel_receiver_requests_ok_total",
+    "otel_receiver_requests_rejected_total",
+    "otel_receiver_requests_decode_error_total",
+    "otel_spans_received_total",
+    "otel_spans_late_after_eviction_total",
+    "otel_sequence_roots_expected_total",
+    "otel_sequence_roots_seen_total",
+    "otel_sequences_promoted_total",
+    "otel_promoted_inputs_added_total",
+    "otel_unique_span_keys_total",
+    "otel_unique_edge_keys_total",
+    "otel_engine_queue_depth",
+    "otel_engine_queue_high_watermark",
+    "otel_engine_backpressure_total",
+    "otel_request_roots_unknown_trace_total",
+    "otel_sequence_finish_unknown_trace_total",
+];
+
+fn to_i64(value: u64) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
+}
+
+fn ensure_column(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> anyhow::Result<()> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .with_context(|| format!("Could not inspect `{table}` table"))?;
+    let existing = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if !existing
+        .iter()
+        .any(|existing_column| existing_column == column)
+    {
+        conn.execute(
+            &format!("ALTER TABLE {table} ADD COLUMN {column} {definition}"),
+            [],
+        )
+        .with_context(|| format!("Could not add `{column}` column to `{table}` table"))?;
+    }
+
+    Ok(())
+}
+
+fn ensure_stats_columns(conn: &Connection) -> anyhow::Result<()> {
+    for column in OTEL_STATS_COLUMNS {
+        ensure_column(conn, "stats", column, "INTEGER NOT NULL DEFAULT 0")?;
+    }
+    Ok(())
+}
+
 pub struct MySqLite {
     conn: Connection,
     run_id: i64,
@@ -167,12 +224,30 @@ impl MySqLite {
                 `code_coverage_phase_us_total` INTEGER NOT NULL DEFAULT 0,
                 `endpoint_coverage_phase_us_total` INTEGER NOT NULL DEFAULT 0,
                 `post_exec_reporting_us_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_receiver_requests_ok_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_receiver_requests_rejected_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_receiver_requests_decode_error_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_spans_received_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_spans_late_after_eviction_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_sequence_roots_expected_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_sequence_roots_seen_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_sequences_promoted_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_promoted_inputs_added_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_unique_span_keys_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_unique_edge_keys_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_engine_queue_depth` INTEGER NOT NULL DEFAULT 0,
+                `otel_engine_queue_high_watermark` INTEGER NOT NULL DEFAULT 0,
+                `otel_engine_backpressure_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_request_roots_unknown_trace_total` INTEGER NOT NULL DEFAULT 0,
+                `otel_sequence_finish_unknown_trace_total` INTEGER NOT NULL DEFAULT 0,
                 `runid` INTEGER NOT NULL,
                 CONSTRAINT run_FK FOREIGN KEY (runid) REFERENCES runs(id)
             )",
             [],
         )
         .context("Could not create `stats` table")?;
+
+        ensure_stats_columns(&conn)?;
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS run_configuration (
@@ -414,6 +489,22 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                     code_coverage_phase_us_total,
                     endpoint_coverage_phase_us_total,
                     post_exec_reporting_us_total,
+                    otel_receiver_requests_ok_total,
+                    otel_receiver_requests_rejected_total,
+                    otel_receiver_requests_decode_error_total,
+                    otel_spans_received_total,
+                    otel_spans_late_after_eviction_total,
+                    otel_sequence_roots_expected_total,
+                    otel_sequence_roots_seen_total,
+                    otel_sequences_promoted_total,
+                    otel_promoted_inputs_added_total,
+                    otel_unique_span_keys_total,
+                    otel_unique_edge_keys_total,
+                    otel_engine_queue_depth,
+                    otel_engine_queue_high_watermark,
+                    otel_engine_backpressure_total,
+                    otel_request_roots_unknown_trace_total,
+                    otel_sequence_finish_unknown_trace_total,
                     runid
                 ) VALUES (
                     :seq_per_sec,
@@ -436,10 +527,28 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                     :code_coverage_phase_us_total,
                     :endpoint_coverage_phase_us_total,
                     :post_exec_reporting_us_total,
+                    :otel_receiver_requests_ok_total,
+                    :otel_receiver_requests_rejected_total,
+                    :otel_receiver_requests_decode_error_total,
+                    :otel_spans_received_total,
+                    :otel_spans_late_after_eviction_total,
+                    :otel_sequence_roots_expected_total,
+                    :otel_sequence_roots_seen_total,
+                    :otel_sequences_promoted_total,
+                    :otel_promoted_inputs_added_total,
+                    :otel_unique_span_keys_total,
+                    :otel_unique_edge_keys_total,
+                    :otel_engine_queue_depth,
+                    :otel_engine_queue_high_watermark,
+                    :otel_engine_backpressure_total,
+                    :otel_request_roots_unknown_trace_total,
+                    :otel_sequence_finish_unknown_trace_total,
                     :runid
                 )",
             )
             .expect("Could not prepare insert statement for stats");
+        let otel_trace_processing_stats = stats.otel_trace_processing_stats;
+
         insert_stmt
             .insert(named_params! {
                 ":seq_per_sec": stats.seq_per_sec,
@@ -462,6 +571,22 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                 ":code_coverage_phase_us_total": i64::try_from(stats.sequence_timing_stats.code_coverage_phase_us).unwrap_or(i64::MAX),
                 ":endpoint_coverage_phase_us_total": i64::try_from(stats.sequence_timing_stats.endpoint_coverage_phase_us).unwrap_or(i64::MAX),
                 ":post_exec_reporting_us_total": i64::try_from(stats.sequence_timing_stats.post_exec_reporting_us).unwrap_or(i64::MAX),
+                ":otel_receiver_requests_ok_total": to_i64(otel_trace_processing_stats.receiver_requests_ok),
+                ":otel_receiver_requests_rejected_total": to_i64(otel_trace_processing_stats.receiver_requests_rejected),
+                ":otel_receiver_requests_decode_error_total": to_i64(otel_trace_processing_stats.receiver_requests_decode_error),
+                ":otel_spans_received_total": to_i64(otel_trace_processing_stats.spans_received),
+                ":otel_spans_late_after_eviction_total": to_i64(otel_trace_processing_stats.spans_late_after_eviction),
+                ":otel_sequence_roots_expected_total": to_i64(otel_trace_processing_stats.sequence_roots_expected),
+                ":otel_sequence_roots_seen_total": to_i64(otel_trace_processing_stats.sequence_roots_seen),
+                ":otel_sequences_promoted_total": to_i64(otel_trace_processing_stats.sequences_promoted),
+                ":otel_promoted_inputs_added_total": to_i64(otel_trace_processing_stats.promoted_inputs_added),
+                ":otel_unique_span_keys_total": to_i64(otel_trace_processing_stats.unique_span_keys),
+                ":otel_unique_edge_keys_total": to_i64(otel_trace_processing_stats.unique_edge_keys),
+                ":otel_engine_queue_depth": to_i64(otel_trace_processing_stats.engine_queue_depth),
+                ":otel_engine_queue_high_watermark": to_i64(otel_trace_processing_stats.engine_queue_high_watermark),
+                ":otel_engine_backpressure_total": to_i64(otel_trace_processing_stats.engine_backpressure),
+                ":otel_request_roots_unknown_trace_total": to_i64(otel_trace_processing_stats.request_roots_unknown_trace),
+                ":otel_sequence_finish_unknown_trace_total": to_i64(otel_trace_processing_stats.sequence_finish_unknown_trace),
                 ":runid": self.run_id,
             })
             .expect("Could not insert stats into database");
