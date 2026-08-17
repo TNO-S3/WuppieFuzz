@@ -4,7 +4,7 @@
 
 ## Features
 
-- Update to LibAFL 0.16.1 (and bump `z3` to 0.20.2 to match its new requirement) in [#356](https://github.com/TNO-S3/WuppieFuzz/issues/356)
+- Update to LibAFL 0.16.1 (and bump `z3` to 0.20.2 to match its new requirement) in [#356](https://github.com/TNO-S3/WuppieFuzz/issues/356). As a result of the Z3 update, the `bundled-z3` feature was renamed to `vendored-z3`.
 - Show a summary of the request sequence currently being fuzzed (`current_sequence`) in the monitor output, inspired by LibAFL's TUI monitor in [#356](https://github.com/TNO-S3/WuppieFuzz/issues/356)
 
 ## Fixes
