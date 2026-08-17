@@ -223,22 +223,22 @@ form_urlencoded 1.2.2
 fs2 0.4.3
 	licensed under "Apache-2.0 OR MIT"
 	by Dan Burkert <dan@danburkert.com>
-futures-channel 0.3.34
+futures-channel 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-core 0.3.34
+futures-core 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-io 0.3.34
+futures-io 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-sink 0.3.34
+futures-sink 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-task 0.3.34
+futures-task 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-futures-util 0.3.34
+futures-util 0.3.33
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 getrandom 0.2.17
@@ -364,7 +364,7 @@ jni-sys 0.4.1
 jni-sys-macros 0.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by Robert Bragg <robert@sixbynine.org>
-js-sys 0.3.104
+js-sys 0.3.103
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 json_env_logger2 0.2.1
@@ -640,7 +640,7 @@ rustls-webpki 0.103.13
 ryu 1.0.23
 	licensed under "Apache-2.0 OR BSL-1.0"
 	by David Tolnay <dtolnay@gmail.com>
-safe_arch 1.1.0
+safe_arch 1.2.0
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Lokathor <zefria@gmail.com>
 same-file 1.0.6
@@ -847,19 +847,19 @@ wasi 0.11.1+wasi-snapshot-preview1
 wasip2 1.0.4+wasi-0.2.12
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by unspecified authors
-wasm-bindgen 0.2.127
+wasm-bindgen 0.2.126
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-futures 0.4.77
+wasm-bindgen-futures 0.4.76
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-macro 0.2.127
+wasm-bindgen-macro 0.2.126
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-shared 0.2.127
+wasm-bindgen-shared 0.2.126
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-web-sys 0.3.104
+web-sys 0.3.103
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 web-time 1.1.0
