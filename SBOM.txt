@@ -7,10 +7,10 @@ adler2 2.0.1
 ahash 0.8.12
 	licensed under "Apache-2.0 OR MIT"
 	by Tom Kaitchuck <Tom.Kaitchuck@gmail.com>
-aho-corasick 1.1.4
+aho-corasick 1.1.5
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-android_system_properties 0.1.5
+android_system_properties 0.1.6
 	licensed under "Apache-2.0 OR MIT"
 	by Nicolas Silva <nical@fastmail.com>
 anstream 1.0.0
@@ -31,10 +31,10 @@ anyhow 1.0.104
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
-aws-lc-rs 1.17.3
+aws-lc-rs 1.18.0
 	licensed under "(Apache-2.0 OR ISC) AND ISC"
 	by AWS-LibCrypto
-aws-lc-sys 0.43.0
+aws-lc-sys 0.44.0
 	licensed under "(Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) AND (Apache-2.0 OR ISC) AND Apache-2.0 AND BSD-3-Clause AND ISC AND MIT"
 	by AWS-LC
 backtrace 0.3.76
@@ -43,7 +43,7 @@ backtrace 0.3.76
 base64 0.22.1
 	licensed under "Apache-2.0 OR MIT"
 	by Marshall Pierce <marshall@mpierce.org>
-base64 0.23.0
+base64 0.23.1
 	licensed under "Apache-2.0 OR MIT"
 	by Marshall Pierce <marshall@mpierce.org>
 bitflags 1.3.2
@@ -82,10 +82,10 @@ chacha20 0.10.1
 chrono 0.4.45
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap 4.6.5
+clap 4.6.6
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-clap_builder 4.6.5
+clap_builder 4.6.6
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 clap_lex 1.1.0
@@ -109,7 +109,7 @@ const_format 0.2.36
 const_panic 0.2.15
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
-cookie 0.18.1
+cookie 0.18.2
 	licensed under "Apache-2.0 OR MIT"
 	by Sergio Benitez <sb@sergio.bz>|Alex Crichton <alex@alexcrichton.com>
 cookie_store 0.22.1
@@ -391,7 +391,7 @@ libafl_bolts 0.15.4
 libm 0.2.16
 	licensed under "MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Amanieu d'Antras <amanieu@gmail.com>|Jorge Aparicio <japaricious@gmail.com>|Trevor Gross <tg@trevorgross.com>
-libsqlite3-sys 0.38.1
+libsqlite3-sys 0.38.2
 	licensed under "MIT"
 	by The rusqlite developers
 libyaml-rs 0.3.0
@@ -508,7 +508,7 @@ petgraph 0.8.3
 pin-project-lite 0.2.17
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-portable-atomic 1.14.0
+portable-atomic 1.15.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 portable-atomic-util 0.2.7
@@ -568,7 +568,7 @@ redox_syscall 0.5.18
 regex 1.13.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
-regex-automata 0.4.16
+regex-automata 0.4.18
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
 regex-syntax 0.8.11
@@ -586,7 +586,7 @@ ring 0.17.14
 rsqlite-vfs 0.1.1
 	licensed under "MIT"
 	by unspecified authors
-rusqlite 0.40.1
+rusqlite 0.40.2
 	licensed under "MIT"
 	by The rusqlite developers
 rustc-demangle 0.1.28
@@ -697,7 +697,7 @@ system-configuration-sys 0.6.0
 tempfile 3.27.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
-thiserror-impl 2.0.19
+thiserror-impl 2.0.20
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 time 0.3.55
@@ -952,12 +952,12 @@ z3 0.19.15
 z3-sys 0.10.9
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.55
+zerocopy 0.8.56
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
-	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
-zerocopy-derive 0.8.55
+	by unspecified authors
+zerocopy-derive 0.8.56
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
-	by Joshua Liebow-Feeser <joshlf@google.com>|Jack Wrenn <jswrenn@amazon.com>
+	by unspecified authors
 zerofrom 0.1.8
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
