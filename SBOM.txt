@@ -109,7 +109,7 @@ console 0.16.4
 const_format 0.2.36
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
-const_panic 0.2.15
+const_panic 0.2.17
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 cookie 0.18.2
@@ -253,7 +253,7 @@ getrandom 0.4.3
 gimli 0.32.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-h2 0.4.15
+h2 0.4.16
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
 hashbrown 0.15.5
@@ -277,7 +277,7 @@ http 1.5.0
 http-body 1.1.0
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Lucio Franco <luciofranco14@gmail.com>|Sean McArthur <sean@seanmonstar.com>
-http-body-util 0.1.4
+http-body-util 0.1.5
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Lucio Franco <luciofranco14@gmail.com>|Sean McArthur <sean@seanmonstar.com>
 httparse 1.10.1
@@ -301,25 +301,25 @@ iana-time-zone 0.1.65
 iana-time-zone-haiku 0.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by René Kijewski <crates.io@k6i.de>
-icu_collections 2.2.0
+icu_collections 2.3.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_locale_core 2.2.0
+icu_locale_core 2.3.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_normalizer 2.2.0
+icu_normalizer 2.3.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_normalizer_data 2.2.0
+icu_normalizer_data 2.3.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_properties 2.2.0
+icu_properties 2.3.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_properties_data 2.2.0
+icu_properties_data 2.3.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_provider 2.2.0
+icu_provider 2.3.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 idna 1.1.0
@@ -412,7 +412,7 @@ linktime-proc-macro 0.2.3
 linux-raw-sys 0.12.1
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Dan Gohman <dev@sunfishcode.online>
-litemap 0.8.2
+litemap 0.8.3
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 ll_mp 0.16.1
@@ -469,7 +469,7 @@ num-complex 0.4.6
 num-derive 0.5.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-num-integer 0.1.46
+num-integer 0.1.47
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 num-iter 0.1.46
@@ -544,7 +544,7 @@ porter-stemmer 0.1.2
 postcard 1.1.3
 	licensed under "Apache-2.0 OR MIT"
 	by James Munns <james@onevariable.com>
-potential_utf 0.1.5
+potential_utf 0.1.6
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 powerfmt 0.2.0
@@ -559,7 +559,7 @@ publicsuffix 2.3.0
 quinn 0.11.11
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-quinn-proto 0.11.16
+quinn-proto 0.11.17
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 quinn-udp 0.5.15
@@ -634,13 +634,13 @@ rustls-platform-verifier 0.7.0
 rustls-platform-verifier-android 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-webpki 0.103.13
+rustls-webpki 0.103.14
 	licensed under "ISC"
 	by unspecified authors
 ryu 1.0.23
 	licensed under "Apache-2.0 OR BSL-1.0"
 	by David Tolnay <dtolnay@gmail.com>
-safe_arch 1.1.0
+safe_arch 1.2.0
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Lokathor <zefria@gmail.com>
 same-file 1.0.6
@@ -730,7 +730,7 @@ time 0.3.55
 time-macros 0.2.32
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
-tinystr 0.8.3
+tinystr 0.8.4
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 tinyvec 1.12.0
@@ -826,7 +826,7 @@ utf8_iter 1.0.4
 utf8parse 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Joe Wilm <joe@jwilm.com>|Christian Duerr <contact@christianduerr.com>
-uuid 1.24.0
+uuid 1.24.1
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
 value-bag 1.13.2
@@ -955,13 +955,13 @@ windows_x86_64_msvc 0.52.6
 wit-bindgen 0.57.1
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-writeable 0.6.3
+writeable 0.6.4
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 xxhash-rust 0.8.18
 	licensed under "BSL-1.0"
 	by Douman <douman@gmx.se>
-yaml_serde 0.10.4
+yaml_serde 0.10.6
 	licensed under "Apache-2.0 OR MIT"
 	by YAML Organization <noreply@yaml.org>
 yoke 0.8.3
@@ -991,13 +991,13 @@ zerofrom-derive 0.1.7
 zeroize 1.9.0
 	licensed under "Apache-2.0 OR MIT"
 	by The RustCrypto Project Developers
-zerotrie 0.2.4
+zerotrie 0.2.5
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-zerovec 0.11.6
+zerovec 0.11.7
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-zerovec-derive 0.11.3
+zerovec-derive 0.11.5
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
 zmij 1.0.23

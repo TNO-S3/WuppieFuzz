@@ -603,21 +603,32 @@ const CURRENT_SEQUENCE_SUMMARY_MAX_LEN: usize = 120;
 /// being fuzzed (e.g. `"GET /pets -> POST /pets/{id}"`), truncated if it would
 /// otherwise be too long to display nicely.
 fn summarize_sequence(input: &OpenApiInput) -> String {
-    let summary = input
+    let mut summary: Vec<String> = input
         .0
         .iter()
         .map(|request| format!("{} {}", request.method, request.path))
-        .collect::<Vec<_>>()
-        .join(" -> ");
-    if summary.chars().count() > CURRENT_SEQUENCE_SUMMARY_MAX_LEN {
-        let truncated: String = summary
-            .chars()
-            .take(CURRENT_SEQUENCE_SUMMARY_MAX_LEN)
-            .collect();
-        format!("{truncated}...")
-    } else {
-        summary
+        .collect();
+
+    if summary.len() <= 2 {
+        // Truncating will not work for sequences of length 2 or less
+        return summary.join(" -> ");
     }
+
+    let mut current_summary_len = summary.iter().map(|s| s.chars().count()).sum::<usize>()
+        + summary.len().saturating_sub(1) * 4; // account for " -> " separators
+    if current_summary_len <= CURRENT_SEQUENCE_SUMMARY_MAX_LEN {
+        return summary.join(" -> ");
+    }
+
+    // Remove requests just before the last one, replace with "..."
+    current_summary_len += 3; // account for "..."
+    while current_summary_len > CURRENT_SEQUENCE_SUMMARY_MAX_LEN && summary.len() > 1 {
+        let removed = summary.remove(summary.len() - 2);
+        current_summary_len -= removed.chars().count() + 4; // account for " -> " separator
+    }
+
+    summary.insert(summary.len() - 1, "...".to_string());
+    summary.join(" -> ")
 }
 
 /// Uses the given event manager to log an event with the given name and value
