@@ -7,12 +7,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::input::OpenApiInput;
-
 use super::{
     coverage::{EdgeKey, OtelCoverageState, SpanKey},
     types::{ParsedSpan, PromotionCandidate},
 };
+use crate::input::OpenApiInput;
 
 const MAX_BUFFERED_ORPHAN_TRACES: usize = 10_000;
 const MAX_BUFFERED_ORPHAN_SPANS: usize = 50_000;

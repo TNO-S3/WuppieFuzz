@@ -20,8 +20,10 @@ use prost::Message;
 use prost_types::Any;
 use tokio::sync::mpsc::{Sender, error::TrySendError};
 
-use super::types::{ArbiterMessage, OtelSpanKind, ParsedSpan, SharedOtelTraceProcessingMetrics};
-use super::types::{record_engine_backpressure, record_engine_queue_depth};
+use super::types::{
+    ArbiterMessage, OtelSpanKind, ParsedSpan, SharedOtelTraceProcessingMetrics,
+    record_engine_backpressure, record_engine_queue_depth,
+};
 
 #[derive(Clone)]
 pub(crate) struct OtlpHttpState {

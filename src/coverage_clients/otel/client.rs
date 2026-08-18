@@ -12,11 +12,6 @@ use anyhow::Context;
 use rand::RngExt;
 use tokio::sync::mpsc::{Sender, error::TrySendError};
 
-use crate::{
-    coverage_clients::{CoverageClient, DelayedGuidance},
-    input::OpenApiInput,
-};
-
 use super::{
     coverage::{SharedCoverageState, new_shared_coverage_state},
     receiver::{OtelReceiverHandle, start_otel_receiver},
@@ -24,6 +19,10 @@ use super::{
         ArbiterMessage, PromotionCandidate, SharedOtelTraceProcessingMetrics,
         record_engine_backpressure, record_engine_queue_depth,
     },
+};
+use crate::{
+    coverage_clients::{CoverageClient, DelayedGuidance},
+    input::OpenApiInput,
 };
 
 fn random_trace_id() -> String {
@@ -382,9 +381,8 @@ impl Drop for OtelCoverageClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::coverage_clients::{CoverageClient, DelayedGuidance};
-
     use super::OtelCoverageClient;
+    use crate::coverage_clients::{CoverageClient, DelayedGuidance};
 
     fn make_client() -> OtelCoverageClient {
         OtelCoverageClient::new_for_tests()

@@ -6,9 +6,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::coverage_clients::MAP_SIZE;
-
 use super::types::{OtelSpanKind, ParsedSpan};
+use crate::coverage_clients::MAP_SIZE;
 
 pub(crate) type SharedCoverageState = Arc<Mutex<OtelCoverageState>>;
 
