@@ -17,12 +17,12 @@ license = false
 eula = false
 
 [features]
-default = ["std", "vendored-openssl", "bundled-sqlite", "bundled-z3"]
+default = ["std", "vendored-openssl", "bundled-sqlite", "vendored-z3"]
 std = []
 sequence-diagnostics = []
 vendored-openssl = ["openssl/vendored"]
 bundled-sqlite = ["rusqlite/bundled"]
-bundled-z3 = ["z3/bundled"]
+vendored-z3 = ["z3/vendored"]
 
 [profile.dev]
 panic = "unwind"
@@ -63,8 +63,8 @@ itertools = "0.15.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.5.0"
 lcov = "0.8"
-libafl = { version = "0.15.4", features = ["clap", "cmin"] }
-libafl_bolts = { version = "0.15.4", features = ["prelude"] }
+libafl = { version = "0.16.0", features = ["clap", "cmin"] }
+libafl_bolts = { version = "0.16.0", features = ["prelude"] }
 log = { version = "0.4.30", features = ["serde"] }
 num = { version = "0.4.3", default-features = false }
 num-derive = "0.5.1"
@@ -93,7 +93,7 @@ unicode-truncate = "2.0.0"
 url = { version = "2.5.8", features = ["serde"] }
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
-z3 = "0.19.13"
+z3 = "0.20.2"
 oas3 = { version = "0.22.0", features = ["yaml-spec"] }
 semver = "1.0.28"
 axum = "0.8"

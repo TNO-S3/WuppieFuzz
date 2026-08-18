@@ -4,6 +4,7 @@
 use std::{
     borrow::Cow,
     collections::{HashSet, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
     marker::PhantomData,
     sync::{
         Arc, Mutex,
@@ -24,7 +25,6 @@ use libafl::{
 use libafl_bolts::{current_time, prelude::RefIndexable};
 use reqwest::blocking::Client;
 use reqwest_cookie_store::CookieStoreMutex;
-use std::hash::{Hash, Hasher};
 use strum::IntoDiscriminant;
 
 use crate::{
@@ -553,6 +553,15 @@ where
                 UserStatsValue::Number(self.performed_requests),
             );
 
+            // send a short summary of the sequence currently being fuzzed, so the
+            // monitor can show users which requests are actively being tested
+            update_stats(
+                state,
+                event_manager,
+                "current_sequence",
+                UserStatsValue::String(Cow::Owned(summarize_sequence(input))),
+            );
+
             let (seq_per_sec, req_per_sec) = self.current_window_rates();
             self.write_stats_snapshot(state, seq_per_sec, req_per_sec);
             self.last_window_time = current_instant;
@@ -720,6 +729,42 @@ fn setup_interrupt() -> Result<Arc<AtomicBool>, anyhow::Error> {
     Ok(manual_interrupt)
 }
 
+/// Maximum length (in characters) of the `current_sequence` summary shown in
+/// the monitor, to keep the terminal/dashboard output readable.
+const CURRENT_SEQUENCE_SUMMARY_MAX_LEN: usize = 120;
+
+/// Builds a short, human-readable summary of the request sequence currently
+/// being fuzzed (e.g. `"GET /pets -> POST /pets/{id}"`), truncated if it would
+/// otherwise be too long to display nicely.
+fn summarize_sequence(input: &OpenApiInput) -> String {
+    let mut summary: Vec<String> = input
+        .0
+        .iter()
+        .map(|request| format!("{} {}", request.method, request.path))
+        .collect();
+
+    if summary.len() <= 2 {
+        // Truncating will not work for sequences of length 2 or less
+        return summary.join(" -> ");
+    }
+
+    let mut current_summary_len = summary.iter().map(|s| s.chars().count()).sum::<usize>()
+        + summary.len().saturating_sub(1) * 4; // account for " -> " separators
+    if current_summary_len <= CURRENT_SEQUENCE_SUMMARY_MAX_LEN {
+        return summary.join(" -> ");
+    }
+
+    // Remove requests just before the last one, replace with "..."
+    current_summary_len += 3; // account for "..."
+    while current_summary_len > CURRENT_SEQUENCE_SUMMARY_MAX_LEN && summary.len() > 1 {
+        let removed = summary.remove(summary.len() - 2);
+        current_summary_len -= removed.chars().count() + 4; // account for " -> " separator
+    }
+
+    summary.insert(summary.len() - 1, "...".to_string());
+    summary.join(" -> ")
+}
+
 /// Uses the given event manager to log an event with the given name and value
 fn update_stats<EM>(
     state: &mut FuzzerState,
@@ -756,5 +801,26 @@ where
 
     fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         RefIndexable::from(&mut self.observers)
+    }
+}
+
+#[cfg(test)]
+mod summarize_sequence_tests {
+    use super::summarize_sequence;
+    use crate::openapi_mutator::test_helpers::{linked_requests, simple_request};
+
+    #[test]
+    fn summarizes_single_request() {
+        let input = simple_request();
+        assert_eq!(summarize_sequence(&input), "GET /simple");
+    }
+
+    #[test]
+    fn summarizes_multiple_requests_in_order() {
+        let input = linked_requests();
+        assert_eq!(
+            summarize_sequence(&input),
+            "GET /simple -> GET /with-query-parameter"
+        );
     }
 }
