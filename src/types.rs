@@ -9,7 +9,7 @@ use libafl::{
         CombinedFeedback, CrashLogic, DifferentIsNovel, ExitKindFeedback, LogicEagerOr,
         MapFeedback, MapIndexesMetadata, TimeFeedback,
     },
-    inputs::NopToTargetBytes,
+    inputs::BytesInputConverter,
     observers::{ExplicitTracking, MultiMapObserver, TimeObserver},
     schedulers::{LenTimeMulTestcasePenalty, MinimizerScheduler, PowerQueueScheduler},
 };
@@ -23,7 +23,7 @@ use crate::{
 pub type FuzzerType<'a> = StdFuzzer<
     SchedulerType<'a>,
     CombinedFeedbackType<'a>,
-    NopToTargetBytes,
+    BytesInputConverter,
     NopInputFilter,
     ExitKindFeedback<CrashLogic>,
 >;
