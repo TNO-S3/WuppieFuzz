@@ -1,3 +1,6 @@
+//! Shared types, defaults, and metrics helpers used across the OTel coverage client, its
+//! OTLP receivers, the trace store, and the arbiter.
+
 use std::{
     sync::{Arc, Mutex},
     time::Duration,

@@ -1,3 +1,7 @@
+//! The async arbiter task: owns the [`TraceStore`](super::trace_store::TraceStore), applies
+//! incoming spans to the shared coverage bitmap, and promotes sequences that produced novel
+//! coverage back to the fuzzer.
+
 use std::sync::mpsc::Sender;
 
 use tokio::{sync::watch, time};

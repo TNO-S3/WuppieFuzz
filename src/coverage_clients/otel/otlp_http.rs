@@ -1,3 +1,6 @@
+//! OTLP/HTTP receiver: an Axum router that accepts `POST /v1/traces` (protobuf or JSON,
+//! optionally gzip-compressed), parses spans, and forwards them to the arbiter job queue.
+
 use std::io::Read;
 
 use axum::{

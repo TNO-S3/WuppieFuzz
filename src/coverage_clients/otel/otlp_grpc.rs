@@ -1,3 +1,6 @@
+//! OTLP/gRPC `TraceService` implementation: accepts `Export` calls and forwards the parsed
+//! spans to the arbiter job queue.
+
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse,
     trace_service_server::{TraceService, TraceServiceServer},

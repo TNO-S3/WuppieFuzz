@@ -1,3 +1,7 @@
+//! The [`CoverageClient`] implementation for OTel-based coverage: injects trace context into
+//! outgoing requests, drives the built-in OTLP receiver/arbiter, and reports coverage derived
+//! from spans back to the fuzzer via [`DelayedGuidance`].
+
 use std::{
     net::SocketAddr,
     path::Path,

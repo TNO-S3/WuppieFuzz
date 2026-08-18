@@ -1,3 +1,6 @@
+//! Spawns the background Tokio runtime that runs the OTLP/HTTP and OTLP/gRPC receivers
+//! alongside the arbiter task, and exposes a handle to submit jobs and trigger shutdown.
+
 use std::{
     net::{SocketAddr, TcpListener as StdTcpListener},
     sync::mpsc::Sender as StdSender,

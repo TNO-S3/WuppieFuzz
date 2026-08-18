@@ -1,3 +1,7 @@
+//! Correlates asynchronously-arriving OTel spans with the request sequence that produced
+//! them, tracking expected/seen request roots, buffering orphan spans, and evicting stale or
+//! overflowing sequences.
+
 use std::{
     collections::{HashMap, HashSet},
     time::{Duration, Instant},

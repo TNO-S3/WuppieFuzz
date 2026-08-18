@@ -1,6 +1,6 @@
 use std::{
     convert::TryFrom,
-    fmt, io,
+    io,
     io::ErrorKind,
     net::{SocketAddr, ToSocketAddrs},
     path::{Path, PathBuf},
@@ -513,45 +513,10 @@ impl<'de> Deserialize<'de> for ReceiverBindSetting {
     where
         D: Deserializer<'de>,
     {
-        struct ReceiverBindVisitor;
-
-        impl<'de> de::Visitor<'de> for ReceiverBindVisitor {
-            type Value = ReceiverBindSetting;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a socket address, 'off', 'null', or null")
-            }
-
-            fn visit_unit<E>(self) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                Ok(ReceiverBindSetting::Disabled)
-            }
-
-            fn visit_none<E>(self) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                Ok(ReceiverBindSetting::Disabled)
-            }
-
-            fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                Deserialize::deserialize(deserializer)
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                parse_receiver_bind_setting(value).map_err(E::custom)
-            }
+        match Option::<String>::deserialize(deserializer)? {
+            None => Ok(Self::Disabled),
+            Some(value) => parse_receiver_bind_setting(&value).map_err(de::Error::custom),
         }
-
-        deserializer.deserialize_any(ReceiverBindVisitor)
     }
 }
 

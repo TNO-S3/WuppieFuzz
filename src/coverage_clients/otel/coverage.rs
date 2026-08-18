@@ -1,3 +1,6 @@
+//! Translates OTel spans into the shared coverage bitmap: distinct span types and
+//! parent/child span edges are each assigned a bit, discovered on first sight.
+
 use std::{
     collections::{HashMap, hash_map::Entry},
     sync::{Arc, Mutex},
