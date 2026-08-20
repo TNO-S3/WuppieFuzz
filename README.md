@@ -46,6 +46,37 @@ Third-party license notices are listed in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTI
 For quick installation of WuppieFuzz for popular operating systems (MacOS,
 Windows, Linux) see [releases](https://github.com/TNO-S3/WuppieFuzz/releases/) or use [`brew install wuppiefuzz`](https://formulae.brew.sh/formula/wuppiefuzz)
 
+## GitHub Action
+
+The WuppieFuzz Action starts a self-contained API image, fuzzes it using an
+OpenAPI specification from your repository, and uploads the reports and target
+logs as a workflow artifact. After the Action is released, use its major version
+tag:
+
+```yaml
+permissions:
+  contents: read
+
+steps:
+  - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+    with:
+      persist-credentials: false
+  - uses: TNO-S3/WuppieFuzz@v1
+    with:
+      openapi-spec: openapi.yaml
+      docker-image: ghcr.io/example/my-api:latest
+      timeout: "300"
+```
+
+The Action requires a Linux runner with Docker. The target image must start
+without additional commands and listen on the host and port named by the
+specification's `servers` URL, normally `localhost`. Log in to private container
+registries before invoking the Action.
+
+Optional inputs control the fuzzing `timeout`, `startup-wait`, `artifact-name`,
+and `wuppiefuzz-version`. The `results-path` output points to the generated files
+for later workflow steps; the Action also uploads them automatically.
+
 ### Short how-to
 
 [![How to use WuppieFuzz? - YouTube](./assets/demo_video.png)](https://www.youtube.com/watch?v=-oR4d9aXrqo)
