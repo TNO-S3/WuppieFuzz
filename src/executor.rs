@@ -107,20 +107,22 @@ pub(crate) fn process_response(
     request: &OpenApiRequest,
     response: &Response,
     api: &Spec,
-    crash_criteria: &[ValidationErrorDiscriminants],
+    crash_policy: (&[ValidationErrorDiscriminants], &[u16]),
     exit_kind: &mut ExitKind,
     parameter_feedback: &mut ParameterFeedback,
 ) -> Option<ValidationError> {
+    let (crash_criteria, always_crash_status_codes) = crash_policy;
     if response.status() == 429 {
         log::warn!("HTTP status 429 'Too Many Requests' encountered!");
         log::warn!("Rate limiting is likely active on the program under test.");
         log::warn!("This hinders fuzz testing. Consider disabling it.");
     }
     let mut maybe_validation_error = None;
-    if response.status().is_server_error() {
+    if always_crash_status_codes.contains(&response.status().as_u16()) {
         *exit_kind = ExitKind::Crash;
         log::debug!(
-            "OpenAPI-input resulted in server error response, ignoring rest of request chain."
+            "HTTP status {} is always considered a crash, ignoring rest of request chain.",
+            response.status()
         );
     } else if let Err(validation_err) = validate_response(api, request, response)
         && crash_criteria.contains(&validation_err.discriminant())
@@ -317,7 +319,10 @@ where
                         &request,
                         &response,
                         self.api,
-                        &self.config.crash_criteria,
+                        (
+                            &self.config.crash_criteria,
+                            &self.config.always_crash_status_codes,
+                        ),
                         &mut exit_kind,
                         &mut parameter_feedback,
                     );
