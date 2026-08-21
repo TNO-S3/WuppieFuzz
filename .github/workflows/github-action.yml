@@ -28,7 +28,7 @@ jobs:
         with:
           openapi-spec: .github/action-test/openapi.yaml
           docker-image: docker.io/mccutchen/go-httpbin@sha256:24528cf5229d0b70065ac27e6c9e4d96f5452a84a3ce4433e56573c18d96827a
-          timeout: "1"
+          timeout: "10"
           startup-wait: "1"
           artifact-name: wuppiefuzz-action-smoke-test
 
@@ -37,4 +37,53 @@ jobs:
           RESULTS_PATH: ${{ steps.fuzz.outputs.results-path }}
         run: |
           test -s "$RESULTS_PATH/target-container.log"
-          test -d "$RESULTS_PATH/reports"
+          python3 - "$RESULTS_PATH/reports/grafana/report.db" <<'PY'
+          import sqlite3
+          import sys
+
+          expected = {
+              ("GET", "/get", 200),
+              ("GET", "/anything/{value}", 200),
+              ("POST", "/anything/post", 200),
+              ("GET", "/status/201", 201),
+              ("GET", "/status/418", 418),
+          }
+
+          with sqlite3.connect(sys.argv[1]) as database:
+              observed = set(database.execute("""
+                  SELECT DISTINCT requests.type, requests.path, responses.status
+                  FROM requests
+                  JOIN responses ON responses.reqid = requests.id
+                  WHERE responses.status IS NOT NULL
+              """))
+              coverage = database.execute("""
+                  SELECT MAX(endpoint_coverage), MAX(endpoint_coverage_total)
+                  FROM coverage
+              """).fetchone()
+              performance = database.execute("""
+                  SELECT seq_per_sec, req_per_sec
+                  FROM stats
+                  ORDER BY id DESC
+                  LIMIT 1
+              """).fetchone()
+
+          missing = expected - observed
+          if missing:
+              raise SystemExit(f"Missing method/path/status combinations: {sorted(missing)}")
+          if coverage != (len(expected), len(expected)):
+              raise SystemExit(f"Expected endpoint coverage 5/5, got {coverage[0]}/{coverage[1]}")
+          if performance is None:
+              raise SystemExit("No performance statistics were recorded")
+
+          seq_per_sec, req_per_sec = performance
+          if seq_per_sec < 10 or req_per_sec < 10:
+              raise SystemExit(
+                  f"Performance below smoke-test floor: {seq_per_sec:.1f} seq/s, "
+                  f"{req_per_sec:.1f} req/s"
+              )
+
+          print(
+              f"Validated {len(expected)} method/path/status combinations, "
+              f"5/5 endpoint coverage, {seq_per_sec:.1f} seq/s, and {req_per_sec:.1f} req/s"
+          )
+          PY

@@ -73,9 +73,9 @@ without additional commands and listen on the host and port named by the
 specification's `servers` URL, normally `localhost`. Log in to private container
 registries before invoking the Action.
 
-Optional inputs control the fuzzing `timeout`, `startup-wait`, `artifact-name`,
-and `wuppiefuzz-version`. The `results-path` output points to the generated files
-for later workflow steps; the Action also uploads them automatically.
+Optional inputs control the fuzzing `timeout`, `startup-wait`, and
+`artifact-name`. The `results-path` output points to the generated files for
+later workflow steps; the Action also uploads them automatically.
 
 ### Short how-to
 

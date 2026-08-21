@@ -7,9 +7,65 @@ servers:
 paths:
   /get:
     get:
+      parameters:
+        - name: query
+          in: query
+          schema:
+            type: string
+            example: smoke-test
       responses:
         "200":
           description: JSON response
           content:
             application/json:
               schema: true
+  /anything/{value}:
+    get:
+      parameters:
+        - name: value
+          in: path
+          required: true
+          schema:
+            type: string
+            example: smoke-test
+        - name: detail
+          in: query
+          schema:
+            type: boolean
+            example: true
+      responses:
+        "200":
+          description: Request details
+          content:
+            application/json:
+              schema: true
+  /anything/post:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  example: smoke-test
+      responses:
+        "200":
+          description: Posted request details
+          content:
+            application/json:
+              schema: true
+  /status/201:
+    get:
+      responses:
+        "201":
+          description: Created
+  /status/418:
+    get:
+      responses:
+        "418":
+          description: Teapot

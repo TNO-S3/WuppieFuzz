@@ -15,20 +15,13 @@ inputs:
     required: true
   timeout:
     description: Fuzzing duration in seconds
-    required: false
     default: "60"
   startup-wait:
     description: Maximum startup wait in seconds
-    required: false
     default: "10"
   artifact-name:
     description: Name of the uploaded results artifact
-    required: false
     default: wuppiefuzz-report
-  wuppiefuzz-version:
-    description: WuppieFuzz release version; defaults to the version in Cargo.toml
-    required: false
-    default: ""
 
 outputs:
   results-path:
@@ -46,7 +39,6 @@ runs:
         INPUT_DOCKER_IMAGE: ${{ inputs.docker-image }}
         INPUT_TIMEOUT: ${{ inputs.timeout }}
         INPUT_STARTUP_WAIT: ${{ inputs.startup-wait }}
-        INPUT_WUPPIEFUZZ_VERSION: ${{ inputs.wuppiefuzz-version }}
       run: "${GITHUB_ACTION_PATH}/action/run.sh"
 
     - name: Upload WuppieFuzz results

@@ -24,12 +24,8 @@ fi
 [[ -f "$spec_path" ]] || fail "OpenAPI specification not found: $spec_path"
 spec_path="$(realpath "$spec_path")"
 
-version="${INPUT_WUPPIEFUZZ_VERSION#v}"
-if [[ -z "$version" ]]; then
-    version="$(awk -F '"' '/^version = "/ { print $2; exit }' "${GITHUB_ACTION_PATH:?}/Cargo.toml")"
-fi
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.+-][0-9A-Za-z.-]+)?$ ]] \
-    || fail "invalid WuppieFuzz version: $version"
+version="$(awk -F '"' '/^version = "/ { print $2; exit }' "${GITHUB_ACTION_PATH:?}/Cargo.toml")"
+[[ -n "$version" ]] || fail "could not determine WuppieFuzz version from Cargo.toml"
 
 case "$(uname -m)" in
     x86_64 | amd64) target="x86_64-unknown-linux-gnu" ;;
@@ -59,9 +55,10 @@ cleanup() {
     fi
     for directory in reports crashes; do
         if [[ -e "$run_dir/$directory" ]]; then
-            cp -a "$run_dir/$directory" "$results_dir/" || status=1
+            mv "$run_dir/$directory" "$results_dir/" || status=1
         fi
     done
+    rm -rf -- "$work_dir" || status=1
 
     exit "$status"
 }
