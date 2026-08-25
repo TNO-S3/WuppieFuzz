@@ -4,7 +4,7 @@ name: WuppieFuzz
 url: "https://github.com/TNO-S3/WuppieFuzz"
 landingURL: "https://tno.to/wuppiefuzz"
 softwareVersion: "1.7.0"
-releaseDate: "2026-08-25"
+releaseDate: "2026-08-26"
 logo: "assets/WuppieFuzz.svg"
 
 platforms:

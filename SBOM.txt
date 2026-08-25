@@ -157,7 +157,7 @@ dispatch2 0.3.1
 document-features 0.2.12
 	licensed under "Apache-2.0 OR MIT"
 	by Slint Developers <info@slint.dev>
-either 1.17.0
+either 1.18.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 embedded-io 0.4.0
@@ -253,7 +253,7 @@ getrandom 0.4.3
 gimli 0.32.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-h2 0.4.16
+h2 0.4.19
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
 hashbrown 0.15.5
@@ -319,7 +319,7 @@ icu_properties 2.3.0
 icu_properties_data 2.3.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_provider 2.3.0
+icu_provider 2.3.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 idna 1.1.0
@@ -421,7 +421,7 @@ ll_mp 0.16.1
 lock_api 0.4.14
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-log 0.4.33
+log 0.4.34
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 lru-slab 0.1.2
@@ -634,7 +634,7 @@ rustls-platform-verifier 0.7.0
 rustls-platform-verifier-android 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-webpki 0.103.14
+rustls-webpki 0.103.15
 	licensed under "ISC"
 	by unspecified authors
 ryu 1.0.23
@@ -826,7 +826,7 @@ utf8_iter 1.0.4
 utf8parse 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Joe Wilm <joe@jwilm.com>|Christian Duerr <contact@christianduerr.com>
-uuid 1.24.1
+uuid 1.25.0
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
 value-bag 1.13.2
@@ -961,7 +961,7 @@ writeable 0.6.4
 xxhash-rust 0.8.18
 	licensed under "BSL-1.0"
 	by Douman <douman@gmx.se>
-yaml_serde 0.10.6
+yaml_serde 0.10.7
 	licensed under "Apache-2.0 OR MIT"
 	by YAML Organization <noreply@yaml.org>
 yoke 0.8.3
@@ -994,10 +994,10 @@ zeroize 1.9.0
 zerotrie 0.2.5
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-zerovec 0.11.7
+zerovec 0.11.8
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-zerovec-derive 0.11.5
+zerovec-derive 0.11.6
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
 zmij 1.0.23
