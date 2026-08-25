@@ -4,6 +4,14 @@
 
 ## Features
 
+## Fixes
+
+# v1.7.0 (2026-08-25)
+
+## Highlights
+
+## Features
+
 - Add `GrammarInterestingMutator`, generating varied injection payloads (SQLi, XSS, SSTI, command/LDAP/NoSQL injection, path traversal, XXE, format strings) from small regex grammars instead of a fixed wordlist, inspired by LibAFL's Nautilus grammar mutator in [#357](https://github.com/TNO-S3/WuppieFuzz/pull/357)
 - Treat request timeouts as a fuzzing objective alongside crashes, so time-based blind injection findings (e.g. `SLEEP`/`WAITFOR DELAY` payloads) are now saved as solutions instead of only being logged in [#357](https://github.com/TNO-S3/WuppieFuzz/pull/357)
 - Add content-based detection of injection side-effects: responses are now also checked for known database/LDAP/NoSQL error signatures and for verbatim reflection of suspicious payload values (e.g. unescaped `<script>`), surfaced as a new `PossibleInjectionSignature` crash criterion in [#357](https://github.com/TNO-S3/WuppieFuzz/pull/357)
