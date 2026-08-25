@@ -2,3 +2,25 @@
 dev-build = "build --no-default-features --features sequence-diagnostics"
 dev-run = "run --no-default-features --features sequence-diagnostics"
 dev-test = "test --no-default-features --features sequence-diagnostics"
+
+# Match the ~8 MiB main-thread stack Linux gets by default; Windows'
+# default of 1 MiB is too small for the recursive OpenAPI schema resolution
+# used during corpus generation.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-args=/STACK:8388608"]
+
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "link-args=-Wl,--stack,8388608"]
+
+# Keep linker-level stack settings aligned across desktop targets.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-Wl,-z,stack-size=8388608"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-Wl,-z,stack-size=8388608"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-args=-Wl,-stack_size,0x800000"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-args=-Wl,-stack_size,0x800000"]
