@@ -11,3 +11,16 @@ rustflags = ["-C", "link-args=/STACK:8388608"]
 
 [target.x86_64-pc-windows-gnu]
 rustflags = ["-C", "link-args=-Wl,--stack,8388608"]
+
+# Keep linker-level stack settings aligned across desktop targets.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-Wl,-z,stack-size=8388608"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-Wl,-z,stack-size=8388608"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-args=-Wl,-stack_size,0x800000"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-args=-Wl,-stack_size,0x800000"]
