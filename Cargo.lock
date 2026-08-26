@@ -243,8 +243,7 @@ checksum = "f1829197343f1874c1979c988a5e75c2539c4645792d87494286ce2cb6dc890d"
 [[package]]
 name = "build_id2"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9f1e2364c899000ad516e29ac00d81596958b226df44a055b427be3ac90e607"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "ahash",
  "rustversion",
@@ -474,9 +473,9 @@ dependencies = [
 
 [[package]]
 name = "combine"
-version = "4.6.7"
+version = "4.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
+checksum = "cfc320937d09e6de266b31b9afb480f197d7a861be86be7cb2ea7e5d1bfffc5e"
 dependencies = [
  "bytes",
  "memchr",
@@ -591,8 +590,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 [[package]]
 name = "core_affinity2"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f8881ee4f0a11950850c835af4024d8bb95bce539b987e7dd592bc6ccd4c89"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "libafl_core",
  "libc",
@@ -845,8 +843,7 @@ dependencies = [
 [[package]]
 name = "exceptional"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "478ce8b27c9eba066c10b9778a75976fcee82a9fab9318ec31ed17f742290f92"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "libafl_core",
  "libc",
@@ -873,8 +870,7 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 [[package]]
 name = "fast_rands"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63fd48d1e4875e83f276690f58a4b4d829ed157bc3210690d082892450fe42fc"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "rand_core 0.10.1",
  "rustversion",
@@ -1608,8 +1604,7 @@ dependencies = [
 [[package]]
 name = "libafl"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f523f899d3c03d12bd693e312b815cacf4c54597d5e9718632a78d779ff3d24"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1652,8 +1647,7 @@ dependencies = [
 [[package]]
 name = "libafl_bolts"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7ffd88aff020c1c954b1047ef9bd037c3a309e733cb6ecdc206c8f365b50ccf"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1696,8 +1690,7 @@ dependencies = [
 [[package]]
 name = "libafl_core"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "500f095e2ded36a365006c5c0b1af91df9fa1db8eb1d8bf09e0519110051bf18"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "backtrace",
  "nix",
@@ -1711,8 +1704,7 @@ dependencies = [
 [[package]]
 name = "libafl_derive"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "667f4c0ed30fb0c785f3e5b679c11e9b41ecf5fe964a372cda29deae6cb7316a"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1781,8 +1773,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 [[package]]
 name = "ll_mp"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9d0cf0498e4fbda92c368f559eceed3520d2ea8a2bd45fc34b20d60daa05f18"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "exceptional",
  "hostname",
@@ -1864,8 +1855,7 @@ checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 [[package]]
 name = "minibsod"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fac0fdabf2033d9e72b6dd0dc811cf888e15fdc2b435cc7898f08bc5d2dd04a"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "exceptional",
  "libc",
@@ -1944,8 +1934,7 @@ dependencies = [
 [[package]]
 name = "no_std_time"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ae6f813d99a8ca14e40e03696623aeb3b8c569d059943692a06c6e531413560"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "rustversion",
 ]
@@ -1953,8 +1942,7 @@ dependencies = [
 [[package]]
 name = "nonzero_macros"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f58b86669675275aa80411d548739c787956f3a80594667bd96fc9d03d5ebfb"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 
 [[package]]
 name = "num"
@@ -2187,8 +2175,7 @@ dependencies = [
 [[package]]
 name = "ownedref"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cd79d8ea5dfa85401c6c1d63359b13e555e50bfce892a695292b29ef763744a"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "libafl_core",
  "rustversion",
@@ -2832,8 +2819,7 @@ dependencies = [
 [[package]]
 name = "serde_anymap"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf2fe27e7d1e3ea97658c78b37624e933229bd3235b2e542474d9c2368a7e3be"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "ctor",
  "erased-serde",
@@ -2954,8 +2940,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "shmem_providers"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0010a858a2491b5b96aa323dbfba84044ffc0fe188fafd005671cfa9518ca135"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "fast_rands",
  "hashbrown 0.17.1",
@@ -3437,8 +3422,7 @@ checksum = "141fb9f71ee586d956d7d6e4d5a9ef8e946061188520140f7591b668841d502e"
 [[package]]
 name = "tuple_list_ex"
 version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a1667a974c813c807a055fd685a433cada13f0bfb8a4f074478ca2b93d9b268"
+source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
 dependencies = [
  "libafl_core",
  "ownedref",

@@ -100,7 +100,7 @@ cobs 0.3.0
 colorchoice 1.0.5
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-combine 4.6.7
+combine 4.6.8
 	licensed under "MIT"
 	by Markus Westerlind <marwes91@gmail.com>
 console 0.16.4
