@@ -86,4 +86,34 @@ fn main() {
     // Tell Cargo to re-run this build script if `build.rs` of `Cargo.lock` is changed
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=Cargo.lock");
+
+    set_main_thread_stack_size();
+}
+
+/// Ensures the main thread gets an ~8 MiB stack (matching Linux/macOS defaults),
+/// instead of the OS default (1 MiB on Windows). Deep OpenAPI schema resolution
+/// (recursive/circular `$ref`s) and other recursive code paths can otherwise
+/// overflow the stack on Windows even though they're fine on Unix targets.
+///
+/// This is set via `cargo:rustc-link-arg` (rather than relying solely on
+/// `.cargo/config.toml`'s `rustflags`) because `rustflags` set there can be
+/// silently overridden by a `RUSTFLAGS` environment variable set elsewhere in
+/// the build pipeline (e.g. by CI tooling), which fully replaces rather than
+/// merges with target-specific `rustflags`. Linker args emitted by a build
+/// script are not subject to that override and are always applied.
+fn set_main_thread_stack_size() {
+    const STACK_SIZE_BYTES: u32 = 8 * 1024 * 1024; // 8 MiB
+
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os != "windows" {
+        return;
+    }
+
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    if target_env == "msvc" {
+        println!("cargo:rustc-link-arg=/STACK:{STACK_SIZE_BYTES}");
+    } else {
+        // mingw/gnu toolchain
+        println!("cargo:rustc-link-arg=-Wl,--stack,{STACK_SIZE_BYTES}");
+    }
 }
