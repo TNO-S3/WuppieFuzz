@@ -6,6 +6,14 @@
 
 ## Fixes
 
+# v1.7.1 (2026-08-26)
+
+## Highlights
+
+## Features
+
+## Fixes
+
 - Persistent stack overflow fix for Windows build in [#365](https://github.com/TNO-S3/WuppieFuzz/pull/365)
 
 # v1.7.0 (2026-08-26)
