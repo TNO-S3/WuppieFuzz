@@ -1,6 +1,3 @@
-#[cfg(windows)]
-use std::ptr::write_volatile;
-
 // This may be marked unused, but will make the compiler give you crucial error messages
 use libafl::{
     NopInputFilter, StdFuzzer,

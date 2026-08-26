@@ -1,5 +1,3 @@
-#[cfg(windows)]
-use std::ptr::write_volatile;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
