@@ -137,21 +137,38 @@ fn diagnose_crt_mismatch() {
         return;
     }
 
-    let Ok(out_dir) = env::var("OUT_DIR") else {
-        return;
-    };
-    // OUT_DIR looks like .../target/<profile>/build/<crate>-<hash>/out;
-    // walk back up to the shared `target/.../deps` directory that holds all
-    // compiled rlibs for this build.
-    let Some(target_dir) = Path::new(&out_dir)
-        .ancestors()
-        .find(|p| p.join("deps").is_dir())
-        .map(|p| p.join("deps"))
-    else {
-        return;
-    };
+    if let Ok(out_dir) = env::var("OUT_DIR") {
+        // OUT_DIR looks like .../target/<profile>/build/<crate>-<hash>/out;
+        // walk back up to the shared `target/.../deps` directory that holds
+        // all compiled rlibs for this build.
+        if let Some(deps_dir) = Path::new(&out_dir)
+            .ancestors()
+            .find(|p| p.join("deps").is_dir())
+            .map(|p| p.join("deps"))
+        {
+            scan_dir_for_crt_markers(&deps_dir, "rlib");
+        }
+    }
 
-    let Ok(entries) = std::fs::read_dir(&target_dir) else {
+    // Our own dependencies aren't the only objects linked in: rustup ships
+    // prebuilt `std`/`core`/`panic_unwind`/etc. rlibs in the toolchain
+    // sysroot that were compiled once upstream and can't retroactively pick
+    // up this crate's `crt-static` target feature. Scan those too, since
+    // they're a likely source of a stray `MSVCRT` reference.
+    if let Ok(output) = Command::new("rustc").arg("--print").arg("sysroot").output() {
+        if let Ok(sysroot) = String::from_utf8(output.stdout) {
+            let target_triple = env::var("TARGET").unwrap_or_default();
+            let libdir = Path::new(sysroot.trim())
+                .join("lib/rustlib")
+                .join(&target_triple)
+                .join("lib");
+            scan_dir_for_crt_markers(&libdir, "rlib");
+        }
+    }
+}
+
+fn scan_dir_for_crt_markers(dir: &Path, ext_filter: &str) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
 
@@ -160,7 +177,7 @@ fn diagnose_crt_mismatch() {
         let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
             continue;
         };
-        if ext != "rlib" {
+        if ext != ext_filter {
             continue;
         }
         let Ok(bytes) = std::fs::read(&path) else {
