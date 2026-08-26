@@ -88,7 +88,7 @@ fn main() {
     println!("cargo:rerun-if-changed=Cargo.lock");
 
     set_main_thread_stack_size();
-    enable_link_diagnostics_if_requested();
+    diagnose_crt_mismatch();
 }
 
 /// Ensures the main thread gets an ~8 MiB stack (matching Linux/macOS defaults),
@@ -119,19 +119,63 @@ fn set_main_thread_stack_size() {
     }
 }
 
-/// Opt-in diagnostic for tracking down `LNK4098: defaultlib '...' conflicts
-/// with use of other libs` warnings on MSVC targets. Set the
-/// `WUPPIEFUZZ_LINK_VERBOSE` environment variable (to any value) when
-/// building/linking to have the linker print, for every input object/library,
-/// which C runtime it was compiled against. This makes it possible to spot
-/// exactly which dependency doesn't match the rest (e.g. a vendored native
-/// library that ignored the `crt-static` target feature), without guessing.
+/// Temporary diagnostic for tracking down the `LNK4098: defaultlib 'libcmt'
+/// conflicts with use of other libs` warning on MSVC targets.
 ///
-/// Left off by default to avoid spamming normal builds with linker noise.
-fn enable_link_diagnostics_if_requested() {
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+/// Every object compiled for MSVC embeds its requested C runtime as a
+/// plain-text `/DEFAULTLIB:"..."` directive, so the dependency responsible
+/// for pulling in the "wrong" CRT (dynamic `MSVCRT` instead of the static
+/// `LIBCMT` cargo-dist's `msvc-crt-static = true` default expects, or vice
+/// versa) can be found by scanning each `.rlib` already produced under
+/// `target/` for those markers — no `dumpbin`/`link.exe` access required.
+/// Findings are emitted as `cargo:warning`s so they show up directly in the
+/// build log. Remove this function (and its call site) once the mismatched
+/// dependency has been identified and fixed.
+fn diagnose_crt_mismatch() {
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
-    if target_os == "windows" && target_env == "msvc" {
-        println!("cargo:rustc-link-arg=/VERBOSE:LIB");
+    if target_env != "msvc" {
+        return;
+    }
+
+    let Ok(out_dir) = env::var("OUT_DIR") else {
+        return;
+    };
+    // OUT_DIR looks like .../target/<profile>/build/<crate>-<hash>/out;
+    // walk back up to the shared `target/.../deps` directory that holds all
+    // compiled rlibs for this build.
+    let Some(target_dir) = Path::new(&out_dir)
+        .ancestors()
+        .find(|p| p.join("deps").is_dir())
+        .map(|p| p.join("deps"))
+    else {
+        return;
+    };
+
+    let Ok(entries) = std::fs::read_dir(&target_dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+            continue;
+        };
+        if ext != "rlib" {
+            continue;
+        }
+        let Ok(bytes) = std::fs::read(&path) else {
+            continue;
+        };
+        // Directives are plain ASCII text embedded in the .drectve section;
+        // a lossy scan is enough to spot the markers.
+        let text = String::from_utf8_lossy(&bytes);
+        let has_libcmt = text.contains("LIBCMT");
+        let has_msvcrt = text.contains("MSVCRT");
+        if has_libcmt || has_msvcrt {
+            println!(
+                "cargo:warning=CRT scan: {} -> LIBCMT={has_libcmt} MSVCRT={has_msvcrt}",
+                path.display()
+            );
+        }
     }
 }
