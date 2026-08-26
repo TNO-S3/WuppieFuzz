@@ -1,0 +1,11 @@
+[toolchain]
+# Some transitive dependencies (currently our libafl fork, see Cargo.toml)
+# bump their MSRV frequently. Pinning to "stable" (rather than a fixed
+# version) makes rustup fetch/use the actual current stable toolchain on
+# every machine and CI runner - including the `cargo-xwin`-based
+# aarch64-pc-windows-msvc cross build, whose Linux host image can otherwise
+# ship a stale pre-installed Rust that's older than what our dependencies
+# require, e.g.:
+#   error: rustc 1.89.0 is not supported by the following packages:
+#     libafl@0.16.1 requires rustc 1.93.1
+channel = "stable"
