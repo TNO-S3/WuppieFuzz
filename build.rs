@@ -195,11 +195,13 @@ fn scan_dir_for_crt_markers_recursive(dir: &Path) {
         // Directives are plain ASCII text embedded in the .drectve section;
         // a lossy scan is enough to spot the markers.
         let text = String::from_utf8_lossy(&bytes);
-        let has_libcmt = text.contains("LIBCMT");
-        let has_msvcrt = text.contains("MSVCRT");
-        if has_libcmt || has_msvcrt {
+        let has_libcmt = text.contains("LIBCMT") && !text.contains("LIBCMTD");
+        let has_libcmtd = text.contains("LIBCMTD");
+        let has_msvcrt = text.contains("MSVCRT") && !text.contains("MSVCRTD");
+        let has_msvcrtd = text.contains("MSVCRTD");
+        if has_libcmt || has_libcmtd || has_msvcrt || has_msvcrtd {
             println!(
-                "cargo:warning=CRT scan: {} -> LIBCMT={has_libcmt} MSVCRT={has_msvcrt}",
+                "cargo:warning=CRT scan: {} -> LIBCMT={has_libcmt} LIBCMTD={has_libcmtd} MSVCRT={has_msvcrt} MSVCRTD={has_msvcrtd}",
                 path.display()
             );
         }
