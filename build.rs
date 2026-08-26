@@ -139,14 +139,19 @@ fn diagnose_crt_mismatch() {
 
     if let Ok(out_dir) = env::var("OUT_DIR") {
         // OUT_DIR looks like .../target/<profile>/build/<crate>-<hash>/out;
-        // walk back up to the shared `target/.../deps` directory that holds
-        // all compiled rlibs for this build.
-        if let Some(deps_dir) = Path::new(&out_dir)
+        // walk back up to the shared `target/<profile>` directory that
+        // holds both the `deps` rlibs and every crate's `build/*/out`
+        // directory (where vendored C/C++ deps like aws-lc-sys/z3-sys/
+        // libsqlite3-sys drop their compiled *.lib archives directly --
+        // those are linked straight in and never get wrapped in an rlib,
+        // so they were missed by an earlier, `deps`-only version of this
+        // scan).
+        if let Some(profile_dir) = Path::new(&out_dir)
             .ancestors()
             .find(|p| p.join("deps").is_dir())
-            .map(|p| p.join("deps"))
+            .and_then(|p| p.parent())
         {
-            scan_dir_for_crt_markers(&deps_dir, "rlib");
+            scan_dir_for_crt_markers_recursive(profile_dir);
         }
     }
 
@@ -162,22 +167,26 @@ fn diagnose_crt_mismatch() {
                 .join("lib/rustlib")
                 .join(&target_triple)
                 .join("lib");
-            scan_dir_for_crt_markers(&libdir, "rlib");
+            scan_dir_for_crt_markers_recursive(&libdir);
         }
     }
 }
 
-fn scan_dir_for_crt_markers(dir: &Path, ext_filter: &str) {
+fn scan_dir_for_crt_markers_recursive(dir: &Path) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
 
     for entry in entries.flatten() {
         let path = entry.path();
+        if path.is_dir() {
+            scan_dir_for_crt_markers_recursive(&path);
+            continue;
+        }
         let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
             continue;
         };
-        if ext != ext_filter {
+        if ext != "rlib" && ext != "lib" {
             continue;
         }
         let Ok(bytes) = std::fs::read(&path) else {
