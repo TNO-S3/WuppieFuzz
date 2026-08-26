@@ -129,10 +129,6 @@ fn set_main_thread_stack_size() {
 ///
 /// Left off by default to avoid spamming normal builds with linker noise.
 fn enable_link_diagnostics_if_requested() {
-    if env::var_os("WUPPIEFUZZ_LINK_VERBOSE").is_none() {
-        return;
-    }
-
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     if target_os == "windows" && target_env == "msvc" {
