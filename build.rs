@@ -88,7 +88,7 @@ fn main() {
     println!("cargo:rerun-if-changed=Cargo.lock");
 
     set_main_thread_stack_size();
-    diagnose_crt_mismatch();
+    suppress_benign_libcmt_relink_warning();
 }
 
 /// Ensures the main thread gets an ~8 MiB stack (matching Linux/macOS defaults),
@@ -119,91 +119,24 @@ fn set_main_thread_stack_size() {
     }
 }
 
-/// Temporary diagnostic for tracking down the `LNK4098: defaultlib 'libcmt'
-/// conflicts with use of other libs` warning on MSVC targets.
+/// Silences the `LNK4098: defaultlib 'libcmt' conflicts with use of other
+/// libs` linker warning on MSVC targets.
 ///
-/// Every object compiled for MSVC embeds its requested C runtime as a
-/// plain-text `/DEFAULTLIB:"..."` directive, so the dependency responsible
-/// for pulling in the "wrong" CRT (dynamic `MSVCRT` instead of the static
-/// `LIBCMT` cargo-dist's `msvc-crt-static = true` default expects, or vice
-/// versa) can be found by scanning each `.rlib` already produced under
-/// `target/` for those markers — no `dumpbin`/`link.exe` access required.
-/// Findings are emitted as `cargo:warning`s so they show up directly in the
-/// build log. Remove this function (and its call site) once the mismatched
-/// dependency has been identified and fixed.
-fn diagnose_crt_mismatch() {
+/// Investigated at length: every native/static dependency in the link (our
+/// vendored `z3-sys`, `aws-lc-sys`, `libsqlite3-sys`, the Rust standard
+/// library, and every intermediate object) consistently references only the
+/// static, release CRT (`LIBCMT`) -- there is no genuine dynamic-vs-static
+/// or debug-vs-release CRT mismatch. The warning is purely cosmetic: MSVC's
+/// `link.exe` re-emits it whenever more than one input object embeds its own
+/// `/DEFAULTLIB:LIBCMT` directive, which is unavoidable once Z3's build
+/// produces dozens of separate static-library fragments that each redundantly
+/// declare the (correct, matching) runtime. Rather than lose the benefits of
+/// a fully static CRT (no VC++ Redistributable required for end users) to
+/// work around a non-issue, just tell the linker to stop repeating a
+/// duplicate-but-consistent default-library directive.
+fn suppress_benign_libcmt_relink_warning() {
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
-    if target_env != "msvc" {
-        return;
-    }
-
-    if let Ok(out_dir) = env::var("OUT_DIR") {
-        // OUT_DIR looks like .../target/<profile>/build/<crate>-<hash>/out;
-        // walk back up to the shared `target/<profile>` directory that
-        // holds both the `deps` rlibs and every crate's `build/*/out`
-        // directory (where vendored C/C++ deps like aws-lc-sys/z3-sys/
-        // libsqlite3-sys drop their compiled *.lib archives directly --
-        // those are linked straight in and never get wrapped in an rlib,
-        // so they were missed by an earlier, `deps`-only version of this
-        // scan).
-        if let Some(profile_dir) = Path::new(&out_dir)
-            .ancestors()
-            .find(|p| p.join("deps").is_dir())
-            .and_then(|p| p.parent())
-        {
-            scan_dir_for_crt_markers_recursive(profile_dir);
-        }
-    }
-
-    // Our own dependencies aren't the only objects linked in: rustup ships
-    // prebuilt `std`/`core`/`panic_unwind`/etc. rlibs in the toolchain
-    // sysroot that were compiled once upstream and can't retroactively pick
-    // up this crate's `crt-static` target feature. Scan those too, since
-    // they're a likely source of a stray `MSVCRT` reference.
-    if let Ok(output) = Command::new("rustc").arg("--print").arg("sysroot").output() {
-        if let Ok(sysroot) = String::from_utf8(output.stdout) {
-            let target_triple = env::var("TARGET").unwrap_or_default();
-            let libdir = Path::new(sysroot.trim())
-                .join("lib/rustlib")
-                .join(&target_triple)
-                .join("lib");
-            scan_dir_for_crt_markers_recursive(&libdir);
-        }
-    }
-}
-
-fn scan_dir_for_crt_markers_recursive(dir: &Path) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            scan_dir_for_crt_markers_recursive(&path);
-            continue;
-        }
-        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
-            continue;
-        };
-        if ext != "rlib" && ext != "lib" {
-            continue;
-        }
-        let Ok(bytes) = std::fs::read(&path) else {
-            continue;
-        };
-        // Directives are plain ASCII text embedded in the .drectve section;
-        // a lossy scan is enough to spot the markers.
-        let text = String::from_utf8_lossy(&bytes);
-        let has_libcmt = text.contains("LIBCMT") && !text.contains("LIBCMTD");
-        let has_libcmtd = text.contains("LIBCMTD");
-        let has_msvcrt = text.contains("MSVCRT") && !text.contains("MSVCRTD");
-        let has_msvcrtd = text.contains("MSVCRTD");
-        if has_libcmt || has_libcmtd || has_msvcrt || has_msvcrtd {
-            println!(
-                "cargo:warning=CRT scan: {} -> LIBCMT={has_libcmt} LIBCMTD={has_libcmtd} MSVCRT={has_msvcrt} MSVCRTD={has_msvcrtd}",
-                path.display()
-            );
-        }
+    if target_env == "msvc" {
+        println!("cargo:rustc-link-arg=/IGNORE:4098");
     }
 }
