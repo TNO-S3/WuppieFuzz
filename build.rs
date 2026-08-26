@@ -88,6 +88,7 @@ fn main() {
     println!("cargo:rerun-if-changed=Cargo.lock");
 
     set_main_thread_stack_size();
+    enable_link_diagnostics_if_requested();
 }
 
 /// Ensures the main thread gets an ~8 MiB stack (matching Linux/macOS defaults),
@@ -115,5 +116,26 @@ fn set_main_thread_stack_size() {
     } else {
         // mingw/gnu toolchain
         println!("cargo:rustc-link-arg=-Wl,--stack,{STACK_SIZE_BYTES}");
+    }
+}
+
+/// Opt-in diagnostic for tracking down `LNK4098: defaultlib '...' conflicts
+/// with use of other libs` warnings on MSVC targets. Set the
+/// `WUPPIEFUZZ_LINK_VERBOSE` environment variable (to any value) when
+/// building/linking to have the linker print, for every input object/library,
+/// which C runtime it was compiled against. This makes it possible to spot
+/// exactly which dependency doesn't match the rest (e.g. a vendored native
+/// library that ignored the `crt-static` target feature), without guessing.
+///
+/// Left off by default to avoid spamming normal builds with linker noise.
+fn enable_link_diagnostics_if_requested() {
+    if env::var_os("WUPPIEFUZZ_LINK_VERBOSE").is_none() {
+        return;
+    }
+
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    if target_os == "windows" && target_env == "msvc" {
+        println!("cargo:rustc-link-arg=/VERBOSE:LIB");
     }
 }
