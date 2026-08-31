@@ -1,6 +1,6 @@
 [package]
 name = "wuppiefuzz"
-version = "1.6.0"
+version = "1.7.1"
 authors = [
     "TNO Software and System Security"
 ]
@@ -17,12 +17,12 @@ license = false
 eula = false
 
 [features]
-default = ["std", "vendored-openssl", "bundled-sqlite", "bundled-z3"]
+default = ["std", "vendored-openssl", "bundled-sqlite", "vendored-z3"]
 std = []
 sequence-diagnostics = []
 vendored-openssl = ["openssl/vendored"]
 bundled-sqlite = ["rusqlite/bundled"]
-bundled-z3 = ["z3/bundled"]
+vendored-z3 = ["z3/vendored"]
 
 [profile.dev]
 panic = "unwind"
@@ -48,7 +48,7 @@ cargo-license = "0.7.0"
 [dependencies]
 ahash = "0.8"
 anyhow = "1.0.102"
-base64 = "0.22.1"
+base64 = "0.23.0"
 build_html = "2.7.0"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
@@ -63,15 +63,14 @@ itertools = "0.15.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.5.0"
 lcov = "0.8"
-libafl = { version = "0.15.4", features = ["clap", "cmin"] }
-libafl_bolts = { version = "0.15.4", features = ["prelude"] }
+libafl = { git = "https://github.com/AFLplusplus/LibAFL", rev = "cf02bdf4140bfd3ea5dd618434c86c591e049d6b", features = ["clap", "cmin"] }
+libafl_bolts = { git = "https://github.com/AFLplusplus/LibAFL", rev = "cf02bdf4140bfd3ea5dd618434c86c591e049d6b", features = ["prelude"] }
 log = { version = "0.4.30", features = ["serde"] }
 num = { version = "0.4.3", default-features = false }
-num-derive = "0.4.2"
+num-derive = "0.5.1"
 num-traits = { version = "0.2", default-features = false }
 once_cell = "1.21.3"
 openapiv3-extended = { version = "6.0.1", features = ["v2"] }
-openssl = "0.10"
 petgraph = "0.8.3"
 porter-stemmer = "0.1.2"
 rand = "0.10.1"
@@ -91,13 +90,25 @@ tempfile = "3.25.0"
 quick-xml = { version = "0.37", features = ["serialize"] }
 zip = "2"
 strum = { version = "0.28.0", features = ["derive"] }
-unicode-truncate = "2.0.0"
+unicode-truncate = "3.0.0"
 url = { version = "2.5.8", features = ["serde"] }
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
-z3 = "0.19.13"
+z3 = "0.20.2"
 oas3 = { version = "0.22.0", features = ["yaml-spec"] }
 semver = "1.0.28"
+
+# `openssl` is not used directly by our code; it's a direct dependency purely
+# to activate the `vendored` feature on the shared `openssl-sys` crate that
+# `reqwest`'s `native-tls` backend pulls in transitively on Linux/macOS. On
+# Windows, `native-tls` uses the native SChannel backend instead and never
+# touches OpenSSL, so this dependency (and the vendored build it triggers) is
+# both unnecessary and actively broken there: `openssl-src`'s Perl-based
+# `Configure` step cannot cross-compile OpenSSL for `aarch64-pc-windows-msvc`
+# from a Linux host (it requires a Windows-native Perl producing
+# backslash-separated paths), which breaks the `cargo-xwin` release build.
+[target.'cfg(not(windows))'.dependencies]
+openssl = "0.10"
 
 [dev-dependencies]
 mockito = "1.7.2"

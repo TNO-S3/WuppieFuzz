@@ -86,6 +86,7 @@ where
                 "requests_per_sec": Self::req_sec_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
                 "coverage": Self::cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
                 "endpoint_coverage": Self::end_cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                "current_sequence": Self::current_sequence_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
             })
             .to_string(),
             OutputFormat::HumanReadable => {
@@ -110,7 +111,7 @@ where
                 return Ok(())
             } else {
                 format!(
-                    "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}",
+                    "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}, current sequence: {}",
                     event_msg,
                     format_duration(&total_time),
                     corpus_size,
@@ -121,6 +122,7 @@ where
                     Self::req_sec_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
                     Self::cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
                     Self::end_cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
+                    Self::current_sequence_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
                 )
             }
         }};
@@ -193,6 +195,15 @@ where
     fn end_cov_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
         client_stats
             .get_user_stats("wuppiefuzz_endpoint_coverage")
+            .unwrap_or(default)
+    }
+
+    fn current_sequence_stats<'a>(
+        client_stats: &'a ClientStats,
+        default: &'a UserStats,
+    ) -> &'a UserStats {
+        client_stats
+            .get_user_stats("current_sequence")
             .unwrap_or(default)
     }
 }

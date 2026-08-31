@@ -1,5 +1,3 @@
-#[cfg(windows)]
-use std::ptr::write_volatile;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
@@ -9,7 +7,7 @@ use libafl::{
     corpus::minimizer::MapCorpusMinimizer,
     events::{Event, EventFirer, EventWithStats, ExecStats},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, MultiMapObserver, TimeObserver},
@@ -98,7 +96,11 @@ pub fn fuzz() -> Result<()> {
         MapCorpusMinimizer::new(&combined_map_observer);
 
     // Initialize state
-    let mut objective = CrashFeedback::new();
+    // A run is a "solution" if the target crashed, or if it timed out (which
+    // catches time-based blind injection payloads, e.g. SQL SLEEP/WAITFOR DELAY,
+    // that don't produce a distinctive crash but do make the request run over
+    // the configured timeout).
+    let mut objective = feedback_or!(CrashFeedback::new(), TimeoutFeedback::new());
     let mut collective_feedback = feedback_or!(
         coverage_feedback,
         time_feedback, // Time feedback, this one does not need a feedback state
