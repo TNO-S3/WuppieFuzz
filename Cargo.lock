@@ -243,7 +243,7 @@ checksum = "f1829197343f1874c1979c988a5e75c2539c4645792d87494286ce2cb6dc890d"
 [[package]]
 name = "build_id2"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "ahash",
  "rustversion",
@@ -590,7 +590,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 [[package]]
 name = "core_affinity2"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "libafl_core",
  "libc",
@@ -843,7 +843,7 @@ dependencies = [
 [[package]]
 name = "exceptional"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "libafl_core",
  "libc",
@@ -870,7 +870,7 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 [[package]]
 name = "fast_rands"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "rand_core 0.10.1",
  "rustversion",
@@ -1604,7 +1604,7 @@ dependencies = [
 [[package]]
 name = "libafl"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1647,7 +1647,7 @@ dependencies = [
 [[package]]
 name = "libafl_bolts"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1690,7 +1690,7 @@ dependencies = [
 [[package]]
 name = "libafl_core"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "backtrace",
  "nix",
@@ -1704,7 +1704,7 @@ dependencies = [
 [[package]]
 name = "libafl_derive"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1773,7 +1773,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 [[package]]
 name = "ll_mp"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "exceptional",
  "hostname",
@@ -1855,7 +1855,7 @@ checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 [[package]]
 name = "minibsod"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "exceptional",
  "libc",
@@ -1934,7 +1934,7 @@ dependencies = [
 [[package]]
 name = "no_std_time"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "rustversion",
 ]
@@ -1942,7 +1942,7 @@ dependencies = [
 [[package]]
 name = "nonzero_macros"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 
 [[package]]
 name = "num"
@@ -2175,7 +2175,7 @@ dependencies = [
 [[package]]
 name = "ownedref"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "libafl_core",
  "rustversion",
@@ -2819,7 +2819,7 @@ dependencies = [
 [[package]]
 name = "serde_anymap"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "ctor",
  "erased-serde",
@@ -2940,7 +2940,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "shmem_providers"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "fast_rands",
  "hashbrown 0.17.1",
@@ -3422,7 +3422,7 @@ checksum = "141fb9f71ee586d956d7d6e4d5a9ef8e946061188520140f7591b668841d502e"
 [[package]]
 name = "tuple_list_ex"
 version = "0.16.1"
-source = "git+https://github.com/ThomasTNO/LibAFL?branch=main#ed1cc6db27157b9d28a341c44b355c0ae1888ca0"
+source = "git+https://github.com/AFLplusplus/LibAFL?rev=cf02bdf4140bfd3ea5dd618434c86c591e049d6b#cf02bdf4140bfd3ea5dd618434c86c591e049d6b"
 dependencies = [
  "libafl_core",
  "ownedref",
