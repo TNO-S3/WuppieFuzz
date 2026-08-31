@@ -796,7 +796,7 @@ unicode-ident 1.0.24
 unicode-segmentation 1.13.3
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
-unicode-truncate 2.0.1
+unicode-truncate 3.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Aetf <aetf@unlimitedcodeworks.xyz>
 unicode-width 0.2.2
