@@ -159,7 +159,7 @@ pub enum Commands {
         coverage_host: Option<SocketAddr>,
 
         /// The format in which your instrumentation provides coverage information.
-        /// Must be one of {'jacoco', 'lcov', 'coverband'}. If omitted, the fuzzer will use
+        /// Must be one of {'jacoco', 'lcov', 'coverband', 'trace-generic'}. If omitted, the fuzzer will use
         /// endpoint coverage only.
         #[arg(value_parser, long, value_enum, ignore_case = true)]
         coverage_format: Option<CoverageFormat>,
@@ -389,7 +389,7 @@ struct PartialConfiguration {
     pub coverage_host: Option<SocketAddr>,
 
     /// The format in which your instrumentation provides coverage information.
-    /// Must be one of {'jacoco', 'lcov', 'coverband'}. If omitted, the fuzzer will use
+    /// Must be one of {'jacoco', 'lcov', 'coverband', 'trace-generic'}. If omitted, the fuzzer will use
     /// endpoint coverage only.
     #[clap(value_parser, long, value_enum, ignore_case = true)]
     pub coverage_format: Option<CoverageFormat>,
@@ -473,6 +473,8 @@ pub enum CoverageFormat {
     Lcov,
     #[serde(alias = "coverband")]
     Coverband,
+    #[serde(alias = "trace-generic", alias = "trace_generic")]
+    TraceGeneric,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -516,7 +518,7 @@ pub struct Configuration {
     pub coverage_host: Option<SocketAddr>,
 
     /// The format in which your instrumentation provides coverage information.
-    /// Must be one of {'jacoco', 'lcov', 'coverband'}. If omitted, the fuzzer will use
+    /// Must be one of {'jacoco', 'lcov', 'coverband', 'trace-generic'}. If omitted, the fuzzer will use
     /// endpoint coverage only.
     pub coverage_configuration: CoverageConfiguration,
 
@@ -579,6 +581,10 @@ pub enum CoverageConfiguration {
     },
     /// Coverband coverage. Requires a source directory if a report needs to be generated.
     Coverband { source_dir: Option<PathBuf> },
+    /// TraceGeneric coverage. Receives a raw 8-bit AFL-like coverage bitmap over the
+    /// wire protocol; no edge-to-source mapping is available, so
+    /// coverage reports are not supported.
+    TraceGeneric,
 }
 
 impl CoverageConfiguration {
@@ -588,6 +594,7 @@ impl CoverageConfiguration {
             Self::Lcov { .. } => "LCOV",
             Self::Jacoco { .. } => "JaCoCo",
             Self::Coverband { .. } => "Coverband",
+            Self::TraceGeneric => "TraceGeneric",
         }
     }
 }
@@ -615,6 +622,11 @@ impl TryFrom<PartialConfiguration> for Configuration {
             {
                 bail!(
                     "A coverage report is requested for Jacoco coverage, but this requires the jacoco_class_dir parameter to be set",
+                );
+            }
+            if value.coverage_format == Some(CoverageFormat::TraceGeneric) {
+                bail!(
+                    "A coverage report is requested for TraceGeneric coverage, but the TraceGeneric coverage agent carries a raw coverage bitmap with no edge-to-source mapping, so no report can be generated; omit --report or use a different coverage format",
                 );
             }
             if value.coverage_format.is_some() && value.source_dir.is_none() {
@@ -645,6 +657,7 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 Some(CoverageFormat::Coverband) => CoverageConfiguration::Coverband {
                     source_dir: value.source_dir,
                 },
+                Some(CoverageFormat::TraceGeneric) => CoverageConfiguration::TraceGeneric,
                 None => CoverageConfiguration::Endpoint,
             },
             timeout: value.timeout,

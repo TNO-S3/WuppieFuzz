@@ -25,6 +25,7 @@ pub mod dummy;
 pub mod endpoint;
 pub mod jacoco;
 pub mod lcov_client;
+pub mod trace_generic;
 
 /// Sets up the line coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
@@ -108,6 +109,11 @@ pub fn effective_coverage_host(config: &Configuration) -> Option<SocketAddr> {
                 .coverage_host
                 .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 3001)),
         ),
+        configuration::CoverageConfiguration::TraceGeneric => Some(
+            config
+                .coverage_host
+                .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 1337)),
+        ),
         configuration::CoverageConfiguration::Endpoint => None,
     }
 }
@@ -155,6 +161,13 @@ pub fn get_coverage_client<'c>(
                     .context("Could not construct CoverbandCoverageClient")?,
             ))
         }
+        configuration::CoverageConfiguration::TraceGeneric => Box::new(
+            trace_generic::TraceGenericCoverageClient::new(
+                // effective_coverage_host always returns Some for TraceGeneric
+                &coverage_host.unwrap(),
+            )
+            .context("Could not construct TraceGenericCoverageClient")?,
+        ),
         configuration::CoverageConfiguration::Endpoint => {
             Box::new(dummy::DummyCoverageClient::new())
         }
