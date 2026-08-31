@@ -4,6 +4,8 @@
 
 ## Features
 
+- Adds support for .NET coverage based on cobertura and dotnet-coverage in [#336](https://github.com/TNO-S3/WuppieFuzz/pull/336)
+
 ## Fixes
 
 # v1.7.1 (2026-08-26)
