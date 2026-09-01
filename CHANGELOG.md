@@ -5,6 +5,7 @@
 ## Features
 
 - Adds support for .NET coverage based on cobertura and dotnet-coverage in [#336](https://github.com/TNO-S3/WuppieFuzz/pull/336)
+- Adds support for coverage guidance using OpenTelemetry in [#358](https://github.com/TNO-S3/WuppieFuzz/pull/358)
 
 ## Fixes
 

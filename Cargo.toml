@@ -97,6 +97,14 @@ walkdir = "2.5.0"
 z3 = "0.20.2"
 oas3 = { version = "0.22.0", features = ["yaml-spec"] }
 semver = "1.0.28"
+axum = "0.8"
+flate2 = "1.1.5"
+opentelemetry-proto = { version = "0.32.0", features = ["gen-tonic", "trace"] }
+prost = "0.14.1"
+prost-types = "0.14.1"
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "sync", "time"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic = { version = "0.14", features = ["transport", "gzip"] }
 
 # `openssl` is not used directly by our code; it's a direct dependency purely
 # to activate the `vendored` feature on the shared `openssl-sys` crate that

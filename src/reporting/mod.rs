@@ -10,6 +10,43 @@ use crate::{
 
 pub mod sqlite;
 
+/// Coarse-grained OTel receiver/arbiter stats for dashboard reporting.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct OtelTraceProcessingStats {
+    /// Number of OTLP requests accepted by the built-in receiver.
+    pub receiver_requests_ok: u64,
+    /// Number of OTLP requests rejected by the built-in receiver.
+    pub receiver_requests_rejected: u64,
+    /// Number of OTLP/HTTP requests that failed protobuf decoding.
+    pub receiver_requests_decode_error: u64,
+    /// Total number of spans handed from the receiver to the arbiter.
+    pub spans_received: u64,
+    /// Number of spans received after a sequence was evicted/dropped from guidance state.
+    pub spans_late_after_eviction: u64,
+    /// Number of request parent IDs registered across sequences.
+    pub sequence_roots_expected: u64,
+    /// Number of request root parent IDs observed in traces.
+    pub sequence_roots_seen: u64,
+    /// Number of completed sequences whose spans introduced new OTel coverage.
+    pub sequences_promoted: u64,
+    /// Number of delayed OTel promotion candidates that were actually added to the corpus.
+    pub promoted_inputs_added: u64,
+    /// Current number of unique OTel semantic span keys.
+    pub unique_span_keys: u64,
+    /// Current number of unique OTel semantic edge keys.
+    pub unique_edge_keys: u64,
+    /// Current OTEL engine queue depth.
+    pub engine_queue_depth: u64,
+    /// Highest observed OTEL engine queue depth.
+    pub engine_queue_high_watermark: u64,
+    /// Number of times producers observed OTEL engine backpressure.
+    pub engine_backpressure: u64,
+    /// Request root registrations for unknown traces.
+    pub request_roots_unknown_trace: u64,
+    /// Sequence finish messages for unknown traces.
+    pub sequence_finish_unknown_trace: u64,
+}
+
 /// Cumulative reasons why an input sequence either finished or stopped early.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SequenceStopStats {
@@ -67,6 +104,7 @@ pub struct CampaignStats {
     pub sequence_stop_stats: SequenceStopStats,
     /// Cumulative executor phase timing totals.
     pub sequence_timing_stats: SequenceTimingStats,
+    pub otel_trace_processing_stats: OtelTraceProcessingStats,
 }
 
 /// Creates and returns the report path for this run. It is typically of the form

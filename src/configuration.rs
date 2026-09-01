@@ -8,7 +8,7 @@ use std::{
 
 use clap::{Parser, Subcommand, ValueEnum, value_parser};
 use libafl::schedulers::powersched::BaseSchedule;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer, de};
 use strum::VariantArray;
 use url::Url;
 
@@ -259,6 +259,20 @@ pub enum Commands {
         /// this string will contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
         #[arg(value_parser, long)]
         cobertura_class_filter: Option<String>,
+
+        /// Legacy alias for --otel-http-receiver-bind. Accepts IP:PORT, `off`, or `null`.
+        #[arg(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+        otel_receiver_bind: ReceiverBindSetting,
+
+        /// Bind address for WuppieFuzz's built-in OTLP/HTTP receiver. Accepts IP:PORT, `off`, or `null`.
+        /// Defaults to 0.0.0.0:4319 when omitted.
+        #[arg(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+        otel_http_receiver_bind: ReceiverBindSetting,
+
+        /// Bind address for WuppieFuzz's built-in OTLP/gRPC receiver. Accepts IP:PORT, `off`, or `null`.
+        /// Defaults to the HTTP receiver IP at port 4317 when omitted.
+        #[arg(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+        otel_grpc_receiver_bind: ReceiverBindSetting,
     },
 }
 
@@ -326,6 +340,8 @@ impl Commands {
                 log_level,
                 jacoco_class_prefix,
                 cobertura_class_filter,
+                otel_http_receiver_bind,
+                otel_grpc_receiver_bind,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -347,6 +363,8 @@ impl Commands {
                 log_level,
                 jacoco_class_prefix,
                 cobertura_class_filter,
+                otel_http_receiver_bind,
+                otel_grpc_receiver_bind,
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,
@@ -476,6 +494,51 @@ struct PartialConfiguration {
     #[serde(alias = "dotnet_namespace_filter")]
     #[clap(value_parser, long)]
     pub cobertura_class_filter: Option<String>,
+
+    /// Bind address for WuppieFuzz's built-in OTLP/HTTP receiver. Accepts IP:PORT, `off`, or `null`.
+    #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+    #[serde(default)]
+    pub otel_http_receiver_bind: ReceiverBindSetting,
+
+    /// Bind address for WuppieFuzz's built-in OTLP/gRPC receiver. Accepts IP:PORT, `off`, or `null`.
+    #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+    #[serde(default)]
+    pub otel_grpc_receiver_bind: ReceiverBindSetting,
+}
+
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+pub enum ReceiverBindSetting {
+    #[default]
+    Unspecified,
+    Disabled,
+    Enabled(SocketAddr),
+}
+
+impl<'de> Deserialize<'de> for ReceiverBindSetting {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Option::<String>::deserialize(deserializer)? {
+            None => Ok(Self::Disabled),
+            Some(value) => parse_receiver_bind_setting(&value).map_err(de::Error::custom),
+        }
+    }
+}
+
+fn receiver_bind_is_specified(setting: ReceiverBindSetting) -> bool {
+    !matches!(setting, ReceiverBindSetting::Unspecified)
+}
+
+fn prefer_receiver_bind(
+    preferred: ReceiverBindSetting,
+    fallback: ReceiverBindSetting,
+) -> ReceiverBindSetting {
+    if receiver_bind_is_specified(preferred) {
+        preferred
+    } else {
+        fallback
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -488,6 +551,11 @@ pub enum CoverageFormat {
     Coverband,
     #[serde(alias = "cobertura")]
     Cobertura,
+    /// OpenTelemetry trace-based coverage: WuppieFuzz injects a W3C traceparent header
+    /// into every request, receives the resulting spans through its built-in OTLP/HTTP or
+    /// OTLP/gRPC receivers, and translates them into a coverage bitmap.
+    #[serde(alias = "otel")]
+    Otel,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -576,7 +644,7 @@ pub struct Configuration {
 }
 
 /// CoverageConfiguration holds all the coverage-agent-specific configuration.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub enum CoverageConfiguration {
     /// Endpoint coverage only. No further configuration is needed.
     Endpoint,
@@ -594,12 +662,16 @@ pub enum CoverageConfiguration {
     },
     /// Coverband coverage. Requires a source directory if a report needs to be generated.
     Coverband { source_dir: Option<PathBuf> },
-    /// Cobertura-over-HTTP coverage. Compatible with any agent serving the WuppieFuzz
-    /// Cobertura HTTP protocol. The bundled .NET agent (`coverage_agents/dotnet/`) is
-    /// the reference implementation.
-    Cobertura {
-        /// Optional filter: only include classes whose filename contains this string.
-        namespace_filter: Option<String>,
+    #[serde(alias = "cobertura")]
+    Cobertura { namespace_filter: Option<String> },
+    /// OpenTelemetry trace-based coverage. WuppieFuzz injects a W3C traceparent header
+    /// into every request, receives spans through its built-in OTLP/HTTP or OTLP/gRPC receivers, and
+    /// builds a span-presence + span-edge coverage bitmap.
+    Otel {
+        /// Bind address of WuppieFuzz's built-in OTLP/HTTP receiver, or None if disabled.
+        otel_http_receiver_bind: Option<SocketAddr>,
+        /// Bind address of WuppieFuzz's built-in OTLP/gRPC receiver, or None if disabled.
+        otel_grpc_receiver_bind: Option<SocketAddr>,
     },
 }
 
@@ -611,6 +683,7 @@ impl CoverageConfiguration {
             Self::Jacoco { .. } => "JaCoCo",
             Self::Coverband { .. } => "Coverband",
             Self::Cobertura { .. } => "Cobertura (HTTP)",
+            Self::Otel { .. } => "OpenTelemetry",
         }
     }
 }
@@ -640,9 +713,13 @@ impl TryFrom<PartialConfiguration> for Configuration {
                     "A coverage report is requested for Jacoco coverage, but this requires the jacoco_class_dir parameter to be set",
                 );
             }
-            if value.coverage_format.is_some()
-                && value.coverage_format != Some(CoverageFormat::Cobertura)
-                && value.source_dir.is_none()
+
+            if matches!(
+                value.coverage_format,
+                Some(CoverageFormat::Jacoco)
+                    | Some(CoverageFormat::Lcov)
+                    | Some(CoverageFormat::Coverband)
+            ) && value.source_dir.is_none()
             {
                 bail!(
                     "A coverage report is requested, but this requires the source_dir parameter to be set",
@@ -674,6 +751,45 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 Some(CoverageFormat::Cobertura) => CoverageConfiguration::Cobertura {
                     namespace_filter: value.cobertura_class_filter,
                 },
+                Some(CoverageFormat::Otel) => {
+                    let default_http_bind = parse_socket_addr("0.0.0.0:4319")
+                        .expect("hardcoded OTLP/HTTP receiver bind address is valid");
+
+                    let otel_http_receiver_bind = match value.otel_http_receiver_bind {
+                        ReceiverBindSetting::Unspecified => Some(default_http_bind),
+                        ReceiverBindSetting::Disabled => None,
+                        ReceiverBindSetting::Enabled(bind) => Some(bind),
+                    };
+
+                    let default_grpc_bind = otel_http_receiver_bind
+                        .map(|http_bind| {
+                            SocketAddr::new(
+                                http_bind.ip(),
+                                if http_bind.port() == 0 { 0 } else { 4317 },
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            parse_socket_addr("0.0.0.0:4317")
+                                .expect("hardcoded OTLP/gRPC receiver bind address is valid")
+                        });
+
+                    let otel_grpc_receiver_bind = match value.otel_grpc_receiver_bind {
+                        ReceiverBindSetting::Unspecified => Some(default_grpc_bind),
+                        ReceiverBindSetting::Disabled => None,
+                        ReceiverBindSetting::Enabled(bind) => Some(bind),
+                    };
+
+                    if otel_http_receiver_bind.is_none() && otel_grpc_receiver_bind.is_none() {
+                        bail!(
+                            "OpenTelemetry coverage requires at least one enabled OTLP receiver; set otel_http_receiver_bind or otel_grpc_receiver_bind to an IP:PORT"
+                        );
+                    }
+
+                    CoverageConfiguration::Otel {
+                        otel_http_receiver_bind,
+                        otel_grpc_receiver_bind,
+                    }
+                }
                 None => CoverageConfiguration::Endpoint,
             },
             timeout: value.timeout,
@@ -747,6 +863,14 @@ impl PartialConfiguration {
             cobertura_class_filter: other
                 .cobertura_class_filter
                 .or_else(|| self.cobertura_class_filter.take()),
+            otel_http_receiver_bind: prefer_receiver_bind(
+                other.otel_http_receiver_bind,
+                self.otel_http_receiver_bind,
+            ),
+            otel_grpc_receiver_bind: prefer_receiver_bind(
+                other.otel_grpc_receiver_bind,
+                self.otel_grpc_receiver_bind,
+            ),
         };
     }
 }
@@ -770,6 +894,14 @@ fn parse_socket_addr(arg: &str) -> Result<SocketAddr, io::Error> {
         ErrorKind::InvalidInput,
         "Could not parse socket address",
     ))
+}
+
+fn parse_receiver_bind_setting(arg: &str) -> Result<ReceiverBindSetting, io::Error> {
+    match arg.trim().to_ascii_lowercase().as_str() {
+        "" | "default" | "auto" => Ok(ReceiverBindSetting::Unspecified),
+        "off" | "none" | "null" | "disabled" | "false" => Ok(ReceiverBindSetting::Disabled),
+        _ => parse_socket_addr(arg).map(ReceiverBindSetting::Enabled),
+    }
 }
 
 fn verify_url(arg: &str) -> anyhow::Result<Url> {
