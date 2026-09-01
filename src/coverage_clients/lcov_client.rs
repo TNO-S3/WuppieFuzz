@@ -74,7 +74,7 @@ impl TeeStream {
     /// This function returns the data cached so far by the TeeStream, and then
     /// erases the cache.
     fn get_and_erase_bytes(&mut self) -> Vec<u8> {
-        self.bytes.drain(..).collect()
+        std::mem::take(&mut self.bytes)
     }
 }
 

@@ -26,6 +26,7 @@ pub struct SerializableOpenApiRequest {
     method: Method,
     path: String,
 
+    #[serde(with = "body_serde")]
     #[serde(default, skip_serializing_if = "Body::is_empty")]
     body: Body,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -50,6 +51,64 @@ impl From<SerializableOpenApiRequest> for OpenApiRequest {
             path: request.path,
             body: request.body,
             parameters: request.parameters,
+        }
+    }
+}
+
+mod body_serde {
+    use super::*;
+
+    pub fn serialize<S>(body: &Body, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serde_yaml::with::singleton_map::serialize(body, serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Body, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        value_to_body(value).map_err(D::Error::custom)
+    }
+
+    /// Convert YAML `Value` to `Body` enum.
+    ///
+    /// Accepts either tagged values (`!ApplicationJson`) or singleton maps (`ApplicationJson: {...}`).
+    /// Strips `!` prefix from tags, extracts variant + inner value, then dispatches to `body_from_variant`.
+    fn value_to_body(value: Value) -> Result<Body, serde_yaml::Error> {
+        match value {
+            Value::Tagged(tagged) => {
+                let TaggedValue { tag, value } = *tagged;
+                body_from_variant(tag.to_string().trim_start_matches('!'), value)
+            }
+            Value::Mapping(map) if map.len() == 1 => {
+                let (variant, value) = map.into_iter().next().expect("map length checked above");
+                match variant {
+                    Value::String(variant) => body_from_variant(&variant, value),
+                    other => Err(Error::custom(format!(
+                        "body variant must be a string, got {other:?}"
+                    ))),
+                }
+            }
+            other => Err(Error::custom(format!(
+                "body must be a tagged value or singleton map, got {other:?}"
+            ))),
+        }
+    }
+
+    /// Map variant name to `Body` constructor, deserialize inner value.
+    ///
+    /// Valid variants: `Empty`, `TextPlain`, `ApplicationJson`, `XWwwFormUrlencoded`.
+    /// Each (except `Empty`) deserializes its paired `Value` using `serde_yaml::from_value`.
+    fn body_from_variant(variant: &str, value: Value) -> Result<Body, serde_yaml::Error> {
+        match variant {
+            "Empty" => Ok(Body::Empty),
+            "TextPlain" => Ok(Body::TextPlain(serde_yaml::from_value(value)?)),
+            "ApplicationJson" => Ok(Body::ApplicationJson(serde_yaml::from_value(value)?)),
+            "XWwwFormUrlencoded" => Ok(Body::XWwwFormUrlencoded(serde_yaml::from_value(value)?)),
+            other => Err(Error::custom(format!("unknown body variant {other}"))),
         }
     }
 }
@@ -207,7 +266,49 @@ impl<'de> Deserialize<'de> for ParameterContents {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input::parameter::SimpleValue;
+    use crate::input::{OpenApiInput, parameter::SimpleValue};
+
+    #[test]
+    fn direct_string_body_serializes_without_nested_enum_error() {
+        let input = OpenApiInput(vec![OpenApiRequest {
+            method: Method::Post,
+            path: "/customers/{customerId}/documents".to_string(),
+            body: Body::ApplicationJson(ParameterContents::LeafValue(SimpleValue::String(
+                "Offer_Letter".to_string(),
+            ))),
+            parameters: BTreeMap::new(),
+        }]);
+
+        let yaml = serde_yaml::to_string(&input).expect("failed to serialize OpenApiInput");
+
+        assert!(yaml.contains("ApplicationJson"));
+        assert!(yaml.contains("!String Offer_Letter"));
+
+        let parsed: OpenApiInput = serde_yaml::from_str(&yaml).expect("failed to deserialize YAML");
+        match &parsed.0[0].body {
+            Body::ApplicationJson(ParameterContents::LeafValue(SimpleValue::String(value))) => {
+                assert_eq!(value, "Offer_Letter");
+            }
+            other => panic!("unexpected body value: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn tagged_body_yaml_still_deserializes() {
+        let yaml = "- method: POST\n  path: /documents\n  body: !ApplicationJson\n    type: !String Offer_Letter\n";
+
+        let parsed: OpenApiInput = serde_yaml::from_str(yaml).expect("failed to deserialize YAML");
+
+        match &parsed.0[0].body {
+            Body::ApplicationJson(ParameterContents::Object(map)) => match map.get("type") {
+                Some(ParameterContents::LeafValue(SimpleValue::String(value))) => {
+                    assert_eq!(value, "Offer_Letter");
+                }
+                other => panic!("unexpected type value: {other:?}"),
+            },
+            other => panic!("unexpected body value: {other:?}"),
+        }
+    }
 
     #[test]
     fn yaml_integer_stays_integer_number() {

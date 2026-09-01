@@ -80,9 +80,18 @@ parameters:
 
 ## Request Body
 
-The `body` field describes the payload `POST` and `PUT` requests. It is annotated with a MIME type using e.g. `!ApplicationJson`.
+The `body` field describes the payload of `POST` and `PUT` requests. It is annotated with a body kind such as `ApplicationJson`, `TextPlain`, or `XWwwFormUrlencoded`.
 
-### Example: Object Body
+New corpus files write the body kind as a singleton map:
+
+```yaml
+body:
+  ApplicationJson: <body_value_definition>
+```
+
+This representation is used instead of nested YAML tags so that body values can still carry their own explicit type tags, for example `!String`, `!Number`, `!Bool`, or `!Null`. This is important for preserving the difference between a string such as `"1"` and a number such as `1`.
+
+Older corpus files that use a tagged body are still accepted when reading corpus files:
 
 ```yaml
 body: !ApplicationJson
@@ -90,10 +99,46 @@ body: !ApplicationJson
   name: !String doggie
 ```
 
+### Example: Object Body
+
+```yaml
+body:
+  ApplicationJson:
+    id: !Number 0
+    name: !String doggie
+```
+
 ### Example: Array of Objects
 
 ```yaml
-body: !ApplicationJson
-- username !String 🎵
-- password !String password123
+body:
+  ApplicationJson:
+    - username: !String 🎵
+      password: !String password123
+    - username: !String user
+      password: !String password123
 ```
+
+### Example: Direct String Body
+
+Some OpenAPI specifications define the entire JSON request body as a primitive value, for example a string enum. In that case the corpus keeps both the body kind and the primitive value type:
+
+```yaml
+body:
+  ApplicationJson: !String Application_Form
+```
+
+This represents an `application/json` request body whose JSON payload is the string `"Application_Form"`.
+
+### Example: Preserving String vs Number
+
+Explicit value tags are preserved even when the YAML scalar text could be interpreted as another type:
+
+```yaml
+body:
+  ApplicationJson:
+    string_id: !String "1"
+    numeric_id: !Number 1
+```
+
+Here `string_id` is sent as the JSON string `"1"`, while `numeric_id` is sent as the JSON number `1`.

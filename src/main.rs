@@ -29,9 +29,6 @@ extern crate num_derive;
 #[macro_use]
 extern crate lazy_static;
 
-#[cfg(windows)]
-use std::ptr::write_volatile;
-
 use anyhow::Result;
 use clap::Parser;
 use configuration::{Commands, OutputFormat};
