@@ -255,6 +255,11 @@ pub enum Commands {
         #[arg(value_parser, long)]
         jacoco_class_prefix: Option<String>,
 
+        /// Filename substring filter for Cobertura coverage. Only classes whose filename contains
+        /// this string will contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
+        #[arg(value_parser, long)]
+        cobertura_class_filter: Option<String>,
+
         /// Legacy alias for --otel-http-receiver-bind. Accepts IP:PORT, `off`, or `null`.
         #[arg(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
         otel_receiver_bind: ReceiverBindSetting,
@@ -334,6 +339,7 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                cobertura_class_filter,
                 otel_http_receiver_bind,
                 otel_grpc_receiver_bind,
                 ..
@@ -356,6 +362,7 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                cobertura_class_filter,
                 otel_http_receiver_bind,
                 otel_grpc_receiver_bind,
             }),
@@ -482,6 +489,12 @@ struct PartialConfiguration {
     #[clap(value_parser, long)]
     pub jacoco_class_prefix: Option<String>,
 
+    /// Filename substring filter for Cobertura coverage. Only classes whose filename contains
+    /// this string contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
+    #[serde(alias = "dotnet_namespace_filter")]
+    #[clap(value_parser, long)]
+    pub cobertura_class_filter: Option<String>,
+
     /// Bind address for WuppieFuzz's built-in OTLP/HTTP receiver. Accepts IP:PORT, `off`, or `null`.
     #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
     #[serde(default)]
@@ -536,6 +549,8 @@ pub enum CoverageFormat {
     Lcov,
     #[serde(alias = "coverband")]
     Coverband,
+    #[serde(alias = "cobertura")]
+    Cobertura,
     /// OpenTelemetry trace-based coverage: WuppieFuzz injects a W3C traceparent header
     /// into every request, receives the resulting spans through its built-in OTLP/HTTP or
     /// OTLP/gRPC receivers, and translates them into a coverage bitmap.
@@ -629,7 +644,7 @@ pub struct Configuration {
 }
 
 /// CoverageConfiguration holds all the coverage-agent-specific configuration.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub enum CoverageConfiguration {
     /// Endpoint coverage only. No further configuration is needed.
     Endpoint,
@@ -647,6 +662,8 @@ pub enum CoverageConfiguration {
     },
     /// Coverband coverage. Requires a source directory if a report needs to be generated.
     Coverband { source_dir: Option<PathBuf> },
+    #[serde(alias = "cobertura")]
+    Cobertura { namespace_filter: Option<String> },
     /// OpenTelemetry trace-based coverage. WuppieFuzz injects a W3C traceparent header
     /// into every request, receives spans through its built-in OTLP/HTTP or OTLP/gRPC receivers, and
     /// builds a span-presence + span-edge coverage bitmap.
@@ -665,6 +682,7 @@ impl CoverageConfiguration {
             Self::Lcov { .. } => "LCOV",
             Self::Jacoco { .. } => "JaCoCo",
             Self::Coverband { .. } => "Coverband",
+            Self::Cobertura { .. } => "Cobertura (HTTP)",
             Self::Otel { .. } => "OpenTelemetry",
         }
     }
@@ -729,6 +747,9 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 },
                 Some(CoverageFormat::Coverband) => CoverageConfiguration::Coverband {
                     source_dir: value.source_dir,
+                },
+                Some(CoverageFormat::Cobertura) => CoverageConfiguration::Cobertura {
+                    namespace_filter: value.cobertura_class_filter,
                 },
                 Some(CoverageFormat::Otel) => {
                     let default_http_bind = parse_socket_addr("0.0.0.0:4319")
@@ -839,6 +860,9 @@ impl PartialConfiguration {
             jacoco_class_prefix: other
                 .jacoco_class_prefix
                 .or_else(|| self.jacoco_class_prefix.take()),
+            cobertura_class_filter: other
+                .cobertura_class_filter
+                .or_else(|| self.cobertura_class_filter.take()),
             otel_http_receiver_bind: prefer_receiver_bind(
                 other.otel_http_receiver_bind,
                 self.otel_http_receiver_bind,

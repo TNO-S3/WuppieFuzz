@@ -153,6 +153,23 @@ impl Body {
 }
 
 impl OpenApiRequest {
+    /// Collects all string-ish leaf values sent in this request (parameters and body).
+    /// Used by injection-signature detection to check whether an injected payload was
+    /// reflected back verbatim in a response.
+    pub fn string_values(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        for contents in self.parameters.values() {
+            contents.string_leaves(&mut out);
+        }
+        match &self.body {
+            Body::Empty => {}
+            Body::TextPlain(contents)
+            | Body::ApplicationJson(contents)
+            | Body::XWwwFormUrlencoded(contents) => contents.string_leaves(&mut out),
+        }
+        out
+    }
+
     /// Replaces all references in the parameters IndexMap by values collected in earlier requests.
     pub fn resolve_parameter_references(
         &mut self,

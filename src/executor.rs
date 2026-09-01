@@ -41,7 +41,8 @@ use crate::{
         curl_request::CurlRequest,
         spec::Spec,
         validate_response::{
-            Response, ValidationError, ValidationErrorDiscriminants, validate_response,
+            Response, ValidationError, ValidationErrorDiscriminants, detect_injection_signatures,
+            validate_response,
         },
     },
     parameter_feedback::ParameterFeedback,
@@ -166,6 +167,14 @@ pub(crate) fn process_response(
         );
         *exit_kind = ExitKind::Crash;
         maybe_validation_error = Some(validation_err);
+    } else if let Some(injection_err) = detect_injection_signatures(request, response)
+        && crash_criteria.contains(&injection_err.discriminant())
+    {
+        log::debug!(
+            "OpenAPI-input resulted in a possible injection signature: {injection_err}, ignoring rest of request chain."
+        );
+        *exit_kind = ExitKind::Crash;
+        maybe_validation_error = Some(injection_err);
     }
     parameter_feedback.process_response(request_index, response);
     maybe_validation_error

@@ -23,6 +23,7 @@ pub const MAP_SIZE: usize = 4 * 8192;
 
 pub mod read_utilities;
 
+pub mod cobertura;
 pub mod coverband;
 pub mod dummy;
 pub mod endpoint;
@@ -154,6 +155,13 @@ pub fn effective_coverage_host(config: &Configuration) -> Option<SocketAddr> {
                 .coverage_host
                 .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6300)),
         ),
+        configuration::CoverageConfiguration::Cobertura { .. } => Some(
+            config
+                .coverage_host
+                // Port 6302 is arbitrary — Cobertura is a report format, not a protocol,
+                // and has no registered or conventional port. Change freely.
+                .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6302)),
+        ),
         configuration::CoverageConfiguration::Lcov { .. }
         | configuration::CoverageConfiguration::Coverband { .. } => Some(
             config
@@ -219,6 +227,26 @@ pub fn get_coverage_client<'c>(
                         .try_into()
                         .with_context(|| format!("Failed to parse the coverage_host URL: {url}"))
                         .context("Could not construct CoverbandCoverageClient")?,
+                )),
+                None,
+            )
+        }
+        configuration::CoverageConfiguration::Cobertura {
+            ref namespace_filter,
+            ..
+        } => {
+            let socket = clargs
+                .coverage_host
+                // Port 6302 is arbitrary — Cobertura is a report format, not a protocol,
+                // and has no registered or conventional port. Change freely.
+                .unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6302));
+            let url = format!("http://{socket}")
+                .parse()
+                .context("Could not parse Cobertura coverage agent URL")?;
+            (
+                Box::new(cobertura::CoberturaCoverageClient::new(
+                    url,
+                    namespace_filter.clone(),
                 )),
                 None,
             )
