@@ -473,41 +473,6 @@ struct PartialConfiguration {
 
     // Manually added possible values below, since automatically showing possible values of an external (remote) enum
     // such as log::LevelFilter is not well supported.
-    // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
-    /// Log level to output. This flag takes precedence over the environment variable. [possible values: off, error, warn, debug, info, trace]
-    #[clap(value_parser = clap::value_parser!(log::LevelFilter), long, value_enum, env = "LOG_LEVEL", ignore_case = true)]
-    pub log_level: Option<log::LevelFilter>,
-
-    /// Prefix used to filter the classes returned from the jacoco coverage. The class name can be found in the source code of the software under test.
-    /// The class name returned from jacoco is in the form of "org/example/software/class".
-    /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
-    #[clap(value_parser, long)]
-    pub jacoco_class_prefix: Option<String>,
-
-    /// Legacy alias for otel_http_receiver_bind. Accepts IP:PORT, `off`, or `null`.
-    #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
-    #[serde(default)]
-    pub otel_receiver_bind: ReceiverBindSetting,
-
-    /// Bind address for WuppieFuzz's built-in OTLP/HTTP receiver. Accepts IP:PORT, `off`, or `null`.
-    #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
-    #[serde(default)]
-    pub otel_http_receiver_bind: ReceiverBindSetting,
-
-    /// Bind address for WuppieFuzz's built-in OTLP/gRPC receiver. Accepts IP:PORT, `off`, or `null`.
-    #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
-    #[serde(default)]
-    pub otel_grpc_receiver_bind: ReceiverBindSetting,
-}
-
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
-pub enum ReceiverBindSetting {
-    #[default]
-    Unspecified,
-    Disabled,
-    Enabled(SocketAddr),
-}
-
 impl<'de> Deserialize<'de> for ReceiverBindSetting {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
