@@ -334,7 +334,6 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
-                otel_receiver_bind,
                 otel_http_receiver_bind,
                 otel_grpc_receiver_bind,
                 ..
@@ -357,7 +356,6 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
-                otel_receiver_bind,
                 otel_http_receiver_bind,
                 otel_grpc_receiver_bind,
             }),
@@ -483,11 +481,6 @@ struct PartialConfiguration {
     /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
     #[clap(value_parser, long)]
     pub jacoco_class_prefix: Option<String>,
-
-    /// Legacy alias for otel_http_receiver_bind. Accepts IP:PORT, `off`, or `null`.
-    #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
-    #[serde(default)]
-    pub otel_receiver_bind: ReceiverBindSetting,
 
     /// Bind address for WuppieFuzz's built-in OTLP/HTTP receiver. Accepts IP:PORT, `off`, or `null`.
     #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
@@ -741,14 +734,7 @@ impl TryFrom<PartialConfiguration> for Configuration {
                     let default_http_bind = parse_socket_addr("0.0.0.0:4319")
                         .expect("hardcoded OTLP/HTTP receiver bind address is valid");
 
-                    let configured_http =
-                        if receiver_bind_is_specified(value.otel_http_receiver_bind) {
-                            value.otel_http_receiver_bind
-                        } else {
-                            value.otel_receiver_bind
-                        };
-
-                    let otel_http_receiver_bind = match configured_http {
+                    let otel_http_receiver_bind = match value.otel_http_receiver_bind {
                         ReceiverBindSetting::Unspecified => Some(default_http_bind),
                         ReceiverBindSetting::Disabled => None,
                         ReceiverBindSetting::Enabled(bind) => Some(bind),
@@ -853,10 +839,6 @@ impl PartialConfiguration {
             jacoco_class_prefix: other
                 .jacoco_class_prefix
                 .or_else(|| self.jacoco_class_prefix.take()),
-            otel_receiver_bind: prefer_receiver_bind(
-                other.otel_receiver_bind,
-                self.otel_receiver_bind,
-            ),
             otel_http_receiver_bind: prefer_receiver_bind(
                 other.otel_http_receiver_bind,
                 self.otel_http_receiver_bind,
