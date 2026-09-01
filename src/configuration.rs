@@ -254,6 +254,11 @@ pub enum Commands {
         /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
         #[arg(value_parser, long)]
         jacoco_class_prefix: Option<String>,
+
+        /// Filename substring filter for Cobertura coverage. Only classes whose filename contains
+        /// this string will contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
+        #[arg(value_parser, long)]
+        cobertura_class_filter: Option<String>,
     },
 }
 
@@ -320,6 +325,7 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                cobertura_class_filter,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -340,6 +346,7 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                cobertura_class_filter,
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,
@@ -463,6 +470,12 @@ struct PartialConfiguration {
     /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
     #[clap(value_parser, long)]
     pub jacoco_class_prefix: Option<String>,
+
+    /// Filename substring filter for Cobertura coverage. Only classes whose filename contains
+    /// this string contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
+    #[serde(alias = "dotnet_namespace_filter")]
+    #[clap(value_parser, long)]
+    pub cobertura_class_filter: Option<String>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -473,6 +486,8 @@ pub enum CoverageFormat {
     Lcov,
     #[serde(alias = "coverband")]
     Coverband,
+    #[serde(alias = "cobertura")]
+    Cobertura,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -579,6 +594,13 @@ pub enum CoverageConfiguration {
     },
     /// Coverband coverage. Requires a source directory if a report needs to be generated.
     Coverband { source_dir: Option<PathBuf> },
+    /// Cobertura-over-HTTP coverage. Compatible with any agent serving the WuppieFuzz
+    /// Cobertura HTTP protocol. The bundled .NET agent (`coverage_agents/dotnet/`) is
+    /// the reference implementation.
+    Cobertura {
+        /// Optional filter: only include classes whose filename contains this string.
+        namespace_filter: Option<String>,
+    },
 }
 
 impl CoverageConfiguration {
@@ -588,6 +610,7 @@ impl CoverageConfiguration {
             Self::Lcov { .. } => "LCOV",
             Self::Jacoco { .. } => "JaCoCo",
             Self::Coverband { .. } => "Coverband",
+            Self::Cobertura { .. } => "Cobertura (HTTP)",
         }
     }
 }
@@ -617,7 +640,10 @@ impl TryFrom<PartialConfiguration> for Configuration {
                     "A coverage report is requested for Jacoco coverage, but this requires the jacoco_class_dir parameter to be set",
                 );
             }
-            if value.coverage_format.is_some() && value.source_dir.is_none() {
+            if value.coverage_format.is_some()
+                && value.coverage_format != Some(CoverageFormat::Cobertura)
+                && value.source_dir.is_none()
+            {
                 bail!(
                     "A coverage report is requested, but this requires the source_dir parameter to be set",
                 );
@@ -644,6 +670,9 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 },
                 Some(CoverageFormat::Coverband) => CoverageConfiguration::Coverband {
                     source_dir: value.source_dir,
+                },
+                Some(CoverageFormat::Cobertura) => CoverageConfiguration::Cobertura {
+                    namespace_filter: value.cobertura_class_filter,
                 },
                 None => CoverageConfiguration::Endpoint,
             },
@@ -715,6 +744,9 @@ impl PartialConfiguration {
             jacoco_class_prefix: other
                 .jacoco_class_prefix
                 .or_else(|| self.jacoco_class_prefix.take()),
+            cobertura_class_filter: other
+                .cobertura_class_filter
+                .or_else(|| self.cobertura_class_filter.take()),
         };
     }
 }
