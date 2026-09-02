@@ -142,6 +142,18 @@ pub enum ValidationError {
     /// The schema is BooleanSchema::false, which does not describe any response.
     /// https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-01#name-boolean-json-schemas
     SchemaIsFalse,
+
+    /// The response body suggests that an injected payload had an observable effect on
+    /// the backend, even though the HTTP status code and response shape were otherwise
+    /// unremarkable. This is either because a known backend error signature (e.g. a raw
+    /// SQL/LDAP/NoSQL error message) was found in the response body, or because a
+    /// suspicious value sent in the request (e.g. `<script>`, `{{ }}`, `' OR `) was
+    /// reflected back verbatim, suggesting it was not sanitized or escaped.
+    ///
+    /// If this variant is returned, the payload most likely triggered unintended
+    /// behaviour (e.g. SQL/NoSQL/LDAP injection or reflected XSS/SSTI) that isn't
+    /// necessarily visible from the status code alone.
+    PossibleInjectionSignature { detail: String },
 }
 
 impl ValidationError {
@@ -234,10 +246,114 @@ impl std::fmt::Display for ValidationError {
                 fmt,
                 "The specification contains the `false` schema for this response, which must never validate."
             ),
+            ValidationError::PossibleInjectionSignature { detail } => write!(
+                fmt,
+                "Possible injection signature detected in response: {detail}"
+            ),
         }
     }
 }
 impl Error for ValidationError {}
+
+/// Well-known substrings that tend to appear in raw backend error messages leaked
+/// into a response body. Their presence often means the backend failed to handle a
+/// malformed/injected value gracefully (e.g. a database driver exception message
+/// bubbling up through the API), regardless of the HTTP status code returned.
+const KNOWN_ERROR_SIGNATURES: &[&str] = &[
+    // MySQL / MariaDB
+    "you have an error in your sql syntax",
+    "warning: mysql_",
+    "mysqli_sql_exception",
+    // PostgreSQL
+    "org.postgresql.util.psqlexception",
+    "pg_query(): query failed",
+    "unterminated quoted string",
+    // SQLite
+    "sqlite3.operationalerror",
+    "sqlite_error",
+    // MSSQL
+    "unclosed quotation mark after the character string",
+    "system.data.sqlclient.sqlexception",
+    // Oracle
+    "ora-00933",
+    "ora-01756",
+    // Generic ORM / driver traces
+    "java.sql.sqlexception",
+    "psycopg2.errors",
+    // NoSQL
+    "com.mongodb.mongoexception",
+    "mongodb\\driver\\exception",
+    // LDAP
+    "javax.naming.directory.invalidsearchfilterexception",
+    "ldapexception",
+];
+
+/// Substrings whose presence in a request value marks it as a distinctive, unlikely-to-
+/// occur-naturally injection payload. If such a value is echoed back verbatim in a
+/// response, it strongly suggests it was not sanitized or escaped by the backend.
+const SUSPICIOUS_PAYLOAD_MARKERS: &[&str] = &[
+    "<script",
+    "onerror=",
+    "{{7*7}}",
+    "${7*7}",
+    "' OR '1'='1",
+    "\" OR \"1\"=\"1",
+    "<!ENTITY",
+    "$where",
+    ")(uid=*",
+    ")(cn=*",
+];
+
+/// Returns whether `value` looks like a distinctive injection payload, i.e. a value
+/// that would not plausibly occur in a legitimate request unless the fuzzer put it there.
+fn is_suspicious_payload(value: &str) -> bool {
+    // Very short values are too likely to occur "naturally" in a response to be a
+    // meaningful signal, even if they happen to match one of our markers.
+    value.len() >= 4
+        && SUSPICIOUS_PAYLOAD_MARKERS
+            .iter()
+            .any(|marker| value.contains(marker))
+}
+
+/// Looks for content-based evidence that an injected payload had an effect on the
+/// backend: either a known raw error signature leaked into the response body, or one
+/// of the values sent in `request` being reflected back verbatim in `response`.
+///
+/// This complements `validate_response`, which only checks the response's shape
+/// (status code, schema) against the specification: some injection payloads (e.g.
+/// unescaped XSS reflection, or a caught-and-logged SQL error) don't necessarily
+/// change the response status code or structure.
+pub fn detect_injection_signatures(
+    request: &OpenApiRequest,
+    response: &Response,
+) -> Option<ValidationError> {
+    let body = response.text().ok()?;
+    if body.is_empty() {
+        return None;
+    }
+    let lowercase_body = body.to_lowercase();
+
+    if let Some(signature) = KNOWN_ERROR_SIGNATURES
+        .iter()
+        .find(|signature| lowercase_body.contains(*signature))
+    {
+        return Some(ValidationError::PossibleInjectionSignature {
+            detail: format!("response body contains known error signature \"{signature}\""),
+        });
+    }
+
+    for value in request.string_values() {
+        if is_suspicious_payload(&value) && body.contains(&value) {
+            return Some(ValidationError::PossibleInjectionSignature {
+                detail: format!(
+                    "request value \"{value}\" was reflected unescaped in the response body"
+                ),
+            });
+        }
+    }
+
+    None
+}
 
 // Validates whether the response matches the API.
 // The return value contains a description of the particular mismatch.
@@ -514,5 +630,76 @@ fn validate_object_against_type(
         }
 
         _ => make_err(format!("Expected type {expected_type:?} and actual response type {response_contents:?} do not match.").to_owned()),
+    }
+}
+
+#[cfg(test)]
+mod injection_signature_tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::input::{Body, Method, ParameterContents, parameter::SimpleValue};
+
+    fn response_with_body(status: StatusCode, body: &str) -> Response {
+        Response {
+            status,
+            cookies: Vec::new(),
+            body: body.as_bytes().to_vec(),
+        }
+    }
+
+    fn request_with_body_string(value: &str) -> OpenApiRequest {
+        OpenApiRequest {
+            method: Method::Post,
+            path: "/simple".to_string(),
+            body: Body::ApplicationJson(ParameterContents::LeafValue(SimpleValue::String(
+                value.to_string(),
+            ))),
+            parameters: BTreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn detects_known_db_error_signature() {
+        let request = request_with_body_string("hello");
+        let response = response_with_body(
+            StatusCode::OK,
+            "Error: You have an error in your SQL syntax; check the manual",
+        );
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleInjectionSignature { .. })
+        ));
+    }
+
+    #[test]
+    fn detects_reflected_xss_payload() {
+        let request = request_with_body_string("<script>alert(1)</script>");
+        let response = response_with_body(
+            StatusCode::OK,
+            "<html><body>Hello, <script>alert(1)</script></body></html>",
+        );
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleInjectionSignature { .. })
+        ));
+    }
+
+    #[test]
+    fn ignores_clean_response() {
+        let request = request_with_body_string("some plain input");
+        let response = response_with_body(StatusCode::OK, "{\"status\": \"ok\"}");
+        assert!(detect_injection_signatures(&request, &response).is_none());
+    }
+
+    #[test]
+    fn ignores_short_values_even_if_matching_marker() {
+        // A short reflected value shouldn't trigger detection, since short strings
+        // are too likely to occur "naturally".
+        let request = request_with_body_string("{{");
+        let response = response_with_body(StatusCode::OK, "here is {{ some text");
+        assert!(detect_injection_signatures(&request, &response).is_none());
     }
 }

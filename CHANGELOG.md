@@ -4,9 +4,38 @@
 
 ## Features
 
+- Adds support for .NET coverage based on cobertura and dotnet-coverage in [#336](https://github.com/TNO-S3/WuppieFuzz/pull/336)
+- Adds support for coverage guidance using OpenTelemetry in [#358](https://github.com/TNO-S3/WuppieFuzz/pull/358)
+- Adds crash deduplication command in [#334](https://github.com/TNO-S3/WuppieFuzz/pull/334)
+
+## Fixes
+
+# v1.7.1 (2026-08-26)
+
+## Highlights
+
+## Features
+
+## Fixes
+
+- Persistent stack overflow fix for Windows build in [#365](https://github.com/TNO-S3/WuppieFuzz/pull/365)
+
+# v1.7.0 (2026-08-26)
+
+## Highlights
+
+## Features
+
+- Add `GrammarInterestingMutator`, generating varied injection payloads (SQLi, XSS, SSTI, command/LDAP/NoSQL injection, path traversal, XXE, format strings) from small regex grammars instead of a fixed wordlist, inspired by LibAFL's Nautilus grammar mutator in [#357](https://github.com/TNO-S3/WuppieFuzz/pull/357)
+- Treat request timeouts as a fuzzing objective alongside crashes, so time-based blind injection findings (e.g. `SLEEP`/`WAITFOR DELAY` payloads) are now saved as solutions instead of only being logged in [#357](https://github.com/TNO-S3/WuppieFuzz/pull/357)
+- Add content-based detection of injection side-effects: responses are now also checked for known database/LDAP/NoSQL error signatures and for verbatim reflection of suspicious payload values (e.g. unescaped `<script>`), surfaced as a new `PossibleInjectionSignature` crash criterion in [#357](https://github.com/TNO-S3/WuppieFuzz/pull/357)
+- Update to LibAFL 0.16.1 (and bump `z3` to 0.20.2 to match its new requirement) in [#356](https://github.com/TNO-S3/WuppieFuzz/pull/356). As a result of the Z3 update, the `bundled-z3` feature was renamed to `vendored-z3`.
+- Show a summary of the request sequence currently being fuzzed (`current_sequence`) in the monitor output, inspired by LibAFL's TUI monitor in [#356](https://github.com/TNO-S3/WuppieFuzz/pull/356)
+
 ## Fixes
 
 - Occassional panic when duration is negative due to time corrections in [#346](https://github.com/TNO-S3/WuppieFuzz/pull/346)
+- Harmonize stack size of builds to prevent crashes in Windows [#360](https://github.com/TNO-S3/WuppieFuzz/pull/360)
 
 # v1.6.0 (2026-06-25)
 

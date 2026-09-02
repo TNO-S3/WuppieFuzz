@@ -1,6 +1,10 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 #[allow(unused_imports)]
@@ -9,7 +13,7 @@ use libafl::{
     corpus::minimizer::MapCorpusMinimizer,
     events::{Event, EventFirer, EventWithStats, ExecStats},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::StdFuzzer,
     mutators::HavocScheduledMutator,
     observers::{CanTrack, MultiMapObserver, TimeObserver},
@@ -76,7 +80,20 @@ pub fn fuzz() -> Result<()> {
 
     // Observers & feedback initialization
     let mut endpoint_coverage_client = setup_endpoint_coverage(api)?;
-    let mut code_coverage_client = setup_line_coverage(config, &report_path)?;
+    let (mut code_coverage_client, otel_trace_processing_metrics) =
+        setup_line_coverage(config, &report_path)?;
+
+    match config.coverage_configuration {
+        crate::configuration::CoverageConfiguration::Endpoint => {
+            log::info!("Coverage guidance: endpoint coverage only (no instrumentation)");
+        }
+        crate::configuration::CoverageConfiguration::Otel { .. } => {
+            log::info!("Coverage guidance: endpoint coverage plus OpenTelemetry spans");
+        }
+        _ => {
+            log::info!("Coverage guidance: endpoint coverage plus source-code coverage");
+        }
+    }
     let combined_map_observer: CombinedMapObserverType<'_> =
         construct_observer(&mut endpoint_coverage_client, &mut code_coverage_client);
     let time_observer = TimeObserver::new("time");
@@ -98,7 +115,11 @@ pub fn fuzz() -> Result<()> {
         MapCorpusMinimizer::new(&combined_map_observer);
 
     // Initialize state
-    let mut objective = CrashFeedback::new();
+    // A run is a "solution" if the target crashed, or if it timed out (which
+    // catches time-based blind injection payloads, e.g. SQL SLEEP/WAITFOR DELAY,
+    // that don't produce a distinctive crash but do make the request run over
+    // the configured timeout).
+    let mut objective = feedback_or!(CrashFeedback::new(), TimeoutFeedback::new());
     let mut collective_feedback = feedback_or!(
         coverage_feedback,
         time_feedback, // Time feedback, this one does not need a feedback state
@@ -119,6 +140,7 @@ pub fn fuzz() -> Result<()> {
         config,
         code_coverage_client,
         endpoint_coverage_client,
+        otel_trace_processing_metrics,
     )?;
 
     // Minimize corpus
@@ -128,6 +150,8 @@ pub fn fuzz() -> Result<()> {
     log::debug!("Start fuzzing loop");
     executor.start_timer();
     loop {
+        executor.drain_otel_promotions(&mut fuzzer, &mut state, &mut mgr)?;
+
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) => (),
             Err(libafl_bolts::Error::ShuttingDown) => {
@@ -138,6 +162,9 @@ pub fn fuzz() -> Result<()> {
                 return Err(err).context("Error in the fuzz loop");
             }
         };
+
+        executor.drain_otel_promotions(&mut fuzzer, &mut state, &mut mgr)?;
+
         // send update of execution data to the monitor
         let executions = *state.executions();
         if let Err(e) = mgr.fire(
@@ -149,6 +176,14 @@ pub fn fuzz() -> Result<()> {
     }
 
     // Coverage reporting
+    if matches!(
+        config.coverage_configuration,
+        crate::configuration::CoverageConfiguration::Otel { .. }
+    ) {
+        // Give batched OTEL exporters a short grace period before the final snapshot.
+        thread::sleep(Duration::from_secs(6));
+    }
+    executor.report_final_coverage_and_stats(&state);
     executor.generate_coverage_report_if_path(report_path.as_deref());
 
     Ok(())

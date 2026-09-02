@@ -150,9 +150,40 @@ impl Body {
     pub fn is_empty(&self) -> bool {
         matches!(self, Body::Empty)
     }
+
+    pub fn contents(&self) -> Option<&ParameterContents> {
+        match self {
+            Body::Empty => None,
+            Body::TextPlain(c) | Body::ApplicationJson(c) | Body::XWwwFormUrlencoded(c) => Some(c),
+        }
+    }
+
+    pub fn contents_mut(&mut self) -> Option<&mut ParameterContents> {
+        match self {
+            Body::Empty => None,
+            Body::TextPlain(c) | Body::ApplicationJson(c) | Body::XWwwFormUrlencoded(c) => Some(c),
+        }
+    }
 }
 
 impl OpenApiRequest {
+    /// Collects all string-ish leaf values sent in this request (parameters and body).
+    /// Used by injection-signature detection to check whether an injected payload was
+    /// reflected back verbatim in a response.
+    pub fn string_values(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        for contents in self.parameters.values() {
+            contents.string_leaves(&mut out);
+        }
+        match &self.body {
+            Body::Empty => {}
+            Body::TextPlain(contents)
+            | Body::ApplicationJson(contents)
+            | Body::XWwwFormUrlencoded(contents) => contents.string_leaves(&mut out),
+        }
+        out
+    }
+
     /// Replaces all references in the parameters IndexMap by values collected in earlier requests.
     pub fn resolve_parameter_references(
         &mut self,

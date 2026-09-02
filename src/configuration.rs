@@ -8,7 +8,7 @@ use std::{
 
 use clap::{Parser, Subcommand, ValueEnum, value_parser};
 use libafl::schedulers::powersched::BaseSchedule;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer, Serialize, de};
 use strum::VariantArray;
 use url::Url;
 
@@ -21,6 +21,16 @@ const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 lazy_static! {
     static ref CONFIGURATION: Result<Configuration, anyhow::Error> =
         Configuration::try_from(PartialConfiguration::get()?);
+}
+
+/// Selects which reproduced crash inputs are minimized during deduplication.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, ValueEnum)]
+#[serde(rename_all = "snake_case")]
+pub enum MinimizationMode {
+    /// Minimize only the selected representative of each crash cluster.
+    Representative,
+    /// Minimize every reproduced crash file.
+    All,
 }
 
 /// Grey-box REST API Fuzzer written in Rust with LibAFL.
@@ -124,6 +134,61 @@ pub enum Commands {
         /// By default, all validation error variants are considered crashes.
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
+        // Manually added possible values below, since automatically showing possible values of an external (remote) enum
+        // such as log::LevelFilter is not well supported.
+        // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
+        /// Log level to output. This flag takes precedence over the environment variable. [possible values: off, error, warn, debug, info, trace]
+        #[arg(value_parser = clap::value_parser!(log::LevelFilter), long, value_enum, env = "LOG_LEVEL", ignore_case = true)]
+        log_level: Option<log::LevelFilter>,
+    },
+    /// Deduplicate crash files generated during an earlier fuzzing run
+    Dedup {
+        /// The path to a configuration file. If present, the configuration file is used
+        /// to configure the deduplication replay. Arguments given on the command line
+        /// take precedence over the configuration file.
+        #[arg(long, value_parser, value_name = "CONFIG_FILE.YAML")]
+        config: Option<PathBuf>,
+        /// The directory containing crash files to deduplicate
+        #[arg(value_name = "CRASH_DIRECTORY")]
+        crash_directory: PathBuf,
+        /// The directory to write deduplicated crash representatives to
+        #[arg(long, value_parser, value_name = "OUTPUT_DIRECTORY")]
+        output: PathBuf,
+        /// Minimize one representative per cluster, or every reproduced crash file.
+        #[arg(long, value_enum, value_name = "MODE", num_args = 0..=1, default_missing_value = "representative")]
+        minimize: Option<MinimizationMode>,
+        /// Which errors are considered a bug when replaying crash files.
+        ///
+        /// Accepts the same values as `wuppiefuzz fuzz --crash-criteria` (see that command's
+        /// help for a description of each error). This should match the crash criteria used
+        /// during the fuzzing run that produced the crash files; with a different (narrower)
+        /// criteria set, crash files may be reported as non-reproducible.
+        ///
+        /// By default, all error types are considered bugs.
+        #[arg(
+            value_parser,
+            long,
+            value_enum,
+            required = false,
+            ignore_case = true,
+            verbatim_doc_comment
+        )]
+        crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
+        /// The OpenAPI specification of the program under test
+        #[arg(long, value_name = "OPENAPI_SPEC.YAML")]
+        openapi_spec: Option<PathBuf>,
+        /// The URL of the server to replay crashes against. This is usually specified in
+        /// the OpenAPI specification, but you can use this option to override it.
+        #[arg(value_parser=verify_url, long)]
+        target: Option<Url>,
+        /// How to log in to the API server. The value should be the name of a YAML file
+        /// that contains the login configuration. See login.md for information on how
+        /// to build one.
+        #[arg(long, value_parser, value_name = "AUTH.YAML")]
+        authentication: Option<PathBuf>,
+        /// Custom (static) headers that should be added to each replayed request.
+        #[arg(long, value_parser, value_name = "STATIC_HEADERS.YAML")]
+        header: Option<PathBuf>,
         // Manually added possible values below, since automatically showing possible values of an external (remote) enum
         // such as log::LevelFilter is not well supported.
         // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
@@ -254,6 +319,25 @@ pub enum Commands {
         /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
         #[arg(value_parser, long)]
         jacoco_class_prefix: Option<String>,
+
+        /// Filename substring filter for Cobertura coverage. Only classes whose filename contains
+        /// this string will contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
+        #[arg(value_parser, long)]
+        cobertura_class_filter: Option<String>,
+
+        /// Legacy alias for --otel-http-receiver-bind. Accepts IP:PORT, `off`, or `null`.
+        #[arg(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+        otel_receiver_bind: ReceiverBindSetting,
+
+        /// Bind address for WuppieFuzz's built-in OTLP/HTTP receiver. Accepts IP:PORT, `off`, or `null`.
+        /// Defaults to 0.0.0.0:4319 when omitted.
+        #[arg(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+        otel_http_receiver_bind: ReceiverBindSetting,
+
+        /// Bind address for WuppieFuzz's built-in OTLP/gRPC receiver. Accepts IP:PORT, `off`, or `null`.
+        /// Defaults to the HTTP receiver IP at port 4317 when omitted.
+        #[arg(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+        otel_grpc_receiver_bind: ReceiverBindSetting,
     },
 }
 
@@ -262,7 +346,8 @@ impl Commands {
         match self {
             Commands::VerifyAuth { config, .. }
             | Commands::Reproduce { config, .. }
-            | Commands::Fuzz { config, .. } => config.as_ref(),
+            | Commands::Fuzz { config, .. }
+            | Commands::Dedup { config, .. } => config.as_ref(),
             _ => None,
         }
     }
@@ -320,6 +405,9 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                cobertura_class_filter,
+                otel_http_receiver_bind,
+                otel_grpc_receiver_bind,
                 ..
             } => Ok(PartialConfiguration {
                 openapi_spec,
@@ -340,6 +428,26 @@ impl Commands {
                 header,
                 log_level,
                 jacoco_class_prefix,
+                cobertura_class_filter,
+                otel_http_receiver_bind,
+                otel_grpc_receiver_bind,
+            }),
+            Commands::Dedup {
+                openapi_spec,
+                target,
+                authentication,
+                header,
+                log_level,
+                crash_criteria,
+                ..
+            } => Ok(PartialConfiguration {
+                openapi_spec,
+                target,
+                authentication,
+                header,
+                log_level,
+                crash_criteria,
+                ..Default::default()
             }),
             Commands::OutputCorpus {
                 corpus_directory: _,
@@ -463,6 +571,57 @@ struct PartialConfiguration {
     /// If no coverage is obtained anymore please check if the prefix is correct. If you use the trace debug level all skipped segment names are logged.
     #[clap(value_parser, long)]
     pub jacoco_class_prefix: Option<String>,
+
+    /// Filename substring filter for Cobertura coverage. Only classes whose filename contains
+    /// this string contribute to the coverage map. Example: `"Controllers"` or `"MyApp"`.
+    #[serde(alias = "dotnet_namespace_filter")]
+    #[clap(value_parser, long)]
+    pub cobertura_class_filter: Option<String>,
+
+    /// Bind address for WuppieFuzz's built-in OTLP/HTTP receiver. Accepts IP:PORT, `off`, or `null`.
+    #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+    #[serde(default)]
+    pub otel_http_receiver_bind: ReceiverBindSetting,
+
+    /// Bind address for WuppieFuzz's built-in OTLP/gRPC receiver. Accepts IP:PORT, `off`, or `null`.
+    #[clap(value_parser = parse_receiver_bind_setting, long, default_value = "default")]
+    #[serde(default)]
+    pub otel_grpc_receiver_bind: ReceiverBindSetting,
+}
+
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+pub enum ReceiverBindSetting {
+    #[default]
+    Unspecified,
+    Disabled,
+    Enabled(SocketAddr),
+}
+
+impl<'de> Deserialize<'de> for ReceiverBindSetting {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Option::<String>::deserialize(deserializer)? {
+            None => Ok(Self::Disabled),
+            Some(value) => parse_receiver_bind_setting(&value).map_err(de::Error::custom),
+        }
+    }
+}
+
+fn receiver_bind_is_specified(setting: ReceiverBindSetting) -> bool {
+    !matches!(setting, ReceiverBindSetting::Unspecified)
+}
+
+fn prefer_receiver_bind(
+    preferred: ReceiverBindSetting,
+    fallback: ReceiverBindSetting,
+) -> ReceiverBindSetting {
+    if receiver_bind_is_specified(preferred) {
+        preferred
+    } else {
+        fallback
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -473,6 +632,13 @@ pub enum CoverageFormat {
     Lcov,
     #[serde(alias = "coverband")]
     Coverband,
+    #[serde(alias = "cobertura")]
+    Cobertura,
+    /// OpenTelemetry trace-based coverage: WuppieFuzz injects a W3C traceparent header
+    /// into every request, receives the resulting spans through its built-in OTLP/HTTP or
+    /// OTLP/gRPC receivers, and translates them into a coverage bitmap.
+    #[serde(alias = "otel")]
+    Otel,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, ValueEnum, Deserialize)]
@@ -561,7 +727,7 @@ pub struct Configuration {
 }
 
 /// CoverageConfiguration holds all the coverage-agent-specific configuration.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub enum CoverageConfiguration {
     /// Endpoint coverage only. No further configuration is needed.
     Endpoint,
@@ -579,6 +745,17 @@ pub enum CoverageConfiguration {
     },
     /// Coverband coverage. Requires a source directory if a report needs to be generated.
     Coverband { source_dir: Option<PathBuf> },
+    #[serde(alias = "cobertura")]
+    Cobertura { namespace_filter: Option<String> },
+    /// OpenTelemetry trace-based coverage. WuppieFuzz injects a W3C traceparent header
+    /// into every request, receives spans through its built-in OTLP/HTTP or OTLP/gRPC receivers, and
+    /// builds a span-presence + span-edge coverage bitmap.
+    Otel {
+        /// Bind address of WuppieFuzz's built-in OTLP/HTTP receiver, or None if disabled.
+        otel_http_receiver_bind: Option<SocketAddr>,
+        /// Bind address of WuppieFuzz's built-in OTLP/gRPC receiver, or None if disabled.
+        otel_grpc_receiver_bind: Option<SocketAddr>,
+    },
 }
 
 impl CoverageConfiguration {
@@ -588,6 +765,8 @@ impl CoverageConfiguration {
             Self::Lcov { .. } => "LCOV",
             Self::Jacoco { .. } => "JaCoCo",
             Self::Coverband { .. } => "Coverband",
+            Self::Cobertura { .. } => "Cobertura (HTTP)",
+            Self::Otel { .. } => "OpenTelemetry",
         }
     }
 }
@@ -617,7 +796,14 @@ impl TryFrom<PartialConfiguration> for Configuration {
                     "A coverage report is requested for Jacoco coverage, but this requires the jacoco_class_dir parameter to be set",
                 );
             }
-            if value.coverage_format.is_some() && value.source_dir.is_none() {
+
+            if matches!(
+                value.coverage_format,
+                Some(CoverageFormat::Jacoco)
+                    | Some(CoverageFormat::Lcov)
+                    | Some(CoverageFormat::Coverband)
+            ) && value.source_dir.is_none()
+            {
                 bail!(
                     "A coverage report is requested, but this requires the source_dir parameter to be set",
                 );
@@ -645,6 +831,48 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 Some(CoverageFormat::Coverband) => CoverageConfiguration::Coverband {
                     source_dir: value.source_dir,
                 },
+                Some(CoverageFormat::Cobertura) => CoverageConfiguration::Cobertura {
+                    namespace_filter: value.cobertura_class_filter,
+                },
+                Some(CoverageFormat::Otel) => {
+                    let default_http_bind = parse_socket_addr("0.0.0.0:4319")
+                        .expect("hardcoded OTLP/HTTP receiver bind address is valid");
+
+                    let otel_http_receiver_bind = match value.otel_http_receiver_bind {
+                        ReceiverBindSetting::Unspecified => Some(default_http_bind),
+                        ReceiverBindSetting::Disabled => None,
+                        ReceiverBindSetting::Enabled(bind) => Some(bind),
+                    };
+
+                    let default_grpc_bind = otel_http_receiver_bind
+                        .map(|http_bind| {
+                            SocketAddr::new(
+                                http_bind.ip(),
+                                if http_bind.port() == 0 { 0 } else { 4317 },
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            parse_socket_addr("0.0.0.0:4317")
+                                .expect("hardcoded OTLP/gRPC receiver bind address is valid")
+                        });
+
+                    let otel_grpc_receiver_bind = match value.otel_grpc_receiver_bind {
+                        ReceiverBindSetting::Unspecified => Some(default_grpc_bind),
+                        ReceiverBindSetting::Disabled => None,
+                        ReceiverBindSetting::Enabled(bind) => Some(bind),
+                    };
+
+                    if otel_http_receiver_bind.is_none() && otel_grpc_receiver_bind.is_none() {
+                        bail!(
+                            "OpenTelemetry coverage requires at least one enabled OTLP receiver; set otel_http_receiver_bind or otel_grpc_receiver_bind to an IP:PORT"
+                        );
+                    }
+
+                    CoverageConfiguration::Otel {
+                        otel_http_receiver_bind,
+                        otel_grpc_receiver_bind,
+                    }
+                }
                 None => CoverageConfiguration::Endpoint,
             },
             timeout: value.timeout,
@@ -715,6 +943,17 @@ impl PartialConfiguration {
             jacoco_class_prefix: other
                 .jacoco_class_prefix
                 .or_else(|| self.jacoco_class_prefix.take()),
+            cobertura_class_filter: other
+                .cobertura_class_filter
+                .or_else(|| self.cobertura_class_filter.take()),
+            otel_http_receiver_bind: prefer_receiver_bind(
+                other.otel_http_receiver_bind,
+                self.otel_http_receiver_bind,
+            ),
+            otel_grpc_receiver_bind: prefer_receiver_bind(
+                other.otel_grpc_receiver_bind,
+                self.otel_grpc_receiver_bind,
+            ),
         };
     }
 }
@@ -738,6 +977,14 @@ fn parse_socket_addr(arg: &str) -> Result<SocketAddr, io::Error> {
         ErrorKind::InvalidInput,
         "Could not parse socket address",
     ))
+}
+
+fn parse_receiver_bind_setting(arg: &str) -> Result<ReceiverBindSetting, io::Error> {
+    match arg.trim().to_ascii_lowercase().as_str() {
+        "" | "default" | "auto" => Ok(ReceiverBindSetting::Unspecified),
+        "off" | "none" | "null" | "disabled" | "false" => Ok(ReceiverBindSetting::Disabled),
+        _ => parse_socket_addr(arg).map(ReceiverBindSetting::Enabled),
+    }
 }
 
 fn verify_url(arg: &str) -> anyhow::Result<Url> {

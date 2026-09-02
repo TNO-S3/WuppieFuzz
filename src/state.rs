@@ -11,7 +11,7 @@ use libafl::{
         Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryOnDiskCorpus, OnDiskCorpus,
         Testcase,
     },
-    feedbacks::{CrashLogic, ExitKindFeedback, StateInitializer},
+    feedbacks::StateInitializer,
     inputs::Input,
     schedulers::powersched::SchedulerMetadata,
     stages::StageId,
@@ -27,7 +27,10 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{openapi::spec::Spec, types::CombinedFeedbackType};
+use crate::{
+    openapi::spec::Spec,
+    types::{CombinedFeedbackType, CombinedObjectiveType},
+};
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///
@@ -366,7 +369,7 @@ where
 
     pub fn initialize(
         mut self,
-        objective: &mut ExitKindFeedback<CrashLogic>,
+        objective: &mut CombinedObjectiveType,
         collective_feedback: &mut CombinedFeedbackType,
     ) -> anyhow::Result<Self> {
         collective_feedback.init_state(&mut self)?;

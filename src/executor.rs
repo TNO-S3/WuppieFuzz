@@ -3,6 +3,8 @@
 
 use std::{
     borrow::Cow,
+    collections::{HashSet, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
     marker::PhantomData,
     sync::{
         Arc, Mutex,
@@ -15,6 +17,7 @@ use libafl::{
     corpus::Corpus,
     events::{Event, EventFirer, EventRestarter, EventWithStats, ExecStats, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
+    fuzzer::Evaluator,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
     state::{HasCorpus, HasExecutions, HasSolutions, Stoppable},
@@ -26,15 +29,20 @@ use strum::IntoDiscriminant;
 
 use crate::{
     authentication::{Authentication, build_http_client},
-    configuration::Configuration,
-    coverage_clients::{CoverageClient, endpoint::EndpointCoverageClient},
+    configuration::{Configuration, CoverageConfiguration},
+    coverage_clients::{
+        CoverageClient,
+        endpoint::EndpointCoverageClient,
+        otel::{SharedOtelTraceProcessingMetrics, read_otel_trace_processing_metrics},
+    },
     input::{OpenApiInput, OpenApiRequest},
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
         spec::Spec,
         validate_response::{
-            Response, ValidationError, ValidationErrorDiscriminants, validate_response,
+            Response, ValidationError, ValidationErrorDiscriminants, detect_injection_signatures,
+            validate_response,
         },
     },
     parameter_feedback::ParameterFeedback,
@@ -65,6 +73,33 @@ fn duration_as_us(start: Instant) -> u64 {
 
 type FuzzerState = crate::state::OpenApiFuzzerState<OpenApiInput>;
 
+#[derive(Default)]
+struct KnownCorpusInputs {
+    seen_hashes: HashSet<u64>,
+}
+
+impl KnownCorpusInputs {
+    fn input_hash(input: &OpenApiInput) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        input.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn ingest_state(&mut self, state: &FuzzerState) {
+        for id in state.corpus().ids() {
+            if let Ok(testcase) = state.corpus().get(id)
+                && let Some(input) = testcase.borrow().input()
+            {
+                self.seen_hashes.insert(Self::input_hash(input));
+            }
+        }
+    }
+
+    fn mark_new(&mut self, input: &OpenApiInput) -> bool {
+        self.seen_hashes.insert(Self::input_hash(input))
+    }
+}
+
 /// The Executor for sending Sequences of OpenAPI requests to the target.
 /// It is responsible for executing inputs chosen by the fuzzer, and tracking
 /// statistics about coverage and errors.
@@ -84,6 +119,9 @@ where
     coverage_client: Box<dyn CoverageClient>,
     endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
     reporter: Option<MySqLite>,
+    known_corpus_inputs: KnownCorpusInputs,
+    otel_trace_processing_metrics: Option<SharedOtelTraceProcessingMetrics>,
+    replaying_otel_promotion: bool,
 
     manual_interrupt: Arc<AtomicBool>,
     maybe_timeout_secs: Option<Duration>,
@@ -129,6 +167,14 @@ pub(crate) fn process_response(
         );
         *exit_kind = ExitKind::Crash;
         maybe_validation_error = Some(validation_err);
+    } else if let Some(injection_err) = detect_injection_signatures(request, response)
+        && crash_criteria.contains(&injection_err.discriminant())
+    {
+        log::debug!(
+            "OpenAPI-input resulted in a possible injection signature: {injection_err}, ignoring rest of request chain."
+        );
+        *exit_kind = ExitKind::Crash;
+        maybe_validation_error = Some(injection_err);
     }
     parameter_feedback.process_response(request_index, response);
     maybe_validation_error
@@ -145,6 +191,7 @@ where
         config: &'static Configuration,
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
+        otel_trace_processing_metrics: Option<SharedOtelTraceProcessingMetrics>,
     ) -> anyhow::Result<Self> {
         let (authentication, cookie_store, http_client) = build_http_client(api)?;
 
@@ -161,6 +208,9 @@ where
             coverage_client,
             endpoint_client,
             reporter: crate::reporting::sqlite::get_reporter(config, api)?,
+            known_corpus_inputs: KnownCorpusInputs::default(),
+            otel_trace_processing_metrics,
+            replaying_otel_promotion: false,
 
             manual_interrupt: setup_interrupt()?,
             maybe_timeout_secs: config.timeout.map(|t| Duration::from_secs(t.get())),
@@ -203,6 +253,37 @@ where
         }
     }
 
+    fn current_window_rates(&self) -> (f64, f64) {
+        let elapsed = self
+            .last_window_time
+            .elapsed()
+            .as_secs_f64()
+            .max(f64::EPSILON);
+        (
+            (self.inputs_tested - self.last_window_seqs) as f64 / elapsed,
+            (self.performed_requests - self.last_window_reqs) as f64 / elapsed,
+        )
+    }
+
+    fn write_stats_snapshot(&self, state: &FuzzerState, seq_per_sec: f64, req_per_sec: f64) {
+        let otel_trace_processing_stats = self
+            .otel_trace_processing_metrics
+            .as_ref()
+            .map(read_otel_trace_processing_metrics)
+            .unwrap_or_default();
+
+        self.reporter.report_stats(CampaignStats {
+            seq_per_sec,
+            req_per_sec,
+            requests_completed_total: self.performed_requests,
+            corpus_size: state.corpus().count().try_into().unwrap_or(u32::MAX),
+            objectives: state.solutions().count().try_into().unwrap_or(u32::MAX),
+            sequence_stop_stats: self.sequence_stop_stats,
+            sequence_timing_stats: self.sequence_timing_stats,
+            otel_trace_processing_stats,
+        });
+    }
+
     /// Executes the given input, tracking and using response parameters and verifying responses.
     /// Returns the target's performance as ExitKind, and the number of requests successfully
     /// executed (i.e. before an error occurred).
@@ -211,6 +292,10 @@ where
         self.inputs_tested += 1;
         let mut performed_requests = 0;
         let mut stop_reason = SequenceStopReason::Completed;
+
+        if let Some(guidance) = self.coverage_client.delayed_guidance() {
+            guidance.start_request_sequence(inputs);
+        }
 
         let mut parameter_feedback = ParameterFeedback::new(inputs.0.len());
         log::debug!("Sending {} requests", inputs.0.len());
@@ -250,7 +335,17 @@ where
                     log::error!("Error building request: {err}");
                     continue;
                 }
-                Ok(r) => r.timeout(Duration::from_millis(self.config.request_timeout)),
+                Ok(r) => {
+                    let mut builder = r.timeout(Duration::from_millis(self.config.request_timeout));
+                    if let Some(traceparent) = self
+                        .coverage_client
+                        .delayed_guidance()
+                        .and_then(|guidance| guidance.traceparent_for_request())
+                    {
+                        builder = builder.header("traceparent", traceparent);
+                    }
+                    builder
+                }
             };
 
             let request_built = match request_builder.build() {
@@ -405,13 +500,13 @@ where
     fn post_exec<EM>(
         &mut self,
         state: &mut FuzzerState,
-        _input: &OpenApiInput,
+        input: &OpenApiInput,
         event_manager: &mut EM,
     ) where
         EM: EventFirer<OpenApiInput, FuzzerState> + EventRestarter<FuzzerState>,
     {
         let code_coverage_phase_start = Instant::now();
-        self.coverage_client.fetch_coverage(true);
+        self.coverage_client.finish_request_sequence(input);
         let (covered, total) = self.coverage_client.max_coverage_ratio();
         Self::add_timing(
             &mut self.sequence_timing_stats.code_coverage_phase_us,
@@ -436,7 +531,10 @@ where
                 state,
                 event_manager,
                 "wuppiefuzz_code_coverage",
-                UserStatsValue::Ratio(covered, total),
+                match self.config.coverage_configuration {
+                    CoverageConfiguration::Otel { .. } => UserStatsValue::Number(covered),
+                    _ => UserStatsValue::Ratio(covered, total),
+                },
             );
         }
 
@@ -456,7 +554,6 @@ where
             .duration_since(self.last_window_time)
             .as_secs();
         if diff > CLIENT_STATS_TIME_WINDOW_SECS {
-            self.last_window_time = current_instant;
             // send the request stats to the event manager for use in the monitor
             update_stats(
                 state,
@@ -465,17 +562,18 @@ where
                 UserStatsValue::Number(self.performed_requests),
             );
 
-            let seq_delta = self.inputs_tested - self.last_window_seqs;
-            let req_delta = self.performed_requests - self.last_window_reqs;
-            self.reporter.report_stats(CampaignStats {
-                seq_per_sec: seq_delta as f64 / diff as f64,
-                req_per_sec: req_delta as f64 / diff as f64,
-                requests_completed_total: self.performed_requests,
-                corpus_size: state.corpus().count().try_into().unwrap_or(u32::MAX),
-                objectives: state.solutions().count().try_into().unwrap_or(u32::MAX),
-                sequence_stop_stats: self.sequence_stop_stats,
-                sequence_timing_stats: self.sequence_timing_stats,
-            });
+            // send a short summary of the sequence currently being fuzzed, so the
+            // monitor can show users which requests are actively being tested
+            update_stats(
+                state,
+                event_manager,
+                "current_sequence",
+                UserStatsValue::String(Cow::Owned(summarize_sequence(input))),
+            );
+
+            let (seq_per_sec, req_per_sec) = self.current_window_rates();
+            self.write_stats_snapshot(state, seq_per_sec, req_per_sec);
+            self.last_window_time = current_instant;
             self.last_window_seqs = self.inputs_tested;
             self.last_window_reqs = self.performed_requests;
         }
@@ -511,6 +609,69 @@ where
             &mut self.sequence_timing_stats.post_exec_reporting_us,
             post_exec_reporting_start,
         );
+    }
+
+    pub(crate) fn report_final_coverage_and_stats(&mut self, state: &FuzzerState) {
+        let (covered, total) = self.coverage_client.max_coverage_ratio();
+        let (e_covered, e_total) = self.endpoint_client.max_coverage_ratio();
+        self.reporter.report_coverage(
+            covered.try_into().unwrap_or(u32::MAX),
+            total.try_into().unwrap_or(u32::MAX),
+            e_covered.try_into().unwrap_or(u32::MAX),
+            e_total.try_into().unwrap_or(u32::MAX),
+        );
+        let (seq_per_sec, req_per_sec) = self.current_window_rates();
+        self.write_stats_snapshot(state, seq_per_sec, req_per_sec);
+    }
+
+    pub(crate) fn drain_otel_promotions<FZ, EM>(
+        &mut self,
+        fuzzer: &mut FZ,
+        state: &mut FuzzerState,
+        event_manager: &mut EM,
+    ) -> Result<(), libafl::Error>
+    where
+        FZ: Evaluator<Self, EM, OpenApiInput, FuzzerState>,
+        EM: EventFirer<OpenApiInput, FuzzerState> + EventRestarter<FuzzerState> + SendExiting,
+    {
+        let Some(guidance) = self.coverage_client.delayed_guidance() else {
+            return Ok(());
+        };
+
+        self.known_corpus_inputs.ingest_state(state);
+        let promoted_inputs = guidance.drain_promoted_inputs();
+        if promoted_inputs.is_empty() {
+            return Ok(());
+        }
+
+        for input in promoted_inputs {
+            if !self.known_corpus_inputs.mark_new(&input) {
+                continue;
+            }
+
+            let corpus_before = state.corpus().count();
+
+            self.replaying_otel_promotion = true;
+            if let Some(guidance) = self.coverage_client.delayed_guidance() {
+                guidance.set_replay_promotion(true);
+            }
+
+            let result = fuzzer.add_input(state, self, event_manager, input);
+
+            if let Some(guidance) = self.coverage_client.delayed_guidance() {
+                guidance.set_replay_promotion(false);
+            }
+            self.replaying_otel_promotion = false;
+
+            result?;
+
+            let accepted = state.corpus().count() > corpus_before;
+            if accepted && let Some(metrics) = &self.otel_trace_processing_metrics {
+                metrics.lock().unwrap().promoted_inputs_added += 1;
+            }
+        }
+
+        Ok(())
     }
 
     /// Uses the embedded coverage clients to generate a coverage report
@@ -577,6 +738,42 @@ fn setup_interrupt() -> Result<Arc<AtomicBool>, anyhow::Error> {
     Ok(manual_interrupt)
 }
 
+/// Maximum length (in characters) of the `current_sequence` summary shown in
+/// the monitor, to keep the terminal/dashboard output readable.
+const CURRENT_SEQUENCE_SUMMARY_MAX_LEN: usize = 120;
+
+/// Builds a short, human-readable summary of the request sequence currently
+/// being fuzzed (e.g. `"GET /pets -> POST /pets/{id}"`), truncated if it would
+/// otherwise be too long to display nicely.
+fn summarize_sequence(input: &OpenApiInput) -> String {
+    let mut summary: Vec<String> = input
+        .0
+        .iter()
+        .map(|request| format!("{} {}", request.method, request.path))
+        .collect();
+
+    if summary.len() <= 2 {
+        // Truncating will not work for sequences of length 2 or less
+        return summary.join(" -> ");
+    }
+
+    let mut current_summary_len = summary.iter().map(|s| s.chars().count()).sum::<usize>()
+        + summary.len().saturating_sub(1) * 4; // account for " -> " separators
+    if current_summary_len <= CURRENT_SEQUENCE_SUMMARY_MAX_LEN {
+        return summary.join(" -> ");
+    }
+
+    // Remove requests just before the last one, replace with "..."
+    current_summary_len += 3; // account for "..."
+    while current_summary_len > CURRENT_SEQUENCE_SUMMARY_MAX_LEN && summary.len() > 1 {
+        let removed = summary.remove(summary.len() - 2);
+        current_summary_len -= removed.chars().count() + 4; // account for " -> " separator
+    }
+
+    summary.insert(summary.len() - 1, "...".to_string());
+    summary.join(" -> ")
+}
+
 /// Uses the given event manager to log an event with the given name and value
 fn update_stats<EM>(
     state: &mut FuzzerState,
@@ -613,5 +810,26 @@ where
 
     fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         RefIndexable::from(&mut self.observers)
+    }
+}
+
+#[cfg(test)]
+mod summarize_sequence_tests {
+    use super::summarize_sequence;
+    use crate::openapi_mutator::test_helpers::{linked_requests, simple_request};
+
+    #[test]
+    fn summarizes_single_request() {
+        let input = simple_request();
+        assert_eq!(summarize_sequence(&input), "GET /simple");
+    }
+
+    #[test]
+    fn summarizes_multiple_requests_in_order() {
+        let input = linked_requests();
+        assert_eq!(
+            summarize_sequence(&input),
+            "GET /simple -> GET /with-query-parameter"
+        );
     }
 }
