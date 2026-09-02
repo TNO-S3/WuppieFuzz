@@ -1,4 +1,4 @@
-FROM rust:latest AS builder
+FROM rust:trixie AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,10 @@ COPY . .
 
 RUN cargo build --release
 
-FROM debian:bookworm-slim AS wuppiefuzz
+FROM debian:trixie-slim AS wuppiefuzz
+RUN apt-get update \
+    && apt-get install -qy libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
 RUN useradd -ms /bin/bash fuzzer
 USER fuzzer
 WORKDIR /app
