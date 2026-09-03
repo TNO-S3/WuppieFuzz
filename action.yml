@@ -1,0 +1,50 @@
+name: WuppieFuzz API fuzzing
+description: Run WuppieFuzz against an API in a Docker image
+author: TNO Software and System Security
+
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  openapi-spec:
+    description: Path to the OpenAPI specification in the checked-out repository
+    required: true
+  docker-image:
+    description: Self-starting Docker image containing the API to fuzz
+    required: true
+  timeout:
+    description: Fuzzing duration in seconds
+    default: "60"
+  startup-wait:
+    description: Maximum startup wait in seconds
+    default: "10"
+  artifact-name:
+    description: Name of the uploaded results artifact
+    default: wuppiefuzz-report
+
+outputs:
+  results-path:
+    description: Directory containing WuppieFuzz reports, crashes, and target logs
+    value: ${{ steps.fuzz.outputs.results-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run WuppieFuzz
+      id: fuzz
+      shell: bash
+      env:
+        INPUT_OPENAPI_SPEC: ${{ inputs.openapi-spec }}
+        INPUT_DOCKER_IMAGE: ${{ inputs.docker-image }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_STARTUP_WAIT: ${{ inputs.startup-wait }}
+      run: "${GITHUB_ACTION_PATH}/action/run.sh"
+
+    - name: Upload WuppieFuzz results
+      if: ${{ always() && steps.fuzz.outputs.results-path != '' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ steps.fuzz.outputs.results-path }}
+        if-no-files-found: error
