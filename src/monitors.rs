@@ -40,6 +40,7 @@ where
     client_stats: Vec<ClientStats>,
     execs_per_sec: String,
     last_execs: u64,
+    observed_crashes: u64,
 }
 
 impl<F> Debug for CoverageMonitor<F>
@@ -75,11 +76,18 @@ where
         let execs_per_sec_pretty = global_stats.execs_per_sec_pretty.to_owned();
 
         let client_stats = &client_stats_mgr.client_stats()[&ClientId(0)];
+        if event_msg == "Objective" {
+            self.observed_crashes += 1;
+            return Ok(());
+        }
+        let observed_crashes = self.observed_crashes;
+
         let output_string = match config.output_format {
             OutputFormat::Json => json!({
                 "event_msg": event_msg,
                 "run_time": format_duration(&total_time),
                 "objectives": objective_size,
+                "observed_crashes": observed_crashes,
                 "executed_sequences": total_execs,
                 "sequences_per_sec": self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
                 "requests": Self::req_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
@@ -90,14 +98,7 @@ where
             })
             .to_string(),
             OutputFormat::HumanReadable => {
-            if event_msg == "Objective" {
-                format!(
-                    "[{}] New 'crash' observed! After run time: {}, total number of objectives reached: {}",
-                    event_msg,
-                    format_duration(&total_time),
-                    objective_size,
-                )
-            } else if event_msg == "Testcase" {
+            if event_msg == "Testcase" {
                 match total_execs {
                     0 => format!(
                             "[{event_msg}] Starting corpus loaded! Initial corpus size: {corpus_size}"
@@ -111,11 +112,12 @@ where
                 return Ok(())
             } else {
                 format!(
-                    "[{}] run time: {}, corpus: {}, objectives: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}, current sequence: {}",
+                    "[{}] run time: {}, corpus: {}, objectives: {}, observed crashes: {}, executed sequences: {}, seq/sec: {}, requests: {}, req/sec: {}, coverage: {}, endpoint coverage: {}, current sequence: {}",
                     event_msg,
                     format_duration(&total_time),
                     corpus_size,
                     objective_size,
+                    observed_crashes,
                     total_execs,
                     self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
                     Self::req_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None)),
@@ -143,6 +145,7 @@ where
             client_stats: vec![],
             execs_per_sec: "NaN".to_string(),
             last_execs: 0,
+            observed_crashes: 0,
         }
     }
 
@@ -154,6 +157,7 @@ where
             client_stats: vec![],
             execs_per_sec: "NaN".to_string(),
             last_execs: 0,
+            observed_crashes: 0,
         }
     }
 
