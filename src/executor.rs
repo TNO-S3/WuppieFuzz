@@ -554,6 +554,13 @@ where
             .duration_since(self.last_window_time)
             .as_secs();
         if diff > CLIENT_STATS_TIME_WINDOW_SECS {
+            update_stats(
+                state,
+                event_manager,
+                "sequences",
+                UserStatsValue::Number(self.inputs_tested as u64),
+            );
+
             // send the request stats to the event manager for use in the monitor
             update_stats(
                 state,

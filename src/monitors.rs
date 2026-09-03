@@ -38,8 +38,6 @@ where
     print_fn: F,
     start_time: Instant,
     client_stats: Vec<ClientStats>,
-    execs_per_sec: String,
-    last_execs: u64,
     observed_crashes: u64,
 }
 
@@ -73,7 +71,6 @@ where
         let objective_size = global_stats.objective_size;
         let total_execs = global_stats.total_execs;
         let corpus_size = global_stats.corpus_size;
-        let execs_per_sec_pretty = global_stats.execs_per_sec_pretty.to_owned();
 
         let client_stats = &client_stats_mgr.client_stats()[&ClientId(0)];
         if event_msg == "Objective" {
@@ -81,6 +78,8 @@ where
             return Ok(());
         }
         let observed_crashes = self.observed_crashes;
+        let default_sequences = UserStats::new(UserStatsValue::Number(0), AggregatorOps::None);
+        let executed_sequences = Self::seq_stats(client_stats, &default_sequences);
 
         let output_string = match config.output_format {
             OutputFormat::Json => json!({
@@ -88,8 +87,8 @@ where
                 "run_time": format_duration(&total_time),
                 "objectives": objective_size,
                 "observed_crashes": observed_crashes,
-                "executed_sequences": total_execs,
-                "sequences_per_sec": self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
+                "executed_sequences": executed_sequences,
+                "sequences_per_sec": Self::seq_sec_stats(client_stats, total_time.as_secs().try_into().unwrap()),
                 "requests": Self::req_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
                 "requests_per_sec": Self::req_sec_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
                 "coverage": Self::cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
@@ -118,8 +117,8 @@ where
                     corpus_size,
                     objective_size,
                     observed_crashes,
-                    total_execs,
-                    self.req_execs_per_sec(total_execs, execs_per_sec_pretty),
+                    executed_sequences,
+                    Self::seq_sec_stats(client_stats, total_time.as_secs().try_into().unwrap()),
                     Self::req_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None)),
                     Self::req_sec_stats(client_stats, &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None), total_time.as_secs().try_into().unwrap()),
                     Self::cov_stats(client_stats, &UserStats::new(UserStatsValue::String(Cow::Borrowed("unknown")), AggregatorOps::None)),
@@ -143,8 +142,6 @@ where
             print_fn,
             start_time: Instant::now(),
             client_stats: vec![],
-            execs_per_sec: "NaN".to_string(),
-            last_execs: 0,
             observed_crashes: 0,
         }
     }
@@ -155,8 +152,6 @@ where
             print_fn,
             start_time,
             client_stats: vec![],
-            execs_per_sec: "NaN".to_string(),
-            last_execs: 0,
             observed_crashes: 0,
         }
     }
@@ -165,12 +160,22 @@ where
         client_stats.get_user_stats("requests").unwrap_or(default)
     }
 
-    fn req_execs_per_sec(&mut self, execs: u64, execs_per_sec_pretty: String) -> String {
-        if self.last_execs < execs {
-            self.execs_per_sec = execs_per_sec_pretty;
-            self.last_execs = execs;
-        }
-        self.execs_per_sec.clone()
+    fn seq_stats<'a>(client_stats: &'a ClientStats, default: &'a UserStats) -> &'a UserStats {
+        client_stats.get_user_stats("sequences").unwrap_or(default)
+    }
+
+    fn seq_sec_stats(client_stats: &ClientStats, secs: usize) -> UserStats {
+        UserStats::new(
+            Self::seq_stats(
+                client_stats,
+                &UserStats::new(UserStatsValue::Number(0), AggregatorOps::None),
+            )
+            .value()
+            .clone()
+            .stats_div(secs)
+            .expect("Something went wrong"),
+            AggregatorOps::None,
+        )
     }
 
     fn req_sec_stats<'a>(
