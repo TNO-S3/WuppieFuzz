@@ -17,6 +17,7 @@ use crate::openapi::validate_response::ValidationErrorDiscriminants;
 const DEFAULT_REQUEST_TIMEOUT: u64 = 30000;
 const DEFAULT_METHOD_MUTATION_STRATEGY: MethodMutationStrategy = MethodMutationStrategy::FollowSpec;
 const DEFAULT_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
+const DEFAULT_ALWAYS_CRASH_STATUS_CODES: [u16; 2] = [500, 502];
 
 lazy_static! {
     static ref CONFIGURATION: Result<Configuration, anyhow::Error> =
@@ -134,6 +135,17 @@ pub enum Commands {
         /// By default, all validation error variants are considered crashes.
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
+        /// Status codes that always count as bugs, even when documented in OpenAPI.
+        /// Defaults to 500 and 502. Pass this flag without values to disable the override.
+        #[arg(
+            long,
+            value_delimiter = ',',
+            num_args = 0..,
+            require_equals = true,
+            value_parser = clap::value_parser!(u16).range(100..=999),
+            value_name = "STATUS"
+        )]
+        always_crash_status_codes: Option<Vec<u16>>,
         // Manually added possible values below, since automatically showing possible values of an external (remote) enum
         // such as log::LevelFilter is not well supported.
         // See https://github.com/serde-rs/serde/issues/1301, https://github.com/serde-rs/serde/issues/723
@@ -267,6 +279,18 @@ pub enum Commands {
         )]
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
+        /// Status codes that always count as bugs, even when documented in OpenAPI.
+        /// Defaults to 500 and 502. Pass this flag without values to disable the override.
+        #[arg(
+            long,
+            value_delimiter = ',',
+            num_args = 0..,
+            require_equals = true,
+            value_parser = clap::value_parser!(u16).range(100..=999),
+            value_name = "STATUS"
+        )]
+        always_crash_status_codes: Option<Vec<u16>>,
+
         /// If present, ask the coverage monitor to generate a report after the
         /// time-out passes
         #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
@@ -375,6 +399,7 @@ impl Commands {
                 authentication,
                 header,
                 crash_criteria,
+                always_crash_status_codes,
                 log_level,
                 ..
             } => Ok(PartialConfiguration {
@@ -383,6 +408,7 @@ impl Commands {
                 authentication,
                 header,
                 crash_criteria,
+                always_crash_status_codes,
                 log_level,
                 ..Default::default()
             }),
@@ -396,6 +422,7 @@ impl Commands {
                 request_timeout,
                 power_schedule,
                 crash_criteria,
+                always_crash_status_codes,
                 report,
                 method_mutation_strategy,
                 jacoco_class_dir,
@@ -419,6 +446,7 @@ impl Commands {
                 request_timeout,
                 power_schedule,
                 crash_criteria,
+                always_crash_status_codes,
                 report,
                 method_mutation_strategy,
                 jacoco_class_dir,
@@ -515,9 +543,19 @@ struct PartialConfiguration {
     #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
     pub power_schedule: Option<BaseSchedule>,
 
-    /// Which errors the fuzzer considers a bug.
+    /// Which validation errors the fuzzer considers a bug.
     #[clap(value_parser, long, value_enum, required = false, ignore_case = true)]
     pub crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
+
+    /// Status codes that always count as bugs, even when documented in OpenAPI.
+    #[clap(
+        long,
+        value_delimiter = ',',
+        num_args = 0..,
+        require_equals = true,
+        value_parser = clap::value_parser!(u16).range(100..=999)
+    )]
+    pub always_crash_status_codes: Option<Vec<u16>>,
 
     /// If present, ask the coverage monitor to generate a report after the
     /// time-out passes
@@ -696,10 +734,13 @@ pub struct Configuration {
     /// The power schedule to use for prioritizing seeds.
     pub power_schedule: BaseSchedule,
 
-    /// Which errors the fuzzer considers a bug. By default, the value for this
+    /// Which validation errors the fuzzer considers a bug. By default, the value for this
     /// option is a list of all validation error variants. By specifying a subset
     /// you can configure what behaviour is considered a bug by the fuzzer.
     pub crash_criteria: Vec<ValidationErrorDiscriminants>,
+
+    /// Status codes that always count as bugs, even when documented in OpenAPI.
+    pub always_crash_status_codes: Vec<u16>,
 
     /// If present, ask the coverage monitor to generate a report after the
     /// time-out passes.
@@ -788,6 +829,14 @@ impl TryFrom<PartialConfiguration> for Configuration {
     type Error = anyhow::Error;
 
     fn try_from(value: PartialConfiguration) -> Result<Self, Self::Error> {
+        if let Some(invalid_status) = value
+            .always_crash_status_codes
+            .as_ref()
+            .and_then(|codes| codes.iter().find(|&&status| !(100..=999).contains(&status)))
+        {
+            bail!("Invalid always-crash HTTP status code {invalid_status}; expected 100..=999");
+        }
+
         if value.report.unwrap_or(false) {
             if value.coverage_format == Some(CoverageFormat::Jacoco)
                 && value.jacoco_class_dir.is_none()
@@ -881,6 +930,9 @@ impl TryFrom<PartialConfiguration> for Configuration {
             crash_criteria: value
                 .crash_criteria
                 .unwrap_or_else(|| ValidationErrorDiscriminants::VARIANTS.to_vec()),
+            always_crash_status_codes: value
+                .always_crash_status_codes
+                .unwrap_or_else(|| DEFAULT_ALWAYS_CRASH_STATUS_CODES.to_vec()),
             report: value.report.unwrap_or(false),
             method_mutation_strategy: value
                 .method_mutation_strategy
@@ -930,6 +982,9 @@ impl PartialConfiguration {
             request_timeout: other.request_timeout.or(self.request_timeout.take()),
             power_schedule: other.power_schedule.or(self.power_schedule.take()),
             crash_criteria: other.crash_criteria.or(self.crash_criteria.take()),
+            always_crash_status_codes: other
+                .always_crash_status_codes
+                .or(self.always_crash_status_codes.take()),
             report: other.report.or(self.report.take()),
             method_mutation_strategy: other
                 .method_mutation_strategy
@@ -1002,8 +1057,10 @@ fn verify_url(arg: &str) -> anyhow::Result<Url> {
 mod tests {
     use std::{convert::TryInto, num::NonZeroU64};
 
+    use clap::Parser;
+
     use super::{
-        Configuration, CoverageConfiguration, CoverageFormat, DEFAULT_REQUEST_TIMEOUT,
+        Cli, Configuration, CoverageConfiguration, CoverageFormat, DEFAULT_REQUEST_TIMEOUT,
         OutputFormat, PartialConfiguration, parse_socket_addr,
     };
 
@@ -1034,7 +1091,55 @@ mod tests {
 
         assert_eq!(tried_config.request_timeout, DEFAULT_REQUEST_TIMEOUT);
         assert_eq!(tried_config.log_level, log::LevelFilter::Info);
-        assert_eq!(tried_config.coverage_configuration, coverage_config)
+        assert_eq!(tried_config.coverage_configuration, coverage_config);
+        assert_eq!(tried_config.always_crash_status_codes, vec![500, 502]);
+    }
+
+    #[test]
+    fn test_always_crash_status_codes() {
+        let cli = Cli::try_parse_from([
+            "wuppiefuzz",
+            "fuzz",
+            "open_api.yaml",
+            "--always-crash-status-codes=500,529",
+        ])
+        .unwrap();
+        assert_eq!(
+            cli.command
+                .fuzzer_config()
+                .unwrap()
+                .always_crash_status_codes,
+            Some(vec![500, 529])
+        );
+
+        let cli = Cli::try_parse_from([
+            "wuppiefuzz",
+            "fuzz",
+            "open_api.yaml",
+            "--always-crash-status-codes",
+        ])
+        .unwrap();
+        assert_eq!(
+            cli.command
+                .fuzzer_config()
+                .unwrap()
+                .always_crash_status_codes,
+            Some(vec![])
+        );
+
+        let invalid: Result<Configuration, _> = PartialConfiguration {
+            openapi_spec: Some("open_api.yaml".into()),
+            always_crash_status_codes: Some(vec![99]),
+            ..Default::default()
+        }
+        .try_into();
+        match invalid {
+            Ok(_) => panic!("Invalid always-crash status code was accepted"),
+            Err(error) => assert_eq!(
+                error.to_string(),
+                "Invalid always-crash HTTP status code 99; expected 100..=999"
+            ),
+        }
     }
 
     #[test]
@@ -1111,6 +1216,7 @@ mod tests {
             coverage_host: Some(parse_socket_addr("127.0.0.1:6300").unwrap()),
             timeout: NonZeroU64::new(60000),
             request_timeout: Some(10000),
+            always_crash_status_codes: Some(vec![500, 502]),
             output_format: Some(OutputFormat::HumanReadable),
             ..Default::default()
         };
@@ -1118,6 +1224,7 @@ mod tests {
         let cli_config: PartialConfiguration = PartialConfiguration {
             openapi_spec: Some("open_api.yaml".into()),
             timeout: NonZeroU64::new(30000),
+            always_crash_status_codes: Some(vec![]),
             output_format: Some(OutputFormat::Json),
             ..Default::default()
         };
@@ -1127,6 +1234,7 @@ mod tests {
             coverage_host: Some(parse_socket_addr("127.0.0.1:6300").unwrap()),
             timeout: NonZeroU64::new(30000),
             request_timeout: Some(10000),
+            always_crash_status_codes: Some(vec![]),
             output_format: Some(OutputFormat::Json),
             ..Default::default()
         };
