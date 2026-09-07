@@ -4,7 +4,7 @@ addr2line 0.25.1
 adler2 2.0.1
 	licensed under "0BSD OR Apache-2.0 OR MIT"
 	by Jonas Schievink <jonasschievink@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>
-aes 0.8.4
+aes 0.9.3
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 ahash 0.8.12
@@ -28,9 +28,6 @@ anstyle-query 1.1.5
 anstyle-wincon 3.0.11
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-arbitrary 1.4.2
-	licensed under "Apache-2.0 OR MIT"
-	by The Rust-Fuzz Project Developers|Nick Fitzgerald <fitzgen@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>|Simonas Kazlauskas <arbitrary@kazlauskas.me>|Brian L. Troutwine <brian@troutwine.us>|Corey Farwell <coreyf@rwell.org>
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
@@ -61,7 +58,7 @@ bitflags 1.3.2
 bitflags 2.13.1
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-block-buffer 0.10.4
+block-buffer 0.12.1
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 block2 0.6.2
@@ -85,12 +82,9 @@ byteorder 1.5.0
 bytes 1.12.1
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
-bzip2 0.5.2
+bzip2 0.6.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-bzip2-sys 0.1.13+1.0.8
-	licensed under "Apache-2.0 OR MIT"
-	by Alex Crichton <alex@alexcrichton.com>
 cesu8 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Eric Kidd <git@randomhacks.net>
@@ -103,7 +97,7 @@ chacha20 0.10.2
 chrono 0.4.45
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-cipher 0.4.4
+cipher 0.5.2
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 clap 4.6.6
@@ -115,6 +109,9 @@ clap_builder 4.6.6
 clap_lex 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
+cmov 0.5.4
+	licensed under "Apache-2.0 OR MIT"
+	by RustCrypto Developers
 cobs 0.3.0
 	licensed under "Apache-2.0 OR MIT"
 	by Allen Welkie <>|James Munns <james@onevariable.com>
@@ -130,13 +127,16 @@ console 0.16.4
 const-hex 1.19.1
 	licensed under "Apache-2.0 OR MIT"
 	by DaniPopes <57450786+DaniPopes@users.noreply.github.com>
+const-oid 0.10.2
+	licensed under "Apache-2.0 OR MIT"
+	by RustCrypto Developers
 const_format 0.2.36
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 const_panic 0.2.17
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
-constant_time_eq 0.3.1
+constant_time_eq 0.4.2
 	licensed under "Apache-2.0 OR CC0-1.0 OR MIT-0"
 	by Cesar Eduardo Barros <cesarb@cesarb.eti.br>
 cookie 0.18.2
@@ -157,25 +157,19 @@ core-foundation-sys 0.8.7
 core_affinity2 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
+cpubits 0.1.1
+	licensed under "Apache-2.0 OR MIT"
+	by RustCrypto Developers
 cpufeatures 0.2.17
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 cpufeatures 0.3.1
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
-crc 3.4.0
-	licensed under "Apache-2.0 OR MIT"
-	by Rui Hu <code@mrhooray.com>|Akhil Velagapudi <4@4khil.com>
-crc-catalog 2.5.0
-	licensed under "Apache-2.0 OR MIT"
-	by Akhil Velagapudi <akhilvelagapudi@gmail.com>
 crc32fast 1.5.1
 	licensed under "Apache-2.0 OR MIT"
 	by Sam Rijs <srijs@airpost.net>|Alex Crichton <alex@alexcrichton.com>
-crossbeam-utils 0.8.22
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
-crypto-common 0.1.7
+crypto-common 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 ctor 1.0.13
@@ -184,6 +178,9 @@ ctor 1.0.13
 ctrlc 3.5.2
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
+ctutils 0.4.2
+	licensed under "Apache-2.0 OR MIT"
+	by RustCrypto Developers
 deflate64 0.1.12
 	licensed under "MIT"
 	by anatawa12 <anatawa12@icloud.com>
@@ -199,7 +196,7 @@ derive_more 2.1.1
 derive_more-impl 2.1.1
 	licensed under "MIT"
 	by Jelte Fennema <github-tech@jeltef.nl>
-digest 0.10.7
+digest 0.11.3
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 dispatch2 0.3.1
@@ -301,9 +298,6 @@ futures-task 0.3.34
 futures-util 0.3.34
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-generic-array 0.14.7
-	licensed under "MIT"
-	by Bartłomiej Kamiński <fizyk20@gmail.com>|Aaron Trent <novacrazy@gmail.com>
 getrandom 0.2.17
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
@@ -331,7 +325,7 @@ hashbrown 0.17.1
 hashlink 0.12.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-hmac 0.12.1
+hmac 0.13.0
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 hostname 0.4.2
@@ -352,6 +346,9 @@ httparse 1.10.1
 httpdate 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by Pyfisch <pyfisch@posteo.org>
+hybrid-array 0.4.14
+	licensed under "Apache-2.0 OR MIT"
+	by RustCrypto Developers
 hyper 1.11.1
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
@@ -403,7 +400,7 @@ indexmap 2.14.1
 indicatif 0.18.6
 	licensed under "MIT"
 	by unspecified authors
-inout 0.1.4
+inout 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 ipnet 2.12.1
@@ -466,6 +463,9 @@ libafl_bolts 0.16.1
 libafl_core 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
+libbz2-rs-sys 0.2.5
+	licensed under "bzip2-1.0.6"
+	by unspecified authors
 libm 0.2.16
 	licensed under "MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Amanieu d'Antras <amanieu@gmail.com>|Jorge Aparicio <japaricious@gmail.com>|Trevor Gross <tg@trevorgross.com>
@@ -499,12 +499,9 @@ log 0.4.34
 lru-slab 0.1.2
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Benjamin Saunders <ben.e.saunders@gmail.com>
-lzma-rs 0.3.0
-	licensed under "MIT"
-	by Guillaume Endignoux <ggendx@gmail.com>
-lzma-sys 0.1.20
-	licensed under "Apache-2.0 OR MIT"
-	by Alex Crichton <alex@alexcrichton.com>
+lzma-rust2 0.16.5
+	licensed under "Apache-2.0"
+	by unspecified authors
 mach2 0.6.0
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
@@ -613,7 +610,7 @@ parking_lot 0.12.5
 parking_lot_core 0.9.12
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-pbkdf2 0.12.2
+pbkdf2 0.13.0
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 percent-encoding 2.3.2
@@ -649,6 +646,9 @@ potential_utf 0.1.6
 powerfmt 0.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
+ppmd-rust 1.4.1
+	licensed under "CC0-1.0 OR MIT-0"
+	by unspecified authors
 ppv-lite86 0.2.21
 	licensed under "Apache-2.0 OR MIT"
 	by The CryptoCorrosion Contributors
@@ -670,7 +670,7 @@ psl-types 2.0.11
 publicsuffix 2.3.0
 	licensed under "Apache-2.0 OR MIT"
 	by rushmorem <rushmore@webenchanter.com>
-quick-xml 0.37.5
+quick-xml 0.42.0
 	licensed under "MIT"
 	by unspecified authors
 quinn 0.11.11
@@ -808,7 +808,10 @@ serde_yaml 0.9.34+deprecated
 serial_test 4.0.1
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
-sha1 0.10.7
+sha1 0.11.0
+	licensed under "Apache-2.0 OR MIT"
+	by RustCrypto Developers
+sha2 0.11.0
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
 shmem_providers 0.16.1
@@ -925,6 +928,9 @@ typed-builder 0.23.2
 typed-builder-macro 0.23.2
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
+typed-path 0.12.3
+	licensed under "Apache-2.0 OR MIT"
+	by Chip Senkbeil <chip@senkbeil.org>
 typeid 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
@@ -1111,9 +1117,6 @@ writeable 0.6.4
 xxhash-rust 0.8.18
 	licensed under "BSL-1.0"
 	by Douman <douman@gmx.se>
-xz2 0.1.7
-	licensed under "Apache-2.0 OR MIT"
-	by Alex Crichton <alex@alexcrichton.com>
 yaml_serde 0.10.7
 	licensed under "Apache-2.0 OR MIT"
 	by YAML Organization <noreply@yaml.org>
@@ -1153,7 +1156,7 @@ zerovec 0.11.8
 zerovec-derive 0.11.6
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-zip 2.4.2
+zip 8.6.0
 	licensed under "MIT"
 	by Mathijs van de Nes <git@mathijs.vd-nes.nl>|Marli Frost <marli@frost.red>|Ryan Levick <ryan.levick@gmail.com>|Chris Hennick <hennickc@amazon.com>
 zlib-rs 0.6.7
