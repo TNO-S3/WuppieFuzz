@@ -46,17 +46,32 @@ Third-party license notices are listed in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTI
 For quick installation of WuppieFuzz for popular operating systems (MacOS,
 Windows, Linux) see [releases](https://github.com/TNO-S3/WuppieFuzz/releases/) or use [`brew install wuppiefuzz`](https://formulae.brew.sh/formula/wuppiefuzz)
 
+### Docker
+
+You can build the docker image with `docker build . -t wuppiefuzz:local`. To use it, you must mount a folder containing your openapi spec. When fuzzing a service you are running locally (not in Docker), you need to specify host networking:
+
+``` shell
+docker run \
+  --network host \
+  -v ./fuzzing-folder:/fuzzing-folder \  # The folder will be populated with wuppiefuzz outputs
+  -w /fuzzing-folder \
+  wuppiefuzz:local fuzz --timeout 60 --report openapi.json
+```
+
+
+
 ### Short how-to
 
 [![How to use WuppieFuzz? - YouTube](./assets/demo_video.png)](https://www.youtube.com/watch?v=-oR4d9aXrqo)
 
 ## Prerequisites for development
 
-To build the project you need to install the following dependencies and tooling
+To build the project you need to install the following dependencies and tooling:
 
-- build-essential `sudo apt install build-essential`
-- pkg-config `sudo apt install pkg-config`
-- Rust `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+```
+sudo apt install -y build-essential pkg-config cmake  # General build tools
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  # Rust
+```
 
 ## Run
 

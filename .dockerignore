@@ -2,6 +2,7 @@
 !Cargo.toml
 !build.rs
 !LICENSE
+!THIRD_PARTY_NOTICES
 !LICENSE.THIRDPARTY
 !src
 !coverage_agents
