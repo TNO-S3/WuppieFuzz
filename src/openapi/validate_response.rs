@@ -634,11 +634,17 @@ fn validate_object_against_type(
 }
 
 #[cfg(test)]
-mod injection_signature_tests {
+mod tests {
     use std::collections::BTreeMap;
 
+    use libafl::executors::ExitKind;
+
     use super::*;
-    use crate::input::{Body, Method, ParameterContents, parameter::SimpleValue};
+    use crate::{
+        executor::process_response,
+        input::{Body, Method, ParameterContents, parameter::SimpleValue},
+        parameter_feedback::ParameterFeedback,
+    };
 
     fn response_with_body(status: StatusCode, body: &str) -> Response {
         Response {
@@ -657,6 +663,96 @@ mod injection_signature_tests {
             ))),
             parameters: BTreeMap::new(),
         }
+    }
+
+    fn server_error_spec() -> Spec {
+        let spec: oas3::Spec = oas3::from_yaml(
+            r#"
+openapi: 3.1.0
+info:
+  title: Server error test
+  version: "1.0"
+paths:
+  /documented:
+    post:
+      responses:
+        "500": { description: Internal Server Error }
+        "502": { description: Bad Gateway }
+        "529": { description: Site is overloaded }
+  /undocumented:
+    post:
+      responses:
+        "200": { description: Success }
+"#,
+        )
+        .unwrap();
+        spec.into()
+    }
+
+    fn process_status(
+        api: &Spec,
+        path: &str,
+        status: StatusCode,
+        crash_criteria: &[ValidationErrorDiscriminants],
+        always_crash_status_codes: &[u16],
+    ) -> ExitKind {
+        let mut request = request_with_body_string("hello");
+        request.path = path.to_string();
+        let response = response_with_body(status, "");
+        let mut exit_kind = ExitKind::Ok;
+        let mut parameter_feedback = ParameterFeedback::new(1);
+
+        process_response(
+            0,
+            &request,
+            &response,
+            api,
+            (crash_criteria, always_crash_status_codes),
+            &mut exit_kind,
+            &mut parameter_feedback,
+        );
+
+        exit_kind
+    }
+
+    #[test]
+    fn classifies_server_errors_using_policy_and_openapi() {
+        let api = server_error_spec();
+
+        for status in [StatusCode::INTERNAL_SERVER_ERROR, StatusCode::BAD_GATEWAY] {
+            assert_eq!(
+                process_status(&api, "/documented", status, &[], &[500, 502]),
+                ExitKind::Crash
+            );
+        }
+
+        let status_529 = StatusCode::from_u16(529).unwrap();
+        assert_eq!(
+            process_status(&api, "/documented", status_529, &[], &[500, 502]),
+            ExitKind::Ok
+        );
+        assert_eq!(
+            process_status(
+                &api,
+                "/undocumented",
+                status_529,
+                &[ValidationErrorDiscriminants::Status5xxNotSpecified],
+                &[500, 502],
+            ),
+            ExitKind::Crash
+        );
+        assert_eq!(
+            process_status(&api, "/undocumented", status_529, &[], &[500, 502]),
+            ExitKind::Ok
+        );
+        assert_eq!(
+            process_status(&api, "/documented", StatusCode::BAD_GATEWAY, &[], &[],),
+            ExitKind::Ok
+        );
+        assert_eq!(
+            process_status(&api, "/documented", status_529, &[], &[529]),
+            ExitKind::Crash
+        );
     }
 
     #[test]
