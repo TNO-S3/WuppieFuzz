@@ -2,13 +2,18 @@
 
 ## Highlights
 
+Limit INFO logging about new "crashes" being observed. Previously one per line (which flooded the terminal), now reported in aggregate in the heartbeat output. Resolves major bug in referencing values.
+
 ## Features
 
 - Adds support for .NET coverage based on cobertura and dotnet-coverage in [#336](https://github.com/TNO-S3/WuppieFuzz/pull/336)
 - Adds support for coverage guidance using OpenTelemetry in [#358](https://github.com/TNO-S3/WuppieFuzz/pull/358)
 - Adds crash deduplication command in [#334](https://github.com/TNO-S3/WuppieFuzz/pull/334)
+- Fix corpus never referencing values from earlier responses in [#377](https://github.com/TNO-S3/WuppieFuzz/pull/377)
 
 ## Fixes
+
+- Harmonizes requests-per-second vs sequences-per-second reporting. Previously the former could be lower than the latter, due to a mismatch in how both were measured. We now do our own bookkeeping for seq/sec reporting as well, ensuring the intuitive constraint that seq/sec > req/sec (a sequence contains at least one request) in [#372](https://github.com/TNO-S3/WuppieFuzz/pull/372)
 
 # v1.7.1 (2026-08-26)
 
