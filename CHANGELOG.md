@@ -14,6 +14,7 @@ Limit INFO logging about new "crashes" being observed. Previously one per line (
 ## Fixes
 
 - Harmonizes requests-per-second vs sequences-per-second reporting. Previously the former could be lower than the latter, due to a mismatch in how both were measured. We now do our own bookkeeping for seq/sec reporting as well, ensuring the intuitive constraint that seq/sec > req/sec (a sequence contains at least one request) in [#372](https://github.com/TNO-S3/WuppieFuzz/pull/372)
+- Recursion limit added to prevent stack overflows in [#389](https://github.com/TNO-S3/WuppieFuzz/pull/389)
 
 # v1.7.1 (2026-08-26)
 
