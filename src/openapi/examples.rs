@@ -379,7 +379,7 @@ fn interesting_values_for_media_type(api: &Spec, contents: &MediaType) -> Vec<Va
     if let Some(more_examples) = contents
         .schema
         .as_ref()
-        .map(|schema| interesting_values_for_schema(api, schema, &[]))
+        .map(|schema| interesting_values_for_schema(api, schema, &[], 0))
     {
         result.extend(more_examples);
     }
@@ -511,12 +511,20 @@ fn example_value_for_schema(api: &Spec, schema: &Schema, recursion_depth: usize)
 ///
 /// `ignore_reference_names` lists `$ref` paths that must not be followed again;
 /// this prevents infinite recursion when a discriminator variant refers back to
-/// its parent schema.
+/// its parent schema. This alone does not bound recursion on long chains of
+/// distinct (non-repeating) `$ref`s, so `recursion_depth` additionally enforces
+/// the same overall limit as [`example_value_for_schema`], guarded by
+/// [`example_recursion_limit_exceeded`].
 fn interesting_values_for_schema(
     api: &Spec,
     schema: &Schema,
     ignore_reference_names: &[&str],
+    recursion_depth: usize,
 ) -> Vec<Value> {
+    if example_recursion_limit_exceeded(recursion_depth) {
+        return vec![];
+    }
+
     let mut ignore_references = ignore_reference_names.to_owned();
     if let Schema::Object(object_or_reference) = schema
         && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
@@ -556,6 +564,7 @@ fn interesting_values_for_schema(
             api,
             &schema,
             &ignore_references,
+            recursion_depth + 1,
         ));
     } else {
         let all_examples: Vec<Vec<Value>> = schema
@@ -572,6 +581,7 @@ fn interesting_values_for_schema(
                         api,
                         schema,
                         &ignore_references,
+                        recursion_depth + 1,
                     ))
                 }
             })
@@ -599,7 +609,12 @@ fn interesting_values_for_schema(
                         {
                             Vec::new()
                         } else {
-                            interesting_values_for_schema(api, schema, &ignore_references)
+                            interesting_values_for_schema(
+                                api,
+                                schema,
+                                &ignore_references,
+                                recursion_depth + 1,
+                            )
                         }
                     })
                 }),
@@ -655,6 +670,7 @@ fn interesting_values_for_discriminator(
     api: &Spec,
     schema: &ObjectSchema,
     ignore_names: &[&str],
+    recursion_depth: usize,
 ) -> Vec<Value> {
     // There is a strong assumption from here on that we're dealing with an
     // object schema, with the fields collected from the variant specified by
@@ -705,6 +721,7 @@ fn interesting_values_for_discriminator(
                     description: None,
                 })),
                 ignore_names,
+                recursion_depth + 1,
             )
             .into_iter()
             // Values from the base object take precendence, as we want
