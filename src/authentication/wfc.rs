@@ -5,6 +5,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use reqwest_cookie_store::RawCookie;
 use semver::Version;
 use serde::Deserialize;
+use url::Url;
 
 use super::Authentication;
 
@@ -246,7 +247,12 @@ impl WfcAuth {
     ///
     /// AuthenticationInfo should not contain both fixed_headers and login_endpoint_auth;
     /// if both are present, fixed_headers takes precedence.
-    pub fn into_authentication(self) -> Result<Authentication> {
+    ///
+    /// `base_url` is the OpenAPI spec's server URL. It is used to resolve a
+    /// `loginEndpointAuth.endpoint` value, which the WFC format specifies as a
+    /// path relative to the SUT's base URL (as opposed to
+    /// `externalEndpointURL`, which is already an absolute URL).
+    pub fn into_authentication(self, base_url: &Url) -> Result<Authentication> {
         self.check_schema_version();
 
         let template = self.auth_template;
@@ -315,7 +321,7 @@ impl WfcAuth {
             (None, true) => {
                 if let Some(name) = &entry.name {
                     let endpoint = partial_login_endpoint.resolve(name)?;
-                    login_with_endpoint(name, endpoint)
+                    login_with_endpoint(name, endpoint, base_url)
                 } else {
                     Err(anyhow!(
                         "WFC authentication entry with loginEndpointAuth is missing \
@@ -331,18 +337,35 @@ impl WfcAuth {
 
 /// Perform the login request described by a WFC `LoginEndpoint` and return the
 /// resulting `Authentication`.
-fn login_with_endpoint(name: &str, endpoint: LoginEndpoint) -> Result<Authentication> {
-    let url = endpoint
-        .external_endpoint_url
-        .as_deref()
-        .or(endpoint.endpoint.as_deref())
-        .ok_or_else(|| {
-            anyhow!(
-                "WFC authentication entry '{name}' loginEndpointAuth has neither \
-                 'endpoint' nor 'externalEndpointURL'"
+///
+/// `base_url` is used to resolve `endpoint` (a path relative to the SUT's base
+/// URL) into an absolute URL. It is ignored when `external_endpoint_url` is
+/// set, since that field is already an absolute URL by itself.
+fn login_with_endpoint(
+    name: &str,
+    endpoint: LoginEndpoint,
+    base_url: &Url,
+) -> Result<Authentication> {
+    let url: Url = if let Some(external) = endpoint.external_endpoint_url.as_deref() {
+        Url::parse(external).with_context(|| {
+            format!(
+                "WFC authentication entry '{name}' has an invalid externalEndpointURL: '{external}'"
             )
         })?
-        .to_string();
+    } else if let Some(path) = endpoint.endpoint.as_deref() {
+        base_url.join(path).with_context(|| {
+            format!(
+                "WFC authentication entry '{name}' has an invalid endpoint path '{path}' \
+                 relative to the API's base URL '{base_url}'"
+            )
+        })?
+    } else {
+        bail!(
+            "WFC authentication entry '{name}' loginEndpointAuth has neither \
+             'endpoint' nor 'externalEndpointURL'"
+        );
+    };
+    let url = url.to_string();
 
     let client = reqwest::blocking::Client::new();
 
@@ -602,12 +625,20 @@ authTemplate:
         serde_yaml::from_str(yaml).expect("Failed to parse WFC YAML")
     }
 
+    /// A placeholder base URL for tests that don't exercise `endpoint`
+    /// resolution (fixed-headers auth, or tests that patch `endpoint` to
+    /// already be an absolute mock-server URL, which `Url::join` passes
+    /// through unchanged).
+    fn test_base_url() -> Url {
+        Url::parse("http://sut.invalid").unwrap()
+    }
+
     // --- Parsing tests (no HTTP) ---------------------------------------------
 
     #[test]
     fn spring_actuator_parses_to_basic() {
         let auth = parse(SPRING_ACTUATOR_DEMO_AUTH)
-            .into_authentication()
+            .into_authentication(&test_base_url())
             .unwrap();
         assert!(
             matches!(auth, Authentication::Basic(ref s) if s == "YWN0dWF0b3I6YWN0dWF0b3I="),
@@ -617,7 +648,9 @@ authTemplate:
 
     #[test]
     fn scout_api_parses_to_raw_first_entry() {
-        let auth = parse(SCOUT_API_AUTH).into_authentication().unwrap();
+        let auth = parse(SCOUT_API_AUTH)
+            .into_authentication(&test_base_url())
+            .unwrap();
         assert!(
             matches!(auth, Authentication::Raw(ref s) if s == "ApiKey user"),
             "Expected Raw(\"ApiKey user\"), got {auth:?}"
@@ -690,7 +723,7 @@ authTemplate:
             &format!("endpoint: {}/api/auth/signin", server.url()),
         );
 
-        let auth = parse(&yaml).into_authentication().unwrap();
+        let auth = parse(&yaml).into_authentication(&test_base_url()).unwrap();
         mock.assert();
         assert!(
             matches!(auth, Authentication::Bearer(ref t) if t == "my-secret-token"),
@@ -713,7 +746,7 @@ authTemplate:
             &format!("endpoint: {}/app/login", server.url()),
         );
 
-        let auth = parse(&yaml).into_authentication().unwrap();
+        let auth = parse(&yaml).into_authentication(&test_base_url()).unwrap();
         mock.assert();
         assert!(
             matches!(auth, Authentication::Cookie(ref cookies) if
@@ -737,7 +770,7 @@ authTemplate:
             &format!("endpoint: {}/api/auth/signin", server.url()),
         );
 
-        let result = parse(&yaml).into_authentication();
+        let result = parse(&yaml).into_authentication(&test_base_url());
         mock.assert();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("401"));
@@ -758,7 +791,7 @@ authTemplate:
             &format!("endpoint: {}/api/auth/signin", server.url()),
         );
 
-        let result = parse(&yaml).into_authentication();
+        let result = parse(&yaml).into_authentication(&test_base_url());
         mock.assert();
         assert!(result.is_err());
         assert!(
@@ -787,7 +820,7 @@ authTemplate:
       sendIn: header
       sendName: Authorization
 "#;
-        let result = parse(yaml).into_authentication();
+        let result = parse(yaml).into_authentication(&test_base_url());
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("verb"), "Error should mention 'verb': {msg}");
@@ -808,7 +841,7 @@ auth:
         sendIn: header
         sendName: Authorization
 "#;
-        let result = parse(yaml).into_authentication();
+        let result = parse(yaml).into_authentication(&test_base_url());
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(
@@ -833,7 +866,7 @@ auth:
         sendIn: header
         sendName: Authorization
 "#;
-        let result = parse(yaml).into_authentication();
+        let result = parse(yaml).into_authentication(&test_base_url());
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(
@@ -851,7 +884,7 @@ auth:
       - name: Authorization
         value: Basic dXNlcjpwYXNz
 "#;
-        let result = parse(yaml).into_authentication();
+        let result = parse(yaml).into_authentication(&test_base_url());
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("name"), "Error should mention 'name': {msg}");
@@ -868,7 +901,7 @@ auth:
 authTemplate:
   name: default-user
 "#;
-        let auth = parse(yaml).into_authentication().unwrap();
+        let auth = parse(yaml).into_authentication(&test_base_url()).unwrap();
         assert!(
             matches!(auth, Authentication::Basic(_)),
             "Expected Basic auth when name comes from template: {auth:?}"
