@@ -74,7 +74,10 @@ fn fill_in_missing_info_fields(contents: &str, filename: &Path) -> String {
     };
 
     let mut patched = false;
-    for (field, default) in [("title", DEFAULT_INFO_TITLE), ("version", DEFAULT_INFO_VERSION)] {
+    for (field, default) in [
+        ("title", DEFAULT_INFO_TITLE),
+        ("version", DEFAULT_INFO_VERSION),
+    ] {
         let key = serde_yaml::Value::String(field.to_string());
         if is_blank(info.get(&key)) {
             log::warn!(
@@ -111,16 +114,20 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
     match serde_yaml::from_str::<VersionedOpenAPI>(&file_contents)
         .context("Failed to parse as YAML OpenAPI v2/v3.0")
     {
-        Ok(spec) => {
-            return Ok(spec.upgrade().into());
-        }
+        Ok(spec) => match upgrade_versioned_openapi(spec) {
+            Ok(spec) => return Ok(spec.into()),
+            Err(err) => errors.push(err),
+        },
         Err(err) => errors.push(err),
     };
 
     match serde_json::from_str::<VersionedOpenAPI>(&file_contents)
         .context("Failed to parse as JSON OpenAPI v2/v3.0")
     {
-        Ok(spec) => return Ok(spec.upgrade().into()),
+        Ok(spec) => match upgrade_versioned_openapi(spec) {
+            Ok(spec) => return Ok(spec.into()),
+            Err(err) => errors.push(err),
+        },
         Err(err) => errors.push(err),
     };
 
@@ -141,14 +148,71 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
         Err(err) => errors.push(err),
     }
     if let Some(deduped) = dedupe_json_object_keys(&file_contents) {
-        match roas_from_str(&deduped).context("Failed to parse using roas (after deduplicating JSON object keys)")
+        match roas_from_str(&deduped)
+            .context("Failed to parse using roas (after deduplicating JSON object keys)")
         {
             Ok(spec) => return Ok(spec),
             Err(err) => errors.push(err),
         }
     }
 
+    // Some Swagger 2.0 documents in the wild use schema constructs that none
+    // of the crates above model correctly: a non-standard `type: file` (valid
+    // only on `body`/`formData` parameters in Swagger 2.0, to indicate a file
+    // upload) and integer `format`s other than `int32`/`int64` (e.g. `uint32`,
+    // `int8`), which `roas`'s Swagger 2.0 model restricts to a closed enum.
+    // Neither affects fuzzing behaviour, so as a last resort we generically
+    // rewrite `type: file` to the OpenAPI 3.0-style `{type: string, format:
+    // binary}`, and drop non-standard integer `format`s, wherever they occur
+    // in the document, and retry.
+    if let Some(sanitized) = sanitize_legacy_schema_quirks(&file_contents) {
+        match roas_from_str(&sanitized)
+            .context("Failed to parse using roas (after normalizing legacy schema constructs)")
+        {
+            Ok(spec) => return Ok(spec),
+            Err(err) => errors.push(err),
+        }
+        if let Some(deduped) = dedupe_json_object_keys(&sanitized) {
+            match roas_from_str(&deduped).context(
+                "Failed to parse using roas (after normalizing legacy schema constructs and deduplicating JSON object keys)",
+            ) {
+                Ok(spec) => return Ok(spec),
+                Err(err) => errors.push(err),
+            }
+        }
+    }
+
     Err(AttemptsFailed { errors }.into())
+}
+
+/// Upgrades a parsed `VersionedOpenAPI` (v2 or v3.0) document to v3.0, via
+/// `openapiv3-extended`'s own `upgrade()` method.
+///
+/// `upgrade()` is not panic-safe: it `panic!`s (rather than returning a
+/// `Result`) on some non-standard-but-real-world Swagger 2.0 constructs, for
+/// example schema properties using the non-standard `type: file` (seen in
+/// `proxyprint.json` from the WebFuzzing/Dataset benchmark). Since this is
+/// just one of several fallback strategies tried by `openapi_from_file`, a
+/// panic here shouldn't take down the whole process: we catch it and turn it
+/// into a regular error so later strategies (e.g. the `roas`-based ones,
+/// combined with `sanitize_legacy_schema_quirks`) still get a chance to run.
+fn upgrade_versioned_openapi(spec: VersionedOpenAPI) -> Result<openapiv3::OpenAPI> {
+    // Suppress the default panic hook's stderr output for the duration of
+    // the call: a caught panic here is an expected, handled fallback
+    // failure, not something that should be logged as if it crashed.
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| spec.upgrade()));
+    std::panic::set_hook(previous_hook);
+
+    result.map_err(|payload| {
+        let message = payload
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "unknown panic".to_string());
+        anyhow::anyhow!("panicked while upgrading OpenAPI v2/v3.0 document: {message}")
+    })
 }
 
 /// Parses `file_contents` with the `roas` crate as OpenAPI v3.1, v3.0 or v2,
@@ -209,6 +273,64 @@ fn roas_from_str(file_contents: &str) -> Result<Spec> {
 fn dedupe_json_object_keys(contents: &str) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(contents).ok()?;
     serde_json::to_string(&value).ok()
+}
+
+/// Generically rewrites two Swagger 2.0 JSON-Schema constructs that aren't
+/// recognized by our parsing crates, wherever they occur anywhere in the
+/// document, and returns the re-serialized document if anything was changed
+/// (or `None` if the document couldn't be parsed generically, or nothing
+/// needed patching):
+///
+/// - A schema's non-standard `type: file` (valid only on Swagger 2.0 `body`/
+///   `formData` parameters, to indicate a file upload) is rewritten to the
+///   OpenAPI 3.0-style equivalent, `{type: string, format: binary}`.
+/// - An integer schema's `format`, if it is anything other than the two
+///   standard values `int32`/`int64` (e.g. `uint32`, `int8`, as seen in the
+///   wild), is dropped. `format` is purely descriptive/advisory for fuzzing
+///   purposes, so losing it is harmless, whereas keeping it causes some
+///   parsers (which model `format` as a closed enum for Swagger 2.0) to
+///   reject the whole document.
+fn sanitize_legacy_schema_quirks(contents: &str) -> Option<String> {
+    let mut doc = serde_yaml::from_str::<serde_yaml::Value>(contents).ok()?;
+    let mut changed = false;
+    fix_legacy_schema_quirks(&mut doc, &mut changed);
+    changed.then(|| serde_yaml::to_string(&doc).ok()).flatten()
+}
+
+/// Recursively walks `value`, applying the schema fixes described on
+/// `sanitize_legacy_schema_quirks`, and sets `changed` to `true` if anything
+/// was rewritten.
+fn fix_legacy_schema_quirks(value: &mut serde_yaml::Value, changed: &mut bool) {
+    if let serde_yaml::Value::Mapping(map) = value {
+        let type_key = serde_yaml::Value::String("type".to_string());
+        let format_key = serde_yaml::Value::String("format".to_string());
+
+        match map.get(&type_key).cloned() {
+            Some(serde_yaml::Value::String(t)) if t == "file" => {
+                map.insert(type_key, serde_yaml::Value::String("string".to_string()));
+                map.insert(format_key, serde_yaml::Value::String("binary".to_string()));
+                *changed = true;
+            }
+            Some(serde_yaml::Value::String(t)) if t == "integer" => {
+                if let Some(serde_yaml::Value::String(f)) = map.get(&format_key).cloned()
+                    && f != "int32"
+                    && f != "int64"
+                {
+                    map.remove(&format_key);
+                    *changed = true;
+                }
+            }
+            _ => {}
+        }
+
+        for (_, v) in map.iter_mut() {
+            fix_legacy_schema_quirks(v, changed);
+        }
+    } else if let serde_yaml::Value::Sequence(seq) = value {
+        for v in seq.iter_mut() {
+            fix_legacy_schema_quirks(v, changed);
+        }
+    }
 }
 
 /// Loads the OpenAPI specification from the given path
@@ -948,9 +1070,10 @@ components:
 
     #[test]
     fn dedupe_json_object_keys_keeps_last_occurrence() {
-        let deduped =
-            dedupe_json_object_keys(r#"{"a": 1, "nested": {"x": "stub"}, "nested": {"x": "real"}}"#)
-                .expect("should be valid JSON");
+        let deduped = dedupe_json_object_keys(
+            r#"{"a": 1, "nested": {"x": "stub"}, "nested": {"x": "real"}}"#,
+        )
+        .expect("should be valid JSON");
         let value: serde_json::Value = serde_json::from_str(&deduped).unwrap();
         assert_eq!(value["nested"]["x"], "real");
     }
@@ -959,5 +1082,128 @@ components:
     fn dedupe_json_object_keys_returns_none_for_yaml() {
         // Plain YAML (not valid as generic JSON) should be rejected, not panic.
         assert!(dedupe_json_object_keys("openapi: 3.0.0\ninfo:\n  title: x\n").is_none());
+    }
+
+    /// Regression test for Swagger 2.0's non-standard `type: file` schema
+    /// (valid only on `body`/`formData` parameters, to indicate a file
+    /// upload, e.g. in proxyprint.json from the WebFuzzing/Dataset
+    /// benchmark), which `roas`'s Swagger 2.0 schema model rejects outright
+    /// (it only recognizes `type: object` in that position).
+    #[test]
+    fn swagger2_file_type_parameter_is_parsed_via_roas() {
+        // `type: file` used as a *schema property* type (as opposed to a
+        // `formData` parameter's own `type`, which `roas` already supports
+        // natively) is a non-standard Swagger 2.0 construct seen in
+        // `proxyprint.json` from the WebFuzzing/Dataset benchmark: `roas`'s
+        // schema model has no `file` variant, so this only parses after
+        // `sanitize_legacy_schema_quirks` rewrites it to the OAS3-equivalent
+        // `{type: string, format: binary}`.
+        let spec = load_spec_from_str(
+            r##"{
+                "swagger": "2.0",
+                "info": { "title": "File upload API", "version": "1.0" },
+                "paths": {
+                    "/upload": {
+                        "post": {
+                            "operationId": "upload",
+                            "responses": {
+                                "200": {
+                                    "description": "OK",
+                                    "schema": { "$ref": "#/definitions/FileResource" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "definitions": {
+                    "FileResource": {
+                        "type": "object",
+                        "properties": {
+                            "file": { "type": "file" }
+                        }
+                    }
+                }
+            }"##,
+        );
+        let op = spec
+            .paths
+            .as_ref()
+            .unwrap()
+            .get("/upload")
+            .unwrap()
+            .post
+            .as_ref()
+            .unwrap();
+        assert_eq!(op.operation_id.as_deref(), Some("upload"));
+    }
+
+    /// Regression test for non-standard integer `format`s (e.g. `uint32`, as
+    /// seen in youtube-mock.yaml from the WebFuzzing/Dataset benchmark), which
+    /// `roas`'s Swagger 2.0 schema model restricts to a closed `int32`/`int64`
+    /// enum.
+    #[test]
+    fn non_standard_integer_format_is_parsed_via_roas() {
+        // `externalDocs` as a single object (rather than a list) at the
+        // document root is valid Swagger 2.0, but trips up a bug in the
+        // `openapiv3-extended` crate's v2 model (it expects a list there),
+        // forcing a fall-through to the `roas`-based strategies below --
+        // mirroring the real-world `youtube-mock.yaml` spec that surfaced
+        // this combination of quirks.
+        let spec = load_spec_from_str(
+            r#"{
+                "swagger": "2.0",
+                "info": { "title": "Odd format API", "version": "1.0" },
+                "externalDocs": { "url": "https://example.com" },
+                "paths": {
+                    "/count": {
+                        "get": {
+                            "operationId": "count",
+                            "responses": {
+                                "200": {
+                                    "description": "OK",
+                                    "schema": { "type": "integer", "format": "uint32" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }"#,
+        );
+        let op = spec
+            .paths
+            .as_ref()
+            .unwrap()
+            .get("/count")
+            .unwrap()
+            .get
+            .as_ref()
+            .unwrap();
+        assert_eq!(op.operation_id.as_deref(), Some("count"));
+    }
+
+    #[test]
+    fn sanitize_legacy_schema_quirks_rewrites_file_type() {
+        let sanitized =
+            sanitize_legacy_schema_quirks(r#"{"type": "file", "description": "upload"}"#)
+                .expect("should have changed something");
+        let value: serde_yaml::Value = serde_yaml::from_str(&sanitized).unwrap();
+        assert_eq!(value["type"], serde_yaml::Value::String("string".into()));
+        assert_eq!(value["format"], serde_yaml::Value::String("binary".into()));
+    }
+
+    #[test]
+    fn sanitize_legacy_schema_quirks_drops_non_standard_integer_format() {
+        let sanitized = sanitize_legacy_schema_quirks(r#"{"type": "integer", "format": "uint32"}"#)
+            .expect("should have changed something");
+        let value: serde_yaml::Value = serde_yaml::from_str(&sanitized).unwrap();
+        assert!(value.get("format").is_none());
+    }
+
+    #[test]
+    fn sanitize_legacy_schema_quirks_leaves_standard_schemas_untouched() {
+        assert!(
+            sanitize_legacy_schema_quirks(r#"{"type": "integer", "format": "int32"}"#).is_none()
+        );
+        assert!(sanitize_legacy_schema_quirks(r#"{"type": "string"}"#).is_none());
     }
 }
