@@ -159,7 +159,7 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
         filename.to_string_lossy()
     );
     let mut try_roas = |contents: &str, context: &'static str| -> Option<Spec> {
-        match roas_from_str(contents).context(context) {
+        match roas_from_str(contents, filename).context(context) {
             Ok(spec) => Some(spec),
             Err(err) => {
                 errors.push(err);
@@ -310,7 +310,7 @@ fn upgrade_versioned_openapi(
 /// converter. (There is no `From<v3_2::Spec> for v3_1::Spec` conversion in
 /// `roas`, since upgrades are one-directional, so a v3.2 document is
 /// re-serialized and handed to `oas3` directly rather than being downgraded.)
-fn roas_from_str(file_contents: &str) -> Result<Spec> {
+fn roas_from_str(file_contents: &str, filename: &Path) -> Result<Spec> {
     fn convert<T: serde::Serialize>(spec: T) -> Result<Spec> {
         let json =
             serde_json::to_string(&spec).context("Failed to re-serialize roas spec as JSON")?;
@@ -320,28 +320,36 @@ fn roas_from_str(file_contents: &str) -> Result<Spec> {
     }
 
     if let Ok(spec) = serde_json::from_str::<roas::v3_2::spec::Spec>(file_contents) {
+        warn_about_roas_validation_issues(&spec, filename);
         return convert(spec);
     }
     if let Ok(spec) = serde_yaml::from_str::<roas::v3_2::spec::Spec>(file_contents) {
+        warn_about_roas_validation_issues(&spec, filename);
         return convert(spec);
     }
     if let Ok(spec) = serde_json::from_str::<roas::v3_1::spec::Spec>(file_contents) {
+        warn_about_roas_validation_issues(&spec, filename);
         return convert(spec);
     }
     if let Ok(spec) = serde_yaml::from_str::<roas::v3_1::spec::Spec>(file_contents) {
+        warn_about_roas_validation_issues(&spec, filename);
         return convert(spec);
     }
     if let Ok(spec) = serde_json::from_str::<roas::v3_0::spec::Spec>(file_contents) {
+        warn_about_roas_validation_issues(&spec, filename);
         return convert(Into::<roas::v3_1::spec::Spec>::into(spec));
     }
     if let Ok(spec) = serde_yaml::from_str::<roas::v3_0::spec::Spec>(file_contents) {
+        warn_about_roas_validation_issues(&spec, filename);
         return convert(Into::<roas::v3_1::spec::Spec>::into(spec));
     }
     if let Ok(spec) = serde_json::from_str::<roas::v2::spec::Spec>(file_contents) {
+        warn_about_roas_validation_issues(&spec, filename);
         let v3_0: roas::v3_0::spec::Spec = spec.into();
         return convert(Into::<roas::v3_1::spec::Spec>::into(v3_0));
     }
     if let Ok(spec) = serde_yaml::from_str::<roas::v2::spec::Spec>(file_contents) {
+        warn_about_roas_validation_issues(&spec, filename);
         let v3_0: roas::v3_0::spec::Spec = spec.into();
         return convert(Into::<roas::v3_1::spec::Spec>::into(v3_0));
     }
@@ -349,6 +357,41 @@ fn roas_from_str(file_contents: &str) -> Result<Spec> {
     anyhow::bail!(
         "Did not match any supported OpenAPI version (v3.2, v3.1, v3.0 or v2) in JSON or YAML"
     )
+}
+
+/// Runs `roas`'s own semantic validator (distinct from, and in addition to,
+/// the structural/syntax parsing `roas_from_str` already did to get here) on
+/// a spec that only loaded at all via the lenient `roas` fallback cascade --
+/// i.e. one we already know is non-standard in some way -- and logs any
+/// findings so the user learns about *semantic* spec problems too (not just
+/// the syntactic quirks `sanitize_legacy_schema_quirks`/`dedupe_json_object_keys`
+/// work around), such as duplicate `operationId`s, invalid server/external-doc
+/// URLs, or empty required fields we don't otherwise patch (e.g. an empty
+/// response `description`).
+///
+/// Deliberately lenient about *unused* components (schemas, parameters,
+/// responses, etc., all covered by `IGNORE_UNUSED`) and undeclared tags
+/// (`IgnoreMissingTags`): neither affects fuzzing and real-world specs
+/// commonly have both, so flagging them would just be noise. External
+/// `$ref`s are similarly ignored (`IgnoreExternalReferences`) since we don't
+/// fetch them here. This is purely informational -- validation findings
+/// never fail the load.
+fn warn_about_roas_validation_issues<T: roas::validation::Validate>(spec: &T, filename: &Path) {
+    use roas::validation::{IGNORE_UNUSED, Options};
+
+    let options = IGNORE_UNUSED | Options::IgnoreExternalReferences | Options::IgnoreMissingTags;
+    if let Err(err) = spec.validate(options, None) {
+        log::warn!(
+            "OpenAPI spec at {} has {} semantic validation issue(s):\n{}",
+            filename.to_string_lossy(),
+            err.errors.len(),
+            err.errors
+                .iter()
+                .map(|e| format!("  - {e}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
 }
 
 /// Parses `contents` as generic JSON and re-serializes it. Object keys that
