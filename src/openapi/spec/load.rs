@@ -152,7 +152,8 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
     // (every strategy above failed), so make sure the user finds out, even
     // though we recover from it automatically.
     log::warn!(
-        "OpenAPI spec at {} could not be parsed as standard OpenAPI v3.1, v3.0 or Swagger v2; \
+        "OpenAPI spec at {} could not be parsed as standard OpenAPI v3.2, v3.1, v3.0 or Swagger \
+         v2; \
          retrying with more lenient fallback parsing. This does not affect fuzzing, but you may \
          want to validate the spec for standards compliance.",
         filename.to_string_lossy()
@@ -174,10 +175,11 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
         && let Some(spec) = try_roas(
             &deduped,
             "Failed to parse using roas (after deduplicating JSON object keys)",
-        ) {
-            warn_about_duplicate_keys(&file_contents, filename);
-            return Ok(spec);
-        }
+        )
+    {
+        warn_about_duplicate_keys(&file_contents, filename);
+        return Ok(spec);
+    }
     if let Some((sanitized, fixes)) = sanitize_legacy_schema_quirks(&file_contents) {
         if let Some(spec) = try_roas(
             &sanitized,
@@ -291,20 +293,25 @@ fn upgrade_versioned_openapi(
     })
 }
 
-/// Parses `file_contents` with the `roas` crate as OpenAPI v3.1, v3.0 or v2,
-/// trying each version (and both JSON and YAML syntax) in turn, and converts
-/// the result to our internal `Spec` representation.
+/// Parses `file_contents` with the `roas` crate as OpenAPI v3.2, v3.1, v3.0
+/// or v2, trying each version (and both JSON and YAML syntax) in turn, and
+/// converts the result to our internal `Spec` representation.
 ///
 /// `roas` models each OpenAPI version with its own, independent type, but
 /// provides `From` conversions to upgrade a document to the next version
-/// (v2 -> v3.0 -> v3.1). We parse whichever version succeeds first, upgrade
-/// it to v3.1, and then convert it to our internal (`oas3`-based) `Spec` by
+/// (v2 -> v3.0 -> v3.1 -> v3.2). We try the newest version first (since a
+/// v3.2-only construct could otherwise be mis-parsed, and silently
+/// misinterpreted, by an older version's more lenient/permissive model), then
+/// fall back to older versions in turn. Whichever version matches is upgraded
+/// to v3.2 and converted to our internal (`oas3`-based) `Spec` by
 /// re-serializing it to JSON and parsing that with `oas3`. This piggybacks on
-/// `oas3`'s already-tested v3.1 parsing and the existing `From<oas3::Spec>`
+/// `oas3`'s already-tested JSON parsing and the existing `From<oas3::Spec>`
 /// conversion, instead of hand-writing a second, parallel field-by-field
-/// converter.
+/// converter. (There is no `From<v3_2::Spec> for v3_1::Spec` conversion in
+/// `roas`, since upgrades are one-directional, so a v3.2 document is
+/// re-serialized and handed to `oas3` directly rather than being downgraded.)
 fn roas_from_str(file_contents: &str) -> Result<Spec> {
-    fn convert(spec: roas::v3_1::spec::Spec) -> Result<Spec> {
+    fn convert<T: serde::Serialize>(spec: T) -> Result<Spec> {
         let json =
             serde_json::to_string(&spec).context("Failed to re-serialize roas spec as JSON")?;
         oas3::from_json(&json)
@@ -312,6 +319,12 @@ fn roas_from_str(file_contents: &str) -> Result<Spec> {
             .context("Failed to parse roas-normalized spec with oas3")
     }
 
+    if let Ok(spec) = serde_json::from_str::<roas::v3_2::spec::Spec>(file_contents) {
+        return convert(spec);
+    }
+    if let Ok(spec) = serde_yaml::from_str::<roas::v3_2::spec::Spec>(file_contents) {
+        return convert(spec);
+    }
     if let Ok(spec) = serde_json::from_str::<roas::v3_1::spec::Spec>(file_contents) {
         return convert(spec);
     }
@@ -319,21 +332,23 @@ fn roas_from_str(file_contents: &str) -> Result<Spec> {
         return convert(spec);
     }
     if let Ok(spec) = serde_json::from_str::<roas::v3_0::spec::Spec>(file_contents) {
-        return convert(spec.into());
+        return convert(Into::<roas::v3_1::spec::Spec>::into(spec));
     }
     if let Ok(spec) = serde_yaml::from_str::<roas::v3_0::spec::Spec>(file_contents) {
-        return convert(spec.into());
+        return convert(Into::<roas::v3_1::spec::Spec>::into(spec));
     }
     if let Ok(spec) = serde_json::from_str::<roas::v2::spec::Spec>(file_contents) {
         let v3_0: roas::v3_0::spec::Spec = spec.into();
-        return convert(v3_0.into());
+        return convert(Into::<roas::v3_1::spec::Spec>::into(v3_0));
     }
     if let Ok(spec) = serde_yaml::from_str::<roas::v2::spec::Spec>(file_contents) {
         let v3_0: roas::v3_0::spec::Spec = spec.into();
-        return convert(v3_0.into());
+        return convert(Into::<roas::v3_1::spec::Spec>::into(v3_0));
     }
 
-    anyhow::bail!("Did not match any supported OpenAPI version (v3.1, v3.0 or v2) in JSON or YAML")
+    anyhow::bail!(
+        "Did not match any supported OpenAPI version (v3.2, v3.1, v3.0 or v2) in JSON or YAML"
+    )
 }
 
 /// Parses `contents` as generic JSON and re-serializes it. Object keys that
@@ -816,6 +831,35 @@ components:
         let schema = get_component_schema(&spec, "Color");
         assert!(schema.examples.contains(&serde_json::json!("red")));
         assert!(schema.examples.contains(&serde_json::json!("blue")));
+    }
+
+    /// Verifies that OpenAPI v3.2 specs (which `oas3`/`openapiv3-extended` don't know
+    /// about, since both predate the v3.2 release) are still loaded successfully, via
+    /// the `roas` fallback cascade's v3.2 parsing strategy. (OAS 3.2 is a backwards-
+    /// compatible extension of 3.1, so this particular minimal spec would also happen
+    /// to parse correctly via the v3.1 strategy; the dedicated v3.2 strategy exists so
+    /// that genuinely v3.2-only constructs, e.g. the new OAuth2 device-authorization
+    /// flow or the `$self` keyword, aren't misparsed or silently dropped by an older,
+    /// unaware model.)
+    #[test]
+    fn v32_spec_is_parsed_via_roas() {
+        let spec_yaml = r#"
+openapi: "3.2.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Color:
+      type: string
+      examples:
+        - "red"
+        - "green"
+"#;
+        let spec = load_spec_from_str(spec_yaml);
+        let schema = get_component_schema(&spec, "Color");
+        assert!(schema.examples.contains(&serde_json::json!("red")));
     }
 
     /// Verifies that `example` on composition schemas (allOf/oneOf/anyOf) is preserved
