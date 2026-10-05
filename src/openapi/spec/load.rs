@@ -60,7 +60,92 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
         Ok(spec) => return Ok(spec.upgrade().into()),
         Err(err) => errors.push(err),
     };
+
+    // The strategies above cover the vast majority of well-formed specs, but
+    // some real-world documents in the wild are rejected by both `oas3` and
+    // `openapiv3`, for example because they use a Swagger 2.0 construct that
+    // isn't supported by those crates (`in: formData` parameters), or contain
+    // a literal duplicate object key that `serde_yaml`'s `Value` refuses to
+    // merge. `roas` is an independent OpenAPI implementation that is more
+    // permissive in some of these cases, so we try it as a last resort.
+    //
+    // We also retry against a "deduplicated" rendition of the file (parsed
+    // generically as JSON and re-serialized, which keeps the last of any
+    // duplicate keys) since `roas`'s own strict deserializer, like `serde_yaml`'s,
+    // refuses documents with duplicate keys.
+    match roas_from_str(&file_contents).context("Failed to parse using roas") {
+        Ok(spec) => return Ok(spec),
+        Err(err) => errors.push(err),
+    }
+    if let Some(deduped) = dedupe_json_object_keys(&file_contents) {
+        match roas_from_str(&deduped).context("Failed to parse using roas (after deduplicating JSON object keys)")
+        {
+            Ok(spec) => return Ok(spec),
+            Err(err) => errors.push(err),
+        }
+    }
+
     Err(AttemptsFailed { errors }.into())
+}
+
+/// Parses `file_contents` with the `roas` crate as OpenAPI v3.1, v3.0 or v2,
+/// trying each version (and both JSON and YAML syntax) in turn, and converts
+/// the result to our internal `Spec` representation.
+///
+/// `roas` models each OpenAPI version with its own, independent type, but
+/// provides `From` conversions to upgrade a document to the next version
+/// (v2 -> v3.0 -> v3.1). We parse whichever version succeeds first, upgrade
+/// it to v3.1, and then convert it to our internal (`oas3`-based) `Spec` by
+/// re-serializing it to JSON and parsing that with `oas3`. This piggybacks on
+/// `oas3`'s already-tested v3.1 parsing and the existing `From<oas3::Spec>`
+/// conversion, instead of hand-writing a second, parallel field-by-field
+/// converter.
+fn roas_from_str(file_contents: &str) -> Result<Spec> {
+    fn convert(spec: roas::v3_1::spec::Spec) -> Result<Spec> {
+        let json =
+            serde_json::to_string(&spec).context("Failed to re-serialize roas spec as JSON")?;
+        oas3::from_json(&json)
+            .map(Into::into)
+            .context("Failed to parse roas-normalized spec with oas3")
+    }
+
+    if let Ok(spec) = serde_json::from_str::<roas::v3_1::spec::Spec>(file_contents) {
+        return convert(spec);
+    }
+    if let Ok(spec) = serde_yaml::from_str::<roas::v3_1::spec::Spec>(file_contents) {
+        return convert(spec);
+    }
+    if let Ok(spec) = serde_json::from_str::<roas::v3_0::spec::Spec>(file_contents) {
+        return convert(spec.into());
+    }
+    if let Ok(spec) = serde_yaml::from_str::<roas::v3_0::spec::Spec>(file_contents) {
+        return convert(spec.into());
+    }
+    if let Ok(spec) = serde_json::from_str::<roas::v2::spec::Spec>(file_contents) {
+        let v3_0: roas::v3_0::spec::Spec = spec.into();
+        return convert(v3_0.into());
+    }
+    if let Ok(spec) = serde_yaml::from_str::<roas::v2::spec::Spec>(file_contents) {
+        let v3_0: roas::v3_0::spec::Spec = spec.into();
+        return convert(v3_0.into());
+    }
+
+    anyhow::bail!("Did not match any supported OpenAPI version (v3.1, v3.0 or v2) in JSON or YAML")
+}
+
+/// Parses `contents` as generic JSON and re-serializes it. Object keys that
+/// occur more than once within the same object are merged, keeping only the
+/// last occurrence, in line with the behaviour of most lenient JSON parsers
+/// (and the JSON specification's recommendation). Returns `None` if `contents`
+/// isn't valid generic JSON (e.g. because it is YAML, or is empty).
+///
+/// This is only used as a last-resort retry (see `openapi_from_file`), after
+/// all other strategies -- including `roas` on the untouched file -- have
+/// already failed, so we don't bother checking whether deduplication actually
+/// changed anything before retrying.
+fn dedupe_json_object_keys(contents: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(contents).ok()?;
+    serde_json::to_string(&value).ok()
 }
 
 /// Loads the OpenAPI specification from the given path
@@ -637,5 +722,118 @@ components:
                 openapiv3_param_examples
             );
         }
+    }
+
+    /// Regression test for Swagger 2.0 specs using `in: formData` parameters
+    /// (e.g. languagetool.json from the WebFuzzing/Dataset benchmark), which
+    /// neither `oas3` nor `openapiv3`'s v2 support can deserialize (`formData`
+    /// isn't a valid v2 parameter location in those crates' models), but
+    /// `roas`'s v2 model handles natively.
+    #[test]
+    fn swagger2_form_data_parameter_is_parsed_via_roas() {
+        let spec = load_spec_from_str(
+            r#"{
+                "swagger": "2.0",
+                "info": { "title": "Form data API", "version": "1.0" },
+                "paths": {
+                    "/check": {
+                        "post": {
+                            "operationId": "check",
+                            "parameters": [
+                                {
+                                    "name": "text",
+                                    "in": "formData",
+                                    "type": "string",
+                                    "required": false
+                                }
+                            ],
+                            "responses": { "200": { "description": "OK" } }
+                        }
+                    }
+                }
+            }"#,
+        );
+        let op = spec
+            .paths
+            .as_ref()
+            .unwrap()
+            .get("/check")
+            .unwrap()
+            .post
+            .as_ref()
+            .unwrap();
+        assert_eq!(op.operation_id.as_deref(), Some("check"));
+    }
+
+    /// Regression test for specs with a literal duplicate object key within
+    /// the same path item (e.g. two `"get"` entries under `/api/albums` in
+    /// blogapi.json from the WebFuzzing/Dataset benchmark). `serde_yaml`'s
+    /// generic `Value` (used by our own pre-processing) and `roas`'s strict
+    /// deserializer both reject such documents outright, so we retry through
+    /// a generic `serde_json::Value` round-trip first, which keeps only the
+    /// last occurrence of a duplicate key, matching how most lenient JSON
+    /// parsers behave.
+    ///
+    /// This test also uses a boolean `exclusiveMinimum` (valid OpenAPI 3.0 /
+    /// JSON Schema draft-4 syntax, as opposed to v3.1's numeric form), to
+    /// verify that `roas`'s v3.0 -> v3.1 upgrade correctly translates it.
+    #[test]
+    fn duplicate_path_item_key_is_resolved_via_last_value() {
+        let spec = load_spec_from_str(
+            r#"{
+                "openapi": "3.0.0",
+                "info": { "title": "Duplicate key API", "version": "1.0" },
+                "paths": {
+                    "/api/albums": {
+                        "get": {
+                            "operationId": "broken_stub",
+                            "responses": { "200": { "description": "stub, should be discarded" } }
+                        },
+                        "get": {
+                            "operationId": "real_operation",
+                            "parameters": [
+                                {
+                                    "name": "page",
+                                    "in": "query",
+                                    "required": false,
+                                    "schema": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "exclusiveMinimum": false
+                                    }
+                                }
+                            ],
+                            "responses": { "200": { "description": "OK" } }
+                        }
+                    }
+                }
+            }"#,
+        );
+        let op = spec
+            .paths
+            .as_ref()
+            .unwrap()
+            .get("/api/albums")
+            .unwrap()
+            .get
+            .as_ref()
+            .unwrap();
+        // The last of the two duplicate `get` keys should win.
+        assert_eq!(op.operation_id.as_deref(), Some("real_operation"));
+    }
+
+    #[test]
+    fn dedupe_json_object_keys_keeps_last_occurrence() {
+        let deduped =
+            dedupe_json_object_keys(r#"{"a": 1, "nested": {"x": "stub"}, "nested": {"x": "real"}}"#)
+                .expect("should be valid JSON");
+        let value: serde_json::Value = serde_json::from_str(&deduped).unwrap();
+        assert_eq!(value["nested"]["x"], "real");
+    }
+
+    #[test]
+    fn dedupe_json_object_keys_returns_none_for_yaml() {
+        // Plain YAML (not valid as generic JSON) should be rejected, not panic.
+        assert!(dedupe_json_object_keys("openapi: 3.0.0\ninfo:\n  title: x\n").is_none());
     }
 }

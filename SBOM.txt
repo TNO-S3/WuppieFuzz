@@ -223,6 +223,9 @@ encode_unicode 1.0.0
 encoding_rs 0.8.41
 	licensed under "(Apache-2.0 OR MIT) AND BSD-3-Clause"
 	by Henri Sivonen <hsivonen@hsivonen.fi>
+enumset 1.1.14
+	licensed under "Apache-2.0 OR MIT"
+	by Alissa Rao <aura@aura.moe>
 env_filter 2.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -391,6 +394,9 @@ icu_properties_data 2.3.0
 icu_provider 2.3.1
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
+ident_case 1.0.1
+	licensed under "Apache-2.0 OR MIT"
+	by Ted Driggs <ted.driggs@outlook.com>
 idna 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
@@ -451,6 +457,12 @@ konst_macro_rules 0.2.19
 kv-log-macro 1.0.7
 	licensed under "Apache-2.0 OR MIT"
 	by Yoshua Wuyts <yoshuawuyts@gmail.com>
+lazy-regex 3.6.2
+	licensed under "MIT"
+	by Canop <cano.petrole@gmail.com>
+lazy-regex-proc_macros 3.6.2
+	licensed under "MIT"
+	by Canop <cano.petrole@gmail.com>
 lazy_static 1.5.0
 	licensed under "Apache-2.0 OR MIT"
 	by Marvin Löbel <loebel.marvin@gmail.com>
@@ -535,6 +547,12 @@ miniz_oxide 0.9.1
 mio 1.2.3
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>|Tokio Contributors <team@tokio.rs>
+monostate 1.0.3
+	licensed under "Apache-2.0 OR MIT"
+	by David Tolnay <dtolnay@gmail.com>
+monostate-impl 1.0.3
+	licensed under "Apache-2.0 OR MIT"
+	by David Tolnay <dtolnay@gmail.com>
 multiversion 0.9.0
 	licensed under "Apache-2.0 OR MIT"
 	by Caleb Zulawski <caleb.zulawski@gmail.com>
@@ -724,9 +742,6 @@ rand_xorshift 0.4.0
 redox_syscall 0.5.18
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
-regex 1.13.1
-	licensed under "Apache-2.0 OR MIT"
-	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
 regex-automata 0.4.18
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers|Andrew Gallant <jamslam@gmail.com>
@@ -742,6 +757,9 @@ reqwest_cookie_store 0.10.0
 ring 0.17.14
 	licensed under "Apache-2.0 AND ISC"
 	by unspecified authors
+roas 0.21.0
+	licensed under "Apache-2.0 OR MIT"
+	by Sergey Vilgelm <sergey@vilgelm.com>
 rsqlite-vfs 0.1.1
 	licensed under "MIT"
 	by unspecified authors

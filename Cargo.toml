@@ -105,6 +105,7 @@ prost-types = "0.14.1"
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "sync", "time"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tonic = { version = "0.14", features = ["transport", "gzip"] }
+roas = { version = "0.21.0", features = ["v2", "v3_0", "v3_1"] }
 
 # `openssl` is not used directly by our code; it's a direct dependency purely
 # to activate the `vendored` feature on the shared `openssl-sys` crate that
