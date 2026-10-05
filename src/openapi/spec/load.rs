@@ -101,36 +101,52 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
     let file_contents = fill_in_missing_info_fields(&file_contents, filename);
     let mut errors = Vec::new();
 
-    match oas3::from_yaml(&file_contents).context("Failed to parse as YAML OpenAPI v3.1") {
-        Ok(spec) => {
-            return Ok(spec.into());
+    // Tries one parsing strategy, expressed as a `Result<Spec>` thunk (so
+    // each call site can freely chain `.context(...)`/`.and_then(...)`/
+    // `.map(...)` to build up its own `Result<Spec>` before handing it over
+    // here). On success, returns the spec for the caller to return
+    // immediately; on failure, records the error and returns `None` so the
+    // caller falls through to the next strategy.
+    let mut try_strategy = |result: Result<Spec>| -> Option<Spec> {
+        match result {
+            Ok(spec) => Some(spec),
+            Err(err) => {
+                errors.push(err);
+                None
+            }
         }
-        Err(err) => errors.push(err),
-    };
-    match oas3::from_json(&file_contents).context("Failed to parse as JSON OpenAPI v3.1") {
-        Ok(spec) => return Ok(spec.into()),
-        Err(err) => errors.push(err),
     };
 
-    match serde_yaml::from_str::<VersionedOpenAPI>(&file_contents)
-        .context("Failed to parse as YAML OpenAPI v2/v3.0")
-    {
-        Ok(spec) => match upgrade_versioned_openapi(spec, filename) {
-            Ok(spec) => return Ok(spec.into()),
-            Err(err) => errors.push(err),
-        },
-        Err(err) => errors.push(err),
-    };
-
-    match serde_json::from_str::<VersionedOpenAPI>(&file_contents)
-        .context("Failed to parse as JSON OpenAPI v2/v3.0")
-    {
-        Ok(spec) => match upgrade_versioned_openapi(spec, filename) {
-            Ok(spec) => return Ok(spec.into()),
-            Err(err) => errors.push(err),
-        },
-        Err(err) => errors.push(err),
-    };
+    if let Some(spec) = try_strategy(
+        oas3::from_yaml(&file_contents)
+            .map(Into::into)
+            .context("Failed to parse as YAML OpenAPI v3.1"),
+    ) {
+        return Ok(spec);
+    }
+    if let Some(spec) = try_strategy(
+        oas3::from_json(&file_contents)
+            .map(Into::into)
+            .context("Failed to parse as JSON OpenAPI v3.1"),
+    ) {
+        return Ok(spec);
+    }
+    if let Some(spec) = try_strategy(
+        serde_yaml::from_str::<VersionedOpenAPI>(&file_contents)
+            .context("Failed to parse as YAML OpenAPI v2/v3.0")
+            .and_then(|spec| upgrade_versioned_openapi(spec, filename))
+            .map(Into::into),
+    ) {
+        return Ok(spec);
+    }
+    if let Some(spec) = try_strategy(
+        serde_json::from_str::<VersionedOpenAPI>(&file_contents)
+            .context("Failed to parse as JSON OpenAPI v2/v3.0")
+            .and_then(|spec| upgrade_versioned_openapi(spec, filename))
+            .map(Into::into),
+    ) {
+        return Ok(spec);
+    }
 
     // The strategies above cover the vast majority of well-formed specs, but
     // some real-world documents in the wild are rejected by both `oas3` and
@@ -159,13 +175,7 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
         filename.to_string_lossy()
     );
     let mut try_roas = |contents: &str, context: &'static str| -> Option<Spec> {
-        match roas_from_str(contents, filename).context(context) {
-            Ok(spec) => Some(spec),
-            Err(err) => {
-                errors.push(err);
-                None
-            }
-        }
+        try_strategy(roas_from_str(contents, filename).context(context))
     };
 
     if let Some(spec) = try_roas(&file_contents, "Failed to parse using roas") {
