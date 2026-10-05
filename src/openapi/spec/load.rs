@@ -142,43 +142,46 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
     // We also retry against a "deduplicated" rendition of the file (parsed
     // generically as JSON and re-serialized, which keeps the last of any
     // duplicate keys) since `roas`'s own strict deserializer, like `serde_yaml`'s,
-    // refuses documents with duplicate keys.
-    match roas_from_str(&file_contents).context("Failed to parse using roas") {
-        Ok(spec) => return Ok(spec),
-        Err(err) => errors.push(err),
-    }
-    if let Some(deduped) = dedupe_json_object_keys(&file_contents) {
-        match roas_from_str(&deduped)
-            .context("Failed to parse using roas (after deduplicating JSON object keys)")
-        {
-            Ok(spec) => return Ok(spec),
-            Err(err) => errors.push(err),
-        }
-    }
-
-    // Some Swagger 2.0 documents in the wild use schema constructs that none
-    // of the crates above model correctly: a non-standard `type: file` (valid
-    // only on `body`/`formData` parameters in Swagger 2.0, to indicate a file
-    // upload) and integer `format`s other than `int32`/`int64` (e.g. `uint32`,
-    // `int8`), which `roas`'s Swagger 2.0 model restricts to a closed enum.
-    // Neither affects fuzzing behaviour, so as a last resort we generically
-    // rewrite `type: file` to the OpenAPI 3.0-style `{type: string, format:
-    // binary}`, and drop non-standard integer `format`s, wherever they occur
-    // in the document, and retry.
-    if let Some(sanitized) = sanitize_legacy_schema_quirks(&file_contents) {
-        match roas_from_str(&sanitized)
-            .context("Failed to parse using roas (after normalizing legacy schema constructs)")
-        {
-            Ok(spec) => return Ok(spec),
-            Err(err) => errors.push(err),
-        }
-        if let Some(deduped) = dedupe_json_object_keys(&sanitized) {
-            match roas_from_str(&deduped).context(
-                "Failed to parse using roas (after normalizing legacy schema constructs and deduplicating JSON object keys)",
-            ) {
-                Ok(spec) => return Ok(spec),
-                Err(err) => errors.push(err),
+    // refuses documents with duplicate keys, and against a "sanitized"
+    // rendition that rewrites a couple of other non-standard Swagger 2.0
+    // schema constructs `roas` doesn't model (see `sanitize_legacy_schema_quirks`),
+    // combining both when both apply.
+    let mut try_roas = |contents: &str, context: &'static str| -> Option<Spec> {
+        match roas_from_str(contents).context(context) {
+            Ok(spec) => Some(spec),
+            Err(err) => {
+                errors.push(err);
+                None
             }
+        }
+    };
+
+    if let Some(spec) = try_roas(&file_contents, "Failed to parse using roas") {
+        return Ok(spec);
+    }
+    if let Some(deduped) = dedupe_json_object_keys(&file_contents)
+        && let Some(spec) = try_roas(
+            &deduped,
+            "Failed to parse using roas (after deduplicating JSON object keys)",
+        )
+    {
+        return Ok(spec);
+    }
+    if let Some(sanitized) = sanitize_legacy_schema_quirks(&file_contents) {
+        if let Some(spec) = try_roas(
+            &sanitized,
+            "Failed to parse using roas (after normalizing legacy schema constructs)",
+        ) {
+            return Ok(spec);
+        }
+        if let Some(deduped) = dedupe_json_object_keys(&sanitized)
+            && let Some(spec) = try_roas(
+                &deduped,
+                "Failed to parse using roas (after normalizing legacy schema constructs and \
+                 deduplicating JSON object keys)",
+            )
+        {
+            return Ok(spec);
         }
     }
 
@@ -197,6 +200,14 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
 /// into a regular error so later strategies (e.g. the `roas`-based ones,
 /// combined with `sanitize_legacy_schema_quirks`) still get a chance to run.
 fn upgrade_versioned_openapi(spec: VersionedOpenAPI) -> Result<openapiv3::OpenAPI> {
+    // `std::panic::set_hook`/`take_hook` act on global, process-wide state,
+    // so swapping the hook to suppress output for the duration of the call
+    // below must be serialized against any other thread doing the same
+    // (e.g. concurrent test runs, or future concurrent spec loading) to
+    // avoid one thread permanently stealing another's hook.
+    static HOOK_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = HOOK_LOCK.lock().unwrap_or_else(|poison| poison.into_inner());
+
     // Suppress the default panic hook's stderr output for the duration of
     // the call: a caught panic here is an expected, handled fallback
     // failure, not something that should be logged as if it crashed.
