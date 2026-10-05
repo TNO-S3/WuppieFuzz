@@ -220,7 +220,7 @@ embedded-io 0.6.1
 encode_unicode 1.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
-encoding_rs 0.8.41
+encoding_rs 0.8.42
 	licensed under "(Apache-2.0 OR MIT) AND BSD-3-Clause"
 	by Henri Sivonen <hsivonen@hsivonen.fi>
 env_filter 2.0.0
@@ -361,7 +361,7 @@ hyper-rustls 0.27.10
 hyper-timeout 0.5.2
 	licensed under "Apache-2.0 OR MIT"
 	by Herman J. Radtke III <herman@hermanradtke.com>
-hyper-util 0.1.20
+hyper-util 0.1.21
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 iana-time-zone 0.1.65
@@ -535,12 +535,6 @@ miniz_oxide 0.9.1
 mio 1.2.3
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>|Tokio Contributors <team@tokio.rs>
-multiversion 0.9.0
-	licensed under "Apache-2.0 OR MIT"
-	by Caleb Zulawski <caleb.zulawski@gmail.com>
-multiversion-macros 0.9.0
-	licensed under "Apache-2.0 OR MIT"
-	by Caleb Zulawski <caleb.zulawski@gmail.com>
 nix 0.31.3
 	licensed under "MIT"
 	by unspecified authors
@@ -688,7 +682,7 @@ quinn 0.11.12
 quinn-proto 0.11.18
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-quinn-udp 0.5.15
+quinn-udp 0.5.16
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 r-efi 5.3.0
@@ -766,10 +760,10 @@ rustls-native-certs 0.8.4
 rustls-pki-types 1.15.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-platform-verifier 0.7.0
+rustls-platform-verifier 0.7.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-platform-verifier-android 0.1.1
+rustls-platform-verifier-android 0.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 rustls-webpki 0.103.15
@@ -832,13 +826,13 @@ simd-adler32 0.3.10
 simdutf8 0.1.5
 	licensed under "Apache-2.0 OR MIT"
 	by Hans Kratz <hans@appfour.com>
-siphasher 1.0.3
+siphasher 1.0.4
 	licensed under "Apache-2.0 OR MIT"
 	by Frank Denis <github@pureftpd.org>
 slab 0.4.12
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>
-smallvec 1.16.1
+smallvec 1.16.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
 socket2 0.6.5
@@ -871,7 +865,7 @@ system-configuration-sys 0.6.0
 tempfile 3.27.0
 	licensed under "Apache-2.0 OR MIT"
 	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
-thiserror-impl 2.0.20
+thiserror-impl 2.0.21
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
 time 0.3.55
@@ -1138,10 +1132,10 @@ z3 0.20.2
 z3-sys 0.11.0
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.57
+zerocopy 0.8.59
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
-zerocopy-derive 0.8.57
+zerocopy-derive 0.8.59
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
 zerofrom 0.1.8
