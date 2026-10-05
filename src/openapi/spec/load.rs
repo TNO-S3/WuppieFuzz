@@ -204,23 +204,34 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
     Err(AttemptsFailed { errors }.into())
 }
 
+/// Logs `header` followed by a bulleted (one per line, `  - `-prefixed) list
+/// of `items`, if any. Does nothing if `items` is empty, so call sites don't
+/// need to check that themselves.
+fn warn_with_bullets<T: std::fmt::Display>(header: &str, items: &[T]) {
+    if items.is_empty() {
+        return;
+    }
+    log::warn!(
+        "{header}\n{}",
+        items
+            .iter()
+            .map(|item| format!("  - {item}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
 /// Logs a warning listing every duplicate object key found in `contents`, if
 /// any (see `find_duplicate_json_keys`). Called once we know deduplication
 /// was actually necessary for `contents` to parse.
 fn warn_about_duplicate_keys(contents: &str, filename: &Path) {
-    let duplicates = find_duplicate_json_keys(contents);
-    if duplicates.is_empty() {
-        return;
-    }
-    log::warn!(
-        "OpenAPI spec at {} contains duplicate object keys; only the last occurrence of each is \
-         used:\n{}",
-        filename.to_string_lossy(),
-        duplicates
-            .iter()
-            .map(|path| format!("  - {path}"))
-            .collect::<Vec<_>>()
-            .join("\n")
+    warn_with_bullets(
+        &format!(
+            "OpenAPI spec at {} contains duplicate object keys; only the last occurrence of \
+             each is used:",
+            filename.to_string_lossy()
+        ),
+        &find_duplicate_json_keys(contents),
     );
 }
 
@@ -228,18 +239,13 @@ fn warn_about_duplicate_keys(contents: &str, filename: &Path) {
 /// `sanitize_legacy_schema_quirks` had to rewrite, if any. Called once we know
 /// sanitizing was actually necessary for the spec to parse.
 fn warn_about_schema_fixes(fixes: &[String], filename: &Path) {
-    if fixes.is_empty() {
-        return;
-    }
-    log::warn!(
-        "OpenAPI spec at {} uses non-standard schema constructs that were automatically \
-         rewritten to make it parseable:\n{}",
-        filename.to_string_lossy(),
-        fixes
-            .iter()
-            .map(|fix| format!("  - {fix}"))
-            .collect::<Vec<_>>()
-            .join("\n")
+    warn_with_bullets(
+        &format!(
+            "OpenAPI spec at {} uses non-standard schema constructs that were automatically \
+             rewritten to make it parseable:",
+            filename.to_string_lossy()
+        ),
+        fixes,
     );
 }
 
@@ -319,44 +325,49 @@ fn roas_from_str(file_contents: &str, filename: &Path) -> Result<Spec> {
             .context("Failed to parse roas-normalized spec with oas3")
     }
 
-    if let Ok(spec) = serde_json::from_str::<roas::v3_2::spec::Spec>(file_contents) {
+    // Tries to parse `file_contents` as the given roas version `T` (JSON,
+    // then YAML), and if either succeeds, warns about any semantic
+    // validation issues and upgrades the parsed spec to v3.1 via `upgrade`
+    // (the identity function if `T` already is `roas::v3_1::spec::Spec`) for
+    // `convert`. Returns `None` (to let the caller try the next-older
+    // version) if `T` doesn't match in either syntax.
+    fn try_version<T, U>(
+        file_contents: &str,
+        filename: &Path,
+        upgrade: impl FnOnce(T) -> U,
+    ) -> Option<Result<Spec>>
+    where
+        T: serde::de::DeserializeOwned + roas::validation::Validate,
+        U: serde::Serialize,
+    {
+        let spec = serde_json::from_str::<T>(file_contents)
+            .ok()
+            .or_else(|| serde_yaml::from_str::<T>(file_contents).ok())?;
         warn_about_roas_validation_issues(&spec, filename);
-        return convert(spec);
-    }
-    if let Ok(spec) = serde_yaml::from_str::<roas::v3_2::spec::Spec>(file_contents) {
-        warn_about_roas_validation_issues(&spec, filename);
-        return convert(spec);
-    }
-    if let Ok(spec) = serde_json::from_str::<roas::v3_1::spec::Spec>(file_contents) {
-        warn_about_roas_validation_issues(&spec, filename);
-        return convert(spec);
-    }
-    if let Ok(spec) = serde_yaml::from_str::<roas::v3_1::spec::Spec>(file_contents) {
-        warn_about_roas_validation_issues(&spec, filename);
-        return convert(spec);
-    }
-    if let Ok(spec) = serde_json::from_str::<roas::v3_0::spec::Spec>(file_contents) {
-        warn_about_roas_validation_issues(&spec, filename);
-        return convert(Into::<roas::v3_1::spec::Spec>::into(spec));
-    }
-    if let Ok(spec) = serde_yaml::from_str::<roas::v3_0::spec::Spec>(file_contents) {
-        warn_about_roas_validation_issues(&spec, filename);
-        return convert(Into::<roas::v3_1::spec::Spec>::into(spec));
-    }
-    if let Ok(spec) = serde_json::from_str::<roas::v2::spec::Spec>(file_contents) {
-        warn_about_roas_validation_issues(&spec, filename);
-        let v3_0: roas::v3_0::spec::Spec = spec.into();
-        return convert(Into::<roas::v3_1::spec::Spec>::into(v3_0));
-    }
-    if let Ok(spec) = serde_yaml::from_str::<roas::v2::spec::Spec>(file_contents) {
-        warn_about_roas_validation_issues(&spec, filename);
-        let v3_0: roas::v3_0::spec::Spec = spec.into();
-        return convert(Into::<roas::v3_1::spec::Spec>::into(v3_0));
+        Some(convert(upgrade(spec)))
     }
 
-    anyhow::bail!(
-        "Did not match any supported OpenAPI version (v3.2, v3.1, v3.0 or v2) in JSON or YAML"
-    )
+    try_version::<roas::v3_2::spec::Spec, _>(file_contents, filename, |spec| spec)
+        .or_else(|| try_version::<roas::v3_1::spec::Spec, _>(file_contents, filename, |spec| spec))
+        .or_else(|| {
+            try_version::<roas::v3_0::spec::Spec, _>(
+                file_contents,
+                filename,
+                Into::<roas::v3_1::spec::Spec>::into,
+            )
+        })
+        .or_else(|| {
+            try_version::<roas::v2::spec::Spec, _>(file_contents, filename, |spec| {
+                let v3_0: roas::v3_0::spec::Spec = spec.into();
+                Into::<roas::v3_1::spec::Spec>::into(v3_0)
+            })
+        })
+        .unwrap_or_else(|| {
+            anyhow::bail!(
+                "Did not match any supported OpenAPI version (v3.2, v3.1, v3.0 or v2) in JSON or \
+                 YAML"
+            )
+        })
 }
 
 /// Runs `roas`'s own semantic validator (distinct from, and in addition to,
@@ -381,15 +392,13 @@ fn warn_about_roas_validation_issues<T: roas::validation::Validate>(spec: &T, fi
 
     let options = IGNORE_UNUSED | Options::IgnoreExternalReferences | Options::IgnoreMissingTags;
     if let Err(err) = spec.validate(options, None) {
-        log::warn!(
-            "OpenAPI spec at {} has {} semantic validation issue(s):\n{}",
-            filename.to_string_lossy(),
-            err.errors.len(),
-            err.errors
-                .iter()
-                .map(|e| format!("  - {e}"))
-                .collect::<Vec<_>>()
-                .join("\n")
+        warn_with_bullets(
+            &format!(
+                "OpenAPI spec at {} has {} semantic validation issue(s):",
+                filename.to_string_lossy(),
+                err.errors.len()
+            ),
+            &err.errors,
         );
     }
 }
