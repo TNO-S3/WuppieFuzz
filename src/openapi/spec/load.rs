@@ -1,9 +1,10 @@
 //! Loads an OpenAPI specification from a file, and converts it to the format we use.
 
-use std::path::Path;
+use std::{cell::RefCell, collections::HashSet, path::Path};
 
 use anyhow::{Context, Result};
 use openapiv3::VersionedOpenAPI;
+use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 
 use super::Spec;
 
@@ -114,7 +115,7 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
     match serde_yaml::from_str::<VersionedOpenAPI>(&file_contents)
         .context("Failed to parse as YAML OpenAPI v2/v3.0")
     {
-        Ok(spec) => match upgrade_versioned_openapi(spec) {
+        Ok(spec) => match upgrade_versioned_openapi(spec, filename) {
             Ok(spec) => return Ok(spec.into()),
             Err(err) => errors.push(err),
         },
@@ -124,7 +125,7 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
     match serde_json::from_str::<VersionedOpenAPI>(&file_contents)
         .context("Failed to parse as JSON OpenAPI v2/v3.0")
     {
-        Ok(spec) => match upgrade_versioned_openapi(spec) {
+        Ok(spec) => match upgrade_versioned_openapi(spec, filename) {
             Ok(spec) => return Ok(spec.into()),
             Err(err) => errors.push(err),
         },
@@ -146,6 +147,16 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
     // rendition that rewrites a couple of other non-standard Swagger 2.0
     // schema constructs `roas` doesn't model (see `sanitize_legacy_schema_quirks`),
     // combining both when both apply.
+    //
+    // Reaching this point at all means the spec isn't fully standards-compliant
+    // (every strategy above failed), so make sure the user finds out, even
+    // though we recover from it automatically.
+    log::warn!(
+        "OpenAPI spec at {} could not be parsed as standard OpenAPI v3.1, v3.0 or Swagger v2; \
+         retrying with more lenient fallback parsing. This does not affect fuzzing, but you may \
+         want to validate the spec for standards compliance.",
+        filename.to_string_lossy()
+    );
     let mut try_roas = |contents: &str, context: &'static str| -> Option<Spec> {
         match roas_from_str(contents).context(context) {
             Ok(spec) => Some(spec),
@@ -163,15 +174,16 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
         && let Some(spec) = try_roas(
             &deduped,
             "Failed to parse using roas (after deduplicating JSON object keys)",
-        )
-    {
-        return Ok(spec);
-    }
-    if let Some(sanitized) = sanitize_legacy_schema_quirks(&file_contents) {
+        ) {
+            warn_about_duplicate_keys(&file_contents, filename);
+            return Ok(spec);
+        }
+    if let Some((sanitized, fixes)) = sanitize_legacy_schema_quirks(&file_contents) {
         if let Some(spec) = try_roas(
             &sanitized,
             "Failed to parse using roas (after normalizing legacy schema constructs)",
         ) {
+            warn_about_schema_fixes(&fixes, filename);
             return Ok(spec);
         }
         if let Some(deduped) = dedupe_json_object_keys(&sanitized)
@@ -181,11 +193,52 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
                  deduplicating JSON object keys)",
             )
         {
+            warn_about_schema_fixes(&fixes, filename);
+            warn_about_duplicate_keys(&sanitized, filename);
             return Ok(spec);
         }
     }
 
     Err(AttemptsFailed { errors }.into())
+}
+
+/// Logs a warning listing every duplicate object key found in `contents`, if
+/// any (see `find_duplicate_json_keys`). Called once we know deduplication
+/// was actually necessary for `contents` to parse.
+fn warn_about_duplicate_keys(contents: &str, filename: &Path) {
+    let duplicates = find_duplicate_json_keys(contents);
+    if duplicates.is_empty() {
+        return;
+    }
+    log::warn!(
+        "OpenAPI spec at {} contains duplicate object keys; only the last occurrence of each is \
+         used:\n{}",
+        filename.to_string_lossy(),
+        duplicates
+            .iter()
+            .map(|path| format!("  - {path}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
+/// Logs a warning listing every non-standard schema construct that
+/// `sanitize_legacy_schema_quirks` had to rewrite, if any. Called once we know
+/// sanitizing was actually necessary for the spec to parse.
+fn warn_about_schema_fixes(fixes: &[String], filename: &Path) {
+    if fixes.is_empty() {
+        return;
+    }
+    log::warn!(
+        "OpenAPI spec at {} uses non-standard schema constructs that were automatically \
+         rewritten to make it parseable:\n{}",
+        filename.to_string_lossy(),
+        fixes
+            .iter()
+            .map(|fix| format!("  - {fix}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
 
 /// Upgrades a parsed `VersionedOpenAPI` (v2 or v3.0) document to v3.0, via
@@ -196,17 +249,24 @@ pub fn openapi_from_file(filename: &Path) -> Result<Spec> {
 /// example schema properties using the non-standard `type: file` (seen in
 /// `proxyprint.json` from the WebFuzzing/Dataset benchmark). Since this is
 /// just one of several fallback strategies tried by `openapi_from_file`, a
-/// panic here shouldn't take down the whole process: we catch it and turn it
-/// into a regular error so later strategies (e.g. the `roas`-based ones,
-/// combined with `sanitize_legacy_schema_quirks`) still get a chance to run.
-fn upgrade_versioned_openapi(spec: VersionedOpenAPI) -> Result<openapiv3::OpenAPI> {
+/// panic here shouldn't take down the whole process: we catch it, warn the
+/// user (a panic here always indicates a non-standard spec, even if a later
+/// strategy recovers), and turn it into a regular error so later strategies
+/// (e.g. the `roas`-based ones, combined with `sanitize_legacy_schema_quirks`)
+/// still get a chance to run.
+fn upgrade_versioned_openapi(
+    spec: VersionedOpenAPI,
+    filename: &Path,
+) -> Result<openapiv3::OpenAPI> {
     // `std::panic::set_hook`/`take_hook` act on global, process-wide state,
     // so swapping the hook to suppress output for the duration of the call
     // below must be serialized against any other thread doing the same
     // (e.g. concurrent test runs, or future concurrent spec loading) to
     // avoid one thread permanently stealing another's hook.
     static HOOK_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    let _guard = HOOK_LOCK.lock().unwrap_or_else(|poison| poison.into_inner());
+    let _guard = HOOK_LOCK
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
 
     // Suppress the default panic hook's stderr output for the duration of
     // the call: a caught panic here is an expected, handled fallback
@@ -222,6 +282,11 @@ fn upgrade_versioned_openapi(spec: VersionedOpenAPI) -> Result<openapiv3::OpenAP
             .map(|s| s.to_string())
             .or_else(|| payload.downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "unknown panic".to_string());
+        log::warn!(
+            "OpenAPI spec at {} uses a non-standard construct that crashed the Swagger/OpenAPI \
+             2.0-3.0 parser ({message}); trying other parsing strategies.",
+            filename.to_string_lossy()
+        );
         anyhow::anyhow!("panicked while upgrading OpenAPI v2/v3.0 document: {message}")
     })
 }
@@ -286,11 +351,132 @@ fn dedupe_json_object_keys(contents: &str) -> Option<String> {
     serde_json::to_string(&value).ok()
 }
 
+/// Returns a human-readable, document-order list of the locations (as
+/// slash-separated paths from the document root) of object keys that occur
+/// more than once within the same JSON object in `contents`. Returns an empty
+/// `Vec` if `contents` isn't valid generic JSON, or has no duplicate keys.
+///
+/// This exists purely to produce an informative warning message when
+/// `dedupe_json_object_keys` turns out to have been necessary; the standard
+/// `serde_json::Value` deserialization used there silently keeps only the
+/// last occurrence of a duplicate key and has no way to report that this
+/// happened, so we do a separate, dedicated pass with a custom `Visitor` that
+/// tracks the path as it walks the document and records duplicates as they
+/// are found.
+fn find_duplicate_json_keys(contents: &str) -> Vec<String> {
+    let path = RefCell::new(Vec::<String>::new());
+    let duplicates = RefCell::new(Vec::<String>::new());
+    let mut de = serde_json::Deserializer::from_str(contents);
+    let _ = DuplicateKeyFinder {
+        path: &path,
+        duplicates: &duplicates,
+    }
+    .deserialize(&mut de);
+    duplicates.into_inner()
+}
+
+/// `serde` visitor/seed used by `find_duplicate_json_keys` to walk a JSON
+/// document, tracking the current path and recording every object key that
+/// is encountered more than once within the same object.
+struct DuplicateKeyFinder<'a> {
+    path: &'a RefCell<Vec<String>>,
+    duplicates: &'a RefCell<Vec<String>>,
+}
+
+impl<'a> DuplicateKeyFinder<'a> {
+    fn child(&self) -> Self {
+        DuplicateKeyFinder {
+            path: self.path,
+            duplicates: self.duplicates,
+        }
+    }
+}
+
+impl<'de, 'a> DeserializeSeed<'de> for DuplicateKeyFinder<'a> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> std::result::Result<Self::Value, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(self)
+    }
+}
+
+impl<'de, 'a> Visitor<'de> for DuplicateKeyFinder<'a> {
+    type Value = ();
+
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "any valid JSON value")
+    }
+
+    fn visit_map<M>(self, mut map: M) -> std::result::Result<Self::Value, M::Error>
+    where
+        M: MapAccess<'de>,
+    {
+        let mut seen = HashSet::new();
+        while let Some(key) = map.next_key::<String>()? {
+            if !seen.insert(key.clone()) {
+                let mut full_path = self.path.borrow().clone();
+                full_path.push(key.clone());
+                self.duplicates.borrow_mut().push(full_path.join("/"));
+            }
+            self.path.borrow_mut().push(key);
+            map.next_value_seed(self.child())?;
+            self.path.borrow_mut().pop();
+        }
+        Ok(())
+    }
+
+    fn visit_seq<S>(self, mut seq: S) -> std::result::Result<Self::Value, S::Error>
+    where
+        S: SeqAccess<'de>,
+    {
+        let mut index = 0usize;
+        loop {
+            self.path.borrow_mut().push(format!("[{index}]"));
+            let visited = seq.next_element_seed(self.child())?;
+            self.path.borrow_mut().pop();
+            match visited {
+                Some(()) => index += 1,
+                None => break,
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_bool<E>(self, _v: bool) -> std::result::Result<Self::Value, E> {
+        Ok(())
+    }
+    fn visit_i64<E>(self, _v: i64) -> std::result::Result<Self::Value, E> {
+        Ok(())
+    }
+    fn visit_u64<E>(self, _v: u64) -> std::result::Result<Self::Value, E> {
+        Ok(())
+    }
+    fn visit_f64<E>(self, _v: f64) -> std::result::Result<Self::Value, E> {
+        Ok(())
+    }
+    fn visit_str<E>(self, _v: &str) -> std::result::Result<Self::Value, E> {
+        Ok(())
+    }
+    fn visit_string<E>(self, _v: String) -> std::result::Result<Self::Value, E> {
+        Ok(())
+    }
+    fn visit_unit<E>(self) -> std::result::Result<Self::Value, E> {
+        Ok(())
+    }
+    fn visit_none<E>(self) -> std::result::Result<Self::Value, E> {
+        Ok(())
+    }
+}
+
 /// Generically rewrites two Swagger 2.0 JSON-Schema constructs that aren't
 /// recognized by our parsing crates, wherever they occur anywhere in the
-/// document, and returns the re-serialized document if anything was changed
-/// (or `None` if the document couldn't be parsed generically, or nothing
-/// needed patching):
+/// document, and returns the re-serialized document together with a
+/// human-readable description of each fix, if anything was changed (or
+/// `None` if the document couldn't be parsed generically, or nothing needed
+/// patching):
 ///
 /// - A schema's non-standard `type: file` (valid only on Swagger 2.0 `body`/
 ///   `formData` parameters, to indicate a file upload) is rewritten to the
@@ -301,26 +487,46 @@ fn dedupe_json_object_keys(contents: &str) -> Option<String> {
 ///   purposes, so losing it is harmless, whereas keeping it causes some
 ///   parsers (which model `format` as a closed enum for Swagger 2.0) to
 ///   reject the whole document.
-fn sanitize_legacy_schema_quirks(contents: &str) -> Option<String> {
+fn sanitize_legacy_schema_quirks(contents: &str) -> Option<(String, Vec<String>)> {
     let mut doc = serde_yaml::from_str::<serde_yaml::Value>(contents).ok()?;
-    let mut changed = false;
-    fix_legacy_schema_quirks(&mut doc, &mut changed);
-    changed.then(|| serde_yaml::to_string(&doc).ok()).flatten()
+    let mut path = Vec::new();
+    let mut fixes = Vec::new();
+    fix_legacy_schema_quirks(&mut doc, &mut path, &mut fixes);
+    if fixes.is_empty() {
+        return None;
+    }
+    let sanitized = serde_yaml::to_string(&doc).ok()?;
+    Some((sanitized, fixes))
 }
 
 /// Recursively walks `value`, applying the schema fixes described on
-/// `sanitize_legacy_schema_quirks`, and sets `changed` to `true` if anything
-/// was rewritten.
-fn fix_legacy_schema_quirks(value: &mut serde_yaml::Value, changed: &mut bool) {
+/// `sanitize_legacy_schema_quirks`, tracking the current path in `path` and
+/// appending a human-readable description of each fix (including its path)
+/// to `fixes`.
+fn fix_legacy_schema_quirks(
+    value: &mut serde_yaml::Value,
+    path: &mut Vec<String>,
+    fixes: &mut Vec<String>,
+) {
     if let serde_yaml::Value::Mapping(map) = value {
         let type_key = serde_yaml::Value::String("type".to_string());
         let format_key = serde_yaml::Value::String("format".to_string());
+        let location = || {
+            if path.is_empty() {
+                "(document root)".to_string()
+            } else {
+                path.join("/")
+            }
+        };
 
         match map.get(&type_key).cloned() {
             Some(serde_yaml::Value::String(t)) if t == "file" => {
                 map.insert(type_key, serde_yaml::Value::String("string".to_string()));
                 map.insert(format_key, serde_yaml::Value::String("binary".to_string()));
-                *changed = true;
+                fixes.push(format!(
+                    "{}: rewrote non-standard `type: file` to `{{type: string, format: binary}}`",
+                    location()
+                ));
             }
             Some(serde_yaml::Value::String(t)) if t == "integer" => {
                 if let Some(serde_yaml::Value::String(f)) = map.get(&format_key).cloned()
@@ -328,18 +534,29 @@ fn fix_legacy_schema_quirks(value: &mut serde_yaml::Value, changed: &mut bool) {
                     && f != "int64"
                 {
                     map.remove(&format_key);
-                    *changed = true;
+                    fixes.push(format!(
+                        "{}: dropped non-standard integer `format: {f}`",
+                        location()
+                    ));
                 }
             }
             _ => {}
         }
 
-        for (_, v) in map.iter_mut() {
-            fix_legacy_schema_quirks(v, changed);
+        for (k, v) in map.iter_mut() {
+            path.push(
+                k.as_str()
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("{k:?}")),
+            );
+            fix_legacy_schema_quirks(v, path, fixes);
+            path.pop();
         }
     } else if let serde_yaml::Value::Sequence(seq) = value {
-        for v in seq.iter_mut() {
-            fix_legacy_schema_quirks(v, changed);
+        for (i, v) in seq.iter_mut().enumerate() {
+            path.push(format!("[{i}]"));
+            fix_legacy_schema_quirks(v, path, fixes);
+            path.pop();
         }
     }
 }
@@ -1194,20 +1411,25 @@ components:
 
     #[test]
     fn sanitize_legacy_schema_quirks_rewrites_file_type() {
-        let sanitized =
+        let (sanitized, fixes) =
             sanitize_legacy_schema_quirks(r#"{"type": "file", "description": "upload"}"#)
                 .expect("should have changed something");
         let value: serde_yaml::Value = serde_yaml::from_str(&sanitized).unwrap();
         assert_eq!(value["type"], serde_yaml::Value::String("string".into()));
         assert_eq!(value["format"], serde_yaml::Value::String("binary".into()));
+        assert_eq!(fixes.len(), 1);
+        assert!(fixes[0].contains("type: file"));
     }
 
     #[test]
     fn sanitize_legacy_schema_quirks_drops_non_standard_integer_format() {
-        let sanitized = sanitize_legacy_schema_quirks(r#"{"type": "integer", "format": "uint32"}"#)
-            .expect("should have changed something");
+        let (sanitized, fixes) =
+            sanitize_legacy_schema_quirks(r#"{"type": "integer", "format": "uint32"}"#)
+                .expect("should have changed something");
         let value: serde_yaml::Value = serde_yaml::from_str(&sanitized).unwrap();
         assert!(value.get("format").is_none());
+        assert_eq!(fixes.len(), 1);
+        assert!(fixes[0].contains("uint32"));
     }
 
     #[test]
@@ -1216,5 +1438,49 @@ components:
             sanitize_legacy_schema_quirks(r#"{"type": "integer", "format": "int32"}"#).is_none()
         );
         assert!(sanitize_legacy_schema_quirks(r#"{"type": "string"}"#).is_none());
+    }
+
+    #[test]
+    fn sanitize_legacy_schema_quirks_reports_the_path_of_the_fix() {
+        let (_, fixes) = sanitize_legacy_schema_quirks(
+            r#"{
+                "components": {
+                    "schemas": {
+                        "FileResource": {
+                            "properties": {
+                                "file": { "type": "file" }
+                            }
+                        }
+                    }
+                }
+            }"#,
+        )
+        .expect("should have changed something");
+        assert_eq!(fixes.len(), 1);
+        assert!(
+            fixes[0].starts_with("components/schemas/FileResource/properties/file:"),
+            "unexpected fix path: {}",
+            fixes[0]
+        );
+    }
+
+    #[test]
+    fn find_duplicate_json_keys_reports_path_of_duplicates() {
+        let duplicates = find_duplicate_json_keys(
+            r#"{
+                "paths": {
+                    "/pets": {
+                        "get": { "operationId": "a" },
+                        "get": { "operationId": "b" }
+                    }
+                }
+            }"#,
+        );
+        assert_eq!(duplicates, vec!["paths//pets/get".to_string()]);
+    }
+
+    #[test]
+    fn find_duplicate_json_keys_returns_empty_for_well_formed_json() {
+        assert!(find_duplicate_json_keys(r#"{"a": {"b": 1}}"#).is_empty());
     }
 }
