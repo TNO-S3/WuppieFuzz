@@ -396,12 +396,19 @@ fn log_schema_debug(schema: &ObjectSchema) {
 
 /// Returns `true` and emits a warning when the recursion depth has reached the
 /// limit (20).  Both `example_value_for_schema` and `interesting_values_for_schema`
-/// call this guard at their entry points.
+/// call this guard at their entry points. Corpus generation can hit this guard
+/// many times (once per affected schema occurrence), so the warning is only
+/// logged once per process to avoid flooding the terminal.
 fn example_recursion_limit_exceeded(recursion_depth: usize) -> bool {
     if recursion_depth >= 20 {
-        log::warn!(
-            "Example resolution exceeds {recursion_depth} steps, this will result in bad examples. Please provide manual examples or avoid circular/deep references."
-        );
+        static WARNED: std::sync::Once = std::sync::Once::new();
+        WARNED.call_once(|| {
+            log::warn!(
+                "Example resolution exceeds {recursion_depth} steps for at least one schema, \
+                 this will result in bad examples. Please provide manual examples or avoid \
+                 circular/deep references (further occurrences of this warning are suppressed)."
+            );
+        });
         true
     } else {
         false
