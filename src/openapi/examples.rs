@@ -400,19 +400,14 @@ fn log_schema_debug(schema: &ObjectSchema) {
 /// many times (once per affected schema occurrence), so the warning is only
 /// logged once per process to avoid flooding the terminal.
 fn example_recursion_limit_exceeded(recursion_depth: usize) -> bool {
-    if recursion_depth >= 20 {
-        static WARNED: std::sync::Once = std::sync::Once::new();
-        WARNED.call_once(|| {
-            log::warn!(
-                "Example resolution exceeds {recursion_depth} steps for at least one schema, \
-                 this will result in bad examples. Please provide manual examples or avoid \
-                 circular/deep references (further occurrences of this warning are suppressed)."
-            );
-        });
-        true
-    } else {
-        false
-    }
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    crate::recursion::recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
+        format!(
+            "Example resolution exceeds {recursion_depth} steps for at least one schema, this \
+             will result in bad examples. Please provide manual examples or avoid circular/deep \
+             references (further occurrences of this warning are suppressed)."
+        )
+    })
 }
 
 /// Returns a single example `Value` that satisfies the given schema, or `None`.
@@ -516,6 +511,18 @@ fn example_value_for_schema(api: &Spec, schema: &Schema, recursion_depth: usize)
 /// 4. If nothing was found in steps 1–3, falls back to type-derived values via
 ///    [`interesting_values_for_type`].
 ///
+/// Returns the `$ref` path of `schema`, if it is a reference rather than an
+/// inline schema.
+fn ref_path_of(schema: &Schema) -> Option<&str> {
+    if let Schema::Object(object_or_reference) = schema
+        && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
+    {
+        Some(ref_path)
+    } else {
+        None
+    }
+}
+
 /// `ignore_reference_names` lists `$ref` paths that must not be followed again;
 /// this prevents infinite recursion when a discriminator variant refers back to
 /// its parent schema. This alone does not bound recursion on long chains of
@@ -533,9 +540,7 @@ fn interesting_values_for_schema(
     }
 
     let mut ignore_references = ignore_reference_names.to_owned();
-    if let Schema::Object(object_or_reference) = schema
-        && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
-    {
+    if let Some(ref_path) = ref_path_of(schema) {
         ignore_references.push(ref_path);
     }
 
@@ -578,9 +583,7 @@ fn interesting_values_for_schema(
             .all_of
             .iter()
             .filter_map(|schema| {
-                if let Schema::Object(object_or_reference) = schema
-                    && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
-                    && ignore_references.contains(&ref_path.as_str())
+                if ref_path_of(schema).is_some_and(|ref_path| ignore_references.contains(&ref_path))
                 {
                     None
                 } else {
@@ -609,10 +612,8 @@ fn interesting_values_for_schema(
                 .iter()
                 .flat_map(|schema_vec| {
                     schema_vec.iter().flat_map(|schema| {
-                        if let Schema::Object(object_or_reference) = schema
-                            && let ObjectOrReference::Ref { ref_path, .. } =
-                                object_or_reference.as_ref()
-                            && ignore_references.contains(&ref_path.as_str())
+                        if ref_path_of(schema)
+                            .is_some_and(|ref_path| ignore_references.contains(&ref_path))
                         {
                             Vec::new()
                         } else {
@@ -692,12 +693,10 @@ fn interesting_values_for_discriminator(
     // Collect variants and default names from OneOf/AnyOf
     // Only references are allowed by the spec, no inline schemas
     for variant in schema.one_of.iter().chain(schema.any_of.iter()) {
-        if let Schema::Object(object_or_reference) = variant
-            && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
-        {
+        if let Some(ref_path) = ref_path_of(variant) {
             // Select the Dog in '#/components/schemas/Dog'
             if let Some(name) = ref_path.split('/').next_back() {
-                mapping.insert(ref_path.clone(), name.to_string());
+                mapping.insert(ref_path.to_string(), name.to_string());
             }
         }
     }

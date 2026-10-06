@@ -111,10 +111,8 @@ impl ParameterAccessElements {
         }
 
         let mut ignore_references = ignore_reference_names.to_owned();
-        if let Schema::Object(object_or_reference) = schema
-            && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
-        {
-            if ignore_references.contains(&ref_path.as_str()) {
+        if let Some(ref_path) = ref_path_of(schema) {
+            if ignore_references.contains(&ref_path) {
                 return vec![];
             }
             ignore_references.push(ref_path);
@@ -160,26 +158,33 @@ impl ParameterAccessElements {
     }
 }
 
+/// Returns the `$ref` path of `schema`, if it is a reference rather than an
+/// inline schema.
+fn ref_path_of(schema: &Schema) -> Option<&str> {
+    if let Schema::Object(object_or_reference) = schema
+        && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
+    {
+        Some(ref_path)
+    } else {
+        None
+    }
+}
+
 /// Returns `true` once the recursion depth has reached the limit (20). Unlike
 /// `openapi::examples`'s analogous guard, this one is hit on every fuzzing
 /// iteration (not just once during corpus generation) whenever a spec has
 /// deeply nested or (previously) cyclic schemas, so the warning is only
 /// logged once per process to avoid flooding the terminal.
 fn parameter_access_recursion_limit_exceeded(recursion_depth: usize) -> bool {
-    if recursion_depth >= 20 {
-        static WARNED: std::sync::Once = std::sync::Once::new();
-        WARNED.call_once(|| {
-            log::warn!(
-                "Parameter access resolution exceeds {recursion_depth} steps for at least one \
-                 schema, this will result in some response fields not being available for the \
-                 link mutator. This is likely due to a deeply nested or circular schema \
-                 (further occurrences of this warning are suppressed)."
-            );
-        });
-        true
-    } else {
-        false
-    }
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    crate::recursion::recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
+        format!(
+            "Parameter access resolution exceeds {recursion_depth} steps for at least one \
+             schema, this will result in some response fields not being available for the link \
+             mutator. This is likely due to a deeply nested or circular schema (further \
+             occurrences of this warning are suppressed)."
+        )
+    })
 }
 
 impl Display for ParameterAccessElements {
