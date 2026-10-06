@@ -57,6 +57,7 @@ use crate::{
     input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
     openapi::spec::Spec,
     parameter_access::ParameterMatching,
+    recursion::recursion_limit_exceeded,
 };
 
 /// Builds a single [`OpenApiRequest`] for the given operation.
@@ -401,7 +402,7 @@ fn log_schema_debug(schema: &ObjectSchema) {
 /// logged once per process to avoid flooding the terminal.
 fn example_recursion_limit_exceeded(recursion_depth: usize) -> bool {
     static WARNED: std::sync::Once = std::sync::Once::new();
-    crate::recursion::recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
+    recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
         format!(
             "Example resolution exceeds {recursion_depth} steps for at least one schema, this \
              will result in bad examples. Please provide manual examples or avoid circular/deep \

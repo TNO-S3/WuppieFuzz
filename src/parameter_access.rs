@@ -20,7 +20,9 @@ use std::{
 use oas3::spec::{ObjectOrReference, Parameter, Schema};
 use serde::{Deserialize, Serialize};
 
-use crate::{input::parameter::ParameterKind, openapi::spec::Spec};
+use crate::{
+    input::parameter::ParameterKind, openapi::spec::Spec, recursion::recursion_limit_exceeded,
+};
 
 #[derive(
     Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
@@ -176,7 +178,7 @@ fn ref_path_of(schema: &Schema) -> Option<&str> {
 /// logged once per process to avoid flooding the terminal.
 fn parameter_access_recursion_limit_exceeded(recursion_depth: usize) -> bool {
     static WARNED: std::sync::Once = std::sync::Once::new();
-    crate::recursion::recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
+    recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
         format!(
             "Parameter access resolution exceeds {recursion_depth} steps for at least one \
              schema, this will result in some response fields not being available for the link \
