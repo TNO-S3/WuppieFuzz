@@ -276,6 +276,18 @@ fn upgrade_versioned_openapi(
     spec: VersionedOpenAPI,
     filename: &Path,
 ) -> Result<openapiv3::OpenAPI> {
+    catch_panic(|| spec.upgrade()).map_err(|message| {
+        log::warn!(
+            "OpenAPI spec at {} uses a non-standard construct that crashed the Swagger/OpenAPI \
+             2.0-3.0 parser ({message}); trying other parsing strategies.",
+            filename.to_string_lossy()
+        );
+        anyhow::anyhow!("panicked while upgrading OpenAPI v2/v3.0 document: {message}")
+    })
+}
+
+/// Runs `f`, returning the panic message instead of unwinding if it panics.
+fn catch_panic<T>(f: impl FnOnce() -> T) -> std::result::Result<T, String> {
     // `std::panic::set_hook`/`take_hook` act on global, process-wide state,
     // so swapping the hook to suppress output for the duration of the call
     // below must be serialized against any other thread doing the same
@@ -291,21 +303,15 @@ fn upgrade_versioned_openapi(
     // failure, not something that should be logged as if it crashed.
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| spec.upgrade()));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
     std::panic::set_hook(previous_hook);
 
     result.map_err(|payload| {
-        let message = payload
+        payload
             .downcast_ref::<&str>()
             .map(|s| s.to_string())
             .or_else(|| payload.downcast_ref::<String>().cloned())
-            .unwrap_or_else(|| "unknown panic".to_string());
-        log::warn!(
-            "OpenAPI spec at {} uses a non-standard construct that crashed the Swagger/OpenAPI \
-             2.0-3.0 parser ({message}); trying other parsing strategies.",
-            filename.to_string_lossy()
-        );
-        anyhow::anyhow!("panicked while upgrading OpenAPI v2/v3.0 document: {message}")
+            .unwrap_or_else(|| "unknown panic".to_string())
     })
 }
 
@@ -354,7 +360,13 @@ fn roas_from_str(file_contents: &str, filename: &Path) -> Result<Spec> {
             .ok()
             .or_else(|| serde_yaml::from_str::<T>(file_contents).ok())?;
         warn_about_roas_validation_issues(&spec, filename);
-        Some(convert(upgrade(spec)))
+        // roas' version upgrades `expect` on some documents (e.g. a v2 response
+        // without `description`).
+        Some(
+            catch_panic(|| upgrade(spec))
+                .map_err(|message| anyhow::anyhow!("panicked while upgrading with roas: {message}"))
+                .and_then(convert),
+        )
     }
 
     try_version::<roas::v3_2::spec::Spec, _>(file_contents, filename, |spec| spec)
@@ -548,22 +560,27 @@ impl<'de, 'a> Visitor<'de> for DuplicateKeyFinder<'a> {
     }
 }
 
-/// Generically rewrites two Swagger 2.0 JSON-Schema constructs that aren't
-/// recognized by our parsing crates, wherever they occur anywhere in the
-/// document, and returns the re-serialized document together with a
-/// human-readable description of each fix, if anything was changed (or
-/// `None` if the document couldn't be parsed generically, or nothing needed
-/// patching):
+/// Generically rewrites Swagger 2.0 constructs that aren't recognized by our
+/// parsing crates, wherever they occur anywhere in the document, and returns
+/// the re-serialized document together with a human-readable description of
+/// each fix, if anything was changed (or `None` if the document couldn't be
+/// parsed generically, or nothing needed patching):
 ///
 /// - A schema's non-standard `type: file` (valid only on Swagger 2.0 `body`/
 ///   `formData` parameters, to indicate a file upload) is rewritten to the
 ///   OpenAPI 3.0-style equivalent, `{type: string, format: binary}`.
 /// - An integer schema's `format`, if it is anything other than the two
 ///   standard values `int32`/`int64` (e.g. `uint32`, `int8`, as seen in the
-///   wild), is dropped. `format` is purely descriptive/advisory for fuzzing
+///   wild), is dropped, and likewise a number schema's `format` other than
+///   `float`/`double`. `format` is purely descriptive/advisory for fuzzing
 ///   purposes, so losing it is harmless, whereas keeping it causes some
 ///   parsers (which model `format` as a closed enum for Swagger 2.0) to
 ///   reject the whole document.
+/// - The siblings of a `$ref` other than `summary`/`description` (e.g.
+///   `x-ms-client-flatten`, `readOnly`) are dropped. They are ignored in
+///   Swagger 2.0 and OpenAPI 3.0 anyway, but `roas` rejects them.
+/// - A response without (or with an empty) `description` gets a placeholder.
+///   `roas`'s v2 -> v3.0 upgrade panics on it.
 fn sanitize_legacy_schema_quirks(contents: &str) -> Option<(String, Vec<String>)> {
     let mut doc = serde_yaml::from_str::<serde_yaml::Value>(contents).ok()?;
     let mut path = Vec::new();
@@ -596,6 +613,52 @@ fn fix_legacy_schema_quirks(
             }
         };
 
+        // Siblings of a `$ref` are ignored in v2/v3.0, and roas rejects them. A path
+        // item may legitimately combine `$ref` with operations.
+        let ref_key = serde_yaml::Value::String("$ref".to_string());
+        let is_path_item = path.len() == 2 && path[0] == "paths";
+        if map.get(&ref_key).is_some_and(serde_yaml::Value::is_string)
+            && map.len() > 1
+            && !is_path_item
+        {
+            let before = map.len();
+            map.retain(|k, _| matches!(k.as_str(), Some("$ref" | "summary" | "description")));
+            if map.len() < before {
+                fixes.push(format!("{}: dropped the siblings of a `$ref`", location()));
+            }
+        }
+
+        // roas' v2 -> v3.0 upgrade panics on a response without (or with an empty)
+        // `description`. Only an operation's responses, and the reusable ones at the
+        // root, hold responses; a schema property may also be called `responses`.
+        let holds_responses = match path.as_slice() {
+            [] => true,
+            [first, _, _] => first == "paths",
+            _ => false,
+        };
+        if holds_responses
+            && let Some(serde_yaml::Value::Mapping(responses)) = map.get_mut("responses")
+        {
+            for (code, response) in responses.iter_mut() {
+                if let serde_yaml::Value::Mapping(response) = response
+                    && !response.contains_key("$ref")
+                    && response
+                        .get("description")
+                        .and_then(serde_yaml::Value::as_str)
+                        .is_none_or(str::is_empty)
+                {
+                    response.insert("description".into(), "No description.".into());
+                    fixes.push(format!(
+                        "{}/responses/{}: filled in a missing response `description`",
+                        location(),
+                        code.as_str()
+                            .map(str::to_string)
+                            .unwrap_or_else(|| format!("{code:?}"))
+                    ));
+                }
+            }
+        }
+
         match map.get(&type_key).cloned() {
             Some(serde_yaml::Value::String(t)) if t == "file" => {
                 map.insert(type_key, serde_yaml::Value::String("string".to_string()));
@@ -605,14 +668,18 @@ fn fix_legacy_schema_quirks(
                     location()
                 ));
             }
-            Some(serde_yaml::Value::String(t)) if t == "integer" => {
+            Some(serde_yaml::Value::String(t)) if t == "integer" || t == "number" => {
+                let standard: &[&str] = if t == "integer" {
+                    &["int32", "int64"]
+                } else {
+                    &["float", "double"]
+                };
                 if let Some(serde_yaml::Value::String(f)) = map.get(&format_key).cloned()
-                    && f != "int32"
-                    && f != "int64"
+                    && !standard.contains(&f.as_str())
                 {
                     map.remove(&format_key);
                     fixes.push(format!(
-                        "{}: dropped non-standard integer `format: {f}`",
+                        "{}: dropped non-standard {t} `format: {f}`",
                         location()
                     ));
                 }
@@ -1568,6 +1635,67 @@ components:
             "unexpected fix path: {}",
             fixes[0]
         );
+    }
+
+    /// Swagger 2.0 as served by APIs.guru: `$ref` parameters (which
+    /// `openapiv3-extended` cannot read), a `$ref` with siblings, a non-standard
+    /// number `format`, and a response without `description` (which made roas
+    /// panic).
+    #[test]
+    fn swagger2_ref_siblings_and_missing_description_are_parsed_via_roas() {
+        let spec = load_spec_from_str(
+            r##"{
+                "swagger": "2.0",
+                "info": { "title": "t", "version": "1" },
+                "parameters": { "id": { "name": "id", "in": "path", "required": true, "type": "string" } },
+                "paths": {
+                    "/a/{id}": {
+                        "get": {
+                            "operationId": "getA",
+                            "parameters": [
+                                { "$ref": "#/parameters/id", "x-ms-parameter-location": "method" }
+                            ],
+                            "responses": {
+                                "200": { "schema": { "type": "number", "format": "decimal" } }
+                            }
+                        }
+                    }
+                }
+            }"##,
+        );
+        let op = spec.paths.as_ref().unwrap()["/a/{id}"]
+            .get
+            .as_ref()
+            .unwrap();
+        assert_eq!(op.operation_id.as_deref(), Some("getA"));
+    }
+
+    /// roas reads this as Swagger 2.0 without complaint, but its v2 -> v3.0
+    /// upgrade panics on the empty response `description` (seen in Azure specs).
+    /// The panic must fall through to the sanitized retry, not crash the process.
+    #[test]
+    fn roas_upgrade_panic_falls_back_to_sanitized_retry() {
+        let spec = load_spec_from_str(
+            r##"{
+                "swagger": "2.0",
+                "info": { "title": "t", "version": "1" },
+                "parameters": { "id": { "name": "id", "in": "path", "required": true, "type": "string" } },
+                "paths": {
+                    "/a/{id}": {
+                        "get": {
+                            "operationId": "getA",
+                            "parameters": [{ "$ref": "#/parameters/id" }],
+                            "responses": { "200": { "description": "" } }
+                        }
+                    }
+                }
+            }"##,
+        );
+        let op = spec.paths.as_ref().unwrap()["/a/{id}"]
+            .get
+            .as_ref()
+            .unwrap();
+        assert_eq!(op.operation_id.as_deref(), Some("getA"));
     }
 
     #[test]
