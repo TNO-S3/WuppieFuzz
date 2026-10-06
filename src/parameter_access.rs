@@ -161,12 +161,12 @@ impl ParameterAccessElements {
 /// Returns the `$ref` path of `schema`, if it is a reference rather than an
 /// inline schema.
 fn ref_path_of(schema: &Schema) -> Option<&str> {
-    if let Schema::Object(object_or_reference) = schema
-        && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
-    {
-        Some(ref_path)
-    } else {
-        None
+    match schema {
+        Schema::Object(object_or_reference) => match object_or_reference.as_ref() {
+            ObjectOrReference::Ref { ref_path, .. } => Some(ref_path),
+            ObjectOrReference::Object(_) => None,
+        },
+        Schema::Boolean(_) => None,
     }
 }
 
