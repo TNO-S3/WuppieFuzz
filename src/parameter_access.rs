@@ -85,14 +85,10 @@ impl ParameterAccessElements {
     /// Lists all parameter accesses (field names and, recursively, their
     /// nested fields) reachable from `schema`.
     ///
-    /// Schemas can be mutually recursive (e.g. `User` has a field of type
-    /// `UserIdentity`, which in turn has a field of type `User`), so this
-    /// tracks the `$ref` paths already followed on the current path and stops
-    /// recursing once one would be followed again, mirroring
-    /// `interesting_values_for_schema`'s cycle handling in
-    /// `openapi::examples`. A recursion depth limit is kept as a backstop for
-    /// long chains of distinct (non-repeating) `$ref`s, which the cycle check
-    /// alone does not bound.
+    /// Tracks `$ref` paths already followed on the current path and stops
+    /// recursing once one repeats, mirroring `interesting_values_for_schema`'s
+    /// cycle handling in `openapi::examples`. A recursion depth limit backs
+    /// this up for long chains of distinct, non-repeating `$ref`s.
     pub fn parameter_accesses_from_schema(
         parent_access: ParameterAccessElements,
         schema: &Schema,
@@ -171,11 +167,9 @@ fn ref_path_of(schema: &Schema) -> Option<&str> {
     }
 }
 
-/// Returns `true` once the recursion depth has reached the limit (20). Unlike
-/// `openapi::examples`'s analogous guard, this one is hit on every fuzzing
-/// iteration (not just once during corpus generation) whenever a spec has
-/// deeply nested or (previously) cyclic schemas, so the warning is only
-/// logged once per process to avoid flooding the terminal.
+/// Guards recursion depth (limit 20) for parameter access resolution, which
+/// runs every fuzzing iteration (unlike `openapi::examples`'s guard, which
+/// only runs during corpus generation).
 fn parameter_access_recursion_limit_exceeded(recursion_depth: usize) -> bool {
     static WARNED: std::sync::Once = std::sync::Once::new();
     recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
