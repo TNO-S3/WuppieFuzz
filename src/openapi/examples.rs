@@ -583,17 +583,16 @@ fn interesting_values_for_schema(
             .all_of
             .iter()
             .filter_map(|schema| {
-                if ref_path_of(schema).is_some_and(|ref_path| ignore_references.contains(&ref_path))
-                {
-                    None
-                } else {
-                    Some(interesting_values_for_schema(
+                let is_cycle = ref_path_of(schema)
+                    .is_some_and(|ref_path| ignore_references.contains(&ref_path));
+                (!is_cycle).then(|| {
+                    interesting_values_for_schema(
                         api,
                         schema,
                         &ignore_references,
                         recursion_depth + 1,
-                    ))
-                }
+                    )
+                })
             })
             .collect();
 
@@ -612,9 +611,9 @@ fn interesting_values_for_schema(
                 .iter()
                 .flat_map(|schema_vec| {
                     schema_vec.iter().flat_map(|schema| {
-                        if ref_path_of(schema)
-                            .is_some_and(|ref_path| ignore_references.contains(&ref_path))
-                        {
+                        let is_cycle = ref_path_of(schema)
+                            .is_some_and(|ref_path| ignore_references.contains(&ref_path));
+                        if is_cycle {
                             Vec::new()
                         } else {
                             interesting_values_for_schema(

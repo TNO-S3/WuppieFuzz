@@ -111,11 +111,10 @@ impl ParameterAccessElements {
         }
 
         let mut ignore_references = ignore_reference_names.to_owned();
-        if let Some(ref_path) = ref_path_of(schema) {
-            if ignore_references.contains(&ref_path) {
-                return vec![];
-            }
-            ignore_references.push(ref_path);
+        match ref_path_of(schema) {
+            Some(ref_path) if ignore_references.contains(&ref_path) => return vec![],
+            Some(ref_path) => ignore_references.push(ref_path),
+            None => {}
         }
 
         let resolved = match schema.resolve(api) {
