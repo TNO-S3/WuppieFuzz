@@ -69,7 +69,7 @@ fn fill_in_missing_info_fields(contents: &str, filename: &Path) -> String {
 
     let info = mapping
         .entry(serde_yaml::Value::String("info".to_string()))
-        .or_insert_with(|| serde_yaml::Value::Mapping(Default::default()));
+        .or_insert_with(|| serde_yaml::Value::Mapping(serde_yaml::Mapping::default()));
     let Some(info) = info.as_mapping_mut() else {
         return contents.to_string();
     };
@@ -296,7 +296,7 @@ fn catch_panic<T>(f: impl FnOnce() -> T) -> std::result::Result<T, String> {
     static HOOK_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _guard = HOOK_LOCK
         .lock()
-        .unwrap_or_else(|poison| poison.into_inner());
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
 
     // Suppress the default panic hook's stderr output for the duration of
     // the call: a caught panic here is an expected, handled fallback
@@ -309,7 +309,7 @@ fn catch_panic<T>(f: impl FnOnce() -> T) -> std::result::Result<T, String> {
     result.map_err(|payload| {
         payload
             .downcast_ref::<&str>()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| payload.downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "unknown panic".to_string())
     })
@@ -660,8 +660,7 @@ fn fix_legacy_schema_quirks(
                         "{}/responses/{}: filled in a missing response `description`",
                         location(),
                         code.as_str()
-                            .map(str::to_string)
-                            .unwrap_or_else(|| format!("{code:?}"))
+                            .map_or_else(|| format!("{code:?}"), str::to_string)
                     ));
                 }
             }
@@ -696,11 +695,7 @@ fn fix_legacy_schema_quirks(
         }
 
         for (k, v) in map.iter_mut() {
-            path.push(
-                k.as_str()
-                    .map(str::to_string)
-                    .unwrap_or_else(|| format!("{k:?}")),
-            );
+            path.push(k.as_str().map_or_else(|| format!("{k:?}"), str::to_string));
             fix_legacy_schema_quirks(v, path, fixes);
             path.pop();
         }
@@ -1291,9 +1286,8 @@ components:
             if let Some(ex) = &oas3_example {
                 assert!(
                     openapiv3_examples.contains(ex),
-                    "Schema '{schema_name}': oas3 has example={:?} but openapiv3 examples={:?}",
-                    oas3_example,
-                    openapiv3_examples
+                    "Schema '{schema_name}': oas3 has example={oas3_example:?} but openapiv3 \
+                     examples={openapiv3_examples:?}"
                 );
             }
             assert_eq!(
@@ -1321,9 +1315,8 @@ components:
             if let Some(ex) = &oas3_example {
                 assert!(
                     openapiv3_examples.contains(ex),
-                    "Property '{prop_name}': oas3 has example={:?} but openapiv3 examples={:?}",
-                    oas3_example,
-                    openapiv3_examples
+                    "Property '{prop_name}': oas3 has example={oas3_example:?} but openapiv3 \
+                     examples={openapiv3_examples:?}"
                 );
             }
             assert_eq!(
@@ -1337,8 +1330,8 @@ components:
             .paths
             .as_ref()
             .into_iter()
-            .flat_map(|map| map.get("/items/{id}"))
-            .flat_map(|path_item| path_item.get.as_ref())
+            .filter_map(|map| map.get("/items/{id}"))
+            .filter_map(|path_item| path_item.get.as_ref())
             .flat_map(|op| op.parameters.iter())
             .filter_map(|p| p.resolve(&spec_via_oas3).ok())
             .find(|p| p.name == "id")
@@ -1347,8 +1340,8 @@ components:
             .paths
             .as_ref()
             .into_iter()
-            .flat_map(|map| map.get("/items/{id}"))
-            .flat_map(|path_item| path_item.get.as_ref())
+            .filter_map(|map| map.get("/items/{id}"))
+            .filter_map(|path_item| path_item.get.as_ref())
             .flat_map(|op| op.parameters.iter())
             .filter_map(|p| p.resolve(&spec_via_openapiv3).ok())
             .find(|p| p.name == "id")
@@ -1372,9 +1365,8 @@ components:
         if let Some(ex) = &oas3_param_example {
             assert!(
                 openapiv3_param_examples.contains(ex),
-                "Parameter schema: oas3 has example={:?} but openapiv3 examples={:?}",
-                oas3_param_example,
-                openapiv3_param_examples
+                "Parameter schema: oas3 has example={oas3_param_example:?} but openapiv3 \
+                 examples={openapiv3_param_examples:?}"
             );
         }
     }
