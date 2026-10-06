@@ -50,6 +50,7 @@ pub struct Header {
 #[serde(rename_all = "camelCase")]
 pub struct PartialLoginEndpoint {
     pub endpoint: Option<String>,
+    #[serde(rename = "externalEndpointURL")]
     pub external_endpoint_url: Option<String>,
     pub payload_raw: Option<String>,
     pub payload_user_pwd: Option<PayloadUsernamePassword>,
