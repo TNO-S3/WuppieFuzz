@@ -364,7 +364,15 @@ fn roas_from_str(file_contents: &str, filename: &Path) -> Result<Spec> {
         // without `description`).
         Some(
             catch_panic(|| upgrade(spec))
-                .map_err(|message| anyhow::anyhow!("panicked while upgrading with roas: {message}"))
+                .map_err(|message| {
+                    log::warn!(
+                        "OpenAPI spec at {} uses a non-standard construct that crashed the \
+                         `roas` parser while upgrading to a newer OpenAPI version ({message}); \
+                         trying other parsing strategies.",
+                        filename.to_string_lossy()
+                    );
+                    anyhow::anyhow!("panicked while upgrading with roas: {message}")
+                })
                 .and_then(convert),
         )
     }
