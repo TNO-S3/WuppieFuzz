@@ -20,7 +20,9 @@ use std::{
 use oas3::spec::{ObjectOrReference, Parameter, Schema};
 use serde::{Deserialize, Serialize};
 
-use crate::{input::parameter::ParameterKind, openapi::spec::Spec};
+use crate::{
+    input::parameter::ParameterKind, openapi::spec::Spec, recursion::recursion_limit_exceeded,
+};
 
 #[derive(
     Clone, Debug, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
@@ -80,11 +82,39 @@ impl ParameterAccessElements {
         Self(elements.to_vec())
     }
 
+    /// Lists all parameter accesses (field names and, recursively, their
+    /// nested fields) reachable from `schema`.
+    ///
+    /// Tracks `$ref` paths already followed on the current path and stops
+    /// recursing once one repeats, mirroring `interesting_values_for_schema`'s
+    /// cycle handling in `openapi::examples`. A recursion depth limit backs
+    /// this up for long chains of distinct, non-repeating `$ref`s.
     pub fn parameter_accesses_from_schema(
         parent_access: ParameterAccessElements,
         schema: &Schema,
         api: &Spec,
     ) -> Vec<ParameterAccessElements> {
+        Self::parameter_accesses_from_schema_impl(parent_access, schema, api, &[], 0)
+    }
+
+    fn parameter_accesses_from_schema_impl(
+        parent_access: ParameterAccessElements,
+        schema: &Schema,
+        api: &Spec,
+        ignore_reference_names: &[&str],
+        recursion_depth: usize,
+    ) -> Vec<ParameterAccessElements> {
+        if parameter_access_recursion_limit_exceeded(recursion_depth) {
+            return vec![];
+        }
+
+        let mut ignore_references = ignore_reference_names.to_owned();
+        match ref_path_of(schema) {
+            Some(ref_path) if ignore_references.contains(&ref_path) => return vec![],
+            Some(ref_path) => ignore_references.push(ref_path),
+            None => {}
+        }
+
         let resolved = match schema.resolve(api) {
             Ok(resolved) => resolved,
             Err(_) => return vec![],
@@ -106,10 +136,12 @@ impl ParameterAccessElements {
                 let current_access =
                     parent_access.with_new_element(ParameterAccessElement::Name(name.clone()));
                 accesses.push(current_access.clone());
-                accesses.extend(Self::parameter_accesses_from_schema(
+                accesses.extend(Self::parameter_accesses_from_schema_impl(
                     current_access,
                     child_schema,
                     api,
+                    &ignore_references,
+                    recursion_depth + 1,
                 ));
                 accesses
             })
@@ -121,6 +153,33 @@ impl ParameterAccessElements {
         elements.push(new_element);
         Self::from_elements(&elements)
     }
+}
+
+/// Returns the `$ref` path of `schema`, if it is a reference rather than an
+/// inline schema.
+fn ref_path_of(schema: &Schema) -> Option<&str> {
+    match schema {
+        Schema::Object(object_or_reference) => match object_or_reference.as_ref() {
+            ObjectOrReference::Ref { ref_path, .. } => Some(ref_path),
+            ObjectOrReference::Object(_) => None,
+        },
+        Schema::Boolean(_) => None,
+    }
+}
+
+/// Guards recursion depth (limit 20) for parameter access resolution, which
+/// runs every fuzzing iteration (unlike `openapi::examples`'s guard, which
+/// only runs during corpus generation).
+fn parameter_access_recursion_limit_exceeded(recursion_depth: usize) -> bool {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
+        format!(
+            "Parameter access resolution exceeds {recursion_depth} steps for at least one \
+             schema, this will result in some response fields not being available for the link \
+             mutator. This is likely due to a deeply nested or circular schema (further \
+             occurrences of this warning are suppressed)."
+        )
+    })
 }
 
 impl Display for ParameterAccessElements {
@@ -386,5 +445,81 @@ impl From<(usize, ParameterAccess)> for ParameterAddressing {
             request_index: value.0,
             access: value.1,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Builds a minimal `Spec` whose `components.schemas` contains two
+    /// mutually-recursive schemas: `User` has a field of type `UserIdentity`,
+    /// which in turn has a field of type `User` (e.g. a "last logged in as"
+    /// back-reference). This mirrors the real-world spec (scout-api) that
+    /// previously caused `parameter_accesses_from_schema` to recurse
+    /// indefinitely and overflow the stack.
+    fn spec_with_mutually_recursive_schemas() -> Spec {
+        let json = r##"{
+            "openapi": "3.0.0",
+            "info": { "title": "t", "version": "1" },
+            "paths": {},
+            "components": {
+                "schemas": {
+                    "User": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string" },
+                            "identity": { "$ref": "#/components/schemas/UserIdentity" }
+                        }
+                    },
+                    "UserIdentity": {
+                        "type": "object",
+                        "properties": {
+                            "provider": { "type": "string" },
+                            "user": { "$ref": "#/components/schemas/User" }
+                        }
+                    }
+                }
+            }
+        }"##;
+        oas3::from_json(json).expect("spec should parse").into()
+    }
+
+    /// Regression test for a stack overflow previously observed when fuzzing
+    /// an API (scout-api) whose response schemas were mutually recursive:
+    /// without cycle detection, `parameter_accesses_from_schema` recursed
+    /// forever on `User -> UserIdentity -> User -> ...`, crashing the whole
+    /// process (not just failing an assertion) rather than returning an
+    /// error. If this test hangs, crashes, or aborts rather than completing
+    /// quickly, the cycle detection has regressed.
+    #[test]
+    fn mutually_recursive_schema_does_not_overflow_stack() {
+        let spec = spec_with_mutually_recursive_schemas();
+        let user_schema = Schema::Object(Box::new(ObjectOrReference::Ref {
+            ref_path: "#/components/schemas/User".to_string(),
+            summary: None,
+            description: None,
+        }));
+
+        let accesses = ParameterAccessElements::parameter_accesses_from_schema(
+            ParameterAccessElements::new(),
+            &user_schema,
+            &spec,
+        );
+
+        // Both fields of `User`, the one non-recursive field of
+        // `UserIdentity` (`provider`), and the `user` field itself (which
+        // points back to `User`) should be reachable exactly once; the field
+        // is listed, but its own fields (which would repeat `name`/`identity`
+        // forever) must not be expanded again.
+        let names: Vec<String> = accesses.iter().map(ToString::to_string).collect();
+        assert!(names.contains(&"name".to_string()));
+        assert!(names.contains(&"identity".to_string()));
+        assert!(names.contains(&"identity/provider".to_string()));
+        assert!(names.contains(&"identity/user".to_string()));
+        assert!(
+            !names.contains(&"identity/user/name".to_string()),
+            "should not recurse back into the already-visited `User` schema"
+        );
     }
 }
