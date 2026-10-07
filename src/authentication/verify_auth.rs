@@ -29,18 +29,20 @@ pub fn verify_auth(api: Spec) -> Result<()> {
     println!("\n=============================================================================");
     println!("\n[*] Running authentication verification!\n\n");
 
-    // Initialize authentication
-    let mut authentication = super::initialize().context("Could not initialize authentication")?;
-
     // Get the API server from the OpenAPI spec
     let server = api
         .servers
         .first()
         .ok_or_else(|| anyhow!("No servers found in the OpenAPI specification."))?;
+    let server_url = Url::parse(&server.url)?;
+
+    // Initialize authentication
+    let mut authentication =
+        super::initialize(&server_url).context("Could not initialize authentication")?;
 
     // Setup cookie store to save the authentication token. This token is added to all HTTP headers.
     let cookie_store = std::sync::Arc::new(reqwest_cookie_store::CookieStoreMutex::new(
-        authentication.cookie_store(&Url::parse(&server.url)?)?,
+        authentication.cookie_store(&server_url)?,
     ));
     let client_builder =
         reqwest::blocking::Client::builder().cookie_provider(std::sync::Arc::clone(&cookie_store));
