@@ -18,6 +18,7 @@ Limit INFO logging about new "crashes" being observed. Previously one per line (
 - externalEndpointURL silently dropped (camelCase rename mismatch) in [#387](https://github.com/TNO-S3/WuppieFuzz/pull/387)
 - Fix relative path in login of WFC not resolving to full URL in [#388](https://github.com/TNO-S3/WuppieFuzz/pull/388)
 - Fix a stack overflow when fuzzing APIs with mutually recursive response schemas, by detecting `$ref` cycles in the link mutator; recursion-limit warnings are now also logged only once instead of flooding the terminal in [#389](https://github.com/TNO-S3/WuppieFuzz/pull/389)
+- Fix a panic during corpus generation on schemas with multiple types, such as OpenAPI 3.1's nullable `type: [x, "null"]`; they are now handled like their non-null type in [#394](https://github.com/TNO-S3/WuppieFuzz/pull/394)
 
 # v1.7.1 (2026-08-26)
 
