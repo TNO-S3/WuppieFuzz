@@ -2,6 +2,14 @@
 
 ## Highlights
 
+## Features
+
+## Fixes
+
+# v1.8.0 (2026-10-07)
+
+## Highlights
+
 Limit INFO logging about new "crashes" being observed. Previously one per line (which flooded the terminal), now reported in aggregate in the heartbeat output. Resolves major bug in referencing values.
 
 ## Features
