@@ -208,7 +208,7 @@ dispatch2 0.3.1
 document-features 0.2.12
 	licensed under "Apache-2.0 OR MIT"
 	by Slint Developers <info@slint.dev>
-either 1.18.0
+either 1.19.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 embedded-io 0.4.0
@@ -316,7 +316,7 @@ getrandom 0.4.3
 gimli 0.32.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-h2 0.4.19
+h2 0.4.20
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
 hashbrown 0.15.5
@@ -355,7 +355,7 @@ httpdate 1.0.3
 hybrid-array 0.4.15
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
-hyper 1.11.1
+hyper 1.12.0
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 hyper-rustls 0.27.10
@@ -424,10 +424,10 @@ iter-read 1.1.0
 itoa 1.0.18
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-jiff 0.2.37
+jiff 0.2.38
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-jiff-static 0.2.37
+jiff-static 0.2.38
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
 jni 0.22.4
@@ -1150,10 +1150,10 @@ z3 0.20.2
 z3-sys 0.11.0
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.60
+zerocopy 0.8.61
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
-zerocopy-derive 0.8.60
+zerocopy-derive 0.8.61
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
 zerofrom 0.1.8
@@ -1162,7 +1162,7 @@ zerofrom 0.1.8
 zerofrom-derive 0.1.8
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-zeroize 1.9.0
+zeroize 1.9.1
 	licensed under "Apache-2.0 OR MIT"
 	by The RustCrypto Project Developers
 zerotrie 0.2.5

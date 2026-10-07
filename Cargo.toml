@@ -1,6 +1,6 @@
 [package]
 name = "wuppiefuzz"
-version = "1.7.1"
+version = "1.8.0"
 authors = [
     "TNO Software and System Security"
 ]
@@ -44,6 +44,7 @@ lto = "thin"
 
 [build-dependencies]
 cargo-license = "0.7.0"
+serde_json = "1.0"
 
 [dependencies]
 ahash = "0.8"

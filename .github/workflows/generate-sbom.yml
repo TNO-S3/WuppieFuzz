@@ -1,4 +1,4 @@
-name: Generate SBOM on Dependabot PR
+name: Generate SBOM and THIRD_PARTY_NOTICES on Dependabot PR
 
 on:
   pull_request:
@@ -33,10 +33,13 @@ jobs:
         with:
           channel: stable
 
+      - name: Install cargo-about
+        run: cargo install cargo-about --features cli --locked
+
       - name: Build project
         run: cargo build --release
 
-      - name: Commit SBOM.txt
+      - name: Commit SBOM.txt and THIRD_PARTY_NOTICES
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_HEAD_REF: ${{ github.head_ref }}
@@ -46,11 +49,11 @@ jobs:
           git fetch
           git checkout "$GITHUB_HEAD_REF"
           git pull
-          if [ -n "$(git status --porcelain)" ]; then
+          if [ -n "$(git status --porcelain -- SBOM.txt THIRD_PARTY_NOTICES)" ]; then
             echo "Uncommitted changes found after build!"
             git status
-            git add SBOM.txt
-            git commit -m "Add SBOM.txt after build"
+            git add SBOM.txt THIRD_PARTY_NOTICES
+            git commit -m "Update SBOM.txt and THIRD_PARTY_NOTICES after build"
             git push origin HEAD:"$GITHUB_HEAD_REF"
           else
             echo "No uncommitted changes found."

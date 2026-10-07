@@ -2,7 +2,15 @@
 
 ## Highlights
 
-Limit INFO logging about new "crashes" being observed. Previously one per line (which flooded the terminal), now reported in aggregate in the heartbeat output. Resolves major bug in referencing values.
+## Features
+
+## Fixes
+
+# v1.8.0 (2026-10-07)
+
+## Highlights
+
+Adds .NET and OpenTelemetry-based coverage guidance, a crash deduplication command, and corpus seeding that now reuses values from earlier responses. Substantially hardens OpenAPI/Swagger spec parsing against non-standard real-world specs (with new v3.2 support), and fixes several WFC authentication bugs as well as stack overflows/panics on recursive or multi-type schemas.
 
 ## Features
 
