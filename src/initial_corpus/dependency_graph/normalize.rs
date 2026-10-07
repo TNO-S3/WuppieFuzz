@@ -11,7 +11,7 @@
 
 use oas3::{
     Map,
-    spec::{MediaType, Operation, Parameter, RequestBody, Response, Schema},
+    spec::{MediaType, Operation, Parameter, RequestBody, Response, Schema, SchemaType},
 };
 
 use crate::{
@@ -329,30 +329,25 @@ fn normalize_schema(
             recursion_depth + 1,
         )
     } else {
+        // A type set like `[object, "null"]` (3.1 nullable) is treated as its structured member.
         match &object_schema.schema_type {
-            Some(type_set) => match type_set {
-                oas3::spec::SchemaTypeSet::Single(schema_type) => match schema_type {
-                    oas3::spec::SchemaType::Array => match object_schema.items.as_ref() {
-                        Some(inner_schema) => {
-                            normalize_schema(api, inner_schema, path, access, recursion_depth + 1)
-                        }
-                        None => None,
-                    },
-                    oas3::spec::SchemaType::Object => Some(normalize_object_type(
-                        api,
-                        &object_schema.properties,
-                        path,
-                        access,
-                        recursion_depth + 1,
-                    )),
-                    // Other types do not have a name, return an empty vec so their key in the
-                    // enclosing object/array is still included.
-                    _ => Some(vec![]),
-                },
-                oas3::spec::SchemaTypeSet::Multiple(_schema_types) => {
-                    todo!("Sets of multiple schemas are not yet supported.")
-                }
-            },
+            Some(type_set) if type_set.contains(SchemaType::Object) => Some(normalize_object_type(
+                api,
+                &object_schema.properties,
+                path,
+                access,
+                recursion_depth + 1,
+            )),
+            Some(type_set) if type_set.contains(SchemaType::Array) => normalize_schema(
+                api,
+                object_schema.items.as_ref()?,
+                path,
+                access,
+                recursion_depth + 1,
+            ),
+            // Other types do not have a name, return an empty vec so their key in the
+            // enclosing object/array is still included.
+            Some(_) => Some(vec![]),
             None => None,
         }
     }
@@ -508,5 +503,24 @@ mod tests {
             },
             ParameterNormalization::new("PetID".into(), context, parameter_access.clone())
         );
+    }
+
+    #[test]
+    fn test_normalize_nullable_type_set() {
+        let api: Spec =
+            oas3::from_yaml("openapi: 3.1.0\ninfo: {title: t, version: '1'}\npaths: {}")
+                .unwrap()
+                .into();
+        let schema: Schema = serde_yaml::from_str(
+            "type: [array, 'null']\nitems:\n  type: [object, 'null']\n  properties:\n    id: {type: [integer, 'null']}",
+        )
+        .unwrap();
+        let access = ParameterAccess::response_body(ParameterAccessElements::new());
+        let names: Vec<_> = normalize_schema(&api, &schema, vec![], access, 0)
+            .unwrap()
+            .into_iter()
+            .map(|n| n.name)
+            .collect();
+        assert_eq!(names, ["id"]);
     }
 }

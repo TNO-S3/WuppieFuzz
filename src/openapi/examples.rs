@@ -489,7 +489,12 @@ fn example_value_for_schema(api: &Spec, schema: &Schema, recursion_depth: usize)
                 return example_value_for_type(api, single_type, &schema, recursion_depth + 1);
             }
             oas3::spec::SchemaTypeSet::Multiple(multiple_types) => {
-                if let Some(first_type) = multiple_types.first() {
+                // Prefer a concrete type over `null`, so `[object, "null"]` yields an object.
+                if let Some(first_type) = multiple_types
+                    .iter()
+                    .find(|t| **t != SchemaType::Null)
+                    .or(multiple_types.first())
+                {
                     return example_value_for_type(api, first_type, &schema, recursion_depth + 1);
                 }
             }
