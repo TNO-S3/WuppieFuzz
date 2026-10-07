@@ -1,0 +1,30 @@
+# Resolve dependencies for every platform WuppieFuzz is actually released for
+# (kept in sync with dist-workspace.toml's `targets`), not just the host
+# triple, so platform-specific crates (e.g. windows-*, the Windows TLS stack)
+# are all accounted for.
+targets = [
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+]
+
+accepted = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "LGPL-2.1-or-later",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Zlib",
+    "0BSD",
+    "bzip2-1.0.6",
+]
