@@ -493,7 +493,7 @@ fn example_value_for_schema(api: &Spec, schema: &Schema, recursion_depth: usize)
                 if let Some(first_type) = multiple_types
                     .iter()
                     .find(|t| **t != SchemaType::Null)
-                    .or(multiple_types.first())
+                    .or_else(multiple_types.first())
                 {
                     return example_value_for_type(api, first_type, &schema, recursion_depth + 1);
                 }
