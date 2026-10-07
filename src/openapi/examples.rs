@@ -57,6 +57,7 @@ use crate::{
     input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::ParameterKind},
     openapi::spec::Spec,
     parameter_access::ParameterMatching,
+    recursion::recursion_limit_exceeded,
 };
 
 /// Builds a single [`OpenApiRequest`] for the given operation.
@@ -379,7 +380,7 @@ fn interesting_values_for_media_type(api: &Spec, contents: &MediaType) -> Vec<Va
     if let Some(more_examples) = contents
         .schema
         .as_ref()
-        .map(|schema| interesting_values_for_schema(api, schema, &[]))
+        .map(|schema| interesting_values_for_schema(api, schema, &[], 0))
     {
         result.extend(more_examples);
     }
@@ -394,18 +395,17 @@ fn log_schema_debug(schema: &ObjectSchema) {
     log::debug!("{schema:?}");
 }
 
-/// Returns `true` and emits a warning when the recursion depth has reached the
-/// limit (20).  Both `example_value_for_schema` and `interesting_values_for_schema`
-/// call this guard at their entry points.
+/// Guards recursion depth (limit 20) for `example_value_for_schema` and
+/// `interesting_values_for_schema`.
 fn example_recursion_limit_exceeded(recursion_depth: usize) -> bool {
-    if recursion_depth >= 20 {
-        log::warn!(
-            "Example resolution exceeds {recursion_depth} steps, this will result in bad examples. Please provide manual examples or avoid circular/deep references."
-        );
-        true
-    } else {
-        false
-    }
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
+        format!(
+            "Example resolution exceeds {recursion_depth} steps for at least one schema, this \
+             will result in bad examples. Please provide manual examples or avoid circular/deep \
+             references (further occurrences of this warning are suppressed)."
+        )
+    })
 }
 
 /// Returns a single example `Value` that satisfies the given schema, or `None`.
@@ -509,18 +509,36 @@ fn example_value_for_schema(api: &Spec, schema: &Schema, recursion_depth: usize)
 /// 4. If nothing was found in steps 1–3, falls back to type-derived values via
 ///    [`interesting_values_for_type`].
 ///
+/// Returns the `$ref` path of `schema`, if it is a reference rather than an
+/// inline schema.
+fn ref_path_of(schema: &Schema) -> Option<&str> {
+    match schema {
+        Schema::Object(object_or_reference) => match object_or_reference.as_ref() {
+            ObjectOrReference::Ref { ref_path, .. } => Some(ref_path),
+            ObjectOrReference::Object(_) => None,
+        },
+        Schema::Boolean(_) => None,
+    }
+}
+
 /// `ignore_reference_names` lists `$ref` paths that must not be followed again;
 /// this prevents infinite recursion when a discriminator variant refers back to
-/// its parent schema.
+/// its parent schema. This alone does not bound recursion on long chains of
+/// distinct (non-repeating) `$ref`s, so `recursion_depth` additionally enforces
+/// the same overall limit as [`example_value_for_schema`], guarded by
+/// [`example_recursion_limit_exceeded`].
 fn interesting_values_for_schema(
     api: &Spec,
     schema: &Schema,
     ignore_reference_names: &[&str],
+    recursion_depth: usize,
 ) -> Vec<Value> {
+    if example_recursion_limit_exceeded(recursion_depth) {
+        return vec![];
+    }
+
     let mut ignore_references = ignore_reference_names.to_owned();
-    if let Schema::Object(object_or_reference) = schema
-        && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
-    {
+    if let Some(ref_path) = ref_path_of(schema) {
         ignore_references.push(ref_path);
     }
 
@@ -556,24 +574,23 @@ fn interesting_values_for_schema(
             api,
             &schema,
             &ignore_references,
+            recursion_depth + 1,
         ));
     } else {
         let all_examples: Vec<Vec<Value>> = schema
             .all_of
             .iter()
             .filter_map(|schema| {
-                if let Schema::Object(object_or_reference) = schema
-                    && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
-                    && ignore_references.contains(&ref_path.as_str())
-                {
-                    None
-                } else {
-                    Some(interesting_values_for_schema(
+                let is_cycle = ref_path_of(schema)
+                    .is_some_and(|ref_path| ignore_references.contains(&ref_path));
+                (!is_cycle).then(|| {
+                    interesting_values_for_schema(
                         api,
                         schema,
                         &ignore_references,
-                    ))
-                }
+                        recursion_depth + 1,
+                    )
+                })
             })
             .collect();
 
@@ -592,14 +609,17 @@ fn interesting_values_for_schema(
                 .iter()
                 .flat_map(|schema_vec| {
                     schema_vec.iter().flat_map(|schema| {
-                        if let Schema::Object(object_or_reference) = schema
-                            && let ObjectOrReference::Ref { ref_path, .. } =
-                                object_or_reference.as_ref()
-                            && ignore_references.contains(&ref_path.as_str())
-                        {
+                        let is_cycle = ref_path_of(schema)
+                            .is_some_and(|ref_path| ignore_references.contains(&ref_path));
+                        if is_cycle {
                             Vec::new()
                         } else {
-                            interesting_values_for_schema(api, schema, &ignore_references)
+                            interesting_values_for_schema(
+                                api,
+                                schema,
+                                &ignore_references,
+                                recursion_depth + 1,
+                            )
                         }
                     })
                 }),
@@ -655,6 +675,7 @@ fn interesting_values_for_discriminator(
     api: &Spec,
     schema: &ObjectSchema,
     ignore_names: &[&str],
+    recursion_depth: usize,
 ) -> Vec<Value> {
     // There is a strong assumption from here on that we're dealing with an
     // object schema, with the fields collected from the variant specified by
@@ -669,12 +690,10 @@ fn interesting_values_for_discriminator(
     // Collect variants and default names from OneOf/AnyOf
     // Only references are allowed by the spec, no inline schemas
     for variant in schema.one_of.iter().chain(schema.any_of.iter()) {
-        if let Schema::Object(object_or_reference) = variant
-            && let ObjectOrReference::Ref { ref_path, .. } = object_or_reference.as_ref()
-        {
+        if let Some(ref_path) = ref_path_of(variant) {
             // Select the Dog in '#/components/schemas/Dog'
             if let Some(name) = ref_path.split('/').next_back() {
-                mapping.insert(ref_path.clone(), name.to_string());
+                mapping.insert(ref_path.to_string(), name.to_string());
             }
         }
     }
@@ -705,6 +724,7 @@ fn interesting_values_for_discriminator(
                     description: None,
                 })),
                 ignore_names,
+                recursion_depth + 1,
             )
             .into_iter()
             // Values from the base object take precendence, as we want

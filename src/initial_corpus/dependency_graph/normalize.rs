@@ -17,6 +17,7 @@ use oas3::{
 use crate::{
     openapi::spec::Spec,
     parameter_access::{ParameterAccess, ParameterAccessElement, ParameterAccessElements},
+    recursion::recursion_limit_exceeded,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -260,15 +261,16 @@ pub fn normalize_request_body<'a>(
     )
 }
 
+/// Guards recursion depth (limit 20) for parameter normalization.
 fn normalization_recursion_limit_exceeded(recursion_depth: usize) -> bool {
-    if recursion_depth >= 20 {
-        log::warn!(
-            "Schema resolution exceeds {recursion_depth} steps, this parameter will not be handled properly. Try to avoid circular/deep schema references."
-        );
-        true
-    } else {
-        false
-    }
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    recursion_limit_exceeded(recursion_depth, 20, &WARNED, || {
+        format!(
+            "Schema resolution exceeds {recursion_depth} steps for at least one parameter, it \
+             will not be handled properly. Try to avoid circular/deep schema references \
+             (further occurrences of this warning are suppressed)."
+        )
+    })
 }
 
 /// Schema describes contents of objects and arrays. This function normalizes field
@@ -390,9 +392,8 @@ fn normalize_object_type<'a>(
     // Avoid infinite recursion (by circular (including self-)references in schemas)
     if parameter_access
         .get_body_access_elements()
-        .is_ok_and(|elements| elements.0.len() >= 20)
+        .is_ok_and(|elements| normalization_recursion_limit_exceeded(elements.0.len()))
     {
-        log::warn!("Schema depth exceeds 20, ignoring further nesting.");
         return vec![];
     }
     object_properties

@@ -52,6 +52,7 @@ mod openapi;
 pub mod openapi_mutator;
 mod parameter_access;
 mod parameter_feedback;
+mod recursion;
 mod reporting;
 mod reproducer;
 mod state;
