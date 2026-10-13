@@ -114,18 +114,27 @@ Appwrite has a web interface and an API that perform similar functions.
 
 We can get Appwrite version 0.9.3 from
 [here](https://github.com/appwrite/appwrite/tree/8ce48c1f47a3ebf37c5ad9828d51d85b98c57fb3)
-by cloning it with `git`. Once cloned, we can run it according to the README
-file found in the repository, which gives us the following command:
+by cloning it with `git`. Checkout the right commit with:
+
+```
+git switch 0.9.3 --detach
+```
+
+Since version 0.9.3 is really old, the traefik version it uses (2.3) is incompatible with recent Docker versions (API 1.40).
+To fix this, **change the version** of traefik in `app/views/install/compose.phtml`: `image: traefik:2.11`.
+
+Then use the docker command provided in the README, but **add an extra volume** with the modified file:
 
 ```sh
 docker run -it --rm \
     --volume /var/run/docker.sock:/var/run/docker.sock \
     --volume "$(pwd)"/appwrite:/usr/src/code/appwrite:rw \
+    --volume "$(pwd)"/app/views/install/compose.phtml:/usr/src/code/app/views/install/compose.phtml:ro \
     --entrypoint="install" \
     appwrite/appwrite:0.9.3
 ```
 
-This command will launch multiple Docker containers, consisting of a database, a
+This will launch multiple Docker containers, consisting of a database, a
 web interface, and more. During this process, the installer will ask for a port
 on which to run the web interface. In this tutorial we assume that port 80 is
 chosen for this.

@@ -64,12 +64,18 @@ pub enum Authentication {
 /// This function uses the command line configuration to log in to the API
 /// server. It produces an `Authentication` on success, which can be used
 /// to configure a `reqwest::Client`.
-pub fn initialize() -> Result<Authentication> {
+///
+/// `base_url` is the OpenAPI spec's server URL, used to resolve any WFC
+/// `loginEndpointAuth.endpoint` value (a path relative to the SUT).
+pub fn initialize(base_url: &Url) -> Result<Authentication> {
     let clargs = Configuration::must_get();
-    initialize_from_config(clargs.authentication.as_deref())
+    initialize_from_config(clargs.authentication.as_deref(), base_url)
 }
 
-pub fn initialize_from_config(config_path: Option<&Path>) -> Result<Authentication> {
+pub fn initialize_from_config(
+    config_path: Option<&Path>,
+    base_url: &Url,
+) -> Result<Authentication> {
     let auth_mode = match config_path {
         None => Mode::None,
         Some(path) => {
@@ -90,7 +96,7 @@ pub fn initialize_from_config(config_path: Option<&Path>) -> Result<Authenticati
                         )
                     })?;
                 return wfc_config
-                    .into_authentication()
+                    .into_authentication(base_url)
                     .context("Error converting WFC authentication config");
             } else {
                 // Internal format
@@ -263,7 +269,7 @@ pub fn build_http_client(
     )?;
 
     // Load auth information from the configuration
-    let mut authentication = initialize()?;
+    let mut authentication = initialize(&server_url)?;
     // Make a cookie jar for our client
     let cookie_store = std::sync::Arc::new(reqwest_cookie_store::CookieStoreMutex::new(
         authentication.cookie_store(&server_url)?,

@@ -6,6 +6,28 @@
 
 ## Fixes
 
+# v1.8.0 (2026-10-07)
+
+## Highlights
+
+Adds .NET and OpenTelemetry-based coverage guidance, a crash deduplication command, and corpus seeding that now reuses values from earlier responses. Substantially hardens OpenAPI/Swagger spec parsing against non-standard real-world specs (with new v3.2 support), and fixes several WFC authentication bugs as well as stack overflows/panics on recursive or multi-type schemas.
+
+## Features
+
+- Adds support for .NET coverage based on cobertura and dotnet-coverage in [#336](https://github.com/TNO-S3/WuppieFuzz/pull/336)
+- Adds support for coverage guidance using OpenTelemetry in [#358](https://github.com/TNO-S3/WuppieFuzz/pull/358)
+- Adds crash deduplication command in [#334](https://github.com/TNO-S3/WuppieFuzz/pull/334)
+- Fix corpus never referencing values from earlier responses in [#377](https://github.com/TNO-S3/WuppieFuzz/pull/377)
+
+## Fixes
+
+- Fix OpenAPI/Swagger spec parsing failures on several real-world benchmark APIs: missing/blank `info.title`/`info.version`, Swagger 2.0's non-standard `type: file` schemas, non-standard integer/number `format`s (e.g. `uint32`), duplicate JSON object keys, non-standard siblings of `$ref`, and missing response `description`s are now all handled by a new `roas`-based fallback parser (which also adds OpenAPI v3.2 support), and panics in both `openapiv3-extended`'s and `roas`'s own upgrade paths are now caught instead of crashing. The spec loader also now warns with specifics whenever it had to work around a non-standard or semantically invalid spec, instead of silently patching it in [#391](https://github.com/TNO-S3/WuppieFuzz/pull/391)
+- Harmonizes requests-per-second vs sequences-per-second reporting. Previously the former could be lower than the latter, due to a mismatch in how both were measured. We now do our own bookkeeping for seq/sec reporting as well, ensuring the intuitive constraint that seq/sec > req/sec (a sequence contains at least one request) in [#372](https://github.com/TNO-S3/WuppieFuzz/pull/372)
+- externalEndpointURL silently dropped (camelCase rename mismatch) in [#387](https://github.com/TNO-S3/WuppieFuzz/pull/387)
+- Fix relative path in login of WFC not resolving to full URL in [#388](https://github.com/TNO-S3/WuppieFuzz/pull/388)
+- Fix a stack overflow when fuzzing APIs with mutually recursive response schemas, by detecting `$ref` cycles in the link mutator; recursion-limit warnings are now also logged only once instead of flooding the terminal in [#389](https://github.com/TNO-S3/WuppieFuzz/pull/389)
+- Fix a panic during corpus generation on schemas with multiple types, such as OpenAPI 3.1's nullable `type: [x, "null"]`; they are now handled like their non-null type in [#394](https://github.com/TNO-S3/WuppieFuzz/pull/394)
+
 # v1.7.1 (2026-08-26)
 
 ## Highlights

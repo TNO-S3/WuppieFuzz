@@ -57,6 +57,13 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      # Needed by build.rs to regenerate THIRD_PARTY_NOTICES; without it the
+      # regeneration is skipped (see build.rs), which would make the
+      # "Check for uncommitted changes" step below unable to catch a stale
+      # THIRD_PARTY_NOTICES file.
+      - name: Install cargo-about
+        run: cargo install cargo-about --features cli --locked
+
       # Run `cargo fmt` to check formatting
       - name: Check formatting with rustfmt
         run: cargo fmt --all -- --check

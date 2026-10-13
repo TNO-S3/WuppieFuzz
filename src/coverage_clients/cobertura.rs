@@ -1,0 +1,628 @@
+//! Generic Cobertura-over-HTTP coverage client.
+//!
+//! Any coverage agent that speaks the WuppieFuzz Cobertura HTTP protocol
+//! (GET `/coverage[?reset=true]` → Cobertura XML, optional GET `/report` → ZIP)
+//! can be used with this client.
+//!
+//! The bundled .NET agent (`coverage_agents/dotnet/`) is the reference implementation:
+//! it wraps Microsoft's `dotnet-coverage` tool and converts binary `.coverage` snapshots
+//! to Cobertura XML on demand. Other language agents may implement the same HTTP contract.
+//!
+//! # Wire format
+//! `/coverage` responses come in one of two formats, distinguished by
+//! `Content-Type`:
+//! - `application/x-wuppiefuzz-coverage-lines` (preferred, fast path): compact
+//!   tab-separated lines, one per covered source range:
+//!   `<path>\t<start_line>\t<end_line>\t<hit 0|1>\n`. The .NET agent reads this
+//!   directly from the coverage snapshot's module/function/line data, without
+//!   ever building or serializing a Cobertura XML document (see
+//!   `CoverageReportReader` in `coverage_agents/dotnet/Program.cs`).
+//! - `application/xml` (fallback): full Cobertura XML, used if an agent's
+//!   fast-read path is unavailable or not implemented.
+
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    fs,
+    io::{Cursor, Read, Write},
+    net::{TcpStream, ToSocketAddrs},
+    path::Path,
+    time::Duration,
+};
+
+use quick_xml::de as xml_de;
+use reqwest::{Url, blocking::Client};
+use serde::Deserialize;
+use zip::ZipArchive;
+
+use super::CoverageClient;
+use crate::coverage_clients::MAP_SIZE;
+
+// --- Cobertura XML deserialization ---
+
+#[derive(Debug, Deserialize)]
+#[serde(rename = "coverage")]
+struct CoberturaCoverage {
+    packages: CoberturaPackages,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CoberturaPackages {
+    #[serde(rename = "package", default)]
+    items: Vec<CoberturaPackage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CoberturaPackage {
+    classes: CoberturaClasses,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CoberturaClasses {
+    #[serde(rename = "class", default)]
+    items: Vec<CoberturaClass>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CoberturaClass {
+    #[serde(rename = "@filename")]
+    filename: String,
+    #[serde(default)]
+    lines: Option<CoberturaLines>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CoberturaLines {
+    #[serde(rename = "line", default)]
+    items: Vec<CoberturaLine>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CoberturaLine {
+    #[serde(rename = "@number")]
+    number: u32,
+    #[serde(rename = "@hits")]
+    hits: u64,
+}
+
+// --- Coverage client ---
+
+/// Generic coverage client for agents that serve Cobertura XML over HTTP.
+///
+/// Communicates with any WuppieFuzz-compatible Cobertura agent via:
+/// - `GET /coverage[?reset=true]` — returns a Cobertura XML snapshot
+/// - `GET /report` — returns an HTML report as a ZIP archive (optional; agents may omit this)
+pub struct CoberturaCoverageClient {
+    /// Coverage bitmap for the current fuzzing iteration.
+    cov_map: [u8; MAP_SIZE],
+    /// Cumulative coverage bitmap across all iterations (OR of all cov_maps).
+    cov_map_total: [u8; MAP_SIZE],
+    /// Maps (filename, line_number) to a bit index in cov_map.
+    bit_idx_mapping: HashMap<(String, u32), usize>,
+    /// Number of bits allocated in the coverage map (one per unique source line seen).
+    first_unused_idx: usize,
+    max_ratio: (u64, u64),
+    url: Url,
+    client: Client,
+    /// Only include classes whose filename contains this string. `None` means include all.
+    namespace_filter: Option<String>,
+    /// Persistent raw-protocol connection used for the hot `fetch_coverage` path
+    /// (see `RawCoverageServerLoop` in the .NET agent's `Program.cs` for the wire
+    /// format and the rationale). `None` if the agent doesn't expose this port,
+    /// or once any I/O error occurs on it — the client then falls back to the
+    /// plain HTTP path (`fetch_coverage_internal`) for the rest of the run.
+    raw_stream: Option<TcpStream>,
+}
+
+/// Connects to the agent's raw fast-path port (`coverage_host`'s port + 1) with
+/// a short timeout, so we don't stall startup if an agent doesn't implement it.
+/// Sets `TCP_NODELAY`, though since every response is written as a single
+/// buffer server-side, Nagle's algorithm shouldn't be able to bite us anyway.
+fn connect_raw(url: &Url) -> Option<TcpStream> {
+    let host = url.host_str()?;
+    let port = url.port()?.checked_add(1)?;
+    let addr = (host, port).to_socket_addrs().ok()?.next()?;
+    let stream = TcpStream::connect_timeout(&addr, Duration::from_millis(200)).ok()?;
+    stream.set_nodelay(true).ok();
+    Some(stream)
+}
+
+impl CoberturaCoverageClient {
+    /// Create a new `CoberturaCoverageClient` pointed at the given agent URL.
+    ///
+    /// `namespace_filter`, when set, restricts coverage to classes whose filename
+    /// contains the given substring (e.g. `"Controllers"` or `"MyApp"`). Useful
+    /// for excluding third-party or generated code from the coverage map.
+    pub fn new(url: Url, namespace_filter: Option<String>) -> Self {
+        let raw_stream = connect_raw(&url);
+        if raw_stream.is_some() {
+            log::debug!("Connected to cobertura agent's raw fast-path port");
+        } else {
+            log::debug!(
+                "Cobertura agent's raw fast-path port unavailable, using HTTP for /coverage"
+            );
+        }
+        Self {
+            cov_map: [0; MAP_SIZE],
+            cov_map_total: [0; MAP_SIZE],
+            bit_idx_mapping: HashMap::new(),
+            first_unused_idx: 0,
+            max_ratio: (0, 0),
+            url,
+            // Disable HTTP keep-alive connection reuse for this client. The
+            // .NET agent's HttpListener writes response headers and body as
+            // two separate socket writes without setting TCP_NODELAY. On a
+            // *reused* keep-alive connection this triggers the classic
+            // Nagle/delayed-ACK interaction: the agent's second write waits
+            // for our ACK of the first, and our TCP stack delays that ACK by
+            // up to ~40ms since we have no outgoing data to piggy-back it on.
+            // A fresh connection's first write is never held back this way
+            // (confirmed empirically: reused-connection fetches averaged
+            // ~50ms for a larger instrumented app vs. ~6-10ms with a new
+            // connection per request). Forcing a new connection per request
+            // costs a negligible local TCP handshake but avoids the stall
+            // entirely. This client talks only to the local coverage agent,
+            // never the fuzzing target, so this has no effect on request
+            // throughput against the target under test.
+            //
+            // Note: when `raw_stream` above is available, none of this
+            // matters for `fetch_coverage` any more, since that hot path uses
+            // the persistent raw connection instead of HTTP. This client is
+            // still used for `generate_coverage_report`, which only runs once
+            // at the end of a campaign, so its performance is not important.
+            client: Client::builder()
+                .tcp_nodelay(true)
+                .pool_max_idle_per_host(0)
+                .build()
+                .unwrap_or_else(|_| Client::new()),
+            namespace_filter,
+            raw_stream,
+        }
+    }
+
+    /// Returns (or allocates) the bit index for a `(filename, line_number)` pair.
+    fn get_bit_index(&mut self, filename: &str, line: u32) -> Option<usize> {
+        match self.bit_idx_mapping.entry((filename.to_owned(), line)) {
+            Entry::Occupied(e) => Some(*e.get()),
+            Entry::Vacant(e) => {
+                let idx = self.first_unused_idx;
+                if idx >= MAP_SIZE * 8 {
+                    log::error!("Coverage map full, cannot track line {line} in {filename}");
+                    return None;
+                }
+                self.first_unused_idx += 1;
+                Some(*e.insert(idx))
+            }
+        }
+    }
+
+    fn class_matches_filter(&self, filename: &str) -> bool {
+        match &self.namespace_filter {
+            None => true,
+            Some(filter) => {
+                if filename.contains(filter.as_str()) {
+                    return true;
+                }
+                log::trace!("Skipping class {filename}");
+                false
+            }
+        }
+    }
+
+    /// Marks a single (filename, line) pair as hit or not-hit in `cov_map`,
+    /// allocating a bit for it first if this is the first time it's been seen.
+    fn set_line_hit(&mut self, filename: &str, line: u32, hit: bool) {
+        let Some(bit_idx) = self.get_bit_index(filename, line) else {
+            return;
+        };
+        if hit {
+            let byte_idx = bit_idx / 8;
+            let bit_offset = bit_idx % 8;
+            self.cov_map[byte_idx] |= 0b_1000_0000 >> bit_offset;
+        }
+    }
+
+    fn process_coverage(&mut self, report: CoberturaCoverage) {
+        self.cov_map = [0; MAP_SIZE];
+        for package in report.packages.items {
+            for class in package.classes.items {
+                if !self.class_matches_filter(&class.filename) {
+                    continue;
+                }
+                let Some(lines) = class.lines else { continue };
+                for line in lines.items {
+                    // Allocate a bit for every source line we see, hit or not,
+                    // so the coverage ratio reflects uncovered lines correctly.
+                    self.set_line_hit(&class.filename, line.number, line.hits > 0);
+                }
+            }
+        }
+        self.merge_into_total();
+    }
+
+    /// Parses an agent's fast tab-separated wire format:
+    /// `<path>\t<start_line>\t<end_line>\t<hit 0|1>` per line. Each range is
+    /// expanded to per-line bits, same as the Cobertura path, so both formats
+    /// produce identical `cov_map` semantics.
+    fn process_fast_lines(&mut self, body: &str) {
+        self.cov_map = [0; MAP_SIZE];
+        for entry in body.lines() {
+            let mut fields = entry.split('\t');
+            let (Some(path), Some(start), Some(end), Some(hit)) =
+                (fields.next(), fields.next(), fields.next(), fields.next())
+            else {
+                if !entry.is_empty() {
+                    log::warn!("Malformed coverage line from cobertura agent: {entry:?}");
+                }
+                continue;
+            };
+            if !self.class_matches_filter(path) {
+                continue;
+            }
+            let (Ok(start), Ok(end)) = (start.parse::<u32>(), end.parse::<u32>()) else {
+                log::warn!("Malformed line range from cobertura agent: {entry:?}");
+                continue;
+            };
+            let hit = hit == "1";
+            for line in start..=end {
+                self.set_line_hit(path, line, hit);
+            }
+        }
+        self.merge_into_total();
+    }
+
+    fn merge_into_total(&mut self) {
+        for (dst, src) in self.cov_map_total.iter_mut().zip(self.cov_map.iter()) {
+            *dst |= src;
+        }
+    }
+
+    /// Fetches a coverage snapshot over the persistent raw connection, if one
+    /// is open. Returns `None` (and permanently drops `raw_stream`, falling
+    /// back to HTTP for the rest of the run) on any I/O or protocol error.
+    ///
+    /// Wire format (see `RawCoverageServerLoop` in the .NET agent's
+    /// `Program.cs`): write a single byte (0 = fetch, 1 = fetch-and-reset),
+    /// then read a 4-byte little-endian length prefix followed by that many
+    /// bytes of UTF-8 payload in the same tab-separated format as the HTTP
+    /// fast path.
+    fn fetch_coverage_raw_once(&mut self, reset: bool) -> std::io::Result<String> {
+        let stream = self
+            .raw_stream
+            .as_mut()
+            .expect("fetch_coverage_raw_once called without a raw_stream");
+        stream.write_all(&[reset as u8])?;
+        stream.flush()?;
+        let mut len_buf = [0u8; 4];
+        stream.read_exact(&mut len_buf)?;
+        let len = u32::from_le_bytes(len_buf) as usize;
+        let mut body_buf = vec![0u8; len];
+        stream.read_exact(&mut body_buf)?;
+        String::from_utf8(body_buf)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+    }
+
+    fn coverage_ratio(&self) -> (u64, u64) {
+        let total = self.first_unused_idx as u64;
+        let full_bytes = self.first_unused_idx / 8;
+        let partial_bits = self.first_unused_idx % 8;
+        let mut ones = self.cov_map_total[..full_bytes]
+            .iter()
+            .fold(0u64, |sum, b| sum + u64::from(b.count_ones()));
+        if partial_bits > 0 && full_bytes < MAP_SIZE {
+            let mask = 0xFFu8 << (8 - partial_bits);
+            ones += u64::from((self.cov_map_total[full_bytes] & mask).count_ones());
+        }
+        (ones, total)
+    }
+}
+
+impl CoverageClient for CoberturaCoverageClient {
+    fn fetch_coverage(&mut self, reset: bool) {
+        if self.raw_stream.is_some() {
+            match self.fetch_coverage_raw_once(reset) {
+                Ok(body) => {
+                    self.process_fast_lines(&body);
+                    return;
+                }
+                Err(err) => {
+                    log::warn!(
+                        "Raw fast-path coverage connection failed ({err}), \
+                        falling back to HTTP for the rest of the run"
+                    );
+                    self.raw_stream = None;
+                }
+            }
+        }
+
+        let mut url = self.url.clone();
+        url.set_path("/coverage");
+        if reset {
+            url.set_query(Some("reset=true"));
+        }
+        match self.client.get(url).send() {
+            Ok(response) => {
+                let is_fast_format = response
+                    .headers()
+                    .get("content-type")
+                    .and_then(|v| v.to_str().ok())
+                    .is_some_and(|ct| ct.contains("x-wuppiefuzz-coverage-lines"));
+                match response.text() {
+                    Ok(body) if is_fast_format => self.process_fast_lines(&body),
+                    Ok(body) => match xml_de::from_str::<CoberturaCoverage>(&body) {
+                        Ok(report) => self.process_coverage(report),
+                        Err(err) => {
+                            log::error!("Failed to parse cobertura XML from cobertura agent: {err}")
+                        }
+                    },
+                    Err(err) => log::error!("Failed to read coverage response body: {err}"),
+                }
+            }
+            Err(err) => log::error!("Failed to fetch coverage from cobertura agent: {err}"),
+        }
+    }
+
+    fn get_coverage_ptr(&mut self) -> *mut u8 {
+        self.cov_map.as_mut_ptr()
+    }
+
+    fn max_coverage_ratio(&mut self) -> (u64, u64) {
+        let (count, total) = self.coverage_ratio();
+        self.max_ratio.0 = self.max_ratio.0.max(count);
+        self.max_ratio.1 = self.max_ratio.1.max(total);
+        self.max_ratio
+    }
+
+    fn generate_coverage_report(&self, report_path: &Path) {
+        let mut url = self.url.clone();
+        url.set_path("/report");
+        let response = match self.client.get(url).send() {
+            Ok(r) => r,
+            Err(err) => {
+                log::error!("Failed to request report from cobertura agent: {err}");
+                return;
+            }
+        };
+
+        let content_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_owned();
+
+        match response.bytes() {
+            Err(err) => log::error!("Failed to read report response from cobertura agent: {err}"),
+            Ok(bytes) => {
+                if content_type.contains("zip") {
+                    unpack_report_zip(&bytes, report_path);
+                } else {
+                    // Fallback: agent returned cobertura XML (no reportgenerator installed)
+                    let dest = report_path.join("cobertura");
+                    let xml_path = dest.join("coverage.xml");
+                    if let Err(err) = fs::create_dir_all(&dest) {
+                        log::error!("Cannot create cobertura report dir: {err}");
+                        return;
+                    }
+                    match fs::write(&xml_path, &bytes) {
+                        Ok(()) => log::info!("Cobertura coverage XML written to {xml_path:?}"),
+                        Err(err) => log::error!("Failed to write cobertura coverage XML: {err}"),
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Unpacks the ZIP archive received from the agent into `report_path/cobertura/`.
+fn unpack_report_zip(bytes: &[u8], report_path: &Path) {
+    let dest = report_path.join("cobertura");
+    if let Err(err) = fs::create_dir_all(&dest) {
+        log::error!("Cannot create cobertura report dir: {err}");
+        return;
+    }
+    let mut archive = match ZipArchive::new(Cursor::new(bytes)) {
+        Ok(a) => a,
+        Err(err) => {
+            log::error!("Failed to open report ZIP from cobertura agent: {err}");
+            return;
+        }
+    };
+    for i in 0..archive.len() {
+        let mut entry = match archive.by_index(i) {
+            Ok(e) => e,
+            Err(err) => {
+                log::warn!("Skipping zip entry {i}: {err}");
+                continue;
+            }
+        };
+        let out_path = dest.join(entry.name());
+        // Protect against zip-slip path traversal attacks
+        if !out_path.starts_with(&dest) {
+            log::warn!("Skipping zip entry with suspicious path: {}", entry.name());
+            continue;
+        }
+        if entry.is_dir() {
+            let _ = fs::create_dir_all(&out_path);
+        } else {
+            if let Some(parent) = out_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            match fs::File::create(&out_path) {
+                Err(err) => log::warn!("Cannot create {out_path:?}: {err}"),
+                Ok(mut out_file) => {
+                    if let Err(err) = std::io::copy(&mut entry, &mut out_file) {
+                        log::warn!("Failed to write {out_path:?}: {err}");
+                    }
+                }
+            }
+        }
+    }
+    log::info!("Cobertura coverage report extracted to {dest:?}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE_COBERTURA: &str = r#"<?xml version="1.0" encoding="utf-8"?>
+<coverage version="1" timestamp="0" lines-valid="4" lines-covered="2" line-rate="0.5">
+  <packages>
+    <package name="MyApp" line-rate="0.5">
+      <classes>
+        <class name="MyApp.Controllers.HomeController" filename="Controllers/HomeController.cs" line-rate="0.5">
+          <methods/>
+          <lines>
+            <line number="10" hits="2" branch="False"/>
+            <line number="11" hits="0" branch="False"/>
+            <line number="15" hits="1" branch="False"/>
+          </lines>
+        </class>
+        <class name="MyApp.Other.Helper" filename="Other/Helper.cs" line-rate="0.0">
+          <methods/>
+          <lines>
+            <line number="5" hits="0" branch="False"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>"#;
+
+    #[test]
+    fn parse_cobertura_xml() {
+        let report: CoberturaCoverage = xml_de::from_str(SAMPLE_COBERTURA).unwrap();
+        let classes = &report.packages.items[0].classes.items;
+        assert_eq!(classes.len(), 2);
+        assert_eq!(classes[0].filename, "Controllers/HomeController.cs");
+        let lines = classes[0].lines.as_ref().unwrap();
+        assert_eq!(lines.items.len(), 3);
+        assert_eq!(lines.items[0].number, 10);
+        assert_eq!(lines.items[0].hits, 2);
+    }
+
+    #[test]
+    fn namespace_filter_match() {
+        let client = CoberturaCoverageClient::new(
+            "http://localhost:6302".parse().unwrap(),
+            Some("Controllers".to_owned()),
+        );
+        assert!(client.class_matches_filter("Controllers/HomeController.cs"));
+        assert!(!client.class_matches_filter("Other/Helper.cs"));
+    }
+
+    #[test]
+    fn namespace_filter_none_matches_all() {
+        let client = CoberturaCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
+        assert!(client.class_matches_filter("Controllers/HomeController.cs"));
+        assert!(client.class_matches_filter("Other/Helper.cs"));
+    }
+
+    #[test]
+    fn bitmap_set_correct_bits() {
+        let mut client =
+            CoberturaCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
+        let report: CoberturaCoverage = xml_de::from_str(SAMPLE_COBERTURA).unwrap();
+        client.process_coverage(report);
+
+        // 4 lines total -> 4 bits allocated (insertion order: 10, 11, 15, 5)
+        assert_eq!(client.first_unused_idx, 4);
+
+        // bit 0 -> line 10 (hits=2) -> byte 0, mask 0b_1000_0000  -> SET
+        // bit 1 -> line 11 (hits=0) -> byte 0, mask 0b_0100_0000  -> unset
+        // bit 2 -> line 15 (hits=1) -> byte 0, mask 0b_0010_0000  -> SET
+        // bit 3 -> line  5 (hits=0) -> byte 0, mask 0b_0001_0000  -> unset
+        assert_ne!(
+            client.cov_map[0] & 0b_1000_0000,
+            0,
+            "line 10 (hits=2) must be set"
+        );
+        assert_eq!(
+            client.cov_map[0] & 0b_0100_0000,
+            0,
+            "line 11 (hits=0) must not be set"
+        );
+        assert_ne!(
+            client.cov_map[0] & 0b_0010_0000,
+            0,
+            "line 15 (hits=1) must be set"
+        );
+        assert_eq!(
+            client.cov_map[0] & 0b_0001_0000,
+            0,
+            "line  5 (hits=0) must not be set"
+        );
+
+        // coverage_ratio: 2 set bits out of 4 total
+        let (ones, total) = client.coverage_ratio();
+        assert_eq!(total, 4);
+        assert_eq!(ones, 2);
+    }
+
+    #[test]
+    fn parse_fast_lines_matches_cobertura_semantics() {
+        // Same coverage as SAMPLE_COBERTURA, expressed in the fast wire
+        // format: ranges expand to per-line bits identically to the
+        // Cobertura per-line elements above.
+        const SAMPLE_FAST: &str = "Controllers/HomeController.cs\t10\t10\t1\n\
+             Controllers/HomeController.cs\t11\t11\t0\n\
+             Controllers/HomeController.cs\t15\t15\t1\n\
+             Other/Helper.cs\t5\t5\t0\n";
+
+        let mut client =
+            CoberturaCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
+        client.process_fast_lines(SAMPLE_FAST);
+
+        assert_eq!(client.first_unused_idx, 4);
+        assert_ne!(client.cov_map[0] & 0b_1000_0000, 0, "line 10 must be set");
+        assert_eq!(
+            client.cov_map[0] & 0b_0100_0000,
+            0,
+            "line 11 must not be set"
+        );
+        assert_ne!(client.cov_map[0] & 0b_0010_0000, 0, "line 15 must be set");
+        assert_eq!(
+            client.cov_map[0] & 0b_0001_0000,
+            0,
+            "line 5 must not be set"
+        );
+
+        let (ones, total) = client.coverage_ratio();
+        assert_eq!(total, 4);
+        assert_eq!(ones, 2);
+    }
+
+    #[test]
+    fn parse_fast_lines_expands_ranges() {
+        // A single range line (e.g. a multi-line statement/block) covers
+        // every line number in [start, end] inclusive.
+        let mut client =
+            CoberturaCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
+        client.process_fast_lines("Foo.cs\t8\t16\t1\n");
+
+        assert_eq!(client.first_unused_idx, 9); // lines 8..=16
+        let (ones, total) = client.coverage_ratio();
+        assert_eq!(total, 9);
+        assert_eq!(ones, 9);
+    }
+
+    #[test]
+    fn parse_fast_lines_respects_namespace_filter() {
+        let mut client = CoberturaCoverageClient::new(
+            "http://localhost:6302".parse().unwrap(),
+            Some("Controllers".to_owned()),
+        );
+        client.process_fast_lines(
+            "Controllers/HomeController.cs\t10\t10\t1\nOther/Helper.cs\t5\t5\t1\n",
+        );
+        assert_eq!(client.first_unused_idx, 1);
+    }
+
+    #[test]
+    fn parse_fast_lines_ignores_malformed_entries() {
+        let mut client =
+            CoberturaCoverageClient::new("http://localhost:6302".parse().unwrap(), None);
+        // Missing fields / non-numeric range should be skipped without panicking.
+        client.process_fast_lines("Foo.cs\tnotanumber\t10\t1\nFoo.cs\t1\n\n");
+        assert_eq!(client.first_unused_idx, 0);
+    }
+}
