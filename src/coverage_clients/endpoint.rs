@@ -18,11 +18,15 @@ use std::{
 
 use build_html::{Container, ContainerType, Html, HtmlContainer, HtmlPage, escape_html};
 use indexmap::{IndexMap, map::Entry};
+use strum::IntoDiscriminant;
 
 use super::{CoverageClient, MAP_SIZE};
 use crate::{
     input::Method,
-    openapi::{spec::Spec, validate_response::ValidationError},
+    openapi::{
+        spec::Spec,
+        validate_response::{ValidationError, ValidationErrorDiscriminants},
+    },
 };
 
 const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";
@@ -50,6 +54,27 @@ pub struct EndpointCoverageClient {
     cov_map_total: [u8; MAP_SIZE],
     len: usize,
     max_ratio: (u64, u64),
+    /// Distinct faults (validation errors) observed per (method, path), used for
+    /// building Web Fuzzing Commons (WFC) reports.
+    faults: Vec<EndpointFault>,
+}
+
+/// A distinct fault (validation error) observed on a given endpoint during the
+/// fuzzing campaign. Used to populate WFC reports (see `crate::reporting::wfc_report`).
+#[derive(Debug, Clone)]
+pub struct EndpointFault {
+    /// The HTTP method of the endpoint on which the fault was observed.
+    pub method: Method,
+    /// The path of the endpoint on which the fault was observed.
+    pub path: String,
+    /// The HTTP status code of the response that triggered the fault.
+    pub status: u16,
+    /// Which kind of validation error was observed.
+    pub discriminant: ValidationErrorDiscriminants,
+    /// A human-readable description of an example occurrence of this fault.
+    pub message: String,
+    /// The number of times this exact fault (same method, path and kind) was observed.
+    pub occurrences: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +120,7 @@ impl EndpointCoverageClient {
             cov_map_total: [0; MAP_SIZE],
             len,
             max_ratio: (0, len as u64),
+            faults: Vec::new(),
         }
     }
 
@@ -110,6 +136,10 @@ impl EndpointCoverageClient {
         output: String,
         validation_error: Option<ValidationError>,
     ) {
+        if let Some(err) = &validation_error {
+            self.record_fault(method, path.clone(), status, err);
+        }
+
         // Get the coverage entry for the method-path-status combination.
         // The entry may be Vacant or Occupied, see below for what this means.
         let entry = self
@@ -152,6 +182,68 @@ impl EndpointCoverageClient {
         // and since we always *add* coverage, we can OR the corresponding bit into that byte.
         self.cov_map[index / 8] |= 0b10000000 >> (index % 8);
         self.cov_map_total[index / 8] |= 0b10000000 >> (index % 8);
+    }
+
+    /// Records a validation error observed for a given (method, path), deduplicating
+    /// repeated occurrences of the same fault type by incrementing a counter instead
+    /// of storing a new entry.
+    fn record_fault(
+        &mut self,
+        method: Method,
+        path: String,
+        status: reqwest::StatusCode,
+        err: &ValidationError,
+    ) {
+        let discriminant = err.discriminant();
+        if let Some(existing) = self.faults.iter_mut().find(|fault| {
+            fault.method == method && fault.path == path && fault.discriminant == discriminant
+        }) {
+            existing.occurrences += 1;
+        } else {
+            self.faults.push(EndpointFault {
+                method,
+                path,
+                status: status.as_u16(),
+                discriminant,
+                message: err.to_string(),
+                occurrences: 1,
+            });
+        }
+    }
+
+    /// Returns all distinct faults (validation errors) observed so far, grouped by
+    /// endpoint and fault category.
+    pub fn faults(&self) -> &[EndpointFault] {
+        &self.faults
+    }
+
+    /// Returns the unique operation ids (`METHOD:path`) known from the API specification.
+    pub fn endpoint_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .endpoint_cov_map
+            .keys()
+            .map(|(method, path, _)| format!("{method}:{path}"))
+            .collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+
+    /// Returns, for every endpoint for which at least one status code was observed,
+    /// the operation id (`METHOD:path`) along with the list of observed HTTP status codes.
+    pub fn covered_http_status(&self) -> Vec<(String, Vec<Option<u16>>)> {
+        let mut map: IndexMap<String, Vec<Option<u16>>> = IndexMap::new();
+        for ((method, path, status), coverage) in &self.endpoint_cov_map {
+            if matches!(
+                coverage,
+                Coverage::ExpectedFound(..) | Coverage::UnexpectedFound(..)
+            ) {
+                map.entry(format!("{method}:{path}"))
+                    .or_default()
+                    .push(status.parse::<u16>().ok());
+            }
+        }
+        map.into_iter().collect()
     }
 
     fn export_filesystem(&self, base_path: &Path) -> Result<(), libafl::Error> {

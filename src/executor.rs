@@ -700,6 +700,39 @@ where
     pub fn start_timer(&mut self) {
         self.starting_time = Some(Instant::now())
     }
+
+    /// Generates a WFC-compliant `report.json` summarizing the fuzzing campaign, if
+    /// `--wfc-report` was requested.
+    pub fn generate_wfc_report_if_requested(
+        &mut self,
+        state: &FuzzerState,
+        report_path: Option<&std::path::Path>,
+    ) {
+        if !self.config.wfc_report {
+            return;
+        }
+        let fuzzing_duration = self
+            .starting_time
+            .map(|start| start.elapsed())
+            .unwrap_or_default();
+        let code_coverage_ratio = self.coverage_client.max_coverage_ratio();
+        let endpoint_coverage_ratio = self.endpoint_client.max_coverage_ratio();
+        let endpoint_client = self.endpoint_client.lock().unwrap();
+        if let Err(err) = crate::reporting::wfc_report::write_report(
+            crate::reporting::wfc_report::WfcReportContext {
+                config: self.config,
+                state,
+                endpoint_client: &endpoint_client,
+                evaluated_http_calls: self.performed_requests,
+                fuzzing_duration,
+                report_path,
+                code_coverage_ratio,
+                endpoint_coverage_ratio,
+            },
+        ) {
+            log::error!("Failed to write WFC report: {err}");
+        }
+    }
 }
 
 impl<EM, FZ, OT> Executor<EM, OpenApiInput, FuzzerState, FZ> for SequenceExecutor<OT>
@@ -752,7 +785,7 @@ const CURRENT_SEQUENCE_SUMMARY_MAX_LEN: usize = 120;
 /// Builds a short, human-readable summary of the request sequence currently
 /// being fuzzed (e.g. `"GET /pets -> POST /pets/{id}"`), truncated if it would
 /// otherwise be too long to display nicely.
-fn summarize_sequence(input: &OpenApiInput) -> String {
+pub(crate) fn summarize_sequence(input: &OpenApiInput) -> String {
     let mut summary: Vec<String> = input
         .0
         .iter()

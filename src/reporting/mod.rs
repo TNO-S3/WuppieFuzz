@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub mod sqlite;
+pub mod wfc_report;
 
 /// Coarse-grained OTel receiver/arbiter stats for dashboard reporting.
 #[derive(Debug, Clone, Copy, Default)]

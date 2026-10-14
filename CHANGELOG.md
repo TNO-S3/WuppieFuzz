@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Implement WFC-report support (pilot) in [#397](https://github.com/TNO-S3/WuppieFuzz/pull/397)
+
 # v1.8.0 (2026-10-07)
 
 ## Highlights
