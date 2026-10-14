@@ -99,8 +99,14 @@ struct TestCase {
     id: String,
     file_path: String,
     name: String,
-    start_line: u32,
-    end_line: u32,
+    // WuppieFuzz test cases are serialized request-sequence files, not generated
+    // source code, so there is no meaningful line range to report here. These
+    // fields are optional in the WFC schema, so they are omitted entirely rather
+    // than defaulting to a misleading `0`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start_line: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end_line: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     named_examples: Option<Vec<String>>,
 }
@@ -228,8 +234,8 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
             id: file_path.clone(),
             file_path,
             name: summarize_sequence(input),
-            start_line: 0,
-            end_line: 0,
+            start_line: None,
+            end_line: None,
             named_examples: None,
         });
     }
