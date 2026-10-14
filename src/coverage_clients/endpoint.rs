@@ -16,18 +16,23 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use build_html::{Container, ContainerType, Html, HtmlContainer, HtmlPage, escape_html};
+use build_html::{
+    Container, ContainerType, Html, HtmlContainer, HtmlPage, Table, TableCell, TableCellType,
+    TableRow, escape_html,
+};
 use indexmap::{IndexMap, map::Entry};
 use libafl::inputs::Input;
 use strum::IntoDiscriminant;
 
 use super::{CoverageClient, MAP_SIZE};
 use crate::{
+    initial_corpus::QUEUE_DIR,
     input::{Method, OpenApiInput},
     openapi::{
         spec::Spec,
         validate_response::{ValidationError, ValidationErrorDiscriminants},
     },
+    reporting::wfc_report::fault_category_name,
     state::CRASHES_DIR,
 };
 
@@ -109,12 +114,20 @@ pub struct CoverArgs<'a> {
 /// given fault, without writing a new copy of it.
 ///
 /// Faults recorded via `record_fault` are proactively written to `CRASHES_DIR` the
-/// moment they are first observed (see `ensure_crash_file`), so this should always
-/// succeed; a `None` result indicates that write failed (e.g. a read-only
-/// filesystem) or the file was removed from under us.
+/// moment they are first observed (see `ensure_crash_file`), so this is checked
+/// first and should almost always succeed. As a fallback (e.g. a read-only
+/// filesystem prevented the proactive write, or the file was otherwise removed
+/// from under us), LibAFL's own `QUEUE_DIR` is also checked under the same name,
+/// since LibAFL persists crashing inputs there too as part of its normal solutions
+/// handling. Only if neither location has the file does this return `None`.
 pub fn locate_test_case(file_name: &str) -> Option<String> {
-    let path = Path::new(CRASHES_DIR).join(file_name);
-    path.exists().then(|| path.to_string_lossy().to_string())
+    for dir in [CRASHES_DIR, QUEUE_DIR] {
+        let path = Path::new(dir).join(file_name);
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+    None
 }
 
 /// Ensures `sequence` is saved to `CRASHES_DIR` under its deterministic content-hash
@@ -154,6 +167,41 @@ pub fn ensure_crash_file_path(sequence: &OpenApiInput) -> String {
         .join(file_name)
         .to_string_lossy()
         .to_string()
+}
+
+/// HTML presentation data for a single fault, used in the flat "All faults" table
+/// of the HTML coverage report.
+struct FaultBadge {
+    /// The WFC fault category id (e.g. `SCHEMA_INVALID_RESPONSE`), shared with
+    /// `reporting::wfc_report` so both reports use the exact same vocabulary.
+    category: &'static str,
+    /// The on-disk reproducer path, if one could be located (see `locate_test_case`).
+    reproduce: Option<String>,
+    /// A CSS class (`cat-<CATEGORY>`) identifying this fault's WFC category, used
+    /// as a styling hook for the category badge.
+    class: String,
+}
+
+/// Builds the badge category, reproducer path and CSS class used to render `fault`
+/// in the HTML coverage report, using the same WFC category vocabulary as
+/// `reporting::wfc_report`.
+fn fault_badge(fault: &EndpointFault) -> FaultBadge {
+    let (category, _code) = fault_category_name(fault.discriminant, fault.status);
+    FaultBadge {
+        category,
+        reproduce: locate_test_case(&fault.test_case_name),
+        class: format!("cat-{category}"),
+    }
+}
+
+/// Truncates `s` to at most `max_chars` characters, appending an ellipsis if it was
+/// shortened. Used to keep long validation-error messages (which can embed entire
+/// schema dumps) from blowing up the "All faults" table layout.
+fn truncate(s: &str, max_chars: usize) -> String {
+    match s.char_indices().nth(max_chars) {
+        Some((byte_idx, _)) => format!("{}…", &s[..byte_idx]),
+        None => s.to_string(),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -245,7 +293,6 @@ impl EndpointCoverageClient {
             }
             // Occupied entry, either already found (expected or unexpected) or expected but not yet found
             Entry::Occupied(mut entry) => {
-                // Only new coverage needs to be inserted.
                 if matches!(entry.get(), Coverage::ExpectedNotFound) {
                     entry.insert(Coverage::ExpectedFound(input, output));
                 }
@@ -431,6 +478,57 @@ impl EndpointCoverageClient {
                 |list, item| list.with_container(item),
             );
 
+        // A flat table of every distinct fault found, for users who want an overview
+        // without clicking through the endpoint tree. Mirrors the WFC report's
+        // `foundFaults`, but interactive and with a ready-to-copy reproduce command.
+        let mut faults_table = Table::new().with_header_row([
+            "Method & path",
+            "Status",
+            "Category",
+            "Occurrences",
+            "Message",
+            "Reproducer",
+        ]);
+        for fault in &self.faults {
+            let FaultBadge {
+                category,
+                reproduce,
+                class,
+            } = fault_badge(fault);
+            let reproduce_cell = match &reproduce {
+                Some(path) => format!(
+                    r#"<code title="{escaped_path}">{escaped_path}</code><br>
+                       <button class="copy-btn" data-copy="wuppiefuzz reproduce {escaped_path}">Copy reproduce command</button>"#,
+                    escaped_path = escape_html(path)
+                ),
+                None => "<em>not found in crashes or queue directories</em>".to_string(),
+            };
+            faults_table.add_custom_body_row(
+                TableRow::new()
+                    .with_cell(TableCell::new(TableCellType::Data).with_raw(format!(
+                        "{} {}",
+                        fault.method,
+                        escape_html(&fault.path)
+                    )))
+                    .with_cell(
+                        TableCell::new(TableCellType::Data).with_raw(fault.status.to_string()),
+                    )
+                    .with_cell(
+                        TableCell::new(TableCellType::Data)
+                            .with_raw(format!(r#"<span class="badge {class}">{category}</span>"#)),
+                    )
+                    .with_cell(
+                        TableCell::new(TableCellType::Data).with_raw(fault.occurrences.to_string()),
+                    )
+                    .with_cell(TableCell::new(TableCellType::Data).with_raw(format!(
+                        "<span title=\"{}\">{}</span>",
+                        escape_html(&fault.message),
+                        escape_html(&truncate(&fault.message, 160)),
+                    )))
+                    .with_cell(TableCell::new(TableCellType::Data).with_raw(reproduce_cell)),
+            );
+        }
+
         // The entire page is just two containers: the header ("menu") listing the endpoints,
         // and the main area listing the input corresponding to a selected endpoint.
         let html: String = HtmlPage::new()
@@ -450,7 +548,19 @@ impl EndpointCoverageClient {
             .with_header(1, "Endpoint coverage report")
             .with_container(
                 Container::new(ContainerType::Div)
-                    .with_attributes([("class", "contents")])
+                    .with_attributes([("id", "tabs")])
+                    .with_raw(format!(
+                        r##"
+                        <button id="tab-endpoints" class="tab active">Endpoints</button>
+                        <button id="tab-faults" class="tab">All faults ({})</button>
+                        <a id="wfc-link" href="../report.json" target="_blank" title="Only present if the campaign was run with --wfc-report">View WFC report.json &#x2197;&#xfe0f;</a>
+                        "##,
+                        self.faults.len()
+                    )),
+            )
+            .with_container(
+                Container::new(ContainerType::Div)
+                    .with_attributes([("id", "view-endpoints"), ("class", "contents")])
                     .with_container(
                         Container::new(ContainerType::Nav)
                             .with_header(2, "Endpoints")
@@ -476,6 +586,16 @@ impl EndpointCoverageClient {
                             .with_paragraph_attr("None selected yet",
                                 [("id", "output-pane")],
                             )
+                    ),
+            )
+            .with_container(
+                Container::new(ContainerType::Div)
+                    .with_attributes([("id", "view-faults"), ("class", "contents"), ("style", "display:none")])
+                    .with_container(
+                        Container::new(ContainerType::Article)
+                            .with_attributes([("style", "width: 100%")])
+                            .with_header(2, "All faults")
+                            .with_raw(faults_table.to_html_string()),
                     ),
             )
             .with_container(
@@ -598,6 +718,35 @@ $(function() {
     $("input").click(update_hidden);
     $("label").click(update_hidden);
     $("input").prop("checked", true);
+
+    $("#tab-endpoints").click(function () {
+        $("#view-faults").hide();
+        $("#view-endpoints").show();
+        $("#filters").show();
+        $(this).addClass("active");
+        $("#tab-faults").removeClass("active");
+    });
+    $("#tab-faults").click(function () {
+        $("#view-endpoints").hide();
+        $("#view-faults").show();
+        $("#filters").hide();
+        $(this).addClass("active");
+        $("#tab-endpoints").removeClass("active");
+    });
+
+    // Delegated handler: the faults table's copy buttons are generated dynamically,
+    // so attach the listener to a static ancestor rather than the buttons themselves.
+    $(document).on("click", ".copy-btn", function () {
+        let text = $(this).attr("data-copy");
+        navigator.clipboard.writeText(text).then(function () {
+            let button = this;
+            let original = $(button).text();
+            $(button).text("Copied!");
+            setTimeout(function () {
+                $(button).text(original);
+            }, 1500);
+        }.bind(this));
+    });
 });
 
 "##;
@@ -647,5 +796,63 @@ article {
     position: fixed;
     top: 5pt;
     right: 5pt;
+}
+#tabs {
+    position: fixed;
+    top: 5pt;
+    left: 260pt;
+}
+.tab {
+    font: inherit;
+    padding: 4pt 10pt;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    background: #eee;
+    cursor: pointer;
+}
+.tab.active {
+    background: #fff;
+    font-weight: bold;
+}
+#wfc-link {
+    margin-left: 15pt;
+}
+.badge {
+    display: inline-block;
+    padding: 1pt 5pt;
+    border-radius: 3pt;
+    background: #ffe0b2;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+#view-faults table {
+    border-collapse: collapse;
+    /* Fixed layout + explicit column widths below keep every column (especially
+       Reproducer, the last one) in its own place regardless of how long an
+       individual Message cell's content is; without this, a long unbroken message
+       can otherwise make the table widen unpredictably and push later columns
+       onto their own line. */
+    table-layout: fixed;
+    width: 100%;
+}
+#view-faults th, #view-faults td {
+    border: 1px solid #ccc;
+    padding: 4pt 6pt;
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: break-word;
+}
+#view-faults th {
+    background: #eee;
+}
+#view-faults th:nth-child(1), #view-faults td:nth-child(1) { width: 18%; }
+#view-faults th:nth-child(2), #view-faults td:nth-child(2) { width: 7%; }
+#view-faults th:nth-child(3), #view-faults td:nth-child(3) { width: 16%; }
+#view-faults th:nth-child(4), #view-faults td:nth-child(4) { width: 9%; }
+#view-faults th:nth-child(5), #view-faults td:nth-child(5) { width: 35%; }
+#view-faults th:nth-child(6), #view-faults td:nth-child(6) { width: 15%; }
+.copy-btn {
+    font-size: 0.85em;
+    cursor: pointer;
 }
 "##;

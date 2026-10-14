@@ -139,14 +139,17 @@ struct Warning {
 /// closest-matching WFC fault category. Where WFC does not (yet) define a
 /// matching category, a WuppieFuzz-specific category in the 900-999 "custom"
 /// range (reserved by the WFC schema for tool-specific faults) is used instead.
-fn fault_category(
+///
+/// Exposed as `pub(crate)` (rather than folded directly into `fault_category`) so
+/// the HTML endpoint coverage report (`coverage_clients::endpoint`) can label and
+/// filter faults using the exact same category vocabulary as the WFC report.
+pub(crate) fn fault_category_name(
     discriminant: ValidationErrorDiscriminants,
     status: u16,
-    message: &str,
-) -> FaultCategoryId {
+) -> (&'static str, u32) {
     use ValidationErrorDiscriminants::*;
 
-    let (id, code) = match discriminant {
+    match discriminant {
         OperationNotInSpec => ("WUP_OPERATION_NOT_IN_SPEC", 900),
         Status5xxNotSpecified => {
             if status == 500 {
@@ -165,7 +168,15 @@ fn fault_category(
         SchemaIsAny => ("WUP_SCHEMA_IS_ANY", 903),
         SchemaIsFalse => ("WUP_SCHEMA_IS_FALSE", 904),
         PossibleInjectionSignature => ("WUP_POSSIBLE_INJECTION_SIGNATURE", 905),
-    };
+    }
+}
+
+fn fault_category(
+    discriminant: ValidationErrorDiscriminants,
+    status: u16,
+    message: &str,
+) -> FaultCategoryId {
+    let (id, code) = fault_category_name(discriminant, status);
 
     FaultCategoryId {
         id: id.to_string(),
