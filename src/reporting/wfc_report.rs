@@ -244,17 +244,34 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         .faults()
         .iter()
         .map(|fault| {
-            let test_case_id = fault.test_case_path.clone().unwrap_or_else(|| {
+            // By the time the campaign has ended (and this report is written), the
+            // request sequence that first triggered this fault should be on disk,
+            // either as a LibAFL crash file or (for faults first seen during corpus
+            // minimization) as a seed in the initial corpus. Fall back to a
+            // synthetic id if neither is found, e.g. if the corpus directory was
+            // cleared out from under us mid-campaign.
+            let reproducer_path =
+                crate::coverage_clients::endpoint::locate_test_case(&fault.test_case_name);
+            if reproducer_path.is_none() {
+                log::warn!(
+                    "Could not locate a test case file named {} for fault {}:{} ({}) on disk",
+                    fault.test_case_name,
+                    fault.method,
+                    fault.path,
+                    fault.status
+                );
+            }
+            let test_case_id = reproducer_path.clone().unwrap_or_else(|| {
                 format!(
                     "endpoint-coverage:{}:{}:{}",
                     fault.method, fault.path, fault.status
                 )
             });
-            if let Some(reproducer_path) = &fault.test_case_path {
+            if let Some(reproducer_path) = reproducer_path {
                 test_file_paths.push(reproducer_path.clone());
                 test_cases.push(TestCase {
                     id: reproducer_path.clone(),
-                    file_path: reproducer_path.clone(),
+                    file_path: reproducer_path,
                     name: format!("{} {} ({})", fault.method, fault.path, fault.status),
                     start_line: None,
                     end_line: None,
