@@ -239,30 +239,46 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
             named_examples: None,
         });
     }
-    test_file_paths.sort();
-    test_file_paths.dedup();
-    let total_tests = test_cases.len() as u64;
 
     let found_faults: Vec<FoundFault> = endpoint_client
         .faults()
         .iter()
-        .map(|fault| FoundFault {
-            operation_id: format!("{}:{}", fault.method, fault.path),
-            test_case_id: format!(
-                "endpoint-coverage:{}:{}:{}",
-                fault.method, fault.path, fault.status
-            ),
-            fault_categories: vec![fault_category(
-                fault.discriminant,
-                fault.status,
-                &format!("{} (observed {} time(s))", fault.message, fault.occurrences),
-            )],
+        .map(|fault| {
+            let test_case_id = fault.test_case_path.clone().unwrap_or_else(|| {
+                format!(
+                    "endpoint-coverage:{}:{}:{}",
+                    fault.method, fault.path, fault.status
+                )
+            });
+            if let Some(reproducer_path) = &fault.test_case_path {
+                test_file_paths.push(reproducer_path.clone());
+                test_cases.push(TestCase {
+                    id: reproducer_path.clone(),
+                    file_path: reproducer_path.clone(),
+                    name: format!("{} {} ({})", fault.method, fault.path, fault.status),
+                    start_line: None,
+                    end_line: None,
+                    named_examples: None,
+                });
+            }
+            FoundFault {
+                operation_id: format!("{}:{}", fault.method, fault.path),
+                test_case_id,
+                fault_categories: vec![fault_category(
+                    fault.discriminant,
+                    fault.status,
+                    &format!("{} (observed {} time(s))", fault.message, fault.occurrences),
+                )],
+            }
         })
         .collect();
     let total_number = found_faults
         .iter()
         .map(|f| f.fault_categories.len() as u64)
         .sum();
+    test_file_paths.sort();
+    test_file_paths.dedup();
+    let total_tests = test_cases.len() as u64;
 
     let covered_http_status = endpoint_client
         .covered_http_status()

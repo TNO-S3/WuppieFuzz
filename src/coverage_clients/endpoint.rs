@@ -18,11 +18,12 @@ use std::{
 
 use build_html::{Container, ContainerType, Html, HtmlContainer, HtmlPage, escape_html};
 use indexmap::{IndexMap, map::Entry};
+use libafl::inputs::Input;
 use strum::IntoDiscriminant;
 
 use super::{CoverageClient, MAP_SIZE};
 use crate::{
-    input::Method,
+    input::{Method, OpenApiInput},
     openapi::{
         spec::Spec,
         validate_response::{ValidationError, ValidationErrorDiscriminants},
@@ -32,6 +33,9 @@ use crate::{
 const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";
 const MISS_SYMBOL: &str = "&#x274c;";
 const SUPERFLUOUS_SYMBOL: &str = "&#x26a0;&#xfe0f";
+/// Directory in which a reproducer (the full request sequence) is stored the first
+/// time a given fault (method, path, status, kind) is observed.
+const FAULTS_DIR: &str = "./faults";
 
 /// Sets up the endpoint coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback
@@ -73,8 +77,52 @@ pub struct EndpointFault {
     pub discriminant: ValidationErrorDiscriminants,
     /// A human-readable description of an example occurrence of this fault.
     pub message: String,
-    /// The number of times this exact fault (same method, path and kind) was observed.
+    /// The number of times this exact fault (same method, path, status and kind) was observed.
     pub occurrences: u32,
+    /// Path to a reproducer file (the full request sequence that first triggered this
+    /// fault), if it could be persisted to disk. `None` if writing it failed.
+    pub test_case_path: Option<String>,
+}
+
+/// Arguments for `EndpointCoverageClient::cover`, bundled into a struct to avoid
+/// a long parameter list (clippy::too_many_arguments).
+pub struct CoverArgs<'a> {
+    /// HTTP method of the request that produced this response.
+    pub method: Method,
+    /// Path of the request that produced this response.
+    pub path: String,
+    /// HTTP status of the response.
+    pub status: reqwest::StatusCode,
+    /// A curl-equivalent representation of the request that produced this response.
+    pub input: String,
+    /// The response body text.
+    pub output: String,
+    /// The validation error found for this response, if any.
+    pub validation_error: Option<ValidationError>,
+    /// The full request sequence currently being executed, used to persist a
+    /// reproducer file the first time a new fault is observed.
+    pub sequence: &'a OpenApiInput,
+}
+
+/// Writes `sequence` to a new file under `FAULTS_DIR`, named after the sequence's
+/// content hash (so repeated faults triggered by the same sequence don't produce
+/// duplicate files). Returns the written path (as a string), or `None` if writing
+/// failed (e.g. due to filesystem permissions); a failure here is non-fatal, since
+/// the fault is still recorded without a reproducer file.
+fn write_fault_reproducer(sequence: &OpenApiInput) -> Option<String> {
+    if let Err(err) = create_dir_all(FAULTS_DIR) {
+        log::warn!("Could not create directory {FAULTS_DIR} for fault reproducers: {err}");
+        return None;
+    }
+    let file_name = sequence.generate_name(None);
+    let path = Path::new(FAULTS_DIR).join(file_name);
+    match sequence.to_file(&path) {
+        Ok(()) => Some(path.to_string_lossy().to_string()),
+        Err(err) => {
+            log::warn!("Could not write fault reproducer to {path:?}: {err}");
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -126,18 +174,21 @@ impl EndpointCoverageClient {
 
     /// Update the endpoint coverage maps (`self.cov_map` and `self.cov_map_total`)
     /// based on the response code `status` after sending the request with
-    /// method `method` to `path`.
-    pub fn cover(
-        &mut self,
-        method: Method,
-        path: String,
-        status: reqwest::StatusCode,
-        input: String,
-        output: String,
-        validation_error: Option<ValidationError>,
-    ) {
+    /// method `method` to `path`. `sequence` is the full request sequence being
+    /// executed; it is persisted to disk as a reproducer the first time a new
+    /// fault is observed (see `record_fault`).
+    pub fn cover(&mut self, args: CoverArgs<'_>) {
+        let CoverArgs {
+            method,
+            path,
+            status,
+            input,
+            output,
+            validation_error,
+            sequence,
+        } = args;
         if let Some(err) = &validation_error {
-            self.record_fault(method, path.clone(), status, err);
+            self.record_fault(method, path.clone(), status, err, sequence);
         }
 
         // Get the coverage entry for the method-path-status combination.
@@ -196,12 +247,18 @@ impl EndpointCoverageClient {
     /// given discriminant is a deterministic function of the status (see
     /// `reporting::wfc_report::fault_category`), including status in the key also
     /// guarantees that every entry in `faults` maps to exactly one fault category.
+    ///
+    /// The first time a given fault is observed, `sequence` (the full request
+    /// sequence that triggered it) is written to `FAULTS_DIR` as a reproducer, so
+    /// WFC reports can point faults at a real, replayable test case instead of a
+    /// synthetic id.
     fn record_fault(
         &mut self,
         method: Method,
         path: String,
         status: reqwest::StatusCode,
         err: &ValidationError,
+        sequence: &OpenApiInput,
     ) {
         let discriminant = err.discriminant();
         let status = status.as_u16();
@@ -213,6 +270,7 @@ impl EndpointCoverageClient {
         }) {
             existing.occurrences += 1;
         } else {
+            let test_case_path = write_fault_reproducer(sequence);
             self.faults.push(EndpointFault {
                 method,
                 path,
@@ -220,6 +278,7 @@ impl EndpointCoverageClient {
                 discriminant,
                 message: err.to_string(),
                 occurrences: 1,
+                test_case_path,
             });
         }
     }

@@ -32,7 +32,7 @@ use crate::{
     configuration::{Configuration, CoverageConfiguration},
     coverage_clients::{
         CoverageClient,
-        endpoint::EndpointCoverageClient,
+        endpoint::{CoverArgs, EndpointCoverageClient},
         otel::{SharedOtelTraceProcessingMetrics, read_otel_trace_processing_metrics},
     },
     input::{OpenApiInput, OpenApiRequest},
@@ -412,16 +412,17 @@ where
                         process_response_start,
                     );
                     let endpoint_cover_start = Instant::now();
-                    self.endpoint_client.lock().unwrap().cover(
-                        request.method,
-                        request.path.clone(),
-                        response.status(),
-                        curl_request,
-                        response.text().unwrap_or_else(|_| {
+                    self.endpoint_client.lock().unwrap().cover(CoverArgs {
+                        method: request.method,
+                        path: request.path.clone(),
+                        status: response.status(),
+                        input: curl_request,
+                        output: response.text().unwrap_or_else(|_| {
                             String::from("Unable to decode the response to UTF-8")
                         }),
                         validation_error,
-                    );
+                        sequence: inputs,
+                    });
                     Self::add_timing(
                         &mut self.sequence_timing_stats.endpoint_cover_us,
                         endpoint_cover_start,
