@@ -159,6 +159,14 @@ pub(crate) fn process_response(
         log::debug!(
             "OpenAPI-input resulted in server error response, ignoring rest of request chain."
         );
+        // A 5xx response is always treated as a crash, regardless of `crash_criteria`
+        // (checked below for other validation error kinds). We still build a
+        // `ValidationError` here (rather than leaving `maybe_validation_error` as
+        // `None`) purely so this fault is visible in fault tracking/WFC reports;
+        // it does not affect the crash decision made above.
+        maybe_validation_error = Some(ValidationError::Status5xxNotSpecified {
+            got: response.status(),
+        });
     } else if let Err(validation_err) = validate_response(api, request, response)
         && crash_criteria.contains(&validation_err.discriminant())
     {
