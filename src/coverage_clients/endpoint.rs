@@ -219,7 +219,7 @@ impl EndpointCoverageClient {
             sequence,
         } = args;
         if let Some(err) = &validation_error {
-            self.record_fault(method, path.clone(), status, err, sequence);
+            self.record_fault(method, &path, status, err, sequence);
         }
 
         // Get the coverage entry for the method-path-status combination.
@@ -286,7 +286,7 @@ impl EndpointCoverageClient {
     fn record_fault(
         &mut self,
         method: Method,
-        path: String,
+        path: &str,
         status: reqwest::StatusCode,
         err: &ValidationError,
         sequence: &OpenApiInput,
@@ -303,7 +303,7 @@ impl EndpointCoverageClient {
         } else {
             self.faults.push(EndpointFault {
                 method,
-                path,
+                path: path.to_owned(),
                 status,
                 discriminant,
                 message: err.to_string(),
@@ -313,8 +313,10 @@ impl EndpointCoverageClient {
         }
     }
 
-    /// Returns all distinct faults (validation errors) observed so far, grouped by
-    /// endpoint and fault category.
+    /// Returns all distinct faults (validation errors) observed so far. Faults are
+    /// deduplicated by (method, path, status, discriminant) (see `record_fault`),
+    /// but otherwise returned as a flat list; callers that need faults grouped by
+    /// endpoint or fault category (e.g. `reporting::wfc_report`) do so themselves.
     pub fn faults(&self) -> &[EndpointFault] {
         &self.faults
     }

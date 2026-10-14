@@ -33,9 +33,7 @@ use crate::{
     types::{EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType},
 };
 
-/// Directory in which the initial (seed) corpus is stored on disk. Exposed so other
-/// modules (e.g. the endpoint coverage client, when locating a fault's reproducer)
-/// don't have to duplicate this path as a separate literal.
+/// Directory in which the initial (seed) corpus is stored on disk.
 pub const QUEUE_DIR: &str = "./queue";
 
 /// Loads an `OpenApiInput` from a yaml file.

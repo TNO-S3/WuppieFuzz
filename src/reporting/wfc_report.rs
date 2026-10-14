@@ -245,11 +245,10 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         .iter()
         .map(|fault| {
             // By the time the campaign has ended (and this report is written), the
-            // request sequence that first triggered this fault should be on disk,
-            // either as a LibAFL crash file or (for faults first seen during corpus
-            // minimization) as a seed in the initial corpus. Fall back to a
-            // synthetic id if neither is found, e.g. if the corpus directory was
-            // cleared out from under us mid-campaign.
+            // request sequence that first triggered this fault should be on disk in
+            // `CRASHES_DIR`: it is written there proactively the moment the fault is
+            // first recorded (see `ensure_crash_file`). Fall back to a synthetic id
+            // if it's not found, e.g. if the file was removed from under us mid-campaign.
             let reproducer_path =
                 crate::coverage_clients::endpoint::locate_test_case(&fault.test_case_name);
             if reproducer_path.is_none() {
