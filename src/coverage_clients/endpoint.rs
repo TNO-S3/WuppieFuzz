@@ -23,7 +23,6 @@ use strum::IntoDiscriminant;
 
 use super::{CoverageClient, MAP_SIZE};
 use crate::{
-    initial_corpus::QUEUE_DIR,
     input::{Method, OpenApiInput},
     openapi::{
         spec::Spec,
@@ -79,10 +78,10 @@ pub struct EndpointFault {
     /// The number of times this exact fault (same method, path, status and kind) was observed.
     pub occurrences: u32,
     /// LibAFL's deterministic content-hash name (`Input::generate_name`) for the full
-    /// request sequence that first triggered this fault. Used to locate a real,
-    /// replayable test case for this fault on disk once the campaign has ended (see
-    /// `reporting::wfc_report`); the file does not necessarily exist yet at the time
-    /// this fault is first recorded.
+    /// request sequence that first triggered this fault; a copy of that sequence is
+    /// saved to `CRASHES_DIR` under this name as soon as the fault is recorded (see
+    /// `ensure_crash_file`), so it is expected to always be locatable on disk (see
+    /// `locate_test_case`, used by `reporting::wfc_report`).
     pub test_case_name: String,
 }
 
@@ -101,34 +100,48 @@ pub struct CoverArgs<'a> {
     pub output: String,
     /// The validation error found for this response, if any.
     pub validation_error: Option<ValidationError>,
-    /// The full request sequence currently being executed, used to derive the name
-    /// of its on-disk test case the first time a new fault is observed.
+    /// The full request sequence currently being executed, saved to `CRASHES_DIR`
+    /// the first time a new fault is observed.
     pub sequence: &'a OpenApiInput,
 }
 
-/// Locates an on-disk file named `file_name` holding the request sequence for a
+/// Locates the on-disk file named `file_name` holding the request sequence for a
 /// given fault, without writing a new copy of it.
 ///
-/// LibAFL's `OnDiskCorpus`/`InMemoryOnDiskCorpus` name testcase files after
-/// `Input::generate_name`, which for `OpenApiInput` is a deterministic content hash
-/// ignoring the `CorpusId` argument; this lets us predict the filename without
-/// duplicating the input into our own file. Every fault tracked here corresponds to
-/// an execution that set `ExitKind::Crash`, so the sequence should land in
-/// `CRASHES_DIR` (LibAFL's `solutions` corpus, which unconditionally saves every
-/// crashing execution) by the time a WFC report is written at the end of the
-/// campaign. The one exception is faults first observed while LibAFL re-executes
-/// seeds during corpus minimization: that bypasses the objective/solutions machinery
-/// entirely, so we fall back to `QUEUE_DIR` (the seed corpus), where the exact same
-/// sequence is still expected to live under its initial, identical file name.
-///
-/// Must only be called once the campaign has ended: during the campaign itself,
-/// LibAFL has not necessarily flushed the corresponding file to disk yet.
+/// Faults recorded via `record_fault` are proactively written to `CRASHES_DIR` the
+/// moment they are first observed (see `ensure_crash_file`), so this should always
+/// succeed; a `None` result indicates that write failed (e.g. a read-only
+/// filesystem) or the file was removed from under us.
 pub fn locate_test_case(file_name: &str) -> Option<String> {
-    [CRASHES_DIR, QUEUE_DIR]
-        .into_iter()
-        .map(|dir| Path::new(dir).join(file_name))
-        .find(|path| path.exists())
-        .map(|path| path.to_string_lossy().to_string())
+    let path = Path::new(CRASHES_DIR).join(file_name);
+    path.exists().then(|| path.to_string_lossy().to_string())
+}
+
+/// Ensures `sequence` is saved to `CRASHES_DIR` under its deterministic content-hash
+/// name (`Input::generate_name`), the same name and directory LibAFL's own
+/// `solutions` corpus would use for it, and returns that name.
+///
+/// Every fault tracked by `record_fault` corresponds to an execution that set
+/// `ExitKind::Crash`, so LibAFL's `CrashFeedback` would normally persist it to
+/// `CRASHES_DIR` anyway. However, faults first observed while LibAFL re-executes
+/// seeds during corpus minimization bypass that objective/solutions machinery
+/// entirely (see `MapCorpusMinimizer::minimize`), and the corresponding seed can
+/// later be deleted from the queue if minimization finds it redundant for coverage
+/// purposes (coverage that is tracked per status code, not per fault reason, so a
+/// seed can be "redundant" there while being the only reproducer for its specific
+/// fault). Writing it here ourselves, right away, closes that gap; if the file
+/// already exists (e.g. LibAFL got there first), this is a cheap, harmless no-op.
+fn ensure_crash_file(sequence: &OpenApiInput) -> String {
+    let file_name = sequence.generate_name(None);
+    let path = Path::new(CRASHES_DIR).join(&file_name);
+    if !path.exists() {
+        if let Err(err) = create_dir_all(CRASHES_DIR) {
+            log::warn!("Could not create directory {CRASHES_DIR} for crash files: {err}");
+        } else if let Err(err) = sequence.to_file(&path) {
+            log::warn!("Could not write crash file to {path:?}: {err}");
+        }
+    }
+    file_name
 }
 
 #[derive(Debug, Clone)]
@@ -181,8 +194,8 @@ impl EndpointCoverageClient {
     /// Update the endpoint coverage maps (`self.cov_map` and `self.cov_map_total`)
     /// based on the response code `status` after sending the request with
     /// method `method` to `path`. `sequence` is the full request sequence being
-    /// executed; the first time a new fault is observed, its path in the LibAFL
-    /// crash corpus is recorded (see `record_fault`).
+    /// executed; the first time a new fault is observed, it is saved to disk (see
+    /// `record_fault`).
     pub fn cover(&mut self, args: CoverArgs<'_>) {
         let CoverArgs {
             method,
@@ -254,10 +267,10 @@ impl EndpointCoverageClient {
     /// `reporting::wfc_report::fault_category`), including status in the key also
     /// guarantees that every entry in `faults` maps to exactly one fault category.
     ///
-    /// The first time a given fault is observed, the deterministic content-hash
-    /// name of `sequence` (the full request sequence that triggered it) is
-    /// recorded, so WFC reports can point faults at a real, replayable test case
-    /// instead of a synthetic id (see `locate_test_case`).
+    /// The first time a given fault is observed, `sequence` (the full request
+    /// sequence that triggered it) is saved to `CRASHES_DIR` (see
+    /// `ensure_crash_file`), so WFC reports can point faults at a real, replayable
+    /// test case instead of a synthetic id.
     fn record_fault(
         &mut self,
         method: Method,
@@ -283,7 +296,7 @@ impl EndpointCoverageClient {
                 discriminant,
                 message: err.to_string(),
                 occurrences: 1,
-                test_case_name: sequence.generate_name(None),
+                test_case_name: ensure_crash_file(sequence),
             });
         }
     }
