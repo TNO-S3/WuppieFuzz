@@ -165,11 +165,16 @@ impl MySqLite {
                 `body` blob(65535),
                 `inputid` INT NOT NULL,
                 `runid` INTEGER NOT NULL,
+                `crash_file` varchar(255) NULL,
                 CONSTRAINT run_FK FOREIGN KEY (runid) REFERENCES runs(id)
             )",
             [],
         )
         .context("Could not create `requests` table")?;
+
+        // Added after the initial `requests` table definition above; ensure it is
+        // present for databases created by older versions of WuppieFuzz too.
+        ensure_column(&conn, "requests", "crash_file", "varchar(255) NULL")?;
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS responses (
@@ -438,6 +443,17 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                 request_id,
             ))
             .expect("Could not insert reponse into database");
+        self.maybe_commit_batch();
+    }
+
+    fn report_crash(&self, request_id: i64, crash_file: &str) {
+        let mut update_stmt = self
+            .conn
+            .prepare_cached("UPDATE requests SET crash_file = ? WHERE id = ?")
+            .expect("Could not prepare update statement for crash file");
+        update_stmt
+            .execute((crash_file, request_id))
+            .expect("Could not update request with crash file");
         self.maybe_commit_batch();
     }
 

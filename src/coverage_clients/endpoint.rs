@@ -144,6 +144,18 @@ fn ensure_crash_file(sequence: &OpenApiInput) -> String {
     file_name
 }
 
+/// Like `ensure_crash_file`, but returns the full path to the reproducer file
+/// rather than just its name. Used to link every crashing request (not just the
+/// first occurrence of each distinct fault) to its reproducer in the SQLite
+/// report, via `Reporting::report_crash`.
+pub fn ensure_crash_file_path(sequence: &OpenApiInput) -> String {
+    let file_name = ensure_crash_file(sequence);
+    Path::new(CRASHES_DIR)
+        .join(file_name)
+        .to_string_lossy()
+        .to_string()
+}
+
 #[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
 enum Coverage {

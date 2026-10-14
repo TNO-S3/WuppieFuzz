@@ -32,7 +32,7 @@ use crate::{
     configuration::{Configuration, CoverageConfiguration},
     coverage_clients::{
         CoverageClient,
-        endpoint::{CoverArgs, EndpointCoverageClient},
+        endpoint::{CoverArgs, EndpointCoverageClient, ensure_crash_file_path},
         otel::{SharedOtelTraceProcessingMetrics, read_otel_trace_processing_metrics},
     },
     input::{OpenApiInput, OpenApiRequest},
@@ -436,6 +436,13 @@ where
                         endpoint_cover_start,
                     );
                     if exit_kind == ExitKind::Crash {
+                        // Link the crashing request to its on-disk reproducer, so the
+                        // SQLite report can point every crashing input/sequence at a
+                        // real, replayable file (not just the distinct faults surfaced
+                        // in the WFC report).
+                        let crash_file_path = ensure_crash_file_path(inputs);
+                        self.reporter
+                            .report_crash(reporter_request_id, &crash_file_path);
                         stop_reason = SequenceStopReason::CrashOrValidation;
                         break 'chain;
                     }
