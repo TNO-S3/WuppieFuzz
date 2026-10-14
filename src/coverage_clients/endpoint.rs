@@ -184,9 +184,18 @@ impl EndpointCoverageClient {
         self.cov_map_total[index / 8] |= 0b10000000 >> (index % 8);
     }
 
-    /// Records a validation error observed for a given (method, path), deduplicating
-    /// repeated occurrences of the same fault type by incrementing a counter instead
-    /// of storing a new entry.
+    /// Records a validation error observed for a given (method, path, status),
+    /// deduplicating repeated occurrences of the same fault type by incrementing
+    /// a counter instead of storing a new entry.
+    ///
+    /// Faults are deduplicated by (method, path, status, discriminant) rather than
+    /// just (method, path, discriminant): the same kind of validation error can
+    /// occur at different HTTP statuses on the same endpoint (e.g. an unspecified
+    /// status observed as both 404 and 409), and these represent distinct faults
+    /// that should be reported separately. Since the WFC fault category for a
+    /// given discriminant is a deterministic function of the status (see
+    /// `reporting::wfc_report::fault_category`), including status in the key also
+    /// guarantees that every entry in `faults` maps to exactly one fault category.
     fn record_fault(
         &mut self,
         method: Method,
@@ -195,15 +204,19 @@ impl EndpointCoverageClient {
         err: &ValidationError,
     ) {
         let discriminant = err.discriminant();
+        let status = status.as_u16();
         if let Some(existing) = self.faults.iter_mut().find(|fault| {
-            fault.method == method && fault.path == path && fault.discriminant == discriminant
+            fault.method == method
+                && fault.path == path
+                && fault.status == status
+                && fault.discriminant == discriminant
         }) {
             existing.occurrences += 1;
         } else {
             self.faults.push(EndpointFault {
                 method,
                 path,
-                status: status.as_u16(),
+                status,
                 discriminant,
                 message: err.to_string(),
                 occurrences: 1,
