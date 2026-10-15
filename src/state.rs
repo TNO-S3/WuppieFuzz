@@ -32,6 +32,12 @@ use crate::{
     types::{CombinedFeedbackType, CombinedObjectiveType},
 };
 
+/// Directory in which LibAFL's `solutions` corpus (crashing/timing-out request
+/// sequences) is stored on disk. Exposed so other modules (e.g. the endpoint
+/// coverage client, when locating a fault's reproducer) don't have to duplicate
+/// this path as a separate literal.
+pub const CRASHES_DIR: &str = "./crashes";
+
 /// OpenApiFuzzerState is an object needed by LibAFL.
 ///
 /// We have a bespoke one so we're able to pass the api spec to mutators,
@@ -353,7 +359,7 @@ where
             corpus: initial_corpus,
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            solutions: OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+            solutions: OnDiskCorpus::new(PathBuf::from(CRASHES_DIR)).unwrap(),
             max_size: libafl::state::DEFAULT_MAX_SIZE,
             #[cfg(feature = "std")]
             remaining_initial_files: None,

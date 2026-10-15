@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub mod sqlite;
+pub mod wfc_report;
 
 /// Coarse-grained OTel receiver/arbiter stats for dashboard reporting.
 #[derive(Debug, Clone, Copy, Default)]
@@ -138,6 +139,11 @@ pub trait Reporting<T, S> {
     /// Report a response error linked to the corresponding request
     fn report_response_error(&self, error: &str, request_id: T);
 
+    /// Link a previously reported request to the on-disk reproducer file for the
+    /// crashing input sequence that produced it (see
+    /// `coverage_clients::endpoint::ensure_crash_file_path`).
+    fn report_crash(&self, request_id: T, crash_file: &str);
+
     /// Report a response error linked to the corresponding request
     fn report_coverage(
         &self,
@@ -178,6 +184,12 @@ where
     fn report_response_error(&self, error: &str, request_id: T) {
         if let Some(reporter) = self.as_ref() {
             reporter.report_response_error(error, request_id)
+        }
+    }
+
+    fn report_crash(&self, request_id: T, crash_file: &str) {
+        if let Some(reporter) = self.as_ref() {
+            reporter.report_crash(request_id, crash_file)
         }
     }
 
