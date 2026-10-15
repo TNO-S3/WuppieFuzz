@@ -40,22 +40,20 @@ const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";
 const MISS_SYMBOL: &str = "&#x274c;";
 const SUPERFLUOUS_SYMBOL: &str = "&#x26a0;&#xfe0f";
 
-/// Sets up the endpoint coverage client according to the configuration, and initializes it
-/// and constructs a LibAFL observer and feedback
-#[allow(clippy::type_complexity)]
+/// Builds an `EndpointCoverageClient` from `api` and wraps it as a shared, lockable
+/// `CoverageClient` so it can be used interchangeably with other coverage backends.
 pub fn setup_endpoint_coverage(
     api: &Spec,
 ) -> core::result::Result<Arc<Mutex<EndpointCoverageClient>>, anyhow::Error> {
     let mut endpoint_coverage_client = Arc::new(Mutex::new(EndpointCoverageClient::new(api)));
-    endpoint_coverage_client.fetch_coverage(true);
-    // no-op for this particular CoverageClient
-
+    endpoint_coverage_client.fetch_coverage(true); // no-op for this particular CoverageClient
     Ok(endpoint_coverage_client)
 }
 
 /// Endpoint coverage client.
 pub struct EndpointCoverageClient {
-    // Keys: (Method, String, StatusCode) - oas3 uses a String for the status code.
+    // Keys: (method, path, status) - status is a String, not `StatusCode`, because
+    // oas3 keys a spec operation's `responses` map by string status codes.
     endpoint_cov_map: IndexMap<(Method, String, String), Coverage>,
     cov_map: [u8; MAP_SIZE],
     cov_map_total: [u8; MAP_SIZE],
@@ -115,6 +113,18 @@ pub struct CoverArgs<'a> {
     /// The full request sequence currently being executed, saved to `CRASHES_DIR`
     /// the first time a new fault is observed.
     pub sequence: &'a OpenApiInput,
+}
+
+/// Arguments for `EndpointCoverageClient::record_fault`, bundled for the same
+/// reason as `CoverArgs`.
+struct FaultArgs<'a> {
+    method: Method,
+    path: &'a str,
+    status: reqwest::StatusCode,
+    err: &'a ValidationError,
+    sequence: &'a OpenApiInput,
+    request: &'a str,
+    response: &'a str,
 }
 
 /// Locates the on-disk file named `file_name` holding the request sequence for a
@@ -211,6 +221,34 @@ fn truncate(s: &str, max_chars: usize) -> String {
     }
 }
 
+/// Renders a fault message as a truncated `<span>` with the full text in its
+/// `title` tooltip. Shared by the "All faults" table and fault-variant blocks.
+fn message_html(message: &str) -> String {
+    format!(
+        r#"<span title="{full}">{short}</span>"#,
+        full = escape_html(message),
+        short = escape_html(&truncate(message, 160)),
+    )
+}
+
+/// Renders the "Reproduce" markup for a fault's reproducer path (with a copy
+/// button), or an explanatory message if none could be located (see
+/// `locate_test_case`). `inline` lays the path and button out on one line
+/// (compact, for the "All faults" table); otherwise they are stacked, which
+/// suits the more spacious fault-variant blocks.
+fn reproduce_html(reproduce: Option<&str>, inline: bool) -> String {
+    match reproduce {
+        Some(path) => {
+            let escaped_path = escape_html(path);
+            let separator = if inline { " " } else { "<br>" };
+            format!(
+                r#"<code title="{escaped_path}">{escaped_path}</code>{separator}<button class="copy-btn" data-copy="wuppiefuzz reproduce {escaped_path}">Copy reproduce command</button>"#
+            )
+        }
+        None => "<em>not found in crashes or queue directories</em>".to_string(),
+    }
+}
+
 #[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
 enum Coverage {
@@ -227,6 +265,30 @@ enum Coverage {
     /// This status code was seen but does not occur in the specification
     /// (request, response, validation error)
     UnexpectedFound(String, String, String),
+}
+
+/// Renders a single `.fault-variant` block (category badge, message, request,
+/// response, reproduce) for one `EndpointFault`, as used in the hidden
+/// `.fault-variants` templates in the endpoint tree (see `export_filesystem`).
+fn render_fault_variant(fault: &EndpointFault) -> String {
+    let FaultBadge {
+        category,
+        reproduce,
+        class,
+    } = fault_badge(fault);
+    format!(
+        r#"<div class="fault-variant">
+            <div class="fv-header"><span class="badge {class}">{category}</span> &times;{occurrences} &mdash; {message}</div>
+            <h4>Request</h4><div class="fv-pane">{request}</div>
+            <h4>Response</h4><div class="fv-pane">{response}</div>
+            <h4>Reproduce</h4><div class="fv-pane">{reproduce}</div>
+        </div>"#,
+        occurrences = fault.occurrences,
+        message = message_html(&fault.message),
+        request = escape_html(&fault.request),
+        response = escape_html(&fault.response),
+        reproduce = reproduce_html(reproduce.as_deref(), false),
+    )
 }
 
 impl EndpointCoverageClient {
@@ -279,7 +341,15 @@ impl EndpointCoverageClient {
             sequence,
         } = args;
         if let Some(err) = &validation_error {
-            self.record_fault(method, &path, status, err, sequence, &input, &output);
+            self.record_fault(FaultArgs {
+                method,
+                path: &path,
+                status,
+                err,
+                sequence,
+                request: &input,
+                response: &output,
+            });
         }
 
         // Get the coverage entry for the method-path-status combination.
@@ -295,12 +365,16 @@ impl EndpointCoverageClient {
         match entry {
             // No pre-existing entry for the method-path-status combination, we found an unspecified response!
             Entry::Vacant(entry) => {
+                // `validation_error` is always `Some` here: an unspecified status always
+                // fails `validate_response` with `OtherStatusNotSpecified`/`Status5xxNotSpecified`,
+                // which is exactly why this entry is Vacant. The fallback is defensive only.
                 entry.insert(Coverage::UnexpectedFound(
                     input,
                     output,
-                    validation_error.map_or("Validation error required!".to_string(), |val| {
-                        val.to_string()
-                    }),
+                    validation_error.map_or_else(
+                        || "Validation error required!".to_string(),
+                        |val| val.to_string(),
+                    ),
                 ));
             }
             // Occupied entry, either already found (expected or unexpected) or expected but not yet found
@@ -357,17 +431,16 @@ impl EndpointCoverageClient {
     /// sequence that triggered it) is saved to `CRASHES_DIR` (see
     /// `ensure_crash_file`), so WFC reports can point faults at a real, replayable
     /// test case instead of a synthetic id.
-    #[allow(clippy::too_many_arguments)]
-    fn record_fault(
-        &mut self,
-        method: Method,
-        path: &str,
-        status: reqwest::StatusCode,
-        err: &ValidationError,
-        sequence: &OpenApiInput,
-        request: &str,
-        response: &str,
-    ) {
+    fn record_fault(&mut self, args: FaultArgs<'_>) {
+        let FaultArgs {
+            method,
+            path,
+            status,
+            err,
+            sequence,
+            request,
+            response,
+        } = args;
         let discriminant = err.discriminant();
         let status = status.as_u16();
         if let Some(existing) = self.faults.iter_mut().find(|fault| {
@@ -528,39 +601,13 @@ impl EndpointCoverageClient {
                                 };
                                 // Add the hidden fault-variants template right after the
                                 // item it belongs to (see comment on `fault_lookup` above).
+                                // Status keys are always numeric (sourced from
+                                // `StatusCode::as_str()`), so a parse failure can't occur.
                                 let status: u16 = item.0.parse().unwrap_or_default();
                                 match fault_lookup.get(&(method, path.as_str(), status)) {
                                     Some(faults) => {
-                                        let blocks: String = faults
-                                            .iter()
-                                            .map(|fault| {
-                                                let FaultBadge {
-                                                    category,
-                                                    reproduce,
-                                                    class,
-                                                } = fault_badge(fault);
-                                                let reproduce_html = match reproduce {
-                                                    Some(path) => format!(
-                                                        r#"<code>{escaped_path}</code> <button class="copy-btn" data-copy="wuppiefuzz reproduce {escaped_path}">Copy reproduce command</button>"#,
-                                                        escaped_path = escape_html(&path)
-                                                    ),
-                                                    None => "<em>not found in crashes or queue directories</em>".to_string(),
-                                                };
-                                                format!(
-                                                    r#"<div class="fault-variant">
-                                                        <div class="fv-header"><span class="badge {class}">{category}</span> &times;{occurrences} &mdash; <span title="{message_full}">{message_short}</span></div>
-                                                        <h4>Request</h4><div class="fv-pane">{request}</div>
-                                                        <h4>Response</h4><div class="fv-pane">{response}</div>
-                                                        <h4>Reproduce</h4><div class="fv-pane">{reproduce_html}</div>
-                                                    </div>"#,
-                                                    occurrences = fault.occurrences,
-                                                    message_full = escape_html(&fault.message),
-                                                    message_short = escape_html(&truncate(&fault.message, 160)),
-                                                    request = escape_html(&fault.request),
-                                                    response = escape_html(&fault.response),
-                                                )
-                                            })
-                                            .collect();
+                                        let blocks: String =
+                                            faults.iter().copied().map(render_fault_variant).collect();
                                         // `with_raw` on a list container still wraps this
                                         // in its own (unmarked) <li>; identify it via the
                                         // inner div's class instead, which `next("li")
@@ -610,14 +657,7 @@ impl EndpointCoverageClient {
                 reproduce,
                 class,
             } = fault_badge(fault);
-            let reproduce_cell = match &reproduce {
-                Some(path) => format!(
-                    r#"<code title="{escaped_path}">{escaped_path}</code><br>
-                       <button class="copy-btn" data-copy="wuppiefuzz reproduce {escaped_path}">Copy reproduce command</button>"#,
-                    escaped_path = escape_html(path)
-                ),
-                None => "<em>not found in crashes or queue directories</em>".to_string(),
-            };
+            let reproduce_cell = reproduce_html(reproduce.as_deref(), false);
             faults_table.add_custom_body_row(
                 TableRow::new()
                     .with_cell(TableCell::new(TableCellType::Data).with_raw(format!(
@@ -635,11 +675,9 @@ impl EndpointCoverageClient {
                     .with_cell(
                         TableCell::new(TableCellType::Data).with_raw(fault.occurrences.to_string()),
                     )
-                    .with_cell(TableCell::new(TableCellType::Data).with_raw(format!(
-                        "<span title=\"{}\">{}</span>",
-                        escape_html(&fault.message),
-                        escape_html(&truncate(&fault.message, 160)),
-                    )))
+                    .with_cell(
+                        TableCell::new(TableCellType::Data).with_raw(message_html(&fault.message)),
+                    )
                     .with_cell(TableCell::new(TableCellType::Data).with_raw(reproduce_cell)),
             );
         }
