@@ -287,7 +287,7 @@ fn render_fault_variant(fault: &EndpointFault) -> String {
         message = message_html(&fault.message),
         request = escape_html(&fault.request),
         response = escape_html(&fault.response),
-        reproduce = reproduce_html(reproduce.as_deref(), false),
+        reproduce = reproduce_html(reproduce.as_deref(), true),
     )
 }
 
