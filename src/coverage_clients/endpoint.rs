@@ -254,17 +254,30 @@ fn reproduce_html(reproduce: Option<&str>, inline: bool) -> String {
 enum Coverage {
     /// This status code occurs in the specification, but was not seen
     ExpectedNotFound,
-    /// This status code occurs in the specification, and was seen
-    /// (request, response, whether this example also triggered a validation error).
-    /// Status codes defined in the spec still count as "found" even when the one
-    /// response seen for them failed validation (e.g. a schema mismatch), but such
-    /// a tainted example is replaced by a clean one as soon as one is observed, so
-    /// the displayed example doesn't misleadingly double as a fault's own example
+    /// This status code occurs in the specification, and was seen. Status codes
+    /// defined in the spec still count as "found" even when the one response seen
+    /// for them failed validation (e.g. a schema mismatch), but such a `tainted`
+    /// example is replaced by a clean one as soon as one is observed, so the
+    /// displayed example doesn't misleadingly double as a fault's own example
     /// (see `cover`).
-    ExpectedFound(String, String, bool),
-    /// This status code was seen but does not occur in the specification
-    /// (request, response, validation error)
-    UnexpectedFound(String, String, String),
+    ExpectedFound {
+        request: String,
+        response: String,
+        tainted: bool,
+        /// Deterministic content-hash name (see `ensure_crash_file`) of the request
+        /// sequence that produced this example, proactively persisted to
+        /// `CRASHES_DIR` so WFC reports can cite a real, locatable test case for
+        /// this coverage (see `reporting::wfc_report`).
+        test_case_id: String,
+    },
+    /// This status code was seen but does not occur in the specification.
+    UnexpectedFound {
+        request: String,
+        response: String,
+        validation_error: String,
+        /// See `ExpectedFound::test_case_id`.
+        test_case_id: String,
+    },
 }
 
 /// Renders a single `.fault-variant` block (category badge, message, request,
@@ -289,6 +302,19 @@ fn render_fault_variant(fault: &EndpointFault) -> String {
         response = escape_html(&fault.response),
         reproduce = reproduce_html(reproduce.as_deref(), true),
     )
+}
+
+/// One observed (endpoint, status) combination, along with the id of the test
+/// case (see `ensure_crash_file`) whose example first demonstrated it. Used to
+/// build WFC `CoveredEndpoint` entries (see `reporting::wfc_report`) that cite a
+/// real, locatable test case rather than a synthetic placeholder.
+pub struct CoveredStatus {
+    /// The operation id (`METHOD:path`) this status was observed on.
+    pub endpoint_id: String,
+    /// The test case (see `ensure_crash_file`) whose example demonstrated this status.
+    pub test_case_id: String,
+    /// The HTTP status observed, or `None` if the call never returned a response.
+    pub status: Option<u16>,
 }
 
 impl EndpointCoverageClient {
@@ -368,14 +394,15 @@ impl EndpointCoverageClient {
                 // `validation_error` is always `Some` here: an unspecified status always
                 // fails `validate_response` with `OtherStatusNotSpecified`/`Status5xxNotSpecified`,
                 // which is exactly why this entry is Vacant. The fallback is defensive only.
-                entry.insert(Coverage::UnexpectedFound(
-                    input,
-                    output,
-                    validation_error.map_or_else(
+                entry.insert(Coverage::UnexpectedFound {
+                    request: input,
+                    response: output,
+                    validation_error: validation_error.map_or_else(
                         || "Validation error required!".to_string(),
                         |val| val.to_string(),
                     ),
-                ));
+                    test_case_id: ensure_crash_file(sequence),
+                });
             }
             // Occupied entry, either already found (expected or unexpected) or expected but not yet found
             Entry::Occupied(mut entry) => {
@@ -386,14 +413,20 @@ impl EndpointCoverageClient {
                         // "tainted" example is upgraded below as soon as a clean one
                         // is seen, so it isn't stuck permanently doubling as a fault's
                         // own example.
-                        entry.insert(Coverage::ExpectedFound(
-                            input,
-                            output,
-                            validation_error.is_some(),
-                        ));
+                        entry.insert(Coverage::ExpectedFound {
+                            request: input,
+                            response: output,
+                            tainted: validation_error.is_some(),
+                            test_case_id: ensure_crash_file(sequence),
+                        });
                     }
-                    Coverage::ExpectedFound(_, _, true) if validation_error.is_none() => {
-                        entry.insert(Coverage::ExpectedFound(input, output, false));
+                    Coverage::ExpectedFound { tainted: true, .. } if validation_error.is_none() => {
+                        entry.insert(Coverage::ExpectedFound {
+                            request: input,
+                            response: output,
+                            tainted: false,
+                            test_case_id: ensure_crash_file(sequence),
+                        });
                     }
                     _ => {}
                 }
@@ -485,21 +518,26 @@ impl EndpointCoverageClient {
         ids
     }
 
-    /// Returns, for every endpoint for which at least one status code was observed,
-    /// the operation id (`METHOD:path`) along with the list of observed HTTP status codes.
-    pub fn covered_http_status(&self) -> Vec<(String, Vec<Option<u16>>)> {
-        let mut map: IndexMap<String, Vec<Option<u16>>> = IndexMap::new();
-        for ((method, path, status), coverage) in &self.endpoint_cov_map {
-            if matches!(
-                coverage,
-                Coverage::ExpectedFound(..) | Coverage::UnexpectedFound(..)
-            ) {
-                map.entry(format!("{method}:{path}"))
-                    .or_default()
-                    .push(status.parse::<u16>().ok());
-            }
-        }
-        map.into_iter().collect()
+    /// Returns, for every (endpoint, status) combination actually observed, the
+    /// operation id (`METHOD:path`), the HTTP status, and the test case that
+    /// demonstrated it. One entry per distinct status, since each of our coverage
+    /// cells only ever stores a single representative example.
+    pub fn covered_http_status(&self) -> Vec<CoveredStatus> {
+        self.endpoint_cov_map
+            .iter()
+            .filter_map(|((method, path, status), coverage)| {
+                let test_case_id = match coverage {
+                    Coverage::ExpectedFound { test_case_id, .. }
+                    | Coverage::UnexpectedFound { test_case_id, .. } => test_case_id.clone(),
+                    Coverage::ExpectedNotFound => return None,
+                };
+                Some(CoveredStatus {
+                    endpoint_id: format!("{method}:{path}"),
+                    test_case_id,
+                    status: status.parse::<u16>().ok(),
+                })
+            })
+            .collect()
     }
 
     fn export_filesystem(&self, base_path: &Path) -> Result<(), libafl::Error> {
@@ -550,7 +588,12 @@ impl EndpointCoverageClient {
                             // puts it into the "input-pane".
                             |list, item| {
                                 let list = match item.1 {
-                                    Coverage::ExpectedFound(request, response, tainted) => {
+                                    Coverage::ExpectedFound {
+                                        request,
+                                        response,
+                                        tainted,
+                                        ..
+                                    } => {
                                         // A tainted example never had a clean (fault-free)
                                         // occurrence to upgrade to (see `cover`): its request
                                         // and response are identical to one of this status's
@@ -571,11 +614,12 @@ impl EndpointCoverageClient {
                                             ],
                                         )
                                     }
-                                    Coverage::UnexpectedFound(
+                                    Coverage::UnexpectedFound {
                                         request,
                                         response,
                                         validation_error,
-                                    ) => list.with_link_attr(
+                                        ..
+                                    } => list.with_link_attr(
                                         "#",
                                         format!("{} {}", SUPERFLUOUS_SYMBOL, item.0),
                                         [

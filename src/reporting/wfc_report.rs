@@ -10,6 +10,7 @@ use std::{
 };
 
 use chrono::SecondsFormat;
+use indexmap::IndexMap;
 use libafl::{
     corpus::Corpus,
     state::{HasCorpus, HasSolutions},
@@ -17,9 +18,12 @@ use libafl::{
 use serde::Serialize;
 
 use crate::{
-    configuration::Configuration, coverage_clients::endpoint::EndpointCoverageClient,
-    executor::summarize_sequence, openapi::validate_response::ValidationErrorDiscriminants,
-    types::OpenApiFuzzerStateType, wuppie_version::get_wuppie_version,
+    configuration::Configuration,
+    coverage_clients::endpoint::{EndpointCoverageClient, locate_test_case},
+    executor::summarize_sequence,
+    openapi::validate_response::ValidationErrorDiscriminants,
+    types::OpenApiFuzzerStateType,
+    wuppie_version::get_wuppie_version,
 };
 
 /// The version of the WFC report schema that WuppieFuzz produces reports for.
@@ -185,6 +189,46 @@ fn fault_category(
     }
 }
 
+/// Registers a `TestCase` for `id` in `test_cases` (a no-op if already present),
+/// and tracks its reproducer file path in `test_file_paths`. `id` is expected to
+/// be a stable content-hash test case name (see `coverage_clients::endpoint::
+/// ensure_crash_file`); its on-disk location is looked up via `locate_test_case`,
+/// falling back to `id` itself if the file can't be found (e.g. removed from
+/// under us mid-campaign), so that every `testCaseId` referenced elsewhere in the
+/// report is still guaranteed to resolve to a `TestCase` entry here (see
+/// WebFuzzing/Commons#49).
+fn register_test_case(
+    test_cases: &mut IndexMap<String, TestCase>,
+    test_file_paths: &mut Vec<String>,
+    id: &str,
+    name: impl FnOnce() -> String,
+) {
+    if test_cases.contains_key(id) {
+        return;
+    }
+    let file_path = match locate_test_case(id) {
+        Some(path) => {
+            test_file_paths.push(path.clone());
+            path
+        }
+        None => {
+            log::warn!("Could not locate a test case file named {id} on disk");
+            id.to_string()
+        }
+    };
+    test_cases.insert(
+        id.to_string(),
+        TestCase {
+            id: id.to_string(),
+            file_path,
+            name: name(),
+            start_line: None,
+            end_line: None,
+            named_examples: None,
+        },
+    );
+}
+
 /// Inputs needed to assemble a WFC report, gathered from the fuzzer executor at the
 /// end of a campaign.
 pub struct WfcReportContext<'a> {
@@ -223,7 +267,7 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
     create_dir_all(&output_dir)?;
 
     let corpus = state.corpus();
-    let mut test_cases = Vec::with_capacity(corpus.count());
+    let mut test_cases: IndexMap<String, TestCase> = IndexMap::with_capacity(corpus.count());
     let mut test_file_paths = Vec::with_capacity(corpus.count());
     let mut output_http_calls = 0u64;
     for id in corpus.ids() {
@@ -240,54 +284,41 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
             .as_ref()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| format!("queue/{id:?}"));
+        // Use the bare file name (LibAFL's deterministic content-hash, the same
+        // name `ensure_crash_file`/`generate_name` produce) as the id, so it is
+        // consistent with the ids used for faults and covered endpoints - never
+        // prefixed with the containing directory (e.g. "queue/").
+        let case_id = Path::new(&file_path)
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_else(|| file_path.clone());
         test_file_paths.push(file_path.clone());
-        test_cases.push(TestCase {
-            id: file_path.clone(),
-            file_path,
-            name: summarize_sequence(input),
-            start_line: None,
-            end_line: None,
-            named_examples: None,
-        });
+        test_cases.insert(
+            case_id.clone(),
+            TestCase {
+                id: case_id,
+                file_path,
+                name: summarize_sequence(input),
+                start_line: None,
+                end_line: None,
+                named_examples: None,
+            },
+        );
     }
 
     let found_faults: Vec<FoundFault> = endpoint_client
         .faults()
         .iter()
         .map(|fault| {
-            // By the time the campaign has ended (and this report is written), the
-            // request sequence that first triggered this fault should be on disk in
-            // `CRASHES_DIR`: it is written there proactively the moment the fault is
-            // first recorded (see `ensure_crash_file`). Fall back to a synthetic id
-            // if it's not found, e.g. if the file was removed from under us mid-campaign.
-            let reproducer_path =
-                crate::coverage_clients::endpoint::locate_test_case(&fault.test_case_name);
-            if reproducer_path.is_none() {
-                log::warn!(
-                    "Could not locate a test case file named {} for fault {}:{} ({}) on disk",
-                    fault.test_case_name,
-                    fault.method,
-                    fault.path,
-                    fault.status
-                );
-            }
-            let test_case_id = reproducer_path.clone().unwrap_or_else(|| {
-                format!(
-                    "endpoint-coverage:{}:{}:{}",
-                    fault.method, fault.path, fault.status
-                )
+            // `fault.test_case_name` is a stable content-hash name, proactively
+            // persisted to `CRASHES_DIR` the moment this fault was first recorded
+            // (see `ensure_crash_file`), so it is used directly as the testCaseId -
+            // `register_test_case` guarantees a matching `TestCase` entry exists for
+            // it regardless of whether that file can still be located on disk.
+            let test_case_id = fault.test_case_name.clone();
+            register_test_case(&mut test_cases, &mut test_file_paths, &test_case_id, || {
+                format!("{} {} ({})", fault.method, fault.path, fault.status)
             });
-            if let Some(reproducer_path) = reproducer_path {
-                test_file_paths.push(reproducer_path.clone());
-                test_cases.push(TestCase {
-                    id: reproducer_path.clone(),
-                    file_path: reproducer_path,
-                    name: format!("{} {} ({})", fault.method, fault.path, fault.status),
-                    start_line: None,
-                    end_line: None,
-                    named_examples: None,
-                });
-            }
             FoundFault {
                 operation_id: format!("{}:{}", fault.method, fault.path),
                 test_case_id,
@@ -303,19 +334,36 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         .iter()
         .map(|f| f.fault_categories.len() as u64)
         .sum();
+
+    // One `CoveredEndpoint` per distinct (endpoint, status) observed, each citing
+    // the real test case (see `ensure_crash_file`) whose example demonstrated it.
+    let covered_http_status: Vec<CoveredEndpoint> = endpoint_client
+        .covered_http_status()
+        .into_iter()
+        .map(|covered| {
+            register_test_case(
+                &mut test_cases,
+                &mut test_file_paths,
+                &covered.test_case_id,
+                || {
+                    let status = covered
+                        .status
+                        .map_or_else(|| "no response".to_string(), |s| s.to_string());
+                    format!("{} ({status})", covered.endpoint_id)
+                },
+            );
+            CoveredEndpoint {
+                endpoint_id: covered.endpoint_id,
+                test_case_id: covered.test_case_id,
+                http_status: vec![covered.status],
+            }
+        })
+        .collect();
+
     test_file_paths.sort();
     test_file_paths.dedup();
     let total_tests = test_cases.len() as u64;
-
-    let covered_http_status = endpoint_client
-        .covered_http_status()
-        .into_iter()
-        .map(|(endpoint_id, http_status)| CoveredEndpoint {
-            endpoint_id,
-            test_case_id: "aggregate-run".to_string(),
-            http_status,
-        })
-        .collect();
+    let test_cases: Vec<TestCase> = test_cases.into_values().collect();
 
     let report = WfcReport {
         schema_version: WFC_SCHEMA_VERSION.to_string(),
