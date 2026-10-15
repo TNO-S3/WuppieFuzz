@@ -88,6 +88,13 @@ pub struct EndpointFault {
     /// `ensure_crash_file`), so it is expected to always be locatable on disk (see
     /// `locate_test_case`, used by `reporting::wfc_report`).
     pub test_case_name: String,
+    /// A curl-equivalent representation of the request that first triggered this
+    /// fault. Used by the HTML endpoint coverage report to let users inspect this
+    /// specific fault variant, separately from the (possibly different) example
+    /// stored for a plain "hit" on the same method/path/status.
+    pub request: String,
+    /// The response body text first observed for this fault.
+    pub response: String,
 }
 
 /// Arguments for `EndpointCoverageClient::cover`, bundled into a struct to avoid
@@ -210,8 +217,13 @@ enum Coverage {
     /// This status code occurs in the specification, but was not seen
     ExpectedNotFound,
     /// This status code occurs in the specification, and was seen
-    /// (request, response)
-    ExpectedFound(String, String),
+    /// (request, response, whether this example also triggered a validation error).
+    /// Status codes defined in the spec still count as "found" even when the one
+    /// response seen for them failed validation (e.g. a schema mismatch), but such
+    /// a tainted example is replaced by a clean one as soon as one is observed, so
+    /// the displayed example doesn't misleadingly double as a fault's own example
+    /// (see `cover`).
+    ExpectedFound(String, String, bool),
     /// This status code was seen but does not occur in the specification
     /// (request, response, validation error)
     UnexpectedFound(String, String, String),
@@ -267,7 +279,7 @@ impl EndpointCoverageClient {
             sequence,
         } = args;
         if let Some(err) = &validation_error {
-            self.record_fault(method, &path, status, err, sequence);
+            self.record_fault(method, &path, status, err, sequence, &input, &output);
         }
 
         // Get the coverage entry for the method-path-status combination.
@@ -293,8 +305,23 @@ impl EndpointCoverageClient {
             }
             // Occupied entry, either already found (expected or unexpected) or expected but not yet found
             Entry::Occupied(mut entry) => {
-                if matches!(entry.get(), Coverage::ExpectedNotFound) {
-                    entry.insert(Coverage::ExpectedFound(input, output));
+                match entry.get() {
+                    Coverage::ExpectedNotFound => {
+                        // Status codes in the spec count as covered even if the one
+                        // response observed for them failed validation; such a
+                        // "tainted" example is upgraded below as soon as a clean one
+                        // is seen, so it isn't stuck permanently doubling as a fault's
+                        // own example.
+                        entry.insert(Coverage::ExpectedFound(
+                            input,
+                            output,
+                            validation_error.is_some(),
+                        ));
+                    }
+                    Coverage::ExpectedFound(_, _, true) if validation_error.is_none() => {
+                        entry.insert(Coverage::ExpectedFound(input, output, false));
+                    }
+                    _ => {}
                 }
             }
         }
@@ -330,6 +357,7 @@ impl EndpointCoverageClient {
     /// sequence that triggered it) is saved to `CRASHES_DIR` (see
     /// `ensure_crash_file`), so WFC reports can point faults at a real, replayable
     /// test case instead of a synthetic id.
+    #[allow(clippy::too_many_arguments)]
     fn record_fault(
         &mut self,
         method: Method,
@@ -337,6 +365,8 @@ impl EndpointCoverageClient {
         status: reqwest::StatusCode,
         err: &ValidationError,
         sequence: &OpenApiInput,
+        request: &str,
+        response: &str,
     ) {
         let discriminant = err.discriminant();
         let status = status.as_u16();
@@ -356,6 +386,8 @@ impl EndpointCoverageClient {
                 message: err.to_string(),
                 occurrences: 1,
                 test_case_name: ensure_crash_file(sequence),
+                request: request.to_owned(),
+                response: response.to_owned(),
             });
         }
     }
@@ -412,6 +444,21 @@ impl EndpointCoverageClient {
         }
         operation_tree.sort_keys();
 
+        // Groups faults by (method, path, status). Rather than listing fault variants
+        // as extra nav entries, each status item in the tree gets a hidden sibling
+        // <li> (holding a <div class="fault-variants">) with one static block per
+        // distinct fault recorded for that exact method/path/status; this is never
+        // shown in the nav itself, only used as a data source so the article pane
+        // can display these variants (each with its own request/response/reproduce)
+        // when their base status item is selected (see COVERAGE_EXPORT_JAVASCRIPT).
+        let mut fault_lookup = IndexMap::<(Method, &str, u16), Vec<&EndpointFault>>::new();
+        for fault in &self.faults {
+            fault_lookup
+                .entry((fault.method, fault.path.as_str(), fault.status))
+                .or_default()
+                .push(fault);
+        }
+
         // Make a nested Unordered List containing all the status codes
         let tree_container = operation_tree
             .into_iter()
@@ -428,18 +475,34 @@ impl EndpointCoverageClient {
                             // request and response in a data attribute. We can then use some javascript on
                             // the "input-link" class that reads this attribute's contents and
                             // puts it into the "input-pane".
-                            |list, item| match item.1 {
-                                Coverage::ExpectedFound(request, response) => list.with_link_attr(
-                                    "#",
-                                    format!("{} {}", HIT_SYMBOL, item.0),
-                                    [
-                                        ("data-input", escape_html(request).as_str()),
-                                        ("data-output", escape_html(response).as_str()),
-                                        ("class", "input-link c-hit"),
-                                    ],
-                                ),
-                                Coverage::UnexpectedFound(request, response, validation_error) => {
-                                    list.with_link_attr(
+                            |list, item| {
+                                let list = match item.1 {
+                                    Coverage::ExpectedFound(request, response, tainted) => {
+                                        // A tainted example never had a clean (fault-free)
+                                        // occurrence to upgrade to (see `cover`): its request
+                                        // and response are identical to one of this status's
+                                        // own fault variants, so the article pane shows a
+                                        // remark instead of duplicating that content.
+                                        let class = if *tainted {
+                                            "input-link c-hit c-fault-only"
+                                        } else {
+                                            "input-link c-hit"
+                                        };
+                                        list.with_link_attr(
+                                            "#",
+                                            format!("{} {}", HIT_SYMBOL, item.0),
+                                            [
+                                                ("data-input", escape_html(request).as_str()),
+                                                ("data-output", escape_html(response).as_str()),
+                                                ("class", class),
+                                            ],
+                                        )
+                                    }
+                                    Coverage::UnexpectedFound(
+                                        request,
+                                        response,
+                                        validation_error,
+                                    ) => list.with_link_attr(
                                         "#",
                                         format!("{} {}", SUPERFLUOUS_SYMBOL, item.0),
                                         [
@@ -449,14 +512,66 @@ impl EndpointCoverageClient {
                                                 "validation-error",
                                                 escape_html(validation_error).as_str(),
                                             ),
-                                            ("class", "input-link c-extra"),
+                                            // Status codes not in the spec are themselves a
+                                            // fault (`OtherStatusNotSpecified`), always
+                                            // recorded from this exact same occurrence, so
+                                            // there's no separate "clean" example for these
+                                            // - the article pane shows a remark instead of
+                                            // duplicating the content from the fault variant.
+                                            ("class", "input-link c-extra c-fault-only"),
                                         ],
-                                    )
+                                    ),
+                                    Coverage::ExpectedNotFound => list.with_raw(format!(
+                                        "<a class=\"c-miss\">{} {}</a>",
+                                        MISS_SYMBOL, item.0
+                                    )),
+                                };
+                                // Add the hidden fault-variants template right after the
+                                // item it belongs to (see comment on `fault_lookup` above).
+                                let status: u16 = item.0.parse().unwrap_or_default();
+                                match fault_lookup.get(&(method, path.as_str(), status)) {
+                                    Some(faults) => {
+                                        let blocks: String = faults
+                                            .iter()
+                                            .map(|fault| {
+                                                let FaultBadge {
+                                                    category,
+                                                    reproduce,
+                                                    class,
+                                                } = fault_badge(fault);
+                                                let reproduce_html = match reproduce {
+                                                    Some(path) => format!(
+                                                        r#"<code>{escaped_path}</code> <button class="copy-btn" data-copy="wuppiefuzz reproduce {escaped_path}">Copy reproduce command</button>"#,
+                                                        escaped_path = escape_html(&path)
+                                                    ),
+                                                    None => "<em>not found in crashes or queue directories</em>".to_string(),
+                                                };
+                                                format!(
+                                                    r#"<div class="fault-variant">
+                                                        <div class="fv-header"><span class="badge {class}">{category}</span> &times;{occurrences} &mdash; <span title="{message_full}">{message_short}</span></div>
+                                                        <h4>Request</h4><div class="fv-pane">{request}</div>
+                                                        <h4>Response</h4><div class="fv-pane">{response}</div>
+                                                        <h4>Reproduce</h4><div class="fv-pane">{reproduce_html}</div>
+                                                    </div>"#,
+                                                    occurrences = fault.occurrences,
+                                                    message_full = escape_html(&fault.message),
+                                                    message_short = escape_html(&truncate(&fault.message, 160)),
+                                                    request = escape_html(&fault.request),
+                                                    response = escape_html(&fault.response),
+                                                )
+                                            })
+                                            .collect();
+                                        // `with_raw` on a list container still wraps this
+                                        // in its own (unmarked) <li>; identify it via the
+                                        // inner div's class instead, which `next("li")
+                                        // .children(".fault-variants")` in the JS below
+                                        // can select without depending on the <li> itself.
+                                        list.with_raw(format!(
+                                            r#"<div class="fault-variants" style="display:none">{blocks}</div>"#
+                                        ))
+                                    }
+                                    None => list,
                                 }
-                                Coverage::ExpectedNotFound => list.with_raw(format!(
-                                    "<a class=\"c-miss\">{} {}</a>",
-                                    MISS_SYMBOL, item.0
-                                )),
                             },
                         );
                         Container::new(ContainerType::Div)
@@ -577,14 +692,28 @@ impl EndpointCoverageClient {
                                 "Click a found (hit/unspecified) status code in the list on the left to see its request + response.",
                                 [("id", "title-pane")],
                             )
-                            .with_header(2, "Request")
+                            .with_container(
+                                Container::new(ContainerType::Div)
+                                    .with_attributes([("id", "request-response-section")])
+                                    .with_header(2, "Request")
+                                    .with_paragraph_attr(
+                                        "None selected yet",
+                                        [("id", "input-pane")],
+                                    )
+                                    .with_header(2, "Response")
+                                    .with_paragraph_attr(
+                                        "None selected yet",
+                                        [("id", "output-pane")],
+                                    ),
+                            )
+                            .with_paragraph_attr(
+                                "",
+                                [("id", "fault-only-remark"), ("style", "display:none")],
+                            )
+                            .with_header(2, "Fault variants")
                             .with_paragraph_attr(
                                 "None selected yet",
-                                [("id", "input-pane")],
-                            )
-                            .with_header(2, "Response")
-                            .with_paragraph_attr("None selected yet",
-                                [("id", "output-pane")],
+                                [("id", "fault-variants-pane")],
                             )
                     ),
             )
@@ -678,7 +807,11 @@ function update_hidden() {
 
     $("ul.method").children().each(function(index, element) {
         if ($(element).children().children().children().filter(function(index, child) {
-            return $(child).css("display") != "none";
+            // is(":visible") (rather than checking the child's own "display" style)
+            // correctly treats the hidden fault-variants <li> (which has no inline
+            // display:none of its own, only a hidden child div, see
+            // `export_filesystem`) as invisible too, since it renders with zero size.
+            return $(child).is(":visible");
         }).length > 0) { // has visible children?
             $(element).show();
         } else {
@@ -687,7 +820,7 @@ function update_hidden() {
     });
     $("ul.path").children().each(function(index, element) {
         if ($(element).children().children().children().filter(function(index, child) {
-            return $(child).css("display") != "none";
+            return $(child).is(":visible");
         }).length > 0) { // has visible children?
             $(element).show();
         } else {
@@ -696,15 +829,12 @@ function update_hidden() {
     });
 }
 $(function() {
-    $(".input-link").click(function() {
-        $("#input-pane").html($(this).attr("data-input"));
-        $("#output-pane").html($(this).attr("data-output"));
+    // Delegated handler so dynamically added markup (e.g. fault variants, which
+    // are static blocks not links) doesn't need its own listener; only the base
+    // tree items carry the "input-link" class that this targets.
+    $(document).on("click", ".input-link", function() {
         $(".input-link").css("background-color", "#00000000");
         $(this).css("background-color", "#FFFF00FF"); 
-        let http_result = $(this).html();
-        let hit_miss_unspecified = http_result.substring(0, 2);
-        let http_method = $(this).closest('div')[0].firstChild.nodeValue;
-        let http_status = http_result.substring(2);
         let maybe_validation_error = $(this).attr("validation-error");
         if (maybe_validation_error === undefined) {
             maybe_validation_error = "";
@@ -713,7 +843,37 @@ $(function() {
         }
         let endpoint = $(this).closest('.endpoint_path')[0].firstChild.nodeValue;
         $("#title-header").html(endpoint);
+        let http_method = $(this).closest('div')[0].firstChild.nodeValue;
+        let http_result = $(this).html();
+        let hit_miss_unspecified = http_result.substring(0, 2);
+        let http_status = http_result.substring(2);
         $("#title-pane").html([hit_miss_unspecified, http_method, http_status].join(" ") + maybe_validation_error);
+        // c-fault-only status codes (unspecified ones, or specified ones that were
+        // only ever observed together with a validation fault - see `cover`) have a
+        // request/response that is identical to one of their own fault variants, so
+        // show a remark instead of duplicating that content in #input-pane/#output-pane.
+        if ($(this).hasClass("c-fault-only")) {
+            $("#request-response-section").hide();
+            let remark = $(this).hasClass("c-extra")
+                ? "This status code is not specified in the API; every occurrence of it was recorded as a fault. See the fault variant(s) below for details."
+                : "This status code is specified in the API, but it was only ever observed together with a validation fault. See the fault variant(s) below for details.";
+            $("#fault-only-remark").text(remark).show();
+        } else {
+            $("#input-pane").html($(this).attr("data-input"));
+            $("#output-pane").html($(this).attr("data-output"));
+            $("#request-response-section").show();
+            $("#fault-only-remark").hide();
+        }
+        // Fault variants for this exact status, if any, live inside a hidden
+        // <div class="fault-variants"> in the very next <li> sibling (see
+        // `export_filesystem`); copy its contents (static request/response/
+        // reproduce blocks, nothing left to wire up) into the visible pane.
+        let variants = $(this).closest("li").next("li").children(".fault-variants");
+        if (variants.length) {
+            $("#fault-variants-pane").html(variants.html());
+        } else {
+            $("#fault-variants-pane").html("No faults recorded for this status.");
+        }
     });
     $("input").click(update_hidden);
     $("label").click(update_hidden);
@@ -775,6 +935,14 @@ nav {
     overflow-y: scroll;
     overflow-x: hidden;
 }
+/* Each status item in the nav tree is followed by a hidden sibling <li>, auto-
+   generated by build_html, that only holds a `.fault-variants` data template
+   (see `export_filesystem`). The template div itself is `display:none`, but
+   list markers belong to the <li>, not its content, so without this rule that
+   <li> still renders an empty bullet point in the nav. */
+nav li:has(> .fault-variants) {
+    display: none;
+}
 article {
     float: left;
     overflow-y: auto;
@@ -791,6 +959,30 @@ article {
     padding: 5pt;
     border-radius: 4pt;
     margin-right: 10pt;
+}
+#fault-variants-pane {
+    max-width: 100%;
+    margin-right: 10pt;
+}
+.fault-variant {
+    border-top: 1px solid #ccc;
+    padding-top: 8pt;
+    margin-top: 8pt;
+}
+.fault-variant .fv-header {
+    margin-bottom: 4pt;
+}
+.fault-variant h4 {
+    margin: 4pt 0 2pt 0;
+}
+.fv-pane {
+    max-width: 100%;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #eee;
+    padding: 5pt;
+    border-radius: 4pt;
 }
 #filters {
     position: fixed;
