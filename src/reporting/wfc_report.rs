@@ -129,11 +129,26 @@ struct CoverageCriterion {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
 struct Warning {
     message: String,
     category: String,
     display_priority: u32,
+}
+
+impl Warning {
+    /// A warning about a `TestCase` that is referenced by the report but whose
+    /// reproducer file is unavailable: either it could never be located on disk
+    /// (`register_test_case`), or it could not be loaded back into memory
+    /// (`build_report`'s corpus loop). `display_priority` is set to a moderate
+    /// value (per the schema, lower means more important) since this affects
+    /// report completeness but not its correctness.
+    fn missing_test_case(message: String) -> Self {
+        Self {
+            message,
+            category: "TEST_CASE_UNAVAILABLE".to_string(),
+            display_priority: 50,
+        }
+    }
 }
 
 /// Maps a validation error (and the HTTP status that triggered it) onto the
@@ -197,22 +212,25 @@ fn fault_category(
 fn register_test_case(
     test_cases: &mut IndexMap<String, TestCase>,
     test_file_paths: &mut Vec<String>,
+    warnings: &mut Vec<Warning>,
     id: &str,
     name: impl FnOnce() -> String,
 ) {
     if test_cases.contains_key(id) {
         return;
     }
-    let file_path = match locate_test_case(id) {
-        Some(path) => {
+    let file_path = locate_test_case(id).map_or_else(
+        || {
+            let message = format!("Could not locate a test case file named {id} on disk");
+            log::warn!("{message}");
+            warnings.push(Warning::missing_test_case(message));
+            id.to_string()
+        },
+        |path| {
             test_file_paths.push(path.clone());
             path
-        }
-        None => {
-            log::warn!("Could not locate a test case file named {id} on disk");
-            id.to_string()
-        }
-    };
+        },
+    );
     test_cases.insert(
         id.to_string(),
         TestCase {
@@ -271,6 +289,7 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
     let corpus = state.corpus();
     let mut test_cases: IndexMap<String, TestCase> = IndexMap::with_capacity(corpus.count());
     let mut test_file_paths = Vec::with_capacity(corpus.count());
+    let mut warnings: Vec<Warning> = Vec::new();
     let mut output_http_calls = 0u64;
     for id in corpus.ids() {
         let Ok(testcase) = corpus.get(id) else {
@@ -282,19 +301,18 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
         // in before a testcase becomes retrievable via `corpus.get`, which is the
         // only way we ever obtain `testcase` here - so every corpus entry we can
         // iterate is guaranteed to already have a real on-disk path.
-        let file_path = testcase_ref
-            .file_path()
-            .as_ref()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| format!("queue/{id:?}"));
+        let file_path = testcase_ref.file_path().as_ref().map_or_else(
+            || format!("queue/{id:?}"),
+            |p| p.to_string_lossy().into_owned(),
+        );
         // Use the bare file name (LibAFL's deterministic content-hash, the same
         // name `ensure_crash_file`/`generate_name` produce) as the id, so it is
         // consistent with the ids used for faults and covered endpoints - never
         // prefixed with the containing directory (e.g. "queue/").
-        let case_id = Path::new(&file_path)
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| file_path.clone());
+        let case_id = Path::new(&file_path).file_name().map_or_else(
+            || file_path.clone(),
+            |name| name.to_string_lossy().into_owned(),
+        );
         // `input()` only returns an already-cached value: LibAFL frees a testcase's
         // input from memory right after it's first written to disk, and only
         // re-populates the cache if it's later reused as a mutation base. Entries
@@ -302,9 +320,11 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
         // campaign's timeout) would otherwise be silently dropped from the report
         // even though their file is on disk - so load explicitly instead.
         let Ok(input) = testcase_ref.load_input(corpus) else {
-            log::warn!(
+            let message = format!(
                 "Could not load corpus entry {id:?} from disk, skipping it in the WFC report"
             );
+            log::warn!("{message}");
+            warnings.push(Warning::missing_test_case(message));
             continue;
         };
         output_http_calls += input.0.len() as u64;
@@ -332,9 +352,13 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
             // `register_test_case` guarantees a matching `TestCase` entry exists for
             // it regardless of whether that file can still be located on disk.
             let test_case_id = fault.test_case_id.clone();
-            register_test_case(&mut test_cases, &mut test_file_paths, &test_case_id, || {
-                format!("{} {} ({})", fault.method, fault.path, fault.status)
-            });
+            register_test_case(
+                &mut test_cases,
+                &mut test_file_paths,
+                &mut warnings,
+                &test_case_id,
+                || format!("{} {} ({})", fault.method, fault.path, fault.status),
+            );
             FoundFault {
                 operation_id: format!("{}:{}", fault.method, fault.path),
                 test_case_id,
@@ -369,6 +393,7 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
             register_test_case(
                 &mut test_cases,
                 &mut test_file_paths,
+                &mut warnings,
                 &covered.test_case_id,
                 || {
                     let status = covered
@@ -435,7 +460,7 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
             tool_name: TOOL_NAME.to_string(),
             criteria,
         }]),
-        warnings: None,
+        warnings: (!warnings.is_empty()).then_some(warnings),
     }
 }
 
