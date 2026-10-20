@@ -277,6 +277,11 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
             continue;
         };
         let mut testcase_ref = testcase.borrow_mut();
+        // Defensive only: `file_path()` should be unreachable here as `None`.
+        // LibAFL's `InMemoryOnDiskCorpus::save_testcase` unconditionally fills it
+        // in before a testcase becomes retrievable via `corpus.get`, which is the
+        // only way we ever obtain `testcase` here - so every corpus entry we can
+        // iterate is guaranteed to already have a real on-disk path.
         let file_path = testcase_ref
             .file_path()
             .as_ref()
