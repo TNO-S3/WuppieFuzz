@@ -276,11 +276,7 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
         let Ok(testcase) = corpus.get(id) else {
             continue;
         };
-        let testcase_ref = testcase.borrow();
-        let Some(input) = testcase_ref.input() else {
-            continue;
-        };
-        output_http_calls += input.0.len() as u64;
+        let mut testcase_ref = testcase.borrow_mut();
         let file_path = testcase_ref
             .file_path()
             .as_ref()
@@ -294,6 +290,19 @@ pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
             .file_name()
             .map(|name| name.to_string_lossy().to_string())
             .unwrap_or_else(|| file_path.clone());
+        // `input()` only returns an already-cached value: LibAFL frees a testcase's
+        // input from memory right after it's first written to disk, and only
+        // re-populates the cache if it's later reused as a mutation base. Entries
+        // that were never reused (e.g. the newest finds, right before the
+        // campaign's timeout) would otherwise be silently dropped from the report
+        // even though their file is on disk - so load explicitly instead.
+        let Ok(input) = testcase_ref.load_input(corpus) else {
+            log::warn!(
+                "Could not load corpus entry {id:?} from disk, skipping it in the WFC report"
+            );
+            continue;
+        };
+        output_http_calls += input.0.len() as u64;
         test_file_paths.push(file_path.clone());
         test_cases.insert(
             case_id.clone(),
