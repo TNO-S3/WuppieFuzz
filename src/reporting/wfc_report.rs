@@ -11,10 +11,7 @@ use std::{
 
 use chrono::SecondsFormat;
 use indexmap::IndexMap;
-use libafl::{
-    corpus::Corpus,
-    state::{HasCorpus, HasSolutions},
-};
+use libafl::{corpus::Corpus, state::HasCorpus};
 use serde::Serialize;
 
 use crate::{
@@ -34,7 +31,7 @@ const TOOL_NAME: &str = "WuppieFuzz";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct WfcReport {
+pub(crate) struct WfcReport {
     schema_version: String,
     tool_name: String,
     tool_version: String,
@@ -232,36 +229,44 @@ fn register_test_case(
 /// Inputs needed to assemble a WFC report, gathered from the fuzzer executor at the
 /// end of a campaign.
 pub struct WfcReportContext<'a> {
+    /// The active fuzzer configuration, used to decide whether the "line" coverage
+    /// criterion is meaningful to report (see `CoverageConfiguration::Endpoint`).
     pub config: &'a Configuration,
+    /// The fuzzer state, whose corpus/solutions are walked to build `testCases`.
     pub state: &'a OpenApiFuzzerStateType,
+    /// Source of endpoint coverage, faults and covered-status data (see
+    /// `EndpointCoverageClient::{faults, covered_http_status, endpoint_ids}`).
     pub endpoint_client: &'a EndpointCoverageClient,
+    /// Total number of HTTP calls evaluated (not just those in the output corpus)
+    /// during the campaign.
     pub evaluated_http_calls: u64,
+    /// Wall-clock duration of the fuzzing campaign.
     pub fuzzing_duration: Duration,
-    pub report_path: &'a Path,
+    /// Code-coverage ratio (covered, total), omitted from the report entirely in
+    /// black-box/endpoint-only mode (see `CoverageConfiguration::Endpoint`).
     pub code_coverage_ratio: (u64, u64),
+    /// Endpoint-coverage ratio (covered, total); always meaningful since it only
+    /// needs the OpenAPI spec.
     pub endpoint_coverage_ratio: (u64, u64),
 }
 
-/// Generates a WFC-compliant `report.json` file, summarizing the fuzzing campaign:
-/// the generated test cases (the corpus), the endpoints covered and the HTTP status
-/// codes observed for them, and any faults (validation errors) found.
+/// Assembles a WFC-compliant report in memory: the generated test cases (the
+/// corpus), the endpoints covered and the HTTP status codes observed for them,
+/// and any faults (validation errors) found.
 ///
-/// `ctx.report_path` is the (already-existing) directory the report should be
-/// written to - the same one used for the HTML/coverage report, since both are
-/// generated together under `--report`.
-pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
+/// No I/O is performed here (see `persist_report` for that), so callers only need
+/// to hold `ctx.endpoint_client`'s lock for the duration of this call, rather than
+/// across the subsequent file write as well.
+pub(crate) fn build_report(ctx: WfcReportContext<'_>) -> WfcReport {
     let WfcReportContext {
         config,
         state,
         endpoint_client,
         evaluated_http_calls,
         fuzzing_duration,
-        report_path,
         code_coverage_ratio,
         endpoint_coverage_ratio,
     } = ctx;
-
-    create_dir_all(report_path)?;
 
     let corpus = state.corpus();
     let mut test_cases: IndexMap<String, TestCase> = IndexMap::with_capacity(corpus.count());
@@ -327,6 +332,10 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
             }
         })
         .collect();
+    // Each `FoundFault` always carries exactly one category (see `fault_category`
+    // above), so this is currently equivalent to `found_faults.len()`; summed over
+    // `fault_categories` instead so it stays correct if a fault is ever classified
+    // under more than one category.
     let total_number = found_faults
         .iter()
         .map(|f| f.fault_categories.len() as u64)
@@ -334,6 +343,11 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
 
     // One `CoveredEndpoint` per distinct (endpoint, status) observed, each citing
     // the real test case (see `ensure_crash_file`) whose example demonstrated it.
+    // This is schema-valid (`httpStatus` just needs to be an array), though the WFC
+    // schema's own doc for `httpStatus` envisions one entry per (endpoint, test
+    // case) grouping together every status that test case's calls observed; we
+    // don't track multiple statuses per test case internally, so emit the more
+    // granular but equally valid per-status form instead.
     let covered_http_status: Vec<CoveredEndpoint> = endpoint_client
         .covered_http_status()
         .into_iter()
@@ -382,7 +396,7 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         });
     }
 
-    let report = WfcReport {
+    WfcReport {
         schema_version: WFC_SCHEMA_VERSION.to_string(),
         tool_name: TOOL_NAME.to_string(),
         tool_version: get_wuppie_version(),
@@ -408,7 +422,17 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
             criteria,
         }]),
         warnings: None,
-    };
+    }
+}
+
+/// Writes `report` to `report_path/report.json`, creating `report_path` if needed.
+/// Pure I/O, no `EndpointCoverageClient` access required (see `build_report`).
+pub(crate) fn persist_report(
+    report: &WfcReport,
+    report_path: &Path,
+    solutions_count: usize,
+) -> anyhow::Result<()> {
+    create_dir_all(report_path)?;
 
     // Objectives (crashes/timeouts) do not necessarily have an associated validation
     // error recorded in the endpoint coverage map (e.g. plain timeouts), but their
@@ -417,13 +441,13 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         "Writing WFC report with {} test cases, {} found faults and {} objectives (crashes/timeouts) to {}",
         report.total_tests,
         report.faults.total_number,
-        state.solutions().count(),
+        solutions_count,
         report_path.display()
     );
 
     let report_file = report_path.join("report.json");
     let file = File::create(&report_file)?;
-    serde_json::to_writer_pretty(file, &report)?;
+    serde_json::to_writer_pretty(file, report)?;
     log::info!("WFC report written to {}", report_file.display());
 
     Ok(())

@@ -740,18 +740,26 @@ where
             .unwrap_or_default();
         let code_coverage_ratio = self.coverage_client.max_coverage_ratio();
         let endpoint_coverage_ratio = self.endpoint_client.max_coverage_ratio();
-        let endpoint_client = self.endpoint_client.lock().unwrap();
-        if let Err(err) = crate::reporting::wfc_report::write_report(
-            crate::reporting::wfc_report::WfcReportContext {
-                config: self.config,
-                state,
-                endpoint_client: &endpoint_client,
-                evaluated_http_calls: self.performed_requests,
-                fuzzing_duration,
-                report_path,
-                code_coverage_ratio,
-                endpoint_coverage_ratio,
-            },
+        // Only the in-memory report assembly needs `endpoint_client` locked; the
+        // lock is released before the (I/O-bound) file write.
+        let report = {
+            let endpoint_client = self.endpoint_client.lock().unwrap();
+            crate::reporting::wfc_report::build_report(
+                crate::reporting::wfc_report::WfcReportContext {
+                    config: self.config,
+                    state,
+                    endpoint_client: &endpoint_client,
+                    evaluated_http_calls: self.performed_requests,
+                    fuzzing_duration,
+                    code_coverage_ratio,
+                    endpoint_coverage_ratio,
+                },
+            )
+        };
+        if let Err(err) = crate::reporting::wfc_report::persist_report(
+            &report,
+            report_path,
+            state.solutions().count(),
         ) {
             log::error!("Failed to write WFC report: {err}");
         }
