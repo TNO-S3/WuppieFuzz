@@ -152,14 +152,14 @@ Grafana dashboard.
 
 ### Web Fuzzing Commons (WFC) report
 
-When you run WuppieFuzz with the `--wfc-report` flag, a `report.json` file is
-written at the end of the campaign (into the same `reports/<timestamp>`
-directory used by `--report`, or into its own timestamped directory if
-`--report` was not given). This file follows the [Web Fuzzing Commons report
+The same `--report` flag also writes a `report.json` file into the
+`reports/<timestamp>` directory, following the [Web Fuzzing Commons report
 schema](https://github.com/WebFuzzing/Commons/blob/master/src/main/resources/wfc/schemas/report.yaml),
 allowing results to be consumed by WFC-compatible tooling. It summarizes the
 generated test cases, the endpoints and HTTP status codes covered, any faults
-(validation errors) found, and basic coverage statistics.
+(validation errors) found, and basic coverage statistics (code coverage is
+included only when a coverage agent - e.g. JaCoCo - is configured; in
+black-box/endpoint-only mode only endpoint coverage is reported).
 
 ## Structure of this repository
 

@@ -268,15 +268,11 @@ pub enum Commands {
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
         /// If present, ask the coverage monitor to generate a report after the
-        /// time-out passes
-        #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
-        report: Option<bool>,
-
-        /// If present, generate a `report.json` file after the fuzzing campaign ends,
-        /// following the Web Fuzzing Commons (WFC) report schema. See
+        /// time-out passes. This also writes a `report.json` file following the
+        /// Web Fuzzing Commons (WFC) report schema; see
         /// https://github.com/WebFuzzing/Commons/blob/master/src/main/resources/wfc/schemas/report.yaml
         #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
-        wfc_report: Option<bool>,
+        report: Option<bool>,
 
         /// If present, determine with which HTTP methods to mutate.
         /// Must be one of {'follow-spec', 'common5', 'common7'},
@@ -403,7 +399,6 @@ impl Commands {
                 power_schedule,
                 crash_criteria,
                 report,
-                wfc_report,
                 method_mutation_strategy,
                 jacoco_class_dir,
                 source_dir,
@@ -427,7 +422,6 @@ impl Commands {
                 power_schedule,
                 crash_criteria,
                 report,
-                wfc_report,
                 method_mutation_strategy,
                 jacoco_class_dir,
                 source_dir,
@@ -528,14 +522,10 @@ struct PartialConfiguration {
     pub crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
     /// If present, ask the coverage monitor to generate a report after the
-    /// time-out passes
+    /// time-out passes. This also writes a `report.json` file following the
+    /// Web Fuzzing Commons (WFC) report schema.
     #[clap(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
     pub report: Option<bool>,
-
-    /// If present, generate a `report.json` file after the fuzzing campaign ends,
-    /// following the Web Fuzzing Commons (WFC) report schema.
-    #[clap(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
-    pub wfc_report: Option<bool>,
 
     /// If present, determine with which HTTP methods to mutate.
     /// Must be one of {'follow-spec', 'common5', 'common7'},
@@ -715,12 +705,9 @@ pub struct Configuration {
     pub crash_criteria: Vec<ValidationErrorDiscriminants>,
 
     /// If present, ask the coverage monitor to generate a report after the
-    /// time-out passes.
+    /// time-out passes. This also writes a `report.json` file following the
+    /// Web Fuzzing Commons (WFC) report schema.
     pub report: bool,
-
-    /// If present, generate a `report.json` file after the fuzzing campaign ends,
-    /// following the Web Fuzzing Commons (WFC) report schema.
-    pub wfc_report: bool,
 
     /// If present, determine with which HTTP methods to mutate.
     /// If omitted, only mutate with methods from api specification.
@@ -899,7 +886,6 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 .crash_criteria
                 .unwrap_or_else(|| ValidationErrorDiscriminants::VARIANTS.to_vec()),
             report: value.report.unwrap_or(false),
-            wfc_report: value.wfc_report.unwrap_or(false),
             method_mutation_strategy: value
                 .method_mutation_strategy
                 .unwrap_or(DEFAULT_METHOD_MUTATION_STRATEGY),
@@ -949,7 +935,6 @@ impl PartialConfiguration {
             power_schedule: other.power_schedule.or(self.power_schedule.take()),
             crash_criteria: other.crash_criteria.or(self.crash_criteria.take()),
             report: other.report.or(self.report.take()),
-            wfc_report: other.wfc_report.or(self.wfc_report.take()),
             method_mutation_strategy: other
                 .method_mutation_strategy
                 .or(self.method_mutation_strategy.take()),

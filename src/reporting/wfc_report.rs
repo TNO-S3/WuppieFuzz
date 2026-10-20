@@ -18,7 +18,7 @@ use libafl::{
 use serde::Serialize;
 
 use crate::{
-    configuration::Configuration,
+    configuration::{Configuration, CoverageConfiguration},
     coverage_clients::endpoint::{EndpointCoverageClient, locate_test_case},
     executor::summarize_sequence,
     openapi::validate_response::ValidationErrorDiscriminants,
@@ -237,7 +237,7 @@ pub struct WfcReportContext<'a> {
     pub endpoint_client: &'a EndpointCoverageClient,
     pub evaluated_http_calls: u64,
     pub fuzzing_duration: Duration,
-    pub report_path: Option<&'a Path>,
+    pub report_path: &'a Path,
     pub code_coverage_ratio: (u64, u64),
     pub endpoint_coverage_ratio: (u64, u64),
 }
@@ -246,8 +246,9 @@ pub struct WfcReportContext<'a> {
 /// the generated test cases (the corpus), the endpoints covered and the HTTP status
 /// codes observed for them, and any faults (validation errors) found.
 ///
-/// `ctx.report_path` is the directory the report should be written to; if `None`, a new
-/// timestamped `reports/<timestamp>` directory is created for it.
+/// `ctx.report_path` is the (already-existing) directory the report should be
+/// written to - the same one used for the HTML/coverage report, since both are
+/// generated together under `--report`.
 pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
     let WfcReportContext {
         config,
@@ -260,11 +261,7 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         endpoint_coverage_ratio,
     } = ctx;
 
-    let output_dir = match report_path {
-        Some(path) => path.to_path_buf(),
-        None => super::generate_report_path(),
-    };
-    create_dir_all(&output_dir)?;
+    create_dir_all(report_path)?;
 
     let corpus = state.corpus();
     let mut test_cases: IndexMap<String, TestCase> = IndexMap::with_capacity(corpus.count());
@@ -310,12 +307,12 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         .faults()
         .iter()
         .map(|fault| {
-            // `fault.test_case_name` is a stable content-hash name, proactively
+            // `fault.test_case_id` is a stable content-hash name, proactively
             // persisted to `CRASHES_DIR` the moment this fault was first recorded
             // (see `ensure_crash_file`), so it is used directly as the testCaseId -
             // `register_test_case` guarantees a matching `TestCase` entry exists for
             // it regardless of whether that file can still be located on disk.
-            let test_case_id = fault.test_case_name.clone();
+            let test_case_id = fault.test_case_id.clone();
             register_test_case(&mut test_cases, &mut test_file_paths, &test_case_id, || {
                 format!("{} {} ({})", fault.method, fault.path, fault.status)
             });
@@ -365,6 +362,26 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
     let total_tests = test_cases.len() as u64;
     let test_cases: Vec<TestCase> = test_cases.into_values().collect();
 
+    // Endpoint coverage is always meaningful (it only needs the OpenAPI spec), but
+    // in black-box mode (`CoverageConfiguration::Endpoint`) there is no real code
+    // coverage agent, so `code_coverage_ratio` is a meaningless dummy value - omit
+    // the "line" criterion entirely rather than report it.
+    let mut criteria = vec![CoverageCriterion {
+        name: "endpoint".to_string(),
+        covered: endpoint_coverage_ratio.0,
+        total: Some(endpoint_coverage_ratio.1),
+    }];
+    if !matches!(
+        config.coverage_configuration,
+        CoverageConfiguration::Endpoint
+    ) {
+        criteria.push(CoverageCriterion {
+            name: format!("line ({})", config.coverage_configuration.type_str()),
+            covered: code_coverage_ratio.0,
+            total: Some(code_coverage_ratio.1),
+        });
+    }
+
     let report = WfcReport {
         schema_version: WFC_SCHEMA_VERSION.to_string(),
         tool_name: TOOL_NAME.to_string(),
@@ -388,18 +405,7 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         execution_time_in_seconds: fuzzing_duration.as_secs(),
         extra: Some(vec![Coverage {
             tool_name: TOOL_NAME.to_string(),
-            criteria: vec![
-                CoverageCriterion {
-                    name: format!("line ({})", config.coverage_configuration.type_str()),
-                    covered: code_coverage_ratio.0,
-                    total: Some(code_coverage_ratio.1),
-                },
-                CoverageCriterion {
-                    name: "endpoint".to_string(),
-                    covered: endpoint_coverage_ratio.0,
-                    total: Some(endpoint_coverage_ratio.1),
-                },
-            ],
+            criteria,
         }]),
         warnings: None,
     };
@@ -412,10 +418,10 @@ pub fn write_report(ctx: WfcReportContext<'_>) -> anyhow::Result<()> {
         report.total_tests,
         report.faults.total_number,
         state.solutions().count(),
-        output_dir.display()
+        report_path.display()
     );
 
-    let report_file = output_dir.join("report.json");
+    let report_file = report_path.join("report.json");
     let file = File::create(&report_file)?;
     serde_json::to_writer_pretty(file, &report)?;
     log::info!("WFC report written to {}", report_file.display());

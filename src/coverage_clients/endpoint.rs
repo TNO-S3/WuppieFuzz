@@ -85,7 +85,7 @@ pub struct EndpointFault {
     /// saved to `CRASHES_DIR` under this name as soon as the fault is recorded (see
     /// `ensure_crash_file`), so it is expected to always be locatable on disk (see
     /// `locate_test_case`, used by `reporting::wfc_report`).
-    pub test_case_name: String,
+    pub test_case_id: String,
     /// A curl-equivalent representation of the request that first triggered this
     /// fault. Used by the HTML endpoint coverage report to let users inspect this
     /// specific fault variant, separately from the (possibly different) example
@@ -206,7 +206,7 @@ fn fault_badge(fault: &EndpointFault) -> FaultBadge {
     let (category, _code) = fault_category_name(fault.discriminant, fault.status);
     FaultBadge {
         category,
-        reproduce: locate_test_case(&fault.test_case_name),
+        reproduce: locate_test_case(&fault.test_case_id),
         class: format!("cat-{category}"),
     }
 }
@@ -491,7 +491,7 @@ impl EndpointCoverageClient {
                 discriminant,
                 message: err.to_string(),
                 occurrences: 1,
-                test_case_name: ensure_crash_file(sequence),
+                test_case_id: ensure_crash_file(sequence),
                 request: request.to_owned(),
                 response: response.to_owned(),
             });
@@ -750,7 +750,7 @@ impl EndpointCoverageClient {
                         r##"
                         <button id="tab-endpoints" class="tab active">Endpoints</button>
                         <button id="tab-faults" class="tab">All faults ({})</button>
-                        <a id="wfc-link" href="../report.json" target="_blank" title="Only present if the campaign was run with --wfc-report">View WFC report.json &#x2197;&#xfe0f;</a>
+                        <a id="wfc-link" href="../report.json" target="_blank">View WFC report.json &#x2197;&#xfe0f;</a>
                         "##,
                         self.faults.len()
                     )),

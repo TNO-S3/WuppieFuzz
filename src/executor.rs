@@ -723,16 +723,17 @@ where
         self.starting_time = Some(Instant::now())
     }
 
-    /// Generates a WFC-compliant `report.json` summarizing the fuzzing campaign, if
-    /// `--wfc-report` was requested.
+    /// Generates a WFC-compliant `report.json` summarizing the fuzzing campaign,
+    /// alongside the HTML/coverage report, if `--report` was requested
+    /// (`report_path.is_some()`).
     pub fn generate_wfc_report_if_requested(
         &mut self,
         state: &FuzzerState,
         report_path: Option<&std::path::Path>,
     ) {
-        if !self.config.wfc_report {
+        let Some(report_path) = report_path else {
             return;
-        }
+        };
         let fuzzing_duration = self
             .starting_time
             .map(|start| start.elapsed())
