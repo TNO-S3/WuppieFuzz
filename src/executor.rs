@@ -430,8 +430,8 @@ where
                         method: request.method,
                         path: request.path.clone(),
                         status: response.status(),
-                        input: curl_request,
-                        output: response.text().unwrap_or_else(|_| {
+                        curl_string: curl_request,
+                        response_body: response.text().unwrap_or_else(|_| {
                             String::from("Unable to decode the response to UTF-8")
                         }),
                         validation_error,

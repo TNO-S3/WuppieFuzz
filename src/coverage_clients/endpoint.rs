@@ -105,9 +105,9 @@ pub struct CoverArgs<'a> {
     /// HTTP status of the response.
     pub status: reqwest::StatusCode,
     /// A curl-equivalent representation of the request that produced this response.
-    pub input: String,
+    pub curl_string: String,
     /// The response body text.
-    pub output: String,
+    pub response_body: String,
     /// The validation error found for this response, if any.
     pub validation_error: Option<ValidationError>,
     /// The full request sequence currently being executed, saved to `CRASHES_DIR`
@@ -151,16 +151,16 @@ pub fn locate_test_case(file_name: &str) -> Option<String> {
 /// name (`Input::generate_name`), the same name and directory LibAFL's own
 /// `solutions` corpus would use for it, and returns that name.
 ///
-/// Every fault tracked by `record_fault` corresponds to an execution that set
-/// `ExitKind::Crash`, so LibAFL's `CrashFeedback` would normally persist it to
-/// `CRASHES_DIR` anyway. However, faults first observed while LibAFL re-executes
-/// seeds during corpus minimization bypass that objective/solutions machinery
-/// entirely (see `MapCorpusMinimizer::minimize`), and the corresponding seed can
-/// later be deleted from the queue if minimization finds it redundant for coverage
-/// purposes (coverage that is tracked per status code, not per fault reason, so a
-/// seed can be "redundant" there while being the only reproducer for its specific
-/// fault). Writing it here ourselves, right away, closes that gap; if the file
-/// already exists (e.g. LibAFL got there first), this is a cheap, harmless no-op.
+/// Corpus minimization trims the initial corpus down to a minimal set of
+/// inputs that together cover every observed `(method, path, status)`
+/// combination; only those survive in the queue for fuzzing. For crashing
+/// inputs this ignores the fault reason: several inputs sharing the same
+/// `(method, path, status)` but with different fault reasons will have only
+/// one of them survive minimization. This function preserves all of them as
+/// crash files in `CRASHES_DIR` regardless. During normal fuzzing, LibAFL's
+/// `CrashFeedback` would persist these for us anyway, but corpus minimization
+/// replays inputs directly through the executor, bypassing `CrashFeedback`
+/// entirely - so here we have to do it ourselves.
 fn ensure_crash_file(sequence: &OpenApiInput) -> String {
     let file_name = sequence.generate_name(None);
     let path = Path::new(CRASHES_DIR).join(&file_name);
@@ -263,6 +263,7 @@ enum Coverage {
     ExpectedFound {
         request: String,
         response: String,
+        /// Whether the response failed spec-validation.
         tainted: bool,
         /// Deterministic content-hash name (see `ensure_crash_file`) of the request
         /// sequence that produced this example, proactively persisted to
@@ -361,8 +362,8 @@ impl EndpointCoverageClient {
             method,
             path,
             status,
-            input,
-            output,
+            curl_string,
+            response_body,
             validation_error,
             sequence,
         } = args;
@@ -373,8 +374,8 @@ impl EndpointCoverageClient {
                 status,
                 err,
                 sequence,
-                request: &input,
-                response: &output,
+                request: &curl_string,
+                response: &response_body,
             });
         }
 
@@ -395,8 +396,8 @@ impl EndpointCoverageClient {
                 // fails `validate_response` with `OtherStatusNotSpecified`/`Status5xxNotSpecified`,
                 // which is exactly why this entry is Vacant. The fallback is defensive only.
                 entry.insert(Coverage::UnexpectedFound {
-                    request: input,
-                    response: output,
+                    request: curl_string,
+                    response: response_body,
                     validation_error: validation_error.map_or_else(
                         || "Validation error required!".to_string(),
                         |val| val.to_string(),
@@ -414,16 +415,16 @@ impl EndpointCoverageClient {
                         // is seen, so it isn't stuck permanently doubling as a fault's
                         // own example.
                         entry.insert(Coverage::ExpectedFound {
-                            request: input,
-                            response: output,
+                            request: curl_string,
+                            response: response_body,
                             tainted: validation_error.is_some(),
                             test_case_id: ensure_crash_file(sequence),
                         });
                     }
                     Coverage::ExpectedFound { tainted: true, .. } if validation_error.is_none() => {
                         entry.insert(Coverage::ExpectedFound {
-                            request: input,
-                            response: output,
+                            request: curl_string,
+                            response: response_body,
                             tainted: false,
                             test_case_id: ensure_crash_file(sequence),
                         });
@@ -859,274 +860,9 @@ impl CoverageClient for Arc<Mutex<EndpointCoverageClient>> {
     }
 }
 
-const COVERAGE_EXPORT_JAVASCRIPT: &str = r##"
-// When the document is loaded, attach "onclick" events to all links of class
-// 'input-link' that display the 'data-input' contents in the 'input-pane'
-// and 'data-output' in the 'output-pane'.
-function update_hidden() {
-    $("ul.path").children().each(function(index, element) {
-        $(element).show();
-    });
-    $("ul.method").children().each(function(index, element) {
-        $(element).show();
-    });
+/// Client-side JavaScript for the HTML endpoint coverage report (tab switching,
+/// filters, and the request/response detail pane).
+const COVERAGE_EXPORT_JAVASCRIPT: &str = include_str!("endpoint_report.js");
 
-    if ($("#f-hit")[0].checked) {
-        $(".c-hit").parent().show();
-    } else {
-        $(".c-hit").parent().hide();
-    }
-    if ($("#f-miss")[0].checked) {
-        $(".c-miss").parent().show();
-    } else {
-        $(".c-miss").parent().hide();
-    }
-    if ($("#f-extra")[0].checked) {
-        $(".c-extra").parent().show();
-    } else {
-        $(".c-extra").parent().hide();
-    }
-
-    $("ul.method").children().each(function(index, element) {
-        if ($(element).children().children().children().filter(function(index, child) {
-            // is(":visible") (rather than checking the child's own "display" style)
-            // correctly treats the hidden fault-variants <li> (which has no inline
-            // display:none of its own, only a hidden child div, see
-            // `export_filesystem`) as invisible too, since it renders with zero size.
-            return $(child).is(":visible");
-        }).length > 0) { // has visible children?
-            $(element).show();
-        } else {
-            $(element).hide();
-        }
-    });
-    $("ul.path").children().each(function(index, element) {
-        if ($(element).children().children().children().filter(function(index, child) {
-            return $(child).is(":visible");
-        }).length > 0) { // has visible children?
-            $(element).show();
-        } else {
-            $(element).hide();
-        }
-    });
-}
-$(function() {
-    // Delegated handler so dynamically added markup (e.g. fault variants, which
-    // are static blocks not links) doesn't need its own listener; only the base
-    // tree items carry the "input-link" class that this targets.
-    $(document).on("click", ".input-link", function() {
-        $(".input-link").css("background-color", "#00000000");
-        $(this).css("background-color", "#FFFF00FF"); 
-        let maybe_validation_error = $(this).attr("validation-error");
-        if (maybe_validation_error === undefined) {
-            maybe_validation_error = "";
-        } else {
-            maybe_validation_error = " - " + maybe_validation_error;
-        }
-        let endpoint = $(this).closest('.endpoint_path')[0].firstChild.nodeValue;
-        $("#title-header").html(endpoint);
-        let http_method = $(this).closest('div')[0].firstChild.nodeValue;
-        let http_result = $(this).html();
-        let hit_miss_unspecified = http_result.substring(0, 2);
-        let http_status = http_result.substring(2);
-        $("#title-pane").html([hit_miss_unspecified, http_method, http_status].join(" ") + maybe_validation_error);
-        // c-fault-only status codes (unspecified ones, or specified ones that were
-        // only ever observed together with a validation fault - see `cover`) have a
-        // request/response that is identical to one of their own fault variants, so
-        // show a remark instead of duplicating that content in #input-pane/#output-pane.
-        if ($(this).hasClass("c-fault-only")) {
-            $("#request-response-section").hide();
-            let remark = $(this).hasClass("c-extra")
-                ? "This status code is not specified in the API; every occurrence of it was recorded as a fault. See the fault variant(s) below for details."
-                : "This status code is specified in the API, but it was only ever observed together with a validation fault. See the fault variant(s) below for details.";
-            $("#fault-only-remark").text(remark).show();
-        } else {
-            $("#input-pane").html($(this).attr("data-input"));
-            $("#output-pane").html($(this).attr("data-output"));
-            $("#request-response-section").show();
-            $("#fault-only-remark").hide();
-        }
-        // Fault variants for this exact status, if any, live inside a hidden
-        // <div class="fault-variants"> in the very next <li> sibling (see
-        // `export_filesystem`); copy its contents (static request/response/
-        // reproduce blocks, nothing left to wire up) into the visible pane.
-        let variants = $(this).closest("li").next("li").children(".fault-variants");
-        if (variants.length) {
-            $("#fault-variants-pane").html(variants.html());
-        } else {
-            $("#fault-variants-pane").html("No faults recorded for this status.");
-        }
-    });
-    $("input").click(update_hidden);
-    $("label").click(update_hidden);
-    $("input").prop("checked", true);
-
-    $("#tab-endpoints").click(function () {
-        $("#view-faults").hide();
-        $("#view-endpoints").show();
-        $("#filters").show();
-        $(this).addClass("active");
-        $("#tab-faults").removeClass("active");
-    });
-    $("#tab-faults").click(function () {
-        $("#view-endpoints").hide();
-        $("#view-faults").show();
-        $("#filters").hide();
-        $(this).addClass("active");
-        $("#tab-endpoints").removeClass("active");
-    });
-
-    // Delegated handler: the faults table's copy buttons are generated dynamically,
-    // so attach the listener to a static ancestor rather than the buttons themselves.
-    $(document).on("click", ".copy-btn", function () {
-        let text = $(this).attr("data-copy");
-        navigator.clipboard.writeText(text).then(function () {
-            let button = this;
-            let original = $(button).text();
-            $(button).text("Copied!");
-            setTimeout(function () {
-                $(button).text(original);
-            }, 1500);
-        }.bind(this));
-    });
-});
-
-"##;
-
-const COVERAGE_EXPORT_CSS: &str = r##"
-body {
-    font-family: Segoe UI Emoji;
-    margin: 0;
-}
-h1 {
-    position: fixed;
-    height: 70pt;
-    padding: 5pt;
-}
-.contents {
-    height: calc(100% - 70pt);
-    margin-top: 70pt;
-    position: fixed;
-    width: calc(100% - 5pt);
-    margin-left: 5pt;
-}
-nav {
-    float: left;
-    width: 250pt;
-    height: 100%;
-    overflow-y: scroll;
-    overflow-x: hidden;
-}
-/* Each status item in the nav tree is followed by a hidden sibling <li>, auto-
-   generated by build_html, that only holds a `.fault-variants` data template
-   (see `export_filesystem`). The template div itself is `display:none`, but
-   list markers belong to the <li>, not its content, so without this rule that
-   <li> still renders an empty bullet point in the nav. */
-nav li:has(> .fault-variants) {
-    display: none;
-}
-article {
-    float: left;
-    overflow-y: auto;
-    width: calc(100% - 260pt);
-    height: 100%;
-    padding-left: 10pt;
-}
-#input-pane, #output-pane {
-    max-width: 100%;
-    font-family: monospace;
-    white-space: pre-wrap;
-    word-break: break-all;
-    background: #eee;
-    padding: 5pt;
-    border-radius: 4pt;
-    margin-right: 10pt;
-}
-#fault-variants-pane {
-    max-width: 100%;
-    margin-right: 10pt;
-}
-.fault-variant {
-    border-top: 1px solid #ccc;
-    padding-top: 8pt;
-    margin-top: 8pt;
-}
-.fault-variant .fv-header {
-    margin-bottom: 4pt;
-}
-.fault-variant h4 {
-    margin: 4pt 0 2pt 0;
-}
-.fv-pane {
-    max-width: 100%;
-    font-family: monospace;
-    white-space: pre-wrap;
-    word-break: break-all;
-    background: #eee;
-    padding: 5pt;
-    border-radius: 4pt;
-}
-#filters {
-    position: fixed;
-    top: 5pt;
-    right: 5pt;
-}
-#tabs {
-    position: fixed;
-    top: 5pt;
-    left: 260pt;
-}
-.tab {
-    font: inherit;
-    padding: 4pt 10pt;
-    border: 1px solid #ccc;
-    border-bottom: none;
-    background: #eee;
-    cursor: pointer;
-}
-.tab.active {
-    background: #fff;
-    font-weight: bold;
-}
-#wfc-link {
-    margin-left: 15pt;
-}
-.badge {
-    display: inline-block;
-    padding: 1pt 5pt;
-    border-radius: 3pt;
-    background: #ffe0b2;
-    font-size: 0.85em;
-    white-space: nowrap;
-}
-#view-faults table {
-    border-collapse: collapse;
-    /* Fixed layout + explicit column widths below keep every column (especially
-       Reproducer, the last one) in its own place regardless of how long an
-       individual Message cell's content is; without this, a long unbroken message
-       can otherwise make the table widen unpredictably and push later columns
-       onto their own line. */
-    table-layout: fixed;
-    width: 100%;
-}
-#view-faults th, #view-faults td {
-    border: 1px solid #ccc;
-    padding: 4pt 6pt;
-    text-align: left;
-    vertical-align: top;
-    overflow-wrap: break-word;
-}
-#view-faults th {
-    background: #eee;
-}
-#view-faults th:nth-child(1), #view-faults td:nth-child(1) { width: 18%; }
-#view-faults th:nth-child(2), #view-faults td:nth-child(2) { width: 7%; }
-#view-faults th:nth-child(3), #view-faults td:nth-child(3) { width: 16%; }
-#view-faults th:nth-child(4), #view-faults td:nth-child(4) { width: 9%; }
-#view-faults th:nth-child(5), #view-faults td:nth-child(5) { width: 35%; }
-#view-faults th:nth-child(6), #view-faults td:nth-child(6) { width: 15%; }
-.copy-btn {
-    font-size: 0.85em;
-    cursor: pointer;
-}
-"##;
+/// Stylesheet for the HTML endpoint coverage report.
+const COVERAGE_EXPORT_CSS: &str = include_str!("endpoint_report.css");

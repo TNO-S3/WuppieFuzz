@@ -33,9 +33,7 @@ use crate::{
 };
 
 /// Directory in which LibAFL's `solutions` corpus (crashing/timing-out request
-/// sequences) is stored on disk. Exposed so other modules (e.g. the endpoint
-/// coverage client, when locating a fault's reproducer) don't have to duplicate
-/// this path as a separate literal.
+/// sequences) is stored on disk.
 pub const CRASHES_DIR: &str = "./crashes";
 
 /// OpenApiFuzzerState is an object needed by LibAFL.
