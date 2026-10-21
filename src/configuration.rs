@@ -268,7 +268,9 @@ pub enum Commands {
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
         /// If present, ask the coverage monitor to generate a report after the
-        /// time-out passes
+        /// time-out passes. This also writes a `report.json` file following the
+        /// Web Fuzzing Commons (WFC) report schema; see
+        /// https://github.com/WebFuzzing/Commons/blob/master/src/main/resources/wfc/schemas/report.yaml
         #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
         report: Option<bool>,
 
@@ -520,7 +522,8 @@ struct PartialConfiguration {
     pub crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
     /// If present, ask the coverage monitor to generate a report after the
-    /// time-out passes
+    /// time-out passes. This also writes a `report.json` file following the
+    /// Web Fuzzing Commons (WFC) report schema.
     #[clap(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
     pub report: Option<bool>,
 
@@ -702,7 +705,8 @@ pub struct Configuration {
     pub crash_criteria: Vec<ValidationErrorDiscriminants>,
 
     /// If present, ask the coverage monitor to generate a report after the
-    /// time-out passes.
+    /// time-out passes. This also writes a `report.json` file following the
+    /// Web Fuzzing Commons (WFC) report schema.
     pub report: bool,
 
     /// If present, determine with which HTTP methods to mutate.
