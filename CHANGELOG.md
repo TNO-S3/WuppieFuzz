@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Treat path parameters that are not templated in their path as query parameters, so they are still fuzzed instead of being dropped with an error during corpus generation in [#405](https://github.com/TNO-S3/WuppieFuzz/pull/405)
+
 # v1.8.0 (2026-10-07)
 
 ## Highlights
