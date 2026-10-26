@@ -133,7 +133,14 @@ fn example_body_for_operation(api: &Spec, operation: &Operation) -> Option<Param
         };
     }
     // TODO this is a bit lackluster
-    log::warn!("Cannot create an example body. Using empty body.");
+    static WARNED_BODY: std::sync::Once = std::sync::Once::new();
+    WARNED_BODY.call_once(|| {
+        log::warn!(
+            "Cannot create an example body for at least one operation. Using empty body \
+             (further occurrences are logged at debug level)."
+        )
+    });
+    log::debug!("Cannot create an example body. Using empty body.");
     None
 }
 
