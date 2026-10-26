@@ -1046,10 +1046,40 @@ fn interesting_values_for_string_type(
                 {
                     return vec![serde_json::Value::String(sample)];
                 }
-                log::warn!("Could not generate an example string that matches the regex {pattern}");
+                static WARNED_NO_MATCH: std::sync::Once = std::sync::Once::new();
+                WARNED_NO_MATCH.call_once(|| {
+                    log::warn!(
+                        "Could not generate an example string that matches the regex {pattern} \
+                         (further occurrences are logged at debug level)."
+                    )
+                });
+                log::debug!(
+                    "Could not generate an example string that matches the regex {pattern}"
+                );
             }
             Err(err) => {
-                log::warn!("Broken regex pattern {pattern}, Error message: {err}");
+                // Repair the common mistake of an unescaped hyphen after a class escape: [\w-/]
+                let repaired = pattern_without_anchors
+                    .replace("\\w-", "\\w\\-")
+                    .replace("\\d-", "\\d\\-")
+                    .replace("\\s-", "\\s\\-");
+                if repaired != pattern_without_anchors
+                    && let Ok(compiled) = rand_regex::Regex::compile(&repaired, 100)
+                    && let Some(sample) = rand::rng()
+                        .sample_iter::<String, _>(&compiled)
+                        .take(1000)
+                        .find(|s| Regex::new(&repaired).is_ok_and(|r| r.is_match(s)))
+                {
+                    return vec![serde_json::Value::String(sample)];
+                }
+                static WARNED_BROKEN: std::sync::Once = std::sync::Once::new();
+                WARNED_BROKEN.call_once(|| {
+                    log::warn!(
+                        "Broken regex pattern {pattern}, Error message: {err} \
+                         (further occurrences are logged at debug level)."
+                    )
+                });
+                log::debug!("Broken regex pattern {pattern}, Error message: {err}");
             }
         }
     }
