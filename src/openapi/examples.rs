@@ -460,10 +460,30 @@ fn example_value_for_schema(api: &Spec, schema: &Schema, recursion_depth: usize)
             return example_value_for_schema(api, &schema.all_of[0], recursion_depth + 1);
         }
         _ => {
-            log::warn!(concat!(
-                "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
-                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
-            ));
+            // Best effort: merge the examples of all sub-schemas; objects are combined key-wise.
+            let parts: Vec<Value> = schema
+                .all_of
+                .iter()
+                .filter_map(|s| example_value_for_schema(api, s, recursion_depth + 1))
+                .collect();
+            if parts.iter().all(Value::is_object) && !parts.is_empty() {
+                let mut merged = serde_json::Map::new();
+                for part in parts {
+                    if let Value::Object(map) = part {
+                        merged.extend(map);
+                    }
+                }
+                for (name, prop) in schema.properties.iter() {
+                    if let Some(v) = example_value_for_schema(api, prop, recursion_depth + 1) {
+                        merged.insert(name.clone(), v);
+                    }
+                }
+                return Some(Value::Object(merged));
+            }
+            if let Some(first) = parts.into_iter().next() {
+                return Some(first);
+            }
+            log::debug!("allOf with multiple schemas yielded no example");
             log_schema_debug(&schema);
             return None;
         }
@@ -1053,10 +1073,24 @@ fn interesting_values_for_string_type(
                 {
                     return vec![serde_json::Value::String(sample)];
                 }
-                log::warn!("Could not generate an example string that matches the regex {pattern}");
+                log::debug!("Could not generate an example string that matches the regex {pattern}");
             }
             Err(err) => {
-                log::warn!("Broken regex pattern {pattern}, Error message: {err}");
+                // Repair the common mistake of an unescaped hyphen after a class escape: [\w-/]
+                let repaired = pattern_without_anchors
+                    .replace("\\w-", "\\w\\-")
+                    .replace("\\d-", "\\d\\-")
+                    .replace("\\s-", "\\s\\-");
+                if repaired != pattern_without_anchors
+                    && let Ok(compiled) = rand_regex::Regex::compile(&repaired, 100)
+                    && let Some(sample) = rand::rng()
+                        .sample_iter::<String, _>(&compiled)
+                        .take(1000)
+                        .find(|s| Regex::new(&repaired).is_ok_and(|r| r.is_match(s)))
+                {
+                    return vec![serde_json::Value::String(sample)];
+                }
+                log::debug!("Broken regex pattern {pattern}, Error message: {err}");
             }
         }
     }
