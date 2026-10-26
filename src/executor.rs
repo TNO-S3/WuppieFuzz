@@ -149,14 +149,9 @@ pub(crate) fn process_response(
     parameter_feedback: &mut ParameterFeedback,
 ) -> Option<ValidationError> {
     if response.status() == 429 {
-        static WARNED_429: std::sync::Once = std::sync::Once::new();
-        WARNED_429.call_once(|| {
-            log::warn!(
-                "HTTP status 429 'Too Many Requests' encountered! Rate limiting is likely active \
-                 on the program under test, which hinders fuzz testing. Consider disabling it \
-                 (further occurrences of this warning are suppressed)."
-            );
-        });
+        log::warn!("HTTP status 429 'Too Many Requests' encountered!");
+        log::warn!("Rate limiting is likely active on the program under test.");
+        log::warn!("This hinders fuzz testing. Consider disabling it.");
     }
     let mut maybe_validation_error = None;
     if response.status().is_server_error() {

@@ -214,16 +214,8 @@ fn normalize_parameter(
         )),
         oas3::spec::ParameterIn::Path => ParameterNormalization::path(
             ParameterAccess::request_path(parameter.name.clone()),
-            path_parts.clone(),
-        )
-        .or_else(|err| {
-            // Spec defect: best effort, treat it like a query parameter so it is still fuzzed.
-            log::warn!("{err}; treating the parameter as untemplated and continuing");
-            Ok(ParameterNormalization::query_header_cookie(
-                ParameterAccess::request_path(parameter.name.clone()),
-                path_parts,
-            ))
-        }),
+            path_parts,
+        ),
     }
 }
 
