@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Log the HTTP 429 'Too Many Requests' rate-limiting warning once instead of on every response in [#403](https://github.com/TNO-S3/WuppieFuzz/pull/403)
+
 # v1.8.0 (2026-10-07)
 
 ## Highlights
