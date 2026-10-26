@@ -104,10 +104,29 @@ fn example_body_for_operation(api: &Spec, operation: &Operation) -> Option<Param
         },
     };
 
-    if object_schema
-        .schema_type
-        .as_ref()
-        .is_some_and(|st| st.contains(SchemaType::Object))
+    let is_object = match &object_schema.schema_type {
+        Some(st) => st.contains(SchemaType::Object),
+        None => !object_schema.properties.is_empty() || !object_schema.all_of.is_empty(),
+    };
+    if !is_object && object_schema.schema_type.is_none() {
+        if let Some(value) = example_value_for_schema(
+            api,
+            &Schema::Object(Box::new(ObjectOrReference::Object(object_schema.clone()))),
+            0,
+        ) {
+            return Some(ParameterContents::from(value));
+        }
+    }
+    if is_object && !object_schema.all_of.is_empty() && object_schema.properties.is_empty() {
+        if let Some(value) = example_value_for_schema(
+            api,
+            &Schema::Object(Box::new(ObjectOrReference::Object(object_schema.clone()))),
+            0,
+        ) {
+            return Some(ParameterContents::from(value));
+        }
+    }
+    if is_object
     {
         let body_map: BTreeMap<String, ParameterContents> = object_schema
             .properties
