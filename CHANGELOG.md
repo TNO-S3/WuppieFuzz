@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Generate example request bodies for schemas with multiple `allOf` entries, schemas with properties but no `type`, and bodies made only of `allOf`/`oneOf`/`anyOf`; remaining empty-body warnings are logged once in [#406](https://github.com/TNO-S3/WuppieFuzz/pull/406)
+
 # v1.8.0 (2026-10-07)
 
 ## Highlights
