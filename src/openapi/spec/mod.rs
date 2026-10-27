@@ -67,9 +67,10 @@ impl From<openapiv3::OpenAPI> for Spec {
 
 /// Simplifies the spec structure. Currently
 /// - Copies PathItem parameters into its sub-Operations
+/// - Turns `in: path` parameters that are not templated in the path into query parameters
 fn simplify(mut api: oas3::Spec) -> oas3::Spec {
     let mut paths = api.paths.take();
-    for (_, path_item) in paths.iter_mut().flatten() {
+    for (path, path_item) in paths.iter_mut().flatten() {
         for operation in [
             &mut path_item.get,
             &mut path_item.put,
@@ -84,10 +85,33 @@ fn simplify(mut api: oas3::Spec) -> oas3::Spec {
         .flatten()
         {
             add_path_params_to_operation(&api, &path_item.parameters, operation);
+            fix_untemplated_path_params(&api, path, operation);
         }
     }
     api.paths = paths;
     api
+}
+
+/// Specs sometimes declare a parameter `in: path` while the path has no `{name}` placeholder.
+/// Such a value would never reach the server, so best-effort it is declared as a query
+/// parameter instead.
+fn fix_untemplated_path_params(api: &oas3::Spec, path: &str, operation: &mut Operation) {
+    for ref_or_param in operation.parameters.iter_mut() {
+        let Ok(mut param) = ref_or_param.resolve(api) else {
+            continue;
+        };
+        if param.location == oas3::spec::ParameterIn::Path
+            && !path.contains(&format!("{{{}}}", param.name))
+        {
+            log::warn!(
+                "Parameter '{}' is declared in the path, but {path} has no {{{}}} placeholder; treating it as a query parameter.",
+                param.name,
+                param.name
+            );
+            param.location = oas3::spec::ParameterIn::Query;
+            *ref_or_param = ObjectOrReference::Object(param);
+        }
+    }
 }
 
 fn add_path_params_to_operation(
@@ -813,6 +837,33 @@ mod tests {
             simplified_spec
                 .operation(&Method::POST, "test_path")
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn untemplated_path_param_becomes_query_param() {
+        let spec: oas3::Spec = oas3::from_json(
+            r#"{"openapi":"3.0.0","info":{"title":"t","version":"1"},"paths":{
+                "/a/{x}":{"get":{"parameters":[
+                    {"name":"x","in":"path","required":true,"schema":{"type":"string"}},
+                    {"name":"id","in":"path","required":true,"schema":{"type":"integer"}}
+                ],"responses":{"200":{"description":"ok"}}}}}}"#,
+        )
+        .unwrap();
+        let simplified = super::simplify(spec);
+        let operation = simplified.operation(&Method::GET, "/a/{x}").unwrap();
+        let locations: Vec<_> = operation
+            .parameters
+            .iter()
+            .filter_map(|p| p.resolve(&simplified).ok())
+            .map(|p| (p.name, p.location))
+            .collect();
+        assert_eq!(
+            locations,
+            vec![
+                ("x".to_string(), oas3::spec::ParameterIn::Path),
+                ("id".to_string(), oas3::spec::ParameterIn::Query),
+            ]
         );
     }
 }
