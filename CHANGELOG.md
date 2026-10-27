@@ -6,6 +6,8 @@
 
 ## Fixes
 
+- Repair regex patterns with an unescaped hyphen after a class escape (e.g. `[\w-/]`) so examples can still be generated, and log remaining regex failures once (then at debug level) in [#404](https://github.com/TNO-S3/WuppieFuzz/pull/404)
+
 # v1.8.0 (2026-10-07)
 
 ## Highlights
