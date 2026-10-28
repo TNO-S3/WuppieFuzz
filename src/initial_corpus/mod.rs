@@ -33,6 +33,9 @@ use crate::{
     types::{EventManagerType, ExecutorType, FuzzerType, OpenApiFuzzerStateType},
 };
 
+/// Directory in which the initial (seed) corpus is stored on disk.
+pub const QUEUE_DIR: &str = "./queue";
+
 /// Loads an `OpenApiInput` from a yaml file.
 pub fn load_starting_corpus(
     corpus_dir: &Path,
@@ -156,7 +159,7 @@ pub fn initialize_corpus(
     initial_corpus_path: Option<&Path>,
     report_path: &Option<&Path>,
 ) -> InMemoryOnDiskCorpus<OpenApiInput> {
-    let mut corpus = InMemoryOnDiskCorpus::new(PathBuf::from("./queue")).unwrap();
+    let mut corpus = InMemoryOnDiskCorpus::new(PathBuf::from(QUEUE_DIR)).unwrap();
     match initial_corpus_path {
         Some(initial_corpus_path) => {
             log::info!("Filling corpus from file: {initial_corpus_path:?}");
