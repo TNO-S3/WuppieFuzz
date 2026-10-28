@@ -183,7 +183,11 @@ pub(crate) fn fault_category_name(
         MediaTypeContainsNoSchema => ("WUP_MEDIA_TYPE_CONTAINS_NO_SCHEMA", 902),
         SchemaIsAny => ("WUP_SCHEMA_IS_ANY", 903),
         SchemaIsFalse => ("WUP_SCHEMA_IS_FALSE", 904),
-        PossibleInjectionSignature => ("WUP_POSSIBLE_INJECTION_SIGNATURE", 905),
+        PossibleLdapInjectionSignature => ("SECURITY_LDAP_INJECTION", 317),
+        PossibleSqlInjectionSignature => ("SECURITY_SQL_INJECTION", 300),
+        PossibleXssInjectionSignature => ("SECURITY_XSS_INJECTION", 301),
+        PossibleCommandInjectionSignature => ("SECURITY_COMMAND_INJECTION", 313),
+        PossibleNoSqlInjectionSignature => ("SECURITY_NOSQL_INJECTION", 314),
     }
 }
 

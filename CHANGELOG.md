@@ -9,6 +9,7 @@ Fuzzing campaigns can now export a `report.json` conforming to the [Web Fuzzing 
 ## Fixes
 
 - Implement WFC-report support: `--report` now also writes a schema-compliant `report.json` alongside the existing HTML/coverage report, with every `testCaseId` guaranteed to resolve to a real, locatable test case, and code-coverage criteria omitted in black-box/endpoint-only mode in [#397](https://github.com/TNO-S3/WuppieFuzz/pull/397)
+- Split the single generic injection-signature crash criterion into dedicated `PossibleLdapInjectionSignature`, `PossibleSqlInjectionSignature`, `PossibleNoSqlInjectionSignature`, `PossibleCommandInjectionSignature`, and `PossibleXssInjectionSignature` variants, each mapped to its own WFC security fault category, in [#397](https://github.com/TNO-S3/WuppieFuzz/pull/397)
 
 # v1.8.0 (2026-10-07)
 

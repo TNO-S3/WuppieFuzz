@@ -143,17 +143,31 @@ pub enum ValidationError {
     /// https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-01#name-boolean-json-schemas
     SchemaIsFalse,
 
-    /// The response body suggests that an injected payload had an observable effect on
-    /// the backend, even though the HTTP status code and response shape were otherwise
-    /// unremarkable. This is either because a known backend error signature (e.g. a raw
-    /// SQL/LDAP/NoSQL error message) was found in the response body, or because a
-    /// suspicious value sent in the request (e.g. `<script>`, `{{ }}`, `' OR `) was
-    /// reflected back verbatim, suggesting it was not sanitized or escaped.
-    ///
-    /// If this variant is returned, the payload most likely triggered unintended
-    /// behaviour (e.g. SQL/NoSQL/LDAP injection or reflected XSS/SSTI) that isn't
-    /// necessarily visible from the status code alone.
-    PossibleInjectionSignature { detail: String },
+    /// The response body contains a known backend error message (e.g. a leaked
+    /// `javax.naming.directory.InvalidSearchFilterException`), or a request value
+    /// characteristic of LDAP query manipulation (e.g. `)(uid=*`) was reflected back
+    /// verbatim, suggesting it was not sanitized or escaped by the backend.
+    PossibleLdapInjectionSignature { detail: String },
+
+    /// Like `PossibleLdapInjectionSignature`, but for signatures characteristic of SQL
+    /// injection, e.g. a leaked `org.postgresql.util.PSQLException` or a reflected
+    /// `' OR '1'='1` tautology payload.
+    PossibleSqlInjectionSignature { detail: String },
+
+    /// Like `PossibleLdapInjectionSignature`, but for signatures characteristic of
+    /// NoSQL injection, e.g. a leaked `com.mongodb.MongoException` or a reflected
+    /// `$where` MongoDB operator payload.
+    PossibleNoSqlInjectionSignature { detail: String },
+
+    /// Like `PossibleLdapInjectionSignature`, but for signatures characteristic of OS
+    /// command injection, e.g. a leaked shell error message (`/bin/sh: ...`) or a
+    /// reflected command-chaining payload (e.g. `` `whoami` ``).
+    PossibleCommandInjectionSignature { detail: String },
+
+    /// Like `PossibleLdapInjectionSignature`, but for a reflected Cross-Site Scripting
+    /// (XSS) payload (e.g. `<script>`), suggesting it was not sanitized or escaped by
+    /// the backend before being echoed back in the response.
+    PossibleXssInjectionSignature { detail: String },
 }
 
 impl ValidationError {
@@ -246,20 +260,36 @@ impl std::fmt::Display for ValidationError {
                 fmt,
                 "The specification contains the `false` schema for this response, which must never validate."
             ),
-            ValidationError::PossibleInjectionSignature { detail } => write!(
+            ValidationError::PossibleLdapInjectionSignature { detail } => write!(
                 fmt,
-                "Possible injection signature detected in response: {detail}"
+                "Possible LDAP injection signature detected in response: {detail}"
+            ),
+            ValidationError::PossibleSqlInjectionSignature { detail } => write!(
+                fmt,
+                "Possible SQL injection signature detected in response: {detail}"
+            ),
+            ValidationError::PossibleNoSqlInjectionSignature { detail } => write!(
+                fmt,
+                "Possible NoSQL injection signature detected in response: {detail}"
+            ),
+            ValidationError::PossibleCommandInjectionSignature { detail } => write!(
+                fmt,
+                "Possible OS command injection signature detected in response: {detail}"
+            ),
+            ValidationError::PossibleXssInjectionSignature { detail } => write!(
+                fmt,
+                "Possible XSS injection signature detected in response: {detail}"
             ),
         }
     }
 }
 impl Error for ValidationError {}
 
-/// Well-known substrings that tend to appear in raw backend error messages leaked
+/// Well-known substrings that tend to appear in raw SQL backend error messages leaked
 /// into a response body. Their presence often means the backend failed to handle a
 /// malformed/injected value gracefully (e.g. a database driver exception message
 /// bubbling up through the API), regardless of the HTTP status code returned.
-const KNOWN_ERROR_SIGNATURES: &[&str] = &[
+const SQL_ERROR_SIGNATURES: &[&str] = &[
     // MySQL / MariaDB
     "you have an error in your sql syntax",
     "warning: mysql_",
@@ -280,40 +310,100 @@ const KNOWN_ERROR_SIGNATURES: &[&str] = &[
     // Generic ORM / driver traces
     "java.sql.sqlexception",
     "psycopg2.errors",
-    // NoSQL
-    "com.mongodb.mongoexception",
-    "mongodb\\driver\\exception",
-    // LDAP
+];
+
+/// Substrings whose presence in a request value marks it as a distinctive,
+/// unlikely-to-occur-naturally SQL injection payload.
+const SQL_PAYLOAD_MARKERS: &[&str] = &["' OR '1'='1", "\" OR \"1\"=\"1"];
+
+/// Well-known substrings that tend to appear in raw NoSQL (e.g. MongoDB) backend
+/// error messages leaked into a response body.
+const NOSQL_ERROR_SIGNATURES: &[&str] =
+    &["com.mongodb.mongoexception", "mongodb\\driver\\exception"];
+
+/// Substrings whose presence in a request value marks it as a distinctive,
+/// unlikely-to-occur-naturally NoSQL injection payload (e.g. a MongoDB operator).
+const NOSQL_PAYLOAD_MARKERS: &[&str] = &["$where"];
+
+/// LDAP-specific counterpart of `SQL_ERROR_SIGNATURES`, kept separate so matches
+/// against these can be reported as `PossibleLdapInjectionSignature` rather than one
+/// of the other injection-category variants.
+const LDAP_ERROR_SIGNATURES: &[&str] = &[
     "javax.naming.directory.invalidsearchfilterexception",
     "ldapexception",
 ];
 
-/// Substrings whose presence in a request value marks it as a distinctive, unlikely-to-
-/// occur-naturally injection payload. If such a value is echoed back verbatim in a
-/// response, it strongly suggests it was not sanitized or escaped by the backend.
-const SUSPICIOUS_PAYLOAD_MARKERS: &[&str] = &[
-    "<script",
-    "onerror=",
-    "{{7*7}}",
-    "${7*7}",
-    "' OR '1'='1",
-    "\" OR \"1\"=\"1",
-    "<!ENTITY",
-    "$where",
-    ")(uid=*",
-    ")(cn=*",
+/// LDAP-specific counterpart of `SQL_PAYLOAD_MARKERS`.
+const LDAP_PAYLOAD_MARKERS: &[&str] = &[")(uid=*", ")(cn=*"];
+
+/// Well-known substrings that tend to appear in raw shell/OS error messages leaked
+/// into a response body, suggesting a request value was passed unsanitized into a
+/// shell or process-execution call.
+const COMMAND_ERROR_SIGNATURES: &[&str] = &[
+    "sh: 1: ",
+    "sh: line 1: ",
+    "/bin/sh: ",
+    "/bin/bash: ",
+    "is not recognized as an internal or external command",
 ];
 
-/// Returns whether `value` looks like a distinctive injection payload, i.e. a value
-/// that would not plausibly occur in a legitimate request unless the fuzzer put it there.
-fn is_suspicious_payload(value: &str) -> bool {
+/// Substrings whose presence in a request value marks it as a distinctive,
+/// unlikely-to-occur-naturally OS command injection payload.
+const COMMAND_PAYLOAD_MARKERS: &[&str] =
+    &["; id;", "&& whoami", "| whoami", "`whoami`", "$(whoami)"];
+
+/// Substrings whose presence in a request value marks it as a distinctive,
+/// unlikely-to-occur-naturally Cross-Site Scripting (XSS) payload.
+const XSS_PAYLOAD_MARKERS: &[&str] = &["<script", "onerror="];
+
+// Deliberately no reflection-based markers for SSTI (`{{7*7}}`, `${7*7}`) or XXE
+// (`<!ENTITY ...>`): unlike XSS/SQL/LDAP, a verbatim reflection of these payloads is
+// not evidence of exploitation. Successful SSTI replaces the payload with its
+// *evaluated* result (e.g. `49`, not `{{7*7}}`), and successful XXE requires the
+// entity to be resolved (e.g. leaked file contents), not the raw declaration echoed
+// back. Checking for reflection here would only ever match the case where the engine
+// did *not* evaluate the payload, i.e. it would flag harmless echo behaviour as a
+// possible fault while never catching a real one. Detecting these properly needs a
+// dedicated oracle (e.g. computing the expected arithmetic result for SSTI).
+
+/// Returns whether `value` contains any of `markers`, i.e. looks like a distinctive
+/// injection payload that would not plausibly occur in a legitimate request unless
+/// the fuzzer put it there.
+fn matches_any_marker(value: &str, markers: &[&str]) -> bool {
     // Very short values are too likely to occur "naturally" in a response to be a
     // meaningful signal, even if they happen to match one of our markers.
-    value.len() >= 4
-        && SUSPICIOUS_PAYLOAD_MARKERS
-            .iter()
-            .any(|marker| value.contains(marker))
+    value.len() >= 4 && markers.iter().any(|marker| value.contains(marker))
 }
+
+/// The injection categories `detect_injection_signatures` looks for, together with
+/// each category's error signatures, payload markers, and `ValidationError`
+/// constructor. Listed in priority order: earlier categories are preferred when a
+/// response happens to match more than one (e.g. LDAP before SQL).
+type InjectionCategory = (
+    &'static [&'static str],
+    &'static [&'static str],
+    fn(String) -> ValidationError,
+);
+
+const INJECTION_CATEGORIES: &[InjectionCategory] = &[
+    (LDAP_ERROR_SIGNATURES, LDAP_PAYLOAD_MARKERS, |detail| {
+        ValidationError::PossibleLdapInjectionSignature { detail }
+    }),
+    (SQL_ERROR_SIGNATURES, SQL_PAYLOAD_MARKERS, |detail| {
+        ValidationError::PossibleSqlInjectionSignature { detail }
+    }),
+    (NOSQL_ERROR_SIGNATURES, NOSQL_PAYLOAD_MARKERS, |detail| {
+        ValidationError::PossibleNoSqlInjectionSignature { detail }
+    }),
+    (
+        COMMAND_ERROR_SIGNATURES,
+        COMMAND_PAYLOAD_MARKERS,
+        |detail| ValidationError::PossibleCommandInjectionSignature { detail },
+    ),
+    (&[], XSS_PAYLOAD_MARKERS, |detail| {
+        ValidationError::PossibleXssInjectionSignature { detail }
+    }),
+];
 
 /// Looks for content-based evidence that an injected payload had an effect on the
 /// backend: either a known raw error signature leaked into the response body, or one
@@ -323,6 +413,11 @@ fn is_suspicious_payload(value: &str) -> bool {
 /// (status code, schema) against the specification: some injection payloads (e.g.
 /// unescaped XSS reflection, or a caught-and-logged SQL error) don't necessarily
 /// change the response status code or structure.
+///
+/// Error signatures are checked (across all categories) before any payload marker,
+/// since a leaked backend error message is stronger evidence than a reflected value;
+/// within each of those two passes, categories are checked in `INJECTION_CATEGORIES`
+/// order.
 pub fn detect_injection_signatures(
     request: &OpenApiRequest,
     response: &Response,
@@ -332,23 +427,26 @@ pub fn detect_injection_signatures(
         return None;
     }
     let lowercase_body = body.to_lowercase();
+    let values = request.string_values();
 
-    if let Some(signature) = KNOWN_ERROR_SIGNATURES
-        .iter()
-        .find(|signature| lowercase_body.contains(*signature))
-    {
-        return Some(ValidationError::PossibleInjectionSignature {
-            detail: format!("response body contains known error signature \"{signature}\""),
-        });
+    for (error_signatures, _, make) in INJECTION_CATEGORIES {
+        if let Some(signature) = error_signatures
+            .iter()
+            .find(|signature| lowercase_body.contains(**signature))
+        {
+            return Some(make(format!(
+                "response body contains known error signature \"{signature}\""
+            )));
+        }
     }
 
-    for value in request.string_values() {
-        if is_suspicious_payload(&value) && body.contains(&value) {
-            return Some(ValidationError::PossibleInjectionSignature {
-                detail: format!(
+    for (_, payload_markers, make) in INJECTION_CATEGORIES {
+        for value in &values {
+            if matches_any_marker(value, payload_markers) && body.contains(value.as_str()) {
+                return Some(make(format!(
                     "request value \"{value}\" was reflected unescaped in the response body"
-                ),
-            });
+                )));
+            }
         }
     }
 
@@ -669,7 +767,7 @@ mod injection_signature_tests {
         let result = detect_injection_signatures(&request, &response);
         assert!(matches!(
             result,
-            Some(ValidationError::PossibleInjectionSignature { .. })
+            Some(ValidationError::PossibleSqlInjectionSignature { .. })
         ));
     }
 
@@ -683,7 +781,87 @@ mod injection_signature_tests {
         let result = detect_injection_signatures(&request, &response);
         assert!(matches!(
             result,
-            Some(ValidationError::PossibleInjectionSignature { .. })
+            Some(ValidationError::PossibleXssInjectionSignature { .. })
+        ));
+    }
+
+    #[test]
+    fn detects_known_nosql_error_signature() {
+        let request = request_with_body_string("hello");
+        let response =
+            response_with_body(StatusCode::OK, "com.mongodb.MongoException: command failed");
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleNoSqlInjectionSignature { .. })
+        ));
+    }
+
+    #[test]
+    fn detects_reflected_nosql_payload() {
+        let request = request_with_body_string("$where");
+        let response = response_with_body(StatusCode::OK, "invalid operator $where used");
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleNoSqlInjectionSignature { .. })
+        ));
+    }
+
+    #[test]
+    fn detects_known_command_error_signature() {
+        let request = request_with_body_string("hello");
+        let response = response_with_body(StatusCode::OK, "sh: 1: ; id;: not found");
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleCommandInjectionSignature { .. })
+        ));
+    }
+
+    #[test]
+    fn detects_reflected_command_payload() {
+        let request = request_with_body_string("&& whoami");
+        let response = response_with_body(StatusCode::OK, "output: root && whoami");
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleCommandInjectionSignature { .. })
+        ));
+    }
+
+    #[test]
+    fn ignores_reflected_ssti_payload() {
+        // Verbatim reflection of an SSTI payload means the template engine did NOT
+        // evaluate it, i.e. it's not evidence of a vulnerability, so this should not
+        // be flagged at all (no reflection-based check exists for SSTI/XXE).
+        let request = request_with_body_string("{{7*7}}");
+        let response = response_with_body(StatusCode::OK, "result: {{7*7}}");
+        assert!(detect_injection_signatures(&request, &response).is_none());
+    }
+
+    #[test]
+    fn detects_ldap_error_signature() {
+        let request = request_with_body_string("hello");
+        let response = response_with_body(
+            StatusCode::OK,
+            "javax.naming.directory.InvalidSearchFilterException: bad filter",
+        );
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleLdapInjectionSignature { .. })
+        ));
+    }
+
+    #[test]
+    fn detects_reflected_ldap_payload() {
+        let request = request_with_body_string(")(uid=*");
+        let response = response_with_body(StatusCode::OK, "no results for )(uid=*");
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleLdapInjectionSignature { .. })
         ));
     }
 
@@ -701,5 +879,23 @@ mod injection_signature_tests {
         let request = request_with_body_string("{{");
         let response = response_with_body(StatusCode::OK, "here is {{ some text");
         assert!(detect_injection_signatures(&request, &response).is_none());
+    }
+
+    #[test]
+    fn prefers_error_signature_over_a_different_categorys_reflected_payload() {
+        // The response contains both a reflected LDAP payload marker (checked before
+        // SQL in `INJECTION_CATEGORIES`) and a leaked SQL error signature. Error
+        // signatures must win globally, regardless of category order, since a leaked
+        // backend exception is stronger evidence than a merely-reflected value.
+        let request = request_with_body_string(")(uid=*");
+        let response = response_with_body(
+            StatusCode::OK,
+            "you have an error in your sql syntax near )(uid=*",
+        );
+        let result = detect_injection_signatures(&request, &response);
+        assert!(matches!(
+            result,
+            Some(ValidationError::PossibleSqlInjectionSignature { .. })
+        ));
     }
 }

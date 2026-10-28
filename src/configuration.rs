@@ -255,6 +255,12 @@ pub enum Commands {
         /// - "UnexpectedContent": The API returned a response body, but no response is specified.
         /// - "MediaTypeContainsNoSchema": The API contains a media type "application/json" with no schema for the data inside the json object. We can't validate the response if no model is given.
         /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type) we cannot validate schemas that are this flexible.
+        /// - "SchemaIsFalse": The schema is the JSON Schema `false` literal, which does not describe any valid response.
+        /// - "PossibleLdapInjectionSignature": The response body contains a known LDAP backend error message, or reflects an LDAP-injection-style request value verbatim.
+        /// - "PossibleSqlInjectionSignature": The response body contains a known SQL backend error message, or reflects a SQL-injection-style request value verbatim.
+        /// - "PossibleNoSqlInjectionSignature": The response body contains a known NoSQL backend error message, or reflects a NoSQL-injection-style request value verbatim.
+        /// - "PossibleCommandInjectionSignature": The response body contains a known shell/OS error message, or reflects an OS-command-injection-style request value verbatim.
+        /// - "PossibleXssInjectionSignature": The response body reflects an XSS-style request value (e.g. `<script>`) verbatim, unescaped.
         ///
         /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors, you can configure what behaviour is considered a bug by the fuzzer.
         #[arg(
