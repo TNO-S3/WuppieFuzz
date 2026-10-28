@@ -174,7 +174,7 @@ pub(crate) fn fault_category_name(
                 ("HTTP_OTHER_STATUS_5XX", 121)
             }
         }
-        OtherStatusNotSpecified => ("WUP_STATUS_NOT_SPECIFIED", 901),
+        OtherStatusNotSpecified => ("HTTP_STATUS_NOT_SPECIFIED", 126),
         ResponseReferenceBroken
         | ResponseObjectIncorrect
         | ResponseEnumIncorrect
