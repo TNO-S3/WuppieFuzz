@@ -265,6 +265,12 @@ where
         )
     }
 
+    fn campaign_elapsed_secs(&self) -> u64 {
+        self.starting_time
+            .map(|start| start.elapsed().as_secs())
+            .unwrap_or(0)
+    }
+
     fn write_stats_snapshot(&self, state: &FuzzerState, seq_per_sec: f64, req_per_sec: f64) {
         let otel_trace_processing_stats = self
             .otel_trace_processing_metrics
@@ -273,6 +279,7 @@ where
             .unwrap_or_default();
 
         self.reporter.report_stats(CampaignStats {
+            elapsed_secs: self.campaign_elapsed_secs(),
             seq_per_sec,
             req_per_sec,
             requests_completed_total: self.performed_requests,
@@ -817,6 +824,28 @@ where
 
     fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         RefIndexable::from(&mut self.observers)
+    }
+}
+
+#[cfg(test)]
+mod campaign_elapsed_secs_tests {
+    use std::time::{Duration, Instant};
+
+    fn campaign_elapsed_secs(starting_time: Option<Instant>) -> u64 {
+        starting_time
+            .map(|start| start.elapsed().as_secs())
+            .unwrap_or(0)
+    }
+
+    #[test]
+    fn elapsed_is_zero_before_campaign_timer_starts() {
+        assert_eq!(campaign_elapsed_secs(None), 0);
+    }
+
+    #[test]
+    fn elapsed_tracks_campaign_start_time() {
+        let start = Instant::now() - Duration::from_secs(5);
+        assert!(campaign_elapsed_secs(Some(start)) >= 5);
     }
 }
 

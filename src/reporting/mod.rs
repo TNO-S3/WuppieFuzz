@@ -90,6 +90,8 @@ pub struct SequenceTimingStats {
 /// Periodic high-level campaign statistics for dashboard reporting.
 #[derive(Debug, Clone, Copy)]
 pub struct CampaignStats {
+    /// Wall-clock seconds since the fuzzing campaign started.
+    pub elapsed_secs: u64,
     /// Number of input sequences executed per second in the latest reporting window.
     pub seq_per_sec: f64,
     /// Number of successfully completed HTTP requests per second in the latest reporting window.
