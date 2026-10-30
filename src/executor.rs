@@ -828,28 +828,6 @@ where
 }
 
 #[cfg(test)]
-mod campaign_elapsed_secs_tests {
-    use std::time::{Duration, Instant};
-
-    fn campaign_elapsed_secs(starting_time: Option<Instant>) -> u64 {
-        starting_time
-            .map(|start| start.elapsed().as_secs())
-            .unwrap_or(0)
-    }
-
-    #[test]
-    fn elapsed_is_zero_before_campaign_timer_starts() {
-        assert_eq!(campaign_elapsed_secs(None), 0);
-    }
-
-    #[test]
-    fn elapsed_tracks_campaign_start_time() {
-        let start = Instant::now() - Duration::from_secs(5);
-        assert!(campaign_elapsed_secs(Some(start)) >= 5);
-    }
-}
-
-#[cfg(test)]
 mod summarize_sequence_tests {
     use super::summarize_sequence;
     use crate::openapi_mutator::test_helpers::{linked_requests, simple_request};
