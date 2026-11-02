@@ -14,6 +14,7 @@ use std::{
 };
 
 use libafl::{
+    HasMetadata,
     corpus::Corpus,
     events::{Event, EventFirer, EventRestarter, EventWithStats, ExecStats, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
@@ -34,8 +35,9 @@ use crate::{
         CoverageClient,
         endpoint::EndpointCoverageClient,
         otel::{SharedOtelTraceProcessingMetrics, read_otel_trace_processing_metrics},
+        sink_wsan_coverage::WsanCoverageClient,
     },
-    input::{OpenApiInput, OpenApiRequest},
+    input::{Body, OpenApiInput, OpenApiRequest, ParameterContents, parameter::SimpleValue},
     openapi::{
         build_request::build_request_from_input,
         curl_request::CurlRequest,
@@ -49,6 +51,7 @@ use crate::{
     reporting::{
         CampaignStats, Reporting, SequenceStopStats, SequenceTimingStats, sqlite::MySqLite,
     },
+    wsan_taint::WsanTaintMap,
 };
 
 /// How often to print a new log line
@@ -65,6 +68,94 @@ enum SequenceStopReason {
     RequestBuildError,
     CrashOrValidation,
     TransportError,
+}
+
+/// Parses an `X-WSan-Sinks` header value into (cwe, sink SQL) pairs. Each
+/// ';'-separated entry is `<cwe>:<location>=<err>#<base64(sql)>`.
+fn parse_sink_entries(header: &str) -> Vec<(u32, String)> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    header
+        .split(';')
+        .filter_map(|entry| {
+            let (key, b64) = entry.split_once('#')?;
+            if b64.is_empty() {
+                return None;
+            }
+            let cwe: u32 = key.split(':').next()?.parse().ok()?;
+            let sql = String::from_utf8_lossy(&STANDARD.decode(b64).ok()?).into_owned();
+            Some((cwe, sql))
+        })
+        .collect()
+}
+
+/// Collects every string value under `pc` as (parameter name, value).
+fn collect_strings(pc: &ParameterContents, name: &str, out: &mut Vec<(String, String)>) {
+    match pc {
+        ParameterContents::LeafValue(SimpleValue::String(s)) => {
+            out.push((name.to_owned(), s.clone()))
+        }
+        ParameterContents::Bytes(b) => {
+            out.push((name.to_owned(), String::from_utf8_lossy(b).into_owned()))
+        }
+        ParameterContents::Object(m) => {
+            for c in m.values() {
+                collect_strings(c, name, out);
+            }
+        }
+        ParameterContents::Array(a) => {
+            for c in a {
+                collect_strings(c, name, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// If a value we sent shows up in a sink's SQL, that parameter reaches the sink.
+/// Records (path, parameter, CWE) in WsanTaintMap so SqlBreakTargetedMutator
+/// knows which parameters to break.
+fn learn_taint(signal: &str, request: &OpenApiRequest, state: &mut FuzzerState) {
+    let entries = parse_sink_entries(signal);
+    if entries.is_empty() {
+        return;
+    }
+    let mut values = Vec::new();
+    for ((name, _kind), pc) in &request.parameters {
+        collect_strings(pc, name, &mut values);
+    }
+    match &request.body {
+        Body::ApplicationJson(pc) | Body::XWwwFormUrlencoded(pc) | Body::TextPlain(pc) => {
+            if let ParameterContents::Object(fields) = pc {
+                for (name, child) in fields {
+                    collect_strings(child, name, &mut values);
+                }
+            } else {
+                collect_strings(pc, "body", &mut values);
+            }
+        }
+        Body::Empty => {}
+    }
+    if !state.has_metadata::<WsanTaintMap>() {
+        state.add_metadata(WsanTaintMap::default());
+    }
+    let map = state.metadata_mut::<WsanTaintMap>().unwrap();
+    for (name, value) in values {
+        // Skip values under 3 characters: they would match SQL text by chance.
+        if value.len() < 3 {
+            continue;
+        }
+        // Pick the breakers (SQL, path, cmd) by the CWE of the sink this value reached.
+        if let Some((cwe, _)) = entries.iter().find(|(_, sql)| sql.contains(&value))
+            && map.mark(&request.path, &name, *cwe)
+        {
+            log::info!(
+                "WSan taint learned: {} <- param {} (cwe {})",
+                request.path,
+                name,
+                cwe
+            );
+        }
+    }
 }
 
 fn duration_as_us(start: Instant) -> u64 {
@@ -118,6 +209,7 @@ where
 
     coverage_client: Box<dyn CoverageClient>,
     endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
+    wsan_client: Arc<Mutex<WsanCoverageClient>>,
     reporter: Option<MySqLite>,
     known_corpus_inputs: KnownCorpusInputs,
     otel_trace_processing_metrics: Option<SharedOtelTraceProcessingMetrics>,
@@ -191,6 +283,7 @@ where
         config: &'static Configuration,
         coverage_client: Box<dyn CoverageClient>,
         endpoint_client: Arc<Mutex<EndpointCoverageClient>>,
+        wsan_client: Arc<Mutex<WsanCoverageClient>>,
         otel_trace_processing_metrics: Option<SharedOtelTraceProcessingMetrics>,
     ) -> anyhow::Result<Self> {
         let (authentication, cookie_store, http_client) = build_http_client(api)?;
@@ -207,6 +300,7 @@ where
 
             coverage_client,
             endpoint_client,
+            wsan_client,
             reporter: crate::reporting::sqlite::get_reporter(config, api)?,
             known_corpus_inputs: KnownCorpusInputs::default(),
             otel_trace_processing_metrics,
@@ -388,6 +482,13 @@ where
                         http_execute_start,
                     );
                     performed_requests += 1;
+                    // Capture WSan's per-request signal before `into()` drops headers.
+                    let wsan_signal = response
+                        .headers()
+                        .get("x-wsan-sinks")
+                        .filter(|_| self.config.enable_wsan)
+                        .and_then(|v| v.to_str().ok())
+                        .map(str::to_owned);
                     let response: Response = response.into();
                     let report_response_start = Instant::now();
                     self.reporter
@@ -422,6 +523,10 @@ where
                         }),
                         validation_error,
                     );
+                    if let Some(signal) = &wsan_signal {
+                        self.wsan_client.lock().unwrap().record(signal);
+                        learn_taint(signal, &request, state);
+                    }
                     Self::add_timing(
                         &mut self.sequence_timing_stats.endpoint_cover_us,
                         endpoint_cover_start,
@@ -685,6 +790,9 @@ where
     pub fn generate_coverage_report(&self, report_path: &std::path::Path) {
         self.endpoint_client.generate_coverage_report(report_path);
         self.coverage_client.generate_coverage_report(report_path);
+        if self.config.enable_wsan {
+            self.wsan_client.generate_coverage_report(report_path);
+        }
     }
 
     /// Uses the embedded coverage clients to generate a coverage report
@@ -837,6 +945,21 @@ mod summarize_sequence_tests {
         assert_eq!(
             summarize_sequence(&input),
             "GET /simple -> GET /with-query-parameter"
+        );
+    }
+}
+
+#[cfg(test)]
+mod parse_sink_entries_tests {
+    use super::parse_sink_entries;
+
+    #[test]
+    fn decodes_valid_entries_and_skips_malformed_ones() {
+        // "U0VMRUNUIDE=" is base64 for "SELECT 1".
+        let header = "89:A.java:42=1#U0VMRUNUIDE=;89:A.java:7=0#;garbage";
+        assert_eq!(
+            parse_sink_entries(header),
+            vec![(89, "SELECT 1".to_owned())]
         );
     }
 }

@@ -4,6 +4,8 @@
 
 ## Features
 
+- Adds `--enable-wsan`: coverage guidance from WSan's `X-WSan-Sinks` response header, and two mutators that append SQL-breaking characters; one targets parameters that reach a sink
+
 ## Fixes
 
 # v1.8.0 (2026-10-07)

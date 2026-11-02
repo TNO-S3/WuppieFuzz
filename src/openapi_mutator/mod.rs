@@ -46,6 +46,8 @@ pub mod string_interesting;
 use string_interesting::StringInterestingMutator;
 pub mod grammar_interesting;
 use grammar_interesting::GrammarInterestingMutator;
+pub mod sql_break;
+use sql_break::{SqlBreakMutator, SqlBreakTargetedMutator};
 pub mod splice_requests;
 use splice_requests::SpliceRequestsMutator;
 
@@ -53,7 +55,11 @@ use splice_requests::SpliceRequestsMutator;
 pub mod test_helpers;
 
 /// Creates a tuple list containing all available mutators from this module.
-pub fn havoc_mutations_openapi() -> tuple_list_type!(
+pub fn havoc_mutations_openapi(
+    enable_wsan: bool,
+) -> tuple_list_type!(
+    OpenApiMutator<OpenApiFuzzerStateType>,
+    OpenApiMutator<OpenApiFuzzerStateType>,
     OpenApiMutator<OpenApiFuzzerStateType>,
     OpenApiMutator<OpenApiFuzzerStateType>,
     OpenApiMutator<OpenApiFuzzerStateType>,
@@ -111,6 +117,7 @@ pub fn havoc_mutations_openapi() -> tuple_list_type!(
         OpenApiMutator::from_bytes_mutator(Box::new(QwordAddMutator::new())),
         OpenApiMutator::from_bytes_mutator(Box::new(StringInterestingMutator::new())),
         OpenApiMutator::from_bytes_mutator(Box::new(GrammarInterestingMutator::new())),
+        OpenApiMutator::from_bytes_mutator(Box::new(SqlBreakMutator::new(enable_wsan))),
         OpenApiMutator::from_bytes_mutator(Box::new(WordAddMutator::new())),
         OpenApiMutator::from_bytes_mutator(Box::new(WordInterestingMutator::new())),
         OpenApiMutator::from_series_mutator(Box::new(AddRequestMutator::new())),
@@ -122,6 +129,7 @@ pub fn havoc_mutations_openapi() -> tuple_list_type!(
         OpenApiMutator::from_series_mutator(Box::new(BreakLinkMutator::new())),
         OpenApiMutator::from_series_mutator(Box::new(EstablishLinkMutator::new())),
         OpenApiMutator::from_series_mutator(Box::new(SpliceRequestsMutator::new())),
+        OpenApiMutator::from_series_mutator(Box::new(SqlBreakTargetedMutator::new(enable_wsan))),
     )
 }
 

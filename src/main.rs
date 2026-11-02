@@ -57,6 +57,7 @@ mod reporting;
 mod reproducer;
 mod state;
 mod types;
+pub mod wsan_taint;
 mod wuppie_version;
 
 use crate::{

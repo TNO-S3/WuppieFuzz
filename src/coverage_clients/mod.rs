@@ -30,6 +30,7 @@ pub mod endpoint;
 pub mod jacoco;
 pub mod lcov_client;
 pub mod otel;
+pub mod sink_wsan_coverage;
 
 /// Sets up the line coverage client according to the configuration, and initializes it
 /// and constructs a LibAFL observer and feedback

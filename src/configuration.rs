@@ -272,6 +272,11 @@ pub enum Commands {
         #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
         report: Option<bool>,
 
+        /// Use the WSan sanitizer's `X-WSan-Sinks` response header: sink
+        /// coverage, learned taint, and the SQL-breaking mutators.
+        #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
+        enable_wsan: Option<bool>,
+
         /// If present, determine with which HTTP methods to mutate.
         /// Must be one of {'follow-spec', 'common5', 'common7'},
         /// follow-spec: only mutate with methods from api specification
@@ -397,6 +402,7 @@ impl Commands {
                 power_schedule,
                 crash_criteria,
                 report,
+                enable_wsan,
                 method_mutation_strategy,
                 jacoco_class_dir,
                 source_dir,
@@ -420,6 +426,7 @@ impl Commands {
                 power_schedule,
                 crash_criteria,
                 report,
+                enable_wsan,
                 method_mutation_strategy,
                 jacoco_class_dir,
                 source_dir,
@@ -523,6 +530,11 @@ struct PartialConfiguration {
     /// time-out passes
     #[clap(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
     pub report: Option<bool>,
+
+    /// Use the WSan sanitizer's `X-WSan-Sinks` response header: sink
+    /// coverage, learned taint, and the SQL-breaking mutators.
+    #[clap(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
+    pub enable_wsan: Option<bool>,
 
     /// If present, determine with which HTTP methods to mutate.
     /// Must be one of {'follow-spec', 'common5', 'common7'},
@@ -705,6 +717,10 @@ pub struct Configuration {
     /// time-out passes.
     pub report: bool,
 
+    /// Use the WSan sanitizer's `X-WSan-Sinks` response header: sink
+    /// coverage, learned taint, and the SQL-breaking mutators.
+    pub enable_wsan: bool,
+
     /// If present, determine with which HTTP methods to mutate.
     /// If omitted, only mutate with methods from api specification.
     pub method_mutation_strategy: MethodMutationStrategy,
@@ -882,6 +898,7 @@ impl TryFrom<PartialConfiguration> for Configuration {
                 .crash_criteria
                 .unwrap_or_else(|| ValidationErrorDiscriminants::VARIANTS.to_vec()),
             report: value.report.unwrap_or(false),
+            enable_wsan: value.enable_wsan.unwrap_or(false),
             method_mutation_strategy: value
                 .method_mutation_strategy
                 .unwrap_or(DEFAULT_METHOD_MUTATION_STRATEGY),
@@ -931,6 +948,7 @@ impl PartialConfiguration {
             power_schedule: other.power_schedule.or(self.power_schedule.take()),
             crash_criteria: other.crash_criteria.or(self.crash_criteria.take()),
             report: other.report.or(self.report.take()),
+            enable_wsan: other.enable_wsan.or(self.enable_wsan.take()),
             method_mutation_strategy: other
                 .method_mutation_strategy
                 .or(self.method_mutation_strategy.take()),

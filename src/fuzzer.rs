@@ -32,7 +32,9 @@ use crate::{
     coverage_clients::{
         CoverageClient,
         endpoint::{EndpointCoverageClient, setup_endpoint_coverage},
-        setup_line_coverage, validate_instrumentation,
+        setup_line_coverage,
+        sink_wsan_coverage::{WsanCoverageClient, setup_wsan_coverage},
+        validate_instrumentation,
     },
     executor::SequenceExecutor,
     initial_corpus::minimize_corpus,
@@ -73,13 +75,14 @@ pub fn fuzz() -> Result<()> {
     );
     let mut state_uninit = OpenApiFuzzerState::new_uninit(initial_corpus, *api.clone())?;
 
-    let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi());
+    let mutator_openapi = HavocScheduledMutator::new(havoc_mutations_openapi(config.enable_wsan));
 
     // Event manager
     let mut mgr = construct_event_mgr();
 
     // Observers & feedback initialization
     let mut endpoint_coverage_client = setup_endpoint_coverage(api)?;
+    let mut wsan_coverage_client = setup_wsan_coverage();
     let (mut code_coverage_client, otel_trace_processing_metrics) =
         setup_line_coverage(config, &report_path)?;
 
@@ -94,8 +97,11 @@ pub fn fuzz() -> Result<()> {
             log::info!("Coverage guidance: endpoint coverage plus source-code coverage");
         }
     }
-    let combined_map_observer: CombinedMapObserverType<'_> =
-        construct_observer(&mut endpoint_coverage_client, &mut code_coverage_client);
+    let combined_map_observer: CombinedMapObserverType<'_> = construct_observer(
+        &mut endpoint_coverage_client,
+        &mut code_coverage_client,
+        &mut wsan_coverage_client,
+    );
     let time_observer = TimeObserver::new("time");
     let time_feedback = TimeFeedback::new(&time_observer);
     let coverage_feedback: CoverageFeedbackType = MapFeedback::new(&combined_map_observer);
@@ -140,6 +146,7 @@ pub fn fuzz() -> Result<()> {
         config,
         code_coverage_client,
         endpoint_coverage_client,
+        wsan_coverage_client,
         otel_trace_processing_metrics,
     )?;
 
@@ -207,6 +214,7 @@ fn construct_scheduler<'a>(
 fn construct_observer<'a>(
     endpoint_coverage_client: &mut Arc<Mutex<EndpointCoverageClient>>,
     code_coverage_client: &mut Box<dyn CoverageClient>,
+    wsan_coverage_client: &mut Arc<Mutex<WsanCoverageClient>>,
 ) -> CombinedMapObserverType<'a> {
     // Safety: libafl wants to read the coverage map directly that we also update in the harness;
     // this is only possible if it does not touch the map while the harness is running. In
@@ -221,6 +229,10 @@ fn construct_observer<'a>(
             OwnedMutSlice::from_raw_parts_mut(
                 code_coverage_client.get_coverage_ptr(),
                 code_coverage_client.get_coverage_len(),
+            ),
+            OwnedMutSlice::from_raw_parts_mut(
+                wsan_coverage_client.get_coverage_ptr(),
+                wsan_coverage_client.get_coverage_len(),
             ),
         ]
     })
