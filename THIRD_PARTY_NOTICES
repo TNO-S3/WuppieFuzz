@@ -93,10 +93,6 @@ Copyright notices (differences from the text above):
     Copyright (c) 2017 The Tokio Authors
 - windows, windows-collections, windows-core, windows-future, windows-implement, windows-interface, windows-link, windows-numerics, windows-registry, windows-result, windows-strings, windows-sys, windows-threading:
     Copyright (c) Microsoft Corporation.
-- zopfli:
-    Copyright 2011 Google Inc.
-- typenum:
-    Copyright 2014 Paho Lurie-Gregg
 - reqwest:
     Copyright 2016 Sean McArthur
 - ctrlc:
@@ -118,7 +114,11 @@ Copyright notices (differences from the text above):
     Copyright 2020 Andrew Straw
 - wide:
     Copyright 2020 Daniel "Lokathor" Gee
-- wuppiefuzz:
+- wuppiefuzz 1.8.0:
+    Copyright 2021-2024 The Netherlands Organisation for Applied Scientific Research
+- wuppiefuzz 1.8.0:
+    Copyright 2021-2025 The Netherlands Organisation for Applied Scientific Research
+- wuppiefuzz 1.8.0:
     Copyright 2021-2026 The Netherlands Organisation for Applied Scientific Research
 - unty:
     Copyright 2023 Bincode
@@ -135,7 +135,6 @@ Components:
 
 - addr2line
 - adler2
-- aes
 - ahash
 - anstream
 - anstyle
@@ -150,11 +149,8 @@ Components:
 - backtrace
 - base64
 - bitflags
-- block-buffer
 - build_id2
-- bumpalo
 - bytemuck
-- bzip2
 - camino
 - cargo-platform
 - cargo-util-schemas
@@ -163,33 +159,25 @@ Components:
 - cfg-if
 - chacha20
 - chrono
-- cipher
 - clap
 - clap_builder
 - clap_derive
 - clap_lex
 - cmake
-- cmov
 - cobs
 - colorchoice
 - const-hex
-- const-oid
-- constant_time_eq
 - cookie
 - cookie_store
 - core-foundation
 - core-foundation-sys
 - core_affinity2
 - core_detect
-- cpubits
 - cpufeatures
 - crc32fast
-- crypto-common
 - ctor
 - ctrlc
-- ctutils
 - deranged
-- digest
 - dispatch2
 - displaydoc
 - document-features
@@ -232,11 +220,9 @@ Components:
 - hashbrown
 - hashlink
 - heck
-- hmac
 - http
 - httparse
 - httpdate
-- hybrid-array
 - hyper-rustls
 - hyper-timeout
 - iana-time-zone
@@ -244,7 +230,6 @@ Components:
 - idna
 - idna_adapter
 - indexmap
-- inout
 - ipnet
 - is_terminal_polyfill
 - iter-read
@@ -266,7 +251,6 @@ Components:
 - ll_mp
 - lock_api
 - log
-- lzma-rust2
 - mach2
 - meminterval
 - mime
@@ -301,7 +285,6 @@ Components:
 - ownedref
 - parking_lot
 - parking_lot_core
-- pbkdf2
 - percent-encoding
 - petgraph
 - pin-project
@@ -352,8 +335,6 @@ Components:
 - serde_spanned
 - serde_urlencoded
 - serde_yaml
-- sha1
-- sha2
 - shlex
 - shmem_providers
 - simdutf8
@@ -386,7 +367,6 @@ Components:
 - typed-builder-macro
 - typed-path
 - typeid
-- typenum
 - uds
 - unicode-ident
 - unicode-segmentation
@@ -421,7 +401,6 @@ Components:
 - yaml_serde
 - zerocopy
 - zeroize
-- zopfli
 
 ===============================================================================
 BSD-3-Clause LICENSE NOTICE
@@ -445,10 +424,6 @@ Copyright notices (differences from the text above):
 - subtle:
     Copyright (c) 2016-2017 Isis Agora Lovecruft, Henry de Valence. All rights reserved.
     Copyright (c) 2016-2024 Isis Agora Lovecruft. All rights reserved.
-- zstd-safe, zstd-sys 2.1.0+zstd.1.5.7:
-    Copyright (c) 2026, Alexandre Bury
-- zstd-sys 2.1.0+zstd.1.5.7:
-    Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
 - encoding_rs:
     Copyright © WHATWG (Apple, Google, Mozilla, Microsoft).
 
@@ -458,8 +433,6 @@ Components:
 - encoding_rs
 - matchit
 - subtle
-- zstd-safe
-- zstd-sys
 
 ===============================================================================
 BSL-1.0 LICENSE NOTICE
@@ -546,9 +519,6 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Copyright notices (differences from the text above):
 
-- deflate64:
-    Copyright (c) .NET Foundation and Contributors
-    Copyright (c) anatawa12 2023
 - openssl-sys:
     Copyright (c) 2014 Alex Crichton
 - mio:
@@ -577,8 +547,6 @@ Copyright notices (differences from the text above):
     Copyright (c) 2015-2020 the fiat-crypto authors (see
 - cargo-license:
     Copyright (c) 2016  Onur Aslan  <onur@onur.im>
-- zstd:
-    Copyright (c) 2016 Alexandre Bury
 - mockito:
     Copyright (c) 2016 Florin Lipan
 - derive_more, derive_more-impl:
@@ -697,7 +665,6 @@ Components:
 - darling
 - darling_core
 - darling_macro
-- deflate64
 - derive_more
 - derive_more-impl
 - fs_extra
@@ -769,33 +736,6 @@ Components:
 - z3-sys
 - zip
 - zmij
-- zstd
-
-===============================================================================
-MIT-0 LICENSE NOTICE
-
-This product includes software licensed under the MIT No Attribution:
-
-MIT No Attribution
-
-Copyright 2026 The ppmd-rust authors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this
-software and associated documentation files (the "Software"), to deal in the Software
-without restriction, including without limitation the rights to use, copy, modify,
-merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-Components:
-
-- ppmd-rust
 
 ===============================================================================
 MPL-2.0 LICENSE NOTICE
@@ -1258,7 +1198,7 @@ Zlib LICENSE NOTICE
 
 This product includes software licensed under the zlib License:
 
-(C) 2024 Trifecta Tech Foundation 
+Copyright (c) 2020 Matias Rodriguez.
 
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any damages
@@ -1272,16 +1212,12 @@ freely, subject to the following restrictions:
    claim that you wrote the original software. If you use this software
    in a product, an acknowledgment in the product documentation would be
    appreciated but is not required.
-
 2. Altered source versions must be plainly marked as such, and must not be
    misrepresented as being the original software.
-
 3. This notice may not be removed or altered from any source distribution.
 
 Copyright notices (differences from the text above):
 
-- const_format, const_format_proc_macros:
-    Copyright (c) 2020 Matias Rodriguez.
 - const_panic, konst, konst_macro_rules:
     Copyright (c) 2021 Matias Rodriguez.
 - typewit:
@@ -1298,63 +1234,5 @@ Components:
 - konst
 - konst_macro_rules
 - typewit
-- zlib-rs
-
-===============================================================================
-bzip2-1.0.6 LICENSE NOTICE
-
-This product includes software licensed under the bzip2 and libbzip2 License v1.0.6:
-
---------------------------------------------------------------------------
-
-The original program, "bzip2", the associated library "libbzip2", and all
-documentation, are
-
-Copyright (C) 1996-2021 Julian R Seward.
-Copyright (C) 2019-2020 Federico Mena Quintero
-Copyright (C) 2021 Micah Snyder
-
-This Rust translation, "libbzip2-rs" is a derived work based on "bzip2" and
-"libbzip2", and is Copyright (C) 2024-2025 Trifecta Tech Foundation and contributors
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-
-2. The origin of this software must not be misrepresented; you must
-   not claim that you wrote the original software.  If you use this
-   software in a product, an acknowledgment in the product
-   documentation would be appreciated but is not required.
-
-3. Altered source versions must be plainly marked as such, and must
-   not be misrepresented as being the original software.
-
-4. The name of the author may not be used to endorse or promote
-   products derived from this software without specific prior written
-   permission.
-
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
-OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Julian Seward, jseward@acm.org
-bzip2/libbzip2 version 1.1.0 of 6 September 2010
-
---------------------------------------------------------------------------
-
-Components:
-
-- libbz2-rs-sys
 
 ===============================================================================
