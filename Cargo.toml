@@ -89,7 +89,7 @@ serde_urlencoded = "0.7.1"
 serde_yaml = "0.9.34"
 tempfile = "3.25.0"
 quick-xml = { version = "0.42", features = ["serialize"] }
-zip = "8"
+zip = "9"
 strum = { version = "0.28.0", features = ["derive"] }
 unicode-truncate = "3.0.0"
 url = { version = "2.5.8", features = ["serde"] }
