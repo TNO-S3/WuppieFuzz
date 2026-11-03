@@ -114,12 +114,6 @@ Copyright notices (differences from the text above):
     Copyright 2020 Andrew Straw
 - wide:
     Copyright 2020 Daniel "Lokathor" Gee
-- wuppiefuzz 1.8.0:
-    Copyright 2021-2024 The Netherlands Organisation for Applied Scientific Research
-- wuppiefuzz 1.8.0:
-    Copyright 2021-2025 The Netherlands Organisation for Applied Scientific Research
-- wuppiefuzz 1.8.0:
-    Copyright 2021-2026 The Netherlands Organisation for Applied Scientific Research
 - unty:
     Copyright 2023 Bincode
 - rustls-pki-types:
@@ -394,7 +388,6 @@ Components:
 - windows-strings
 - windows-sys
 - windows-threading
-- wuppiefuzz
 - yaml_serde
 - zerocopy
 - zeroize
