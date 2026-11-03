@@ -83,7 +83,6 @@ serde = { version = "1.0", default-features = false, features = [
 ] }
 serde_json = "1.0"
 serde_yaml = "0.9.34"
-tempfile = "3.25.0"
 quick-xml = { version = "0.42", features = ["serialize"] }
 zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 strum = { version = "0.28.0", features = ["derive"] }
@@ -119,3 +118,4 @@ openssl = "0.10"
 
 [dev-dependencies]
 mockito = "1.7.2"
+tempfile = "3.25.0"

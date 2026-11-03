@@ -187,9 +187,6 @@ equivalent 1.0.3
 erased-serde 0.4.11
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-errno 0.3.14
-	licensed under "Apache-2.0 OR MIT"
-	by Chris Wong <lambda.fairy@gmail.com>|Dan Gohman <dev@sunfishcode.online>
 exceptional 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
@@ -430,9 +427,6 @@ link-section 0.19.3
 linktime-proc-macro 0.2.3
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
-linux-raw-sys 0.12.1
-	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
-	by Dan Gohman <dev@sunfishcode.online>
 litemap 0.8.3
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
@@ -682,9 +676,6 @@ rustc-demangle 0.1.28
 rustc-hash 2.1.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-rustix 1.1.6
-	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
-	by Dan Gohman <dev@sunfishcode.online>|Jakub Konka <kubkon@jakubkonka.com>
 rustls 0.23.46
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
@@ -787,9 +778,6 @@ system-configuration 0.7.0
 system-configuration-sys 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
-tempfile 3.27.0
-	licensed under "Apache-2.0 OR MIT"
-	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
 thiserror-impl 2.0.21
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
