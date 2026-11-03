@@ -373,6 +373,7 @@ Components:
 - url
 - utf8_iter
 - utf8parse
+- utf_types
 - uuid
 - value-bag
 - vcpkg
@@ -614,8 +615,6 @@ Copyright notices (differences from the text above):
     Copyright (c) 2022 Ibraheem Ahmed
 - hyper-util:
     Copyright (c) 2023-2025 Sean McArthur
-- tonic:
-    Copyright (c) 2025 Lucio Franco
 - convert_case:
     Copyright (c) 2025 rutrum
 - z3-src:
@@ -628,6 +627,10 @@ Copyright notices (differences from the text above):
     Copyright 2016 Nika Layzell
 - rand_regex:
     Copyright 2018 Kenny Chan
+- tonic 0.14.9:
+    Copyright 2019 gRPC authors.
+- tonic 0.14.9, tonic-prost:
+    Copyright 2025 gRPC authors.
 - urlencoding:
     © 2016 Bertram Truong
     © 2021 Kornel Lesiński
