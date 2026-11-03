@@ -437,7 +437,10 @@ fn unpack_report_zip(bytes: &[u8], report_path: &Path) {
         };
         // enclosed_name rejects absolute paths and `..` escapes (zip-slip)
         let Some(relative_path) = entry.enclosed_name() else {
-            log::warn!("Skipping zip entry with suspicious path: {:?}", entry.name());
+            log::warn!(
+                "Skipping zip entry with suspicious path: {:?}",
+                entry.name()
+            );
             continue;
         };
         let out_path = dest.join(relative_path);
