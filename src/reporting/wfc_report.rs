@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// The version of the WFC report schema that WuppieFuzz produces reports for.
-const WFC_SCHEMA_VERSION: &str = "0.8.0";
+const WFC_SCHEMA_VERSION: &str = "0.10.0";
 
 /// The human-readable name under which WuppieFuzz identifies itself in WFC reports.
 const TOOL_NAME: &str = "WuppieFuzz";
@@ -174,8 +174,16 @@ pub(crate) fn fault_category_name(
                 ("HTTP_OTHER_STATUS_5XX", 121)
             }
         }
-        OtherStatusNotSpecified => ("HTTP_STATUS_NOT_SPECIFIED", 126),
-        ResponseReferenceBroken
+        // WFC does not yet have a dedicated category for "status code not declared
+        // in the schema" (as opposed to a genuine 5xx server error, handled above).
+        // A 3-way split of `SCHEMA_INVALID_RESPONSE` into `_BODY`/`_HEADERS`/`_STATUS`
+        // is being discussed upstream (WebFuzzing/Commons#54); until that lands, this
+        // follows the maintainer's suggested interim mapping of folding it into
+        // `SCHEMA_INVALID_RESPONSE` alongside the body-shape checks below, using the
+        // existing `context` field (see `fault_category`) to carry that same "body" vs
+        // "status" distinction in the meantime.
+        OtherStatusNotSpecified
+        | ResponseReferenceBroken
         | ResponseObjectIncorrect
         | ResponseEnumIncorrect
         | ResponseMalformedJSON
@@ -191,17 +199,36 @@ pub(crate) fn fault_category_name(
     }
 }
 
+/// Builds the `FaultCategoryId` for a fault, including its `context`.
+///
+/// For most categories, `context` is simply the human-readable `message` describing
+/// the specific fault instance. But `SCHEMA_INVALID_RESPONSE` currently covers both
+/// status-code and body-shape violations under one WFC code (see the comment on
+/// `fault_category_name`); for those, `context` is prefixed with "status: " or
+/// "body: " so report consumers can already tell them apart today, ahead of WFC
+/// splitting them into dedicated categories.
 fn fault_category(
     discriminant: ValidationErrorDiscriminants,
     status: u16,
     message: &str,
 ) -> FaultCategoryId {
+    use ValidationErrorDiscriminants::*;
+
     let (id, code) = fault_category_name(discriminant, status);
+    let context = match discriminant {
+        OtherStatusNotSpecified => format!("status: {message}"),
+        ResponseReferenceBroken
+        | ResponseObjectIncorrect
+        | ResponseEnumIncorrect
+        | ResponseMalformedJSON
+        | UnexpectedContent => format!("body: {message}"),
+        _ => message.to_string(),
+    };
 
     FaultCategoryId {
         id: id.to_string(),
         code,
-        context: Some(message.to_string()),
+        context: Some(context),
     }
 }
 
