@@ -183,7 +183,6 @@ Components:
 - document-features
 - dunce
 - either
-- encode_unicode
 - encoding_rs
 - enumset
 - enumset_derive
@@ -232,7 +231,6 @@ Components:
 - indexmap
 - ipnet
 - is_terminal_polyfill
-- iter-read
 - itertools
 - itoa
 - jobserver
@@ -331,7 +329,6 @@ Components:
 - serde_core
 - serde_derive
 - serde_json
-- serde_path_to_error
 - serde_spanned
 - serde_urlencoded
 - serde_yaml
@@ -377,6 +374,7 @@ Components:
 - url
 - utf8_iter
 - utf8parse
+- utf_types
 - uuid
 - value-bag
 - vcpkg
@@ -397,7 +395,6 @@ Components:
 - windows-strings
 - windows-sys
 - windows-threading
-- wuppiefuzz
 - yaml_serde
 - zerocopy
 - zeroize
@@ -560,8 +557,6 @@ Copyright notices (differences from the text above):
     Copyright (c) 2019 svartalf
 - same-file, winapi-util:
     Copyright (c) 2017 Andrew Gallant
-- console, indicatif:
-    Copyright (c) 2017 Armin Ronacher <armin.ronacher@active-4.com>
 - fs_extra:
     Copyright (c) 2017 Denis Kurilenko
 - memoffset:
@@ -620,10 +615,6 @@ Copyright notices (differences from the text above):
     Copyright (c) 2022 Ibraheem Ahmed
 - hyper-util:
     Copyright (c) 2023-2025 Sean McArthur
-- unit-prefix:
-    Copyright (c) 2024 Benjamin Sago, Fabio Valentini
-- tonic:
-    Copyright (c) 2025 Lucio Franco
 - convert_case:
     Copyright (c) 2025 rutrum
 - z3-src:
@@ -636,6 +627,10 @@ Copyright notices (differences from the text above):
     Copyright 2016 Nika Layzell
 - rand_regex:
     Copyright 2018 Kenny Chan
+- tonic 0.14.9:
+    Copyright 2019 gRPC authors.
+- tonic 0.14.9, tonic-prost:
+    Copyright 2025 gRPC authors.
 - urlencoding:
     © 2016 Bertram Truong
     © 2021 Kornel Lesiński
@@ -658,7 +653,6 @@ Components:
 - cargo-license
 - cargo_metadata
 - cfg_aliases
-- console
 - convert_case
 - csv
 - csv-core
@@ -674,7 +668,6 @@ Components:
 - http-body-util
 - hyper
 - hyper-util
-- indicatif
 - jiff
 - jiff-core
 - json_env_logger2
@@ -723,7 +716,6 @@ Components:
 - tracing-core
 - try-lock
 - tuple_list
-- unit-prefix
 - unsafe-libyaml
 - urlencoding
 - virtue
