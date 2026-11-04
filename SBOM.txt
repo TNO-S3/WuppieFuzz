@@ -1,12 +1,9 @@
-addr2line 0.25.1
+addr2line 0.27.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 adler2 2.0.1
 	licensed under "0BSD OR Apache-2.0 OR MIT"
 	by Jonas Schievink <jonasschievink@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>
-aes 0.9.3
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 ahash 0.8.12
 	licensed under "Apache-2.0 OR MIT"
 	by Tom Kaitchuck <Tom.Kaitchuck@gmail.com>
@@ -31,10 +28,10 @@ anstyle-wincon 3.0.11
 atomic-waker 1.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by Stjepan Glavina <stjepang@gmail.com>|Contributors to futures-rs
-aws-lc-rs 1.18.1
+aws-lc-rs 1.19.0
 	licensed under "(Apache-2.0 OR ISC) AND ISC"
 	by AWS-LibCrypto
-aws-lc-sys 0.45.0
+aws-lc-sys 0.47.0
 	licensed under "(Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0) AND (Apache-2.0 OR ISC) AND Apache-2.0 AND BSD-3-Clause AND ISC AND MIT"
 	by AWS-LC
 axum 0.8.9
@@ -43,7 +40,7 @@ axum 0.8.9
 axum-core 0.5.6
 	licensed under "MIT"
 	by unspecified authors
-backtrace 0.3.76
+backtrace 0.3.77
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 base64 0.22.1
@@ -58,9 +55,6 @@ bitflags 1.3.2
 bitflags 2.13.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-block-buffer 0.12.1
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 block2 0.6.2
 	licensed under "MIT"
 	by Mads Marquart <mads@marquart.dk>
@@ -82,9 +76,6 @@ byteorder 1.5.0
 bytes 1.12.1
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>|Sean McArthur <sean@seanmonstar.com>
-bzip2 0.6.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 cesu8 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Eric Kidd <git@randomhacks.net>
@@ -97,9 +88,6 @@ chacha20 0.10.2
 chrono 0.4.45
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-cipher 0.5.2
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 clap 4.6.7
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
@@ -109,36 +97,21 @@ clap_builder 4.6.7
 clap_lex 1.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-cmov 0.5.4
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 cobs 0.3.0
 	licensed under "Apache-2.0 OR MIT"
 	by Allen Welkie <>|James Munns <james@onevariable.com>
 colorchoice 1.0.5
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-combine 4.6.8
+combine 4.6.9
 	licensed under "MIT"
 	by Markus Westerlind <marwes91@gmail.com>
-console 0.16.6
-	licensed under "MIT"
-	by unspecified authors
-const-hex 1.19.3
-	licensed under "Apache-2.0 OR MIT"
-	by DaniPopes <57450786+DaniPopes@users.noreply.github.com>
-const-oid 0.10.2
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
-const_format 0.2.36
+const_format 0.2.37
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 const_panic 0.2.17
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
-constant_time_eq 0.4.2
-	licensed under "Apache-2.0 OR CC0-1.0 OR MIT-0"
-	by Cesar Eduardo Barros <cesarb@cesarb.eti.br>
 cookie 0.18.2
 	licensed under "Apache-2.0 OR MIT"
 	by Sergio Benitez <sb@sergio.bz>|Alex Crichton <alex@alexcrichton.com>
@@ -160,37 +133,22 @@ core_affinity2 0.16.1
 core_detect 1.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Thom Chiovoloni <chiovolonit@gmail.com>
-cpubits 0.1.1
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
-cpufeatures 0.2.17
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 cpufeatures 0.3.1
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
-crc32fast 1.5.2
+crc32fast 1.5.4
 	licensed under "Apache-2.0 OR MIT"
 	by Sam Rijs <srijs@airpost.net>|Alex Crichton <alex@alexcrichton.com>
-crypto-common 0.2.2
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 ctor 1.0.13
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
 ctrlc 3.5.2
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
-ctutils 0.4.3
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
-deflate64 0.1.12
-	licensed under "MIT"
-	by anatawa12 <anatawa12@icloud.com>
-defmt-macros 1.1.1
+defmt-macros 1.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by The Knurling-rs developers
-deranged 0.5.8
+deranged 0.5.9
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
 derive_more 2.1.1
@@ -199,9 +157,6 @@ derive_more 2.1.1
 derive_more-impl 2.1.1
 	licensed under "MIT"
 	by Jelte Fennema <github-tech@jeltef.nl>
-digest 0.11.3
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 dispatch2 0.3.1
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Mads Marquart <mads@marquart.dk>|Mary <mary@mary.zone>
@@ -217,27 +172,21 @@ embedded-io 0.4.0
 embedded-io 0.6.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-encode_unicode 1.0.0
-	licensed under "Apache-2.0 OR MIT"
-	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
-encoding_rs 0.8.42
+encoding_rs 0.8.44
 	licensed under "(Apache-2.0 OR MIT) AND BSD-3-Clause"
 	by Henri Sivonen <hsivonen@hsivonen.fi>
-enumset 1.1.14
+enumset 1.1.15
 	licensed under "Apache-2.0 OR MIT"
 	by Alissa Rao <aura@aura.moe>
 env_filter 2.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-equivalent 1.0.2
+equivalent 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-erased-serde 0.4.10
+erased-serde 0.4.11
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-errno 0.3.14
-	licensed under "Apache-2.0 OR MIT"
-	by Chris Wong <lambda.fairy@gmail.com>|Dan Gohman <dev@sunfishcode.online>
 exceptional 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
@@ -313,7 +262,7 @@ getrandom 0.3.4
 getrandom 0.4.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rand Project Developers
-gimli 0.32.3
+gimli 0.34.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 h2 0.4.20
@@ -331,9 +280,6 @@ hashbrown 0.17.1
 hashlink 0.12.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-hmac 0.13.0
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 hostname 0.4.2
 	licensed under "MIT"
 	by unspecified authors
@@ -352,9 +298,6 @@ httparse 1.10.1
 httpdate 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by Pyfisch <pyfisch@posteo.org>
-hybrid-array 0.4.15
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 hyper 1.12.0
 	licensed under "MIT"
 	by Sean McArthur <sean@seanmonstar.com>
@@ -373,25 +316,25 @@ iana-time-zone 0.1.65
 iana-time-zone-haiku 0.1.2
 	licensed under "Apache-2.0 OR MIT"
 	by René Kijewski <crates.io@k6i.de>
-icu_collections 2.3.0
+icu_collections 2.4.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_locale_core 2.3.0
+icu_locale_core 2.4.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_normalizer 2.3.0
+icu_normalizer 2.4.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_normalizer_data 2.3.0
+icu_normalizer_data 2.4.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_properties 2.3.0
+icu_properties 2.4.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_properties_data 2.3.0
+icu_properties_data 2.4.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-icu_provider 2.3.1
+icu_provider 2.4.0
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 ident_case 1.0.1
@@ -406,28 +349,19 @@ idna_adapter 1.2.2
 indexmap 2.14.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-indicatif 0.18.6
-	licensed under "MIT"
-	by unspecified authors
-inout 0.2.2
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 ipnet 2.12.2
 	licensed under "Apache-2.0 OR MIT"
 	by Kris Price <kris@krisprice.nz>
 is_terminal_polyfill 1.70.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-iter-read 1.1.0
-	licensed under "Apache-2.0 OR MIT"
-	by Georg Brandl <georg@python.org>
 itoa 1.0.18
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-jiff 0.2.38
+jiff 0.2.39
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-jiff-static 0.2.38
+jiff-static 0.2.39
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
 jni 0.22.4
@@ -442,7 +376,7 @@ jni-sys 0.4.1
 jni-sys-macros 0.4.1
 	licensed under "Apache-2.0 OR MIT"
 	by Robert Bragg <robert@sixbynine.org>
-js-sys 0.3.106
+js-sys 0.3.107
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 json_env_logger2 0.2.1
@@ -478,9 +412,6 @@ libafl_bolts 0.16.1
 libafl_core 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-libbz2-rs-sys 0.2.5
-	licensed under "bzip2-1.0.6"
-	by unspecified authors
 libm 0.2.16
 	licensed under "MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Amanieu d'Antras <amanieu@gmail.com>|Jorge Aparicio <japaricious@gmail.com>|Trevor Gross <tg@trevorgross.com>
@@ -496,9 +427,6 @@ link-section 0.19.3
 linktime-proc-macro 0.2.3
 	licensed under "Apache-2.0 OR MIT"
 	by Matt Mastracci <matthew@mastracci.com>
-linux-raw-sys 0.12.1
-	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
-	by Dan Gohman <dev@sunfishcode.online>
 litemap 0.8.3
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
@@ -508,15 +436,12 @@ ll_mp 0.16.1
 lock_api 0.4.14
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-log 0.4.34
+log 0.4.35
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
 lru-slab 0.1.3
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Benjamin Saunders <ben.e.saunders@gmail.com>
-lzma-rust2 0.16.5
-	licensed under "Apache-2.0"
-	by unspecified authors
 mach2 0.6.0
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
@@ -538,9 +463,6 @@ mime 0.3.17
 minibsod 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
-miniz_oxide 0.8.9
-	licensed under "Apache-2.0 OR MIT OR Zlib"
-	by Frommi <daniil.liferenko@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>|Rich Geldreich richgel99@gmail.com
 miniz_oxide 0.9.1
 	licensed under "Apache-2.0 OR MIT OR Zlib"
 	by Frommi <daniil.liferenko@gmail.com>|oyvindln <oyvindln@users.noreply.github.com>|Rich Geldreich richgel99@gmail.com
@@ -589,7 +511,7 @@ objc2 0.6.5
 objc2-encode 4.1.0
 	licensed under "MIT"
 	by Mads Marquart <mads@marquart.dk>
-object 0.37.3
+object 0.40.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
 once_cell 1.21.4
@@ -601,25 +523,25 @@ once_cell_polyfill 1.70.2
 openapiv3-extended 6.0.1
 	licensed under "Apache-2.0 OR MIT"
 	by Kurt Wolf <kurtwolfbuilds@gmail.com>
-openssl 0.10.81
+openssl 0.10.82
 	licensed under "Apache-2.0"
 	by Steven Fackler <sfackler@gmail.com>
 openssl-macros 0.1.1
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-openssl-probe 0.2.1
+openssl-probe 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>
-openssl-sys 0.9.117
+openssl-sys 0.9.118
 	licensed under "MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Steven Fackler <sfackler@gmail.com>
-opentelemetry 0.33.0
+opentelemetry 0.33.1
 	licensed under "Apache-2.0"
 	by unspecified authors
-opentelemetry-proto 0.33.0
+opentelemetry-proto 0.33.1
 	licensed under "Apache-2.0"
 	by unspecified authors
-opentelemetry_sdk 0.33.0
+opentelemetry_sdk 0.33.1
 	licensed under "Apache-2.0"
 	by unspecified authors
 ownedref 0.16.1
@@ -631,9 +553,6 @@ parking_lot 0.12.5
 parking_lot_core 0.9.12
 	licensed under "Apache-2.0 OR MIT"
 	by Amanieu d'Antras <amanieu@gmail.com>
-pbkdf2 0.13.0
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 percent-encoding 2.3.2
 	licensed under "Apache-2.0 OR MIT"
 	by The rust-url developers
@@ -667,15 +586,9 @@ potential_utf 0.1.6
 powerfmt 0.2.1
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
-ppmd-rust 1.5.0
-	licensed under "CC0-1.0 OR MIT-0"
-	by unspecified authors
 ppv-lite86 0.2.21
 	licensed under "Apache-2.0 OR MIT"
 	by The CryptoCorrosion Contributors
-proptest 1.11.0
-	licensed under "Apache-2.0 OR MIT"
-	by Jason Lingle
 prost 0.14.4
 	licensed under "Apache-2.0"
 	by Dan Burkert <dan@danburkert.com>|Lucio Franco <luciofranco14@gmail.com>|Casper Meijn <casper@meijn.net>|Tokio Contributors <team@tokio.rs>
@@ -730,9 +643,6 @@ rand_pcg 0.10.2
 rand_regex 0.19.0
 	licensed under "MIT"
 	by kennytm <kennytm@gmail.com>
-rand_xorshift 0.4.0
-	licensed under "Apache-2.0 OR MIT"
-	by The Rand Project Developers|The Rust Project Developers
 redox_syscall 0.5.18
 	licensed under "MIT"
 	by Jeremy Soller <jackpot51@gmail.com>
@@ -766,13 +676,10 @@ rustc-demangle 0.1.28
 rustc-hash 2.1.3
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
-rustix 1.1.5
-	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
-	by Dan Gohman <dev@sunfishcode.online>|Jakub Konka <kubkon@jakubkonka.com>
 rustls 0.23.46
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
-rustls-native-certs 0.8.4
+rustls-native-certs 0.8.5
 	licensed under "Apache-2.0 OR ISC OR MIT"
 	by unspecified authors
 rustls-pki-types 1.15.1
@@ -784,7 +691,7 @@ rustls-platform-verifier 0.7.1
 rustls-platform-verifier-android 0.2.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-rustls-webpki 0.103.15
+rustls-webpki 0.103.16
 	licensed under "ISC"
 	by unspecified authors
 ryu 1.0.23
@@ -796,7 +703,7 @@ safe_arch 1.2.0
 same-file 1.0.6
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-schannel 0.1.29
+schannel 0.1.30
 	licensed under "MIT"
 	by Steven Fackler <sfackler@gmail.com>|Steffen Butzer <steffen.butzer@outlook.com>
 scopeguard 1.2.0
@@ -817,9 +724,6 @@ serde_anymap 0.16.1
 serde_core 1.0.229
 	licensed under "Apache-2.0 OR MIT"
 	by Erick Tryzelaar <erick.tryzelaar@gmail.com>|David Tolnay <dtolnay@gmail.com>
-serde_path_to_error 0.1.20
-	licensed under "Apache-2.0 OR MIT"
-	by David Tolnay <dtolnay@gmail.com>
 serde_urlencoded 0.7.1
 	licensed under "Apache-2.0 OR MIT"
 	by Anthony Ramine <n.oxyde@gmail.com>
@@ -829,12 +733,6 @@ serde_yaml 0.9.34+deprecated
 serial_test 4.0.1
 	licensed under "MIT"
 	by Tom Parker-Shemilt <palfrey@tevp.net>
-sha1 0.11.0
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
-sha2 0.11.0
-	licensed under "Apache-2.0 OR MIT"
-	by RustCrypto Developers
 shmem_providers 0.16.1
 	licensed under "Apache-2.0 OR MIT"
 	by Andrea Fioraldi <andreafioraldi@gmail.com>|Dominik Maier <domenukk@gmail.com>
@@ -850,7 +748,7 @@ siphasher 1.0.4
 slab 0.4.12
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>
-smallvec 1.16.2
+smallvec 1.16.4
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
 socket2 0.6.5
@@ -880,9 +778,6 @@ system-configuration 0.7.0
 system-configuration-sys 0.6.0
 	licensed under "Apache-2.0 OR MIT"
 	by Mullvad VPN
-tempfile 3.27.0
-	licensed under "Apache-2.0 OR MIT"
-	by Steven Allen <steven@stebalien.com>|The Rust Project Developers|Ashley Mannix <ashleymannix@live.com.au>|Jason White <me@jasonwhite.io>
 thiserror-impl 2.0.21
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
@@ -892,7 +787,7 @@ time 0.3.55
 time-macros 0.2.32
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <open-source@jhpratt.dev>|Time contributors
-tinystr 0.8.4
+tinystr 0.8.5
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
 tinyvec 1.13.3
@@ -907,15 +802,15 @@ tokio-rustls 0.26.6
 tokio-stream 0.1.19
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
-tokio-util 0.7.19
+tokio-util 0.7.20
 	licensed under "MIT"
 	by Tokio Contributors <team@tokio.rs>
-tonic 0.14.6
+tonic 0.14.9
 	licensed under "MIT"
-	by Lucio Franco <luciofranco14@gmail.com>
-tonic-prost 0.14.6
+	by gRPC authors
+tonic-prost 0.14.9
 	licensed under "MIT"
-	by Lucio Franco <luciofranco14@gmail.com>
+	by gRPC authors
 tower 0.5.3
 	licensed under "MIT"
 	by Tower Maintainers <team@tower-rs.com>
@@ -946,25 +841,19 @@ typed-builder 0.23.2
 typed-builder-macro 0.23.2
 	licensed under "Apache-2.0 OR MIT"
 	by IdanArye <idanarye@gmail.com>|Chris Morgan <me@chrismorgan.info>
-typed-path 0.12.3
+typed-path 0.13.0
 	licensed under "Apache-2.0 OR MIT"
 	by Chip Senkbeil <chip@senkbeil.org>
 typeid 1.0.3
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-typenum 1.20.1
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
 typewit 1.15.2
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
 uds 0.4.2
 	licensed under "Apache-2.0 OR MIT"
 	by Torbjørn Birch Moltu <t.b.moltu@lyse.net>
-unarray 0.1.4
-	licensed under "Apache-2.0 OR MIT"
-	by unspecified authors
-unicode-ident 1.0.26
+unicode-ident 1.0.27
 	licensed under "(Apache-2.0 OR MIT) AND Unicode-3.0"
 	by David Tolnay <dtolnay@gmail.com>
 unicode-segmentation 1.13.3
@@ -973,12 +862,9 @@ unicode-segmentation 1.13.3
 unicode-truncate 3.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Aetf <aetf@unlimitedcodeworks.xyz>
-unicode-width 0.2.2
+unicode-width 0.2.3
 	licensed under "Apache-2.0 OR MIT"
 	by kwantam <kwantam@gmail.com>|Manish Goregaokar <manishsmail@gmail.com>
-unit-prefix 0.5.2
-	licensed under "MIT"
-	by Fabio Valentini <decathorpe@gmail.com>|Benjamin Sago <ogham@bsago.me>
 unsafe-libyaml 0.2.11
 	licensed under "MIT"
 	by David Tolnay <dtolnay@gmail.com>
@@ -994,13 +880,16 @@ url 2.5.8
 urlencoding 2.1.3
 	licensed under "MIT"
 	by Kornel <kornel@geekhood.net>|Bertram Truong <b@bertramtruong.com>
-utf8_iter 1.0.4
+utf8_iter 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by Henri Sivonen <hsivonen@hsivonen.fi>
 utf8parse 0.2.2
 	licensed under "Apache-2.0 OR MIT"
 	by Joe Wilm <joe@jwilm.com>|Christian Duerr <contact@christianduerr.com>
-uuid 1.27.0
+utf_types 1.0.0
+	licensed under "Apache-2.0 OR MIT"
+	by Henri Sivonen <hsivonen@hsivonen.fi>
+uuid 1.29.0
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
 value-bag 1.14.1
@@ -1021,25 +910,25 @@ wasi 0.11.1+wasi-snapshot-preview1
 wasip2 1.0.4+wasi-0.2.12
 	licensed under "Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT"
 	by unspecified authors
-wasm-bindgen 0.2.129
+wasm-bindgen 0.2.130
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-futures 0.4.79
+wasm-bindgen-futures 0.4.80
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-macro 0.2.129
+wasm-bindgen-macro 0.2.130
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-wasm-bindgen-shared 0.2.129
+wasm-bindgen-shared 0.2.130
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
-web-sys 0.3.106
+web-sys 0.3.107
 	licensed under "Apache-2.0 OR MIT"
 	by The wasm-bindgen Developers
 web-time 1.1.0
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-webpki-root-certs 1.0.9
+webpki-root-certs 1.0.11
 	licensed under "CDLA-Permissive-2.0"
 	by unspecified authors
 wide 1.7.1
@@ -1138,7 +1027,7 @@ xxhash-rust 0.8.19
 yaml_serde 0.10.7
 	licensed under "Apache-2.0 OR MIT"
 	by YAML Organization <noreply@yaml.org>
-yoke 0.8.3
+yoke 0.8.4
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
 yoke-derive 0.8.4
@@ -1150,10 +1039,10 @@ z3 0.20.2
 z3-sys 0.11.0
 	licensed under "MIT"
 	by Graydon Hoare <graydon@pobox.com>|Bruce Mitchener <bruce.mitchener@gmail.com>|Nick Fitzgerald <fitzgen@gmail.com>|Mark DenHoed <mark.denhoed@cs.ox.ac.uk>
-zerocopy 0.8.61
+zerocopy 0.8.63
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
-zerocopy-derive 0.8.61
+zerocopy-derive 0.8.63
 	licensed under "Apache-2.0 OR BSD-2-Clause OR MIT"
 	by unspecified authors
 zerofrom 0.1.8
@@ -1168,13 +1057,13 @@ zeroize 1.9.1
 zerotrie 0.2.5
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-zerovec 0.11.8
+zerovec 0.11.9
 	licensed under "Unicode-3.0"
 	by The ICU4X Project Developers
-zerovec-derive 0.11.6
+zerovec-derive 0.11.7
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-zip 8.6.0
+zip 9.3.0
 	licensed under "MIT"
 	by Mathijs van de Nes <git@mathijs.vd-nes.nl>|Marli Frost <marli@frost.red>|Ryan Levick <ryan.levick@gmail.com>|Chris Hennick <hennickc@amazon.com>
 zlib-rs 0.6.8
@@ -1183,15 +1072,3 @@ zlib-rs 0.6.8
 zmij 1.0.23
 	licensed under "MIT"
 	by David Tolnay <dtolnay@gmail.com>
-zopfli 0.8.3
-	licensed under "Apache-2.0"
-	by unspecified authors
-zstd 0.13.3
-	licensed under "MIT"
-	by Alexandre Bury <alexandre.bury@gmail.com>
-zstd-safe 7.3.0
-	licensed under "BSD-3-Clause"
-	by Alexandre Bury <alexandre.bury@gmail.com>
-zstd-sys 2.1.0+zstd.1.5.7
-	licensed under "BSD-3-Clause"
-	by Alexandre Bury <alexandre.bury@gmail.com>
