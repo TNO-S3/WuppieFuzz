@@ -265,6 +265,12 @@ where
         )
     }
 
+    fn campaign_elapsed_secs(&self) -> u64 {
+        self.starting_time
+            .map(|start| start.elapsed().as_secs())
+            .unwrap_or(0)
+    }
+
     fn write_stats_snapshot(&self, state: &FuzzerState, seq_per_sec: f64, req_per_sec: f64) {
         let otel_trace_processing_stats = self
             .otel_trace_processing_metrics
@@ -273,6 +279,7 @@ where
             .unwrap_or_default();
 
         self.reporter.report_stats(CampaignStats {
+            elapsed_secs: self.campaign_elapsed_secs(),
             seq_per_sec,
             req_per_sec,
             requests_completed_total: self.performed_requests,
