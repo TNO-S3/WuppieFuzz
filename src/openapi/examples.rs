@@ -104,11 +104,23 @@ fn example_body_for_operation(api: &Spec, operation: &Operation) -> Option<Param
         },
     };
 
-    if object_schema
-        .schema_type
-        .as_ref()
-        .is_some_and(|st| st.contains(SchemaType::Object))
-    {
+    // Compositions (`allOf`/`oneOf`/`anyOf`) are resolved by the generic schema example generator.
+    let has_composition = !object_schema.all_of.is_empty()
+        || !object_schema.one_of.is_empty()
+        || !object_schema.any_of.is_empty();
+    if has_composition && object_schema.properties.is_empty() {
+        let composed = Schema::Object(Box::new(ObjectOrReference::Object(object_schema.clone())));
+        if let Some(value) = example_value_for_schema(api, &composed, 0) {
+            return Some(ParameterContents::from(value));
+        }
+    }
+
+    // A schema with properties but without an explicit type is an object in practice.
+    let is_object = match &object_schema.schema_type {
+        Some(st) => st.contains(SchemaType::Object),
+        None => !object_schema.properties.is_empty(),
+    };
+    if is_object {
         let body_map: BTreeMap<String, ParameterContents> = object_schema
             .properties
             .iter()
@@ -123,6 +135,7 @@ fn example_body_for_operation(api: &Spec, operation: &Operation) -> Option<Param
     }
     if object_schema
         .schema_type
+        .as_ref()
         .is_some_and(|st| st.contains(SchemaType::Array))
     {
         return match &object_schema.items {
@@ -132,8 +145,14 @@ fn example_body_for_operation(api: &Spec, operation: &Operation) -> Option<Param
             None => None,
         };
     }
-    // TODO this is a bit lackluster
-    log::warn!("Cannot create an example body. Using empty body.");
+    static WARNED_BODY: std::sync::Once = std::sync::Once::new();
+    WARNED_BODY.call_once(|| {
+        log::warn!(
+            "Cannot create an example body for at least one operation. Using empty body \
+             (further occurrences are logged at debug level)."
+        )
+    });
+    log::debug!("Cannot create an example body. Using empty body.");
     None
 }
 
@@ -453,10 +472,30 @@ fn example_value_for_schema(api: &Spec, schema: &Schema, recursion_depth: usize)
             return example_value_for_schema(api, &schema.all_of[0], recursion_depth + 1);
         }
         _ => {
-            log::warn!(concat!(
-                "Generating example parameters for the allOf keyword with more than one schema is not supported. ",
-                "See https://swagger.io/docs/specification/v3_0/data-models/oneof-anyof-allof-not/#allof"
-            ));
+            // Best effort: merge the examples of all sub-schemas; objects are combined key-wise.
+            let parts: Vec<Value> = schema
+                .all_of
+                .iter()
+                .filter_map(|s| example_value_for_schema(api, s, recursion_depth + 1))
+                .collect();
+            if !parts.is_empty() && parts.iter().all(Value::is_object) {
+                let mut merged = serde_json::Map::new();
+                for part in parts {
+                    if let Value::Object(map) = part {
+                        merged.extend(map);
+                    }
+                }
+                for (name, prop) in schema.properties.iter() {
+                    if let Some(v) = example_value_for_schema(api, prop, recursion_depth + 1) {
+                        merged.insert(name.clone(), v);
+                    }
+                }
+                return Some(Value::Object(merged));
+            }
+            if let Some(first) = parts.into_iter().next() {
+                return Some(first);
+            }
+            log::debug!("allOf with multiple schemas yielded no example");
             log_schema_debug(&schema);
             return None;
         }
@@ -1337,4 +1376,51 @@ fn interesting_requests_for_operation(
     };
     assert_ne!(rv.len(), 0);
     rv
+}
+
+#[cfg(test)]
+mod body_tests {
+    use super::*;
+
+    fn body_for(schema: &str) -> Option<ParameterContents> {
+        let json = format!(
+            r#"{{"openapi":"3.0.0","info":{{"title":"t","version":"1"}},"paths":{{"/p":{{"post":{{
+                "requestBody":{{"content":{{"application/json":{{"schema":{schema}}}}}}},
+                "responses":{{"200":{{"description":"ok"}}}}}}}}}}}}"#
+        );
+        let api = Spec::from(oas3::from_json(&json).unwrap());
+        let operation = api.operation(&reqwest::Method::POST, "/p").unwrap();
+        example_body_for_operation(&api, operation)
+    }
+
+    #[test]
+    fn typeless_schema_with_properties_gets_a_body() {
+        let body = body_for(r#"{"properties":{"name":{"type":"string"}}}"#).unwrap();
+        assert!(format!("{body:?}").contains("name"));
+    }
+
+    #[test]
+    fn allof_only_schema_gets_a_body() {
+        let body =
+            body_for(r#"{"allOf":[{"type":"object","properties":{"name":{"type":"string"}}}]}"#)
+                .unwrap();
+        assert!(format!("{body:?}").contains("name"));
+    }
+
+    #[test]
+    fn multi_schema_allof_body_is_merged() {
+        let body = body_for(
+            r#"{"allOf":[
+                {"type":"object","properties":{"name":{"type":"string"}}},
+                {"type":"object","properties":{"age":{"type":"integer"}}}]}"#,
+        )
+        .unwrap();
+        let debug = format!("{body:?}");
+        assert!(debug.contains("name") && debug.contains("age"));
+    }
+
+    #[test]
+    fn schema_without_any_structure_gets_no_body() {
+        assert!(body_for("{}").is_none());
+    }
 }
