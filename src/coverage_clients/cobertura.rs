@@ -435,12 +435,15 @@ fn unpack_report_zip(bytes: &[u8], report_path: &Path) {
                 continue;
             }
         };
-        let out_path = dest.join(entry.name());
-        // Protect against zip-slip path traversal attacks
-        if !out_path.starts_with(&dest) {
-            log::warn!("Skipping zip entry with suspicious path: {}", entry.name());
+        // enclosed_name rejects absolute paths and `..` escapes (zip-slip)
+        let Some(relative_path) = entry.enclosed_name() else {
+            log::warn!(
+                "Skipping zip entry with suspicious path: {:?}",
+                entry.name()
+            );
             continue;
-        }
+        };
+        let out_path = dest.join(relative_path);
         if entry.is_dir() {
             let _ = fs::create_dir_all(&out_path);
         } else {

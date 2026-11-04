@@ -199,10 +199,18 @@ fn render_notices_from_json(json_bytes: &[u8]) -> Result<String, String> {
             .flatten()
             .filter_map(|u| {
                 let name = u["crate"]["name"].as_str()?;
+                // WuppieFuzz itself is first-party, not a third-party notice
+                if name == env!("CARGO_PKG_NAME") {
+                    return None;
+                }
                 let version = u["crate"]["version"].as_str().unwrap_or_default();
                 Some((name.to_string(), version.to_string()))
             })
             .collect();
+
+        if crates.is_empty() {
+            continue;
+        }
 
         let group = groups.entry(id).or_insert_with(|| Group {
             name: name.clone(),
