@@ -103,6 +103,10 @@ pub fn reproduce(input_file: &Path) -> Result<()> {
                     &mut parameter_feedback,
                 );
                 if exit_kind == ExitKind::Crash {
+                    info!(
+                        "Request resulted in a crash (status code: {})",
+                        response.status()
+                    );
                     if let Ok(text) = response.text() {
                         info!("Response contents printed below: \n{text}")
                     }

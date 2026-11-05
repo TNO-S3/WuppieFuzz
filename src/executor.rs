@@ -32,7 +32,7 @@ use crate::{
     configuration::{Configuration, CoverageConfiguration},
     coverage_clients::{
         CoverageClient,
-        endpoint::EndpointCoverageClient,
+        endpoint::{CoverArgs, EndpointCoverageClient, ensure_crash_file_path},
         otel::{SharedOtelTraceProcessingMetrics, read_otel_trace_processing_metrics},
     },
     input::{OpenApiInput, OpenApiRequest},
@@ -159,6 +159,20 @@ pub(crate) fn process_response(
         log::debug!(
             "OpenAPI-input resulted in server error response, ignoring rest of request chain."
         );
+        // Any 5xx response is always treated as a crash, regardless of `crash_criteria`
+        // (checked below for other validation error kinds) and regardless of whether
+        // the specification happens to declare this status for this path. We still
+        // prefer the precise `ValidationError` from `validate_response` when available,
+        // so fault tracking/WFC reports get an accurate category (e.g. a schema
+        // mismatch rather than "not specified" when the spec does declare this 5xx);
+        // we only fall back to constructing `Status5xxNotSpecified` directly when the
+        // spec/schema check finds nothing wrong, purely to keep this crash visible as
+        // a fault at all.
+        maybe_validation_error = validate_response(api, request, response).err().or(Some(
+            ValidationError::Status5xxNotSpecified {
+                got: response.status(),
+            },
+        ));
     } else if let Err(validation_err) = validate_response(api, request, response)
         && crash_criteria.contains(&validation_err.discriminant())
     {
@@ -412,21 +426,29 @@ where
                         process_response_start,
                     );
                     let endpoint_cover_start = Instant::now();
-                    self.endpoint_client.lock().unwrap().cover(
-                        request.method,
-                        request.path.clone(),
-                        response.status(),
-                        curl_request,
-                        response.text().unwrap_or_else(|_| {
+                    self.endpoint_client.lock().unwrap().cover(CoverArgs {
+                        method: request.method,
+                        path: request.path.clone(),
+                        status: response.status(),
+                        curl_string: curl_request,
+                        response_body: response.text().unwrap_or_else(|_| {
                             String::from("Unable to decode the response to UTF-8")
                         }),
                         validation_error,
-                    );
+                        sequence: inputs,
+                    });
                     Self::add_timing(
                         &mut self.sequence_timing_stats.endpoint_cover_us,
                         endpoint_cover_start,
                     );
                     if exit_kind == ExitKind::Crash {
+                        // Link the crashing request to its on-disk reproducer, so the
+                        // SQLite report can point every crashing input/sequence at a
+                        // real, replayable file (not just the distinct faults surfaced
+                        // in the WFC report).
+                        let crash_file_path = ensure_crash_file_path(inputs);
+                        self.reporter
+                            .report_crash(reporter_request_id, &crash_file_path);
                         stop_reason = SequenceStopReason::CrashOrValidation;
                         break 'chain;
                     }
@@ -700,6 +722,48 @@ where
     pub fn start_timer(&mut self) {
         self.starting_time = Some(Instant::now())
     }
+
+    /// Generates a WFC-compliant `report.json` summarizing the fuzzing campaign,
+    /// alongside the HTML/coverage report, if `--report` was requested
+    /// (`report_path.is_some()`).
+    pub fn generate_wfc_report_if_requested(
+        &mut self,
+        state: &FuzzerState,
+        report_path: Option<&std::path::Path>,
+    ) {
+        let Some(report_path) = report_path else {
+            return;
+        };
+        let fuzzing_duration = self
+            .starting_time
+            .map(|start| start.elapsed())
+            .unwrap_or_default();
+        let code_coverage_ratio = self.coverage_client.max_coverage_ratio();
+        let endpoint_coverage_ratio = self.endpoint_client.max_coverage_ratio();
+        // Only the in-memory report assembly needs `endpoint_client` locked; the
+        // lock is released before the (I/O-bound) file write.
+        let report = {
+            let endpoint_client = self.endpoint_client.lock().unwrap();
+            crate::reporting::wfc_report::build_report(
+                crate::reporting::wfc_report::WfcReportContext {
+                    config: self.config,
+                    state,
+                    endpoint_client: &endpoint_client,
+                    evaluated_http_calls: self.performed_requests,
+                    fuzzing_duration,
+                    code_coverage_ratio,
+                    endpoint_coverage_ratio,
+                },
+            )
+        };
+        if let Err(err) = crate::reporting::wfc_report::persist_report(
+            &report,
+            report_path,
+            state.solutions().count(),
+        ) {
+            log::error!("Failed to write WFC report: {err}");
+        }
+    }
 }
 
 impl<EM, FZ, OT> Executor<EM, OpenApiInput, FuzzerState, FZ> for SequenceExecutor<OT>
@@ -752,7 +816,7 @@ const CURRENT_SEQUENCE_SUMMARY_MAX_LEN: usize = 120;
 /// Builds a short, human-readable summary of the request sequence currently
 /// being fuzzed (e.g. `"GET /pets -> POST /pets/{id}"`), truncated if it would
 /// otherwise be too long to display nicely.
-fn summarize_sequence(input: &OpenApiInput) -> String {
+pub(crate) fn summarize_sequence(input: &OpenApiInput) -> String {
     let mut summary: Vec<String> = input
         .0
         .iter()
