@@ -6,6 +6,7 @@
 
 ## Fixes
 
+- Treat path parameters that are not templated in their path as query parameters, so they are still fuzzed instead of being dropped with an error during corpus generation in [#405](https://github.com/TNO-S3/WuppieFuzz/pull/405)
 - Repair regex patterns with an unescaped hyphen after a class escape (e.g. `[\w-/]`) so examples can still be generated, and log remaining regex failures once (then at debug level) in [#404](https://github.com/TNO-S3/WuppieFuzz/pull/404)
 - Generate example request bodies for schemas with multiple `allOf` entries, schemas with properties but no `type`, and bodies made only of `allOf`/`oneOf`/`anyOf`; remaining empty-body warnings are logged once in [#406](https://github.com/TNO-S3/WuppieFuzz/pull/406)
 
