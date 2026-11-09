@@ -36,6 +36,8 @@ use crate::{
     state::CRASHES_DIR,
 };
 
+const COVERAGE_EXAMPLES_DIR: &str = "./coverage_examples";
+
 const HIT_SYMBOL: &str = "&#x2714;&#xfe0f;";
 const MISS_SYMBOL: &str = "&#x274c;";
 const SUPERFLUOUS_SYMBOL: &str = "&#x26a0;&#xfe0f";
@@ -131,15 +133,11 @@ struct FaultArgs<'a> {
 /// Locates the on-disk file named `file_name` holding the request sequence for a
 /// given fault or coverage example, without writing a new copy of it.
 ///
-/// Genuine faults are proactively written to `CRASHES_DIR` (see
-/// `ensure_crash_file`), so that's checked first. Non-fault coverage examples are
-/// deliberately *not* written there (`CRASHES_DIR` should only contain actual
-/// objectives); instead their coverage is new by construction, so LibAFL's own
-/// corpus machinery is expected to have already persisted them to `QUEUE_DIR`
-/// under the same deterministic name (`Input::generate_name`). `None` if neither
-/// location has the file.
+/// Faults are stored in `CRASHES_DIR` and coverage examples in
+/// `COVERAGE_EXAMPLES_DIR`; LibAFL's `QUEUE_DIR` is a fallback for existing
+/// corpus entries. `None` if none of these locations has the file.
 pub fn locate_test_case(file_name: &str) -> Option<String> {
-    for dir in [CRASHES_DIR, QUEUE_DIR] {
+    for dir in [CRASHES_DIR, COVERAGE_EXAMPLES_DIR, QUEUE_DIR] {
         let path = Path::new(dir).join(file_name);
         if path.exists() {
             return Some(path.to_string_lossy().to_string());
@@ -152,9 +150,7 @@ pub fn locate_test_case(file_name: &str) -> Option<String> {
 /// name (`Input::generate_name`), the same name and directory LibAFL's own
 /// `solutions` corpus would use for it, and returns that name.
 ///
-/// Only ever called for genuine faults (via `record_fault`, and the always-a-fault
-/// `Coverage::UnexpectedFound` case), so `CRASHES_DIR` never holds a plain valid
-/// hit; see `test_case_name` for the non-fault counterpart.
+/// Only called for genuine faults, so `CRASHES_DIR` never holds a plain valid hit.
 ///
 /// Corpus minimization trims the initial corpus down to a minimal set of
 /// inputs that together cover every observed `(method, path, status)`
@@ -174,6 +170,23 @@ fn ensure_crash_file(sequence: &OpenApiInput) -> String {
             log::warn!("Could not create directory {CRASHES_DIR} for crash files: {err}");
         } else if let Err(err) = sequence.to_file(&path) {
             log::warn!("Could not write crash file to {path:?}: {err}");
+        }
+    }
+    file_name
+}
+
+/// Persists a non-fault coverage example outside `CRASHES_DIR` and returns its
+/// deterministic content-hash name.
+fn ensure_coverage_file(sequence: &OpenApiInput) -> String {
+    let file_name = sequence.generate_name(None);
+    let path = Path::new(COVERAGE_EXAMPLES_DIR).join(&file_name);
+    if !path.exists() {
+        if let Err(err) = create_dir_all(COVERAGE_EXAMPLES_DIR) {
+            log::warn!(
+                "Could not create directory {COVERAGE_EXAMPLES_DIR} for coverage examples: {err}"
+            );
+        } else if let Err(err) = sequence.to_file(&path) {
+            log::warn!("Could not write coverage example to {path:?}: {err}");
         }
     }
     file_name
@@ -411,7 +424,13 @@ impl EndpointCoverageClient {
             Entry::Vacant(entry) => {
                 // `validation_error` is always `Some` here: an unspecified status always
                 // fails `validate_response` with `OtherStatusNotSpecified`/`Status5xxNotSpecified`,
-                // which is exactly why this entry is Vacant. The fallback is defensive only.
+                // but the error may be excluded by `crash_criteria`. Only persist those
+                // cases as crashes when the executor classified them as a fault.
+                let test_case_id = if validation_error.is_some() {
+                    ensure_crash_file(sequence)
+                } else {
+                    ensure_coverage_file(sequence)
+                };
                 entry.insert(Coverage::UnexpectedFound {
                     request: curl_string,
                     response: response_body,
@@ -419,7 +438,7 @@ impl EndpointCoverageClient {
                         || "Validation error required!".to_string(),
                         |val| val.to_string(),
                     ),
-                    test_case_id: ensure_crash_file(sequence),
+                    test_case_id,
                 });
             }
             // Occupied entry, either already found (expected or unexpected) or expected but not yet found
@@ -888,3 +907,70 @@ const COVERAGE_EXPORT_JAVASCRIPT: &str = include_str!("endpoint_report.js");
 
 /// Stylesheet for the HTML endpoint coverage report.
 const COVERAGE_EXPORT_CSS: &str = include_str!("endpoint_report.css");
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::BTreeMap,
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use super::*;
+    use crate::input::{Body, OpenApiRequest};
+
+    fn spec() -> Spec {
+        let json = r#"{"openapi":"3.0.0","info":{"title":"t","version":"1"},"paths":{"/p":{"get":{"responses":{"200":{"description":"ok"}}}}}}"#;
+        Spec::from(oas3::from_json(json).unwrap())
+    }
+
+    fn input(path: String) -> OpenApiInput {
+        OpenApiInput(vec![OpenApiRequest {
+            method: Method::Get,
+            path,
+            body: Body::Empty,
+            parameters: BTreeMap::new(),
+        }])
+    }
+
+    #[test]
+    fn unlisted_noncrashing_status_is_saved_outside_crashes() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let sequence = input(format!("/p-{unique}"));
+        let id = sequence.generate_name(None);
+        let crash_path = Path::new(CRASHES_DIR).join(&id);
+        let coverage_path = Path::new(COVERAGE_EXAMPLES_DIR).join(&id);
+        assert!(!crash_path.exists());
+        assert!(!coverage_path.exists());
+
+        EndpointCoverageClient::new(&spec()).cover(CoverArgs {
+            method: Method::Get,
+            path: "/p".to_string(),
+            status: 201,
+            curl_string: String::new(),
+            response_body: String::new(),
+            validation_error: None,
+            sequence: &sequence,
+        });
+
+        let saved_as_crash = crash_path.exists();
+        let saved_as_coverage_example = coverage_path.exists();
+        let located = locate_test_case(&id);
+        let expected_path = coverage_path.to_string_lossy().into_owned();
+        let _ = fs::remove_file(&crash_path);
+        let _ = fs::remove_file(&coverage_path);
+        assert!(!saved_as_crash, "non-crashing sample entered ./crashes");
+        assert!(
+            saved_as_coverage_example,
+            "non-crashing sample was not persisted"
+        );
+        assert_eq!(
+            located.as_deref(),
+            Some(expected_path.as_str()),
+            "sample is not locatable for reports"
+        );
+    }
+}
