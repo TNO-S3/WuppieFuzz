@@ -112,9 +112,8 @@ pub struct CoverArgs<'a> {
     pub response_body: String,
     /// The validation error found for this response, if any.
     pub validation_error: Option<ValidationError>,
-    /// The full request sequence currently being executed. Saved to `CRASHES_DIR`
-    /// on a new fault (see `ensure_crash_file`); for a plain valid hit, no write
-    /// happens (see `test_case_name`).
+    /// The full request sequence currently being executed. Faults are saved to
+    /// `CRASHES_DIR`; coverage examples are saved to `COVERAGE_EXAMPLES_DIR`.
     pub sequence: &'a OpenApiInput,
 }
 
@@ -192,17 +191,6 @@ fn ensure_coverage_file(sequence: &OpenApiInput) -> String {
     file_name
 }
 
-/// Returns the deterministic content-hash name (`Input::generate_name`) that
-/// identifies `sequence`, without writing anything to disk. Used for non-fault
-/// coverage examples, whose coverage is new and thus expected to already be
-/// persisted by LibAFL under this same name (found via `locate_test_case`'s
-/// `QUEUE_DIR` check). If not found (e.g. an "upgrade" of a previously-tainted
-/// hit, which isn't new coverage on its own), callers fall back to
-/// `TEST_CASE_UNAVAILABLE`.
-fn test_case_name(sequence: &OpenApiInput) -> String {
-    sequence.generate_name(None)
-}
-
 /// Like `ensure_crash_file`, but returns the full path to the reproducer file
 /// rather than just its name. Used to link every crashing request (not just the
 /// first occurrence of each distinct fault) to its reproducer in the SQLite
@@ -274,7 +262,9 @@ fn reproduce_html(reproduce: Option<&str>, inline: bool) -> String {
                 r#"<code title="{escaped_path}">{escaped_path}</code>{separator}<button class="copy-btn" data-copy="wuppiefuzz reproduce {escaped_path}">Copy reproduce command</button>"#
             )
         }
-        None => "<em>not found in crashes or queue directories</em>".to_string(),
+        None => {
+            "<em>not found in crashes, coverage examples, or queue directories</em>".to_string()
+        }
     }
 }
 
@@ -294,10 +284,9 @@ enum Coverage {
         response: String,
         /// Whether the response failed spec-validation.
         tainted: bool,
-        /// Deterministic content-hash name (see `ensure_crash_file`/`test_case_name`)
-        /// of the request sequence that produced this example. If `tainted`, it's
-        /// in `CRASHES_DIR`; otherwise it's expected to already be in LibAFL's own
-        /// `QUEUE_DIR`. Either way, WFC reports can cite a real, locatable test case.
+        /// Deterministic content-hash name of the request sequence that produced
+        /// this example. Tainted examples are in `CRASHES_DIR`; clean ones are in
+        /// `COVERAGE_EXAMPLES_DIR`.
         test_case_id: String,
     },
     /// This status code was seen but does not occur in the specification.
@@ -335,14 +324,14 @@ fn render_fault_variant(fault: &EndpointFault) -> String {
 }
 
 /// One observed (endpoint, status) combination, along with the id of the test
-/// case (see `ensure_crash_file`/`test_case_name`) whose example first
+/// case (see `ensure_crash_file`/`ensure_coverage_file`) whose example first
 /// demonstrated it. Used to build WFC `CoveredEndpoint` entries (see
 /// `reporting::wfc_report`) that cite a real, locatable test case rather than a
 /// synthetic placeholder.
 pub struct CoveredStatus {
     /// The operation id (`METHOD:path`) this status was observed on.
     pub endpoint_id: String,
-    /// The test case (see `ensure_crash_file`/`test_case_name`) whose example
+    /// The test case (see `ensure_crash_file`/`ensure_coverage_file`) whose example
     /// demonstrated this status.
     pub test_case_id: String,
     /// The HTTP status observed, or `None` if the call never returned a response.
@@ -459,7 +448,7 @@ impl EndpointCoverageClient {
                             test_case_id: if tainted {
                                 ensure_crash_file(sequence)
                             } else {
-                                test_case_name(sequence)
+                                ensure_coverage_file(sequence)
                             },
                         });
                     }
@@ -468,7 +457,7 @@ impl EndpointCoverageClient {
                             request: curl_string,
                             response: response_body,
                             tainted: false,
-                            test_case_id: test_case_name(sequence),
+                            test_case_id: ensure_coverage_file(sequence),
                         });
                     }
                     _ => {}
@@ -971,6 +960,59 @@ mod tests {
             located.as_deref(),
             Some(expected_path.as_str()),
             "sample is not locatable for reports"
+        );
+    }
+
+    #[test]
+    fn clean_replacement_for_tainted_coverage_is_persisted() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tainted_sequence = input(format!("/p-tainted-{unique}"));
+        let clean_sequence = input(format!("/p-clean-{unique}"));
+        let tainted_id = tainted_sequence.generate_name(None);
+        let clean_id = clean_sequence.generate_name(None);
+        let crash_path = Path::new(CRASHES_DIR).join(&tainted_id);
+        let coverage_path = Path::new(COVERAGE_EXAMPLES_DIR).join(&clean_id);
+        assert!(!crash_path.exists());
+        assert!(!coverage_path.exists());
+
+        let mut client = EndpointCoverageClient::new(&spec());
+        client.cover(CoverArgs {
+            method: Method::Get,
+            path: "/p".to_string(),
+            status: 200,
+            curl_string: String::new(),
+            response_body: String::new(),
+            validation_error: Some(ValidationError::UnexpectedContent { content_length: 1 }),
+            sequence: &tainted_sequence,
+        });
+        client.cover(CoverArgs {
+            method: Method::Get,
+            path: "/p".to_string(),
+            status: 200,
+            curl_string: String::new(),
+            response_body: String::new(),
+            validation_error: None,
+            sequence: &clean_sequence,
+        });
+
+        let covered = client.covered_http_status().into_iter().next().unwrap();
+        let saved_as_coverage_example = coverage_path.exists();
+        let located = locate_test_case(&clean_id);
+        let expected_path = coverage_path.to_string_lossy().into_owned();
+        let _ = fs::remove_file(&crash_path);
+        let _ = fs::remove_file(&coverage_path);
+        assert_eq!(covered.test_case_id, clean_id);
+        assert!(
+            saved_as_coverage_example,
+            "clean replacement was not persisted"
+        );
+        assert_eq!(
+            located.as_deref(),
+            Some(expected_path.as_str()),
+            "clean replacement is not locatable for reports"
         );
     }
 }
