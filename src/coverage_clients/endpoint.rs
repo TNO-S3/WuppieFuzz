@@ -110,8 +110,9 @@ pub struct CoverArgs<'a> {
     pub response_body: String,
     /// The validation error found for this response, if any.
     pub validation_error: Option<ValidationError>,
-    /// The full request sequence currently being executed, saved to `CRASHES_DIR`
-    /// the first time a new fault is observed.
+    /// The full request sequence currently being executed. Saved to `CRASHES_DIR`
+    /// the first time a new fault is observed (see `ensure_crash_file`); for a plain
+    /// valid hit, no proactive write happens (see `test_case_name`).
     pub sequence: &'a OpenApiInput,
 }
 
@@ -128,15 +129,19 @@ struct FaultArgs<'a> {
 }
 
 /// Locates the on-disk file named `file_name` holding the request sequence for a
-/// given fault, without writing a new copy of it.
+/// given fault or coverage example, without writing a new copy of it.
 ///
-/// Faults recorded via `record_fault` are proactively written to `CRASHES_DIR` the
-/// moment they are first observed (see `ensure_crash_file`), so this is checked
-/// first and should almost always succeed. As a fallback (e.g. a read-only
-/// filesystem prevented the proactive write, or the file was otherwise removed
-/// from under us), LibAFL's own `QUEUE_DIR` is also checked under the same name,
-/// since LibAFL persists crashing inputs there too as part of its normal solutions
-/// handling. Only if neither location has the file does this return `None`.
+/// Genuine faults recorded via `record_fault` are proactively written to
+/// `CRASHES_DIR` (see `ensure_crash_file`) the moment they are first observed, so
+/// this is checked first. Non-fault coverage examples (a plain, valid "hit" on a
+/// `(method, path, status)` declared in the spec) are deliberately *not* written
+/// there: `CRASHES_DIR` should only ever contain actual objectives. Instead, such
+/// an example's coverage is new by construction (see `EndpointCoverageClient::cover`),
+/// so LibAFL's own feedback/corpus machinery (fed by the same coverage map, see
+/// `construct_observer` in `fuzzer.rs`) is expected to have already persisted it to
+/// `QUEUE_DIR` as an "interesting" input, under the same deterministic name
+/// (`Input::generate_name`) - which is why that directory is also checked here.
+/// Only if neither location has the file does this return `None`.
 pub fn locate_test_case(file_name: &str) -> Option<String> {
     for dir in [CRASHES_DIR, QUEUE_DIR] {
         let path = Path::new(dir).join(file_name);
@@ -150,6 +155,11 @@ pub fn locate_test_case(file_name: &str) -> Option<String> {
 /// Ensures `sequence` is saved to `CRASHES_DIR` under its deterministic content-hash
 /// name (`Input::generate_name`), the same name and directory LibAFL's own
 /// `solutions` corpus would use for it, and returns that name.
+///
+/// Only ever called for genuine faults (via `record_fault`, and for the
+/// always-a-fault `Coverage::UnexpectedFound` case), so that every file in
+/// `CRASHES_DIR` really is an actual objective, never a plain valid "hit"; see
+/// `test_case_name` for the non-fault counterpart.
 ///
 /// Corpus minimization trims the initial corpus down to a minimal set of
 /// inputs that together cover every observed `(method, path, status)`
@@ -172,6 +182,19 @@ fn ensure_crash_file(sequence: &OpenApiInput) -> String {
         }
     }
     file_name
+}
+
+/// Returns the deterministic content-hash name (`Input::generate_name`) that
+/// identifies `sequence`, without writing anything to disk. Used for non-fault
+/// coverage examples (see `ensure_crash_file`'s doc comment): such a sequence's
+/// coverage is new, so it is expected to already be persisted by LibAFL itself
+/// under this same name, found later via `locate_test_case`'s `QUEUE_DIR` check.
+/// If it was not (e.g. this example is "upgrading" a previously-tainted hit with a
+/// later clean one, which is not new coverage on its own), the resulting id may not
+/// be locatable; callers handle that gracefully as a `TEST_CASE_UNAVAILABLE` fault
+/// (see `reporting::wfc_report`).
+fn test_case_name(sequence: &OpenApiInput) -> String {
+    sequence.generate_name(None)
 }
 
 /// Like `ensure_crash_file`, but returns the full path to the reproducer file
@@ -265,10 +288,13 @@ enum Coverage {
         response: String,
         /// Whether the response failed spec-validation.
         tainted: bool,
-        /// Deterministic content-hash name (see `ensure_crash_file`) of the request
-        /// sequence that produced this example, proactively persisted to
-        /// `CRASHES_DIR` so WFC reports can cite a real, locatable test case for
-        /// this coverage (see `reporting::wfc_report`).
+        /// Deterministic content-hash name (see `ensure_crash_file`/`test_case_name`)
+        /// of the request sequence that produced this example. If `tainted` (an
+        /// actual fault), it was proactively persisted to `CRASHES_DIR`; otherwise
+        /// no write happens here and it is expected to already be in `QUEUE_DIR`
+        /// via LibAFL's own corpus (see `test_case_name`'s doc comment). Either way,
+        /// WFC reports can cite a real, locatable test case for this coverage (see
+        /// `reporting::wfc_report`).
         test_case_id: String,
     },
     /// This status code was seen but does not occur in the specification.
@@ -306,13 +332,15 @@ fn render_fault_variant(fault: &EndpointFault) -> String {
 }
 
 /// One observed (endpoint, status) combination, along with the id of the test
-/// case (see `ensure_crash_file`) whose example first demonstrated it. Used to
-/// build WFC `CoveredEndpoint` entries (see `reporting::wfc_report`) that cite a
-/// real, locatable test case rather than a synthetic placeholder.
+/// case (see `ensure_crash_file`/`test_case_name`) whose example first
+/// demonstrated it. Used to build WFC `CoveredEndpoint` entries (see
+/// `reporting::wfc_report`) that cite a real, locatable test case rather than a
+/// synthetic placeholder.
 pub struct CoveredStatus {
     /// The operation id (`METHOD:path`) this status was observed on.
     pub endpoint_id: String,
-    /// The test case (see `ensure_crash_file`) whose example demonstrated this status.
+    /// The test case (see `ensure_crash_file`/`test_case_name`) whose example
+    /// demonstrated this status.
     pub test_case_id: String,
     /// The HTTP status observed, or `None` if the call never returned a response.
     pub status: Option<u16>,
@@ -412,12 +440,20 @@ impl EndpointCoverageClient {
                         // response observed for them failed validation; such a
                         // "tainted" example is upgraded below as soon as a clean one
                         // is seen, so it isn't stuck permanently doubling as a fault's
-                        // own example.
+                        // own example. Only the tainted case is an actual fault (and
+                        // was already written to `CRASHES_DIR` by `record_fault` above);
+                        // a clean hit is not, so it only gets a `test_case_name` (see
+                        // its doc comment for why no write is needed here).
+                        let tainted = validation_error.is_some();
                         entry.insert(Coverage::ExpectedFound {
                             request: curl_string,
                             response: response_body,
-                            tainted: validation_error.is_some(),
-                            test_case_id: ensure_crash_file(sequence),
+                            tainted,
+                            test_case_id: if tainted {
+                                ensure_crash_file(sequence)
+                            } else {
+                                test_case_name(sequence)
+                            },
                         });
                     }
                     Coverage::ExpectedFound { tainted: true, .. } if validation_error.is_none() => {
@@ -425,7 +461,7 @@ impl EndpointCoverageClient {
                             request: curl_string,
                             response: response_body,
                             tainted: false,
-                            test_case_id: ensure_crash_file(sequence),
+                            test_case_id: test_case_name(sequence),
                         });
                     }
                     _ => {}
