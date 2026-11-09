@@ -167,7 +167,12 @@ pub(crate) fn fault_category_name(
 
     match discriminant {
         OperationNotInSpec => ("WUP_OPERATION_NOT_IN_SPEC", 900),
-        Status5xxNotSpecified => {
+        // Both an undeclared 5xx and a correctly-declared-but-still-crashing 5xx
+        // (see `ValidationError::Status5xxSpecified`) map to the same generic "a 5xx
+        // was seen" WFC category: the distinction between the two only affects
+        // whether `--crash-criteria` treats the latter as a crash at all, not which
+        // category it's reported under once it is.
+        Status5xxNotSpecified | Status5xxSpecified => {
             if status == 500 {
                 ("HTTP_STATUS_500", 100)
             } else {

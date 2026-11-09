@@ -246,7 +246,8 @@ pub enum Commands {
         ///
         /// The possible errors are:
         /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally means it should not have been executed by the fuzzer to begin with.
-        /// - "Status5xxNotSpecified": The HTTP status code 5xx returned from the API is not one of the status codes mentioned for this path in the specification.
+        /// - "Status5xxNotSpecified": The HTTP status code 5xx returned from the API is not one of the status codes mentioned for this path in the specification (or its body doesn't match the declared schema). Always treated as a crash, regardless of this setting, since the API is violating its own documented contract.
+        /// - "Status5xxSpecified": The HTTP status code 5xx returned from the API, and its body, do match what is declared for this path in the specification. Unlike "Status5xxNotSpecified" this is not necessarily a bug, so whether it is treated as a crash is controlled by this setting (included by default).
         /// - "OtherStatusNotSpecified": The HTTP status code 1xx - 4xx returned from the API is not one of the status codes mentioned for this path in the specification.
         /// - "ResponseReferenceBroken":  The specification calls for an object to be returned, and refers to the correct structure of this object using a reference (`#/example/reference`). However, the reference path is not present in the specification or contains circular references.
         /// - "ResponseObjectIncorrect": The response body returned by the API does not match the structure specified in the API specification.
