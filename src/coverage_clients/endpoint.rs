@@ -115,8 +115,8 @@ pub struct CoverArgs<'a> {
     pub sequence: &'a OpenApiInput,
 }
 
-/// Arguments for `EndpointCoverageClient::record_fault`, bundled for the same
-/// reason as `CoverArgs`.
+/// Arguments for `EndpointCoverageClient::record_fault`, bundled into a struct to 
+/// avoid a long parameter list (clippy:too_many_arguments).
 struct FaultArgs<'a> {
     method: Method,
     path: &'a str,
@@ -183,7 +183,7 @@ pub fn ensure_crash_file_path(sequence: &OpenApiInput) -> String {
     Path::new(CRASHES_DIR)
         .join(file_name)
         .to_string_lossy()
-        .to_string()
+        .into_owned()
 }
 
 /// HTML presentation data for a single fault, used in the flat "All faults" table
