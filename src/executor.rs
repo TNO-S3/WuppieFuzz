@@ -429,7 +429,7 @@ where
                     self.endpoint_client.lock().unwrap().cover(CoverArgs {
                         method: request.method,
                         path: request.path.clone(),
-                        status: response.status(),
+                        status: response.status().as_u16(),
                         curl_string: curl_request,
                         response_body: response.text().unwrap_or_else(|_| {
                             String::from("Unable to decode the response to UTF-8")

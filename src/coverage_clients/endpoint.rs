@@ -103,7 +103,7 @@ pub struct CoverArgs<'a> {
     /// Path of the request that produced this response.
     pub path: String,
     /// HTTP status of the response.
-    pub status: reqwest::StatusCode,
+    pub status: u16,
     /// A curl-equivalent representation of the request that produced this response.
     pub curl_string: String,
     /// The response body text.
@@ -115,12 +115,12 @@ pub struct CoverArgs<'a> {
     pub sequence: &'a OpenApiInput,
 }
 
-/// Arguments for `EndpointCoverageClient::record_fault`, bundled into a struct to 
+/// Arguments for `EndpointCoverageClient::record_fault`, bundled into a struct to
 /// avoid a long parameter list (clippy:too_many_arguments).
 struct FaultArgs<'a> {
     method: Method,
     path: &'a str,
-    status: reqwest::StatusCode,
+    status: u16,
     err: &'a ValidationError,
     sequence: &'a OpenApiInput,
     request: &'a str,
@@ -293,7 +293,7 @@ fn render_fault_variant(fault: &EndpointFault) -> String {
     format!(
         r#"<div class="fault-variant">
             <div class="fv-header"><span class="badge {class}">{category}</span> &times;{occurrences} &mdash; {message}</div>
-            <h4>Request</h4><div class="fv-pane">{request}</div>
+            <h4>Request</h4><p class="fv-hint">Final request of the sequence that triggered this fault; for a stateful API, replaying only this request may not reproduce the fault on its own &mdash; use "Reproduce" below to replay the full sequence.</p><div class="fv-pane">{request}</div>
             <h4>Response</h4><div class="fv-pane">{response}</div>
             <h4>Reproduce</h4><div class="fv-pane">{reproduce}</div>
         </div>"#,
@@ -383,8 +383,7 @@ impl EndpointCoverageClient {
         // The entry may be Vacant or Occupied, see below for what this means.
         let entry = self
             .endpoint_cov_map
-            // Use as_str to ensure "200" instead of "200 OK"
-            .entry((method, path, status.as_str().to_string()));
+            .entry((method, path, status.to_string()));
         // Must get the index before entry.insert below, which needs ownership of the entry
         let index = entry.index();
 
@@ -476,7 +475,6 @@ impl EndpointCoverageClient {
             response,
         } = args;
         let discriminant = err.discriminant();
-        let status = status.as_u16();
         if let Some(existing) = self.faults.iter_mut().find(|fault| {
             fault.method == method
                 && fault.path == path

@@ -61,6 +61,11 @@ article {
 .fault-variant h4 {
     margin: 4pt 0 2pt 0;
 }
+.fv-hint {
+    margin: 0 0 4pt 0;
+    font-size: 0.9em;
+    color: #555;
+}
 .fv-pane {
     max-width: 100%;
     font-family: monospace;
