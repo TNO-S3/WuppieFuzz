@@ -155,10 +155,8 @@ pub(crate) fn process_response(
     }
     let mut maybe_validation_error = None;
     if response.status().is_server_error() {
-        // A 5xx that violates the spec (undeclared status, or a declared status with a
-        // mismatched body) is always a crash, regardless of `crash_criteria` (checked
-        // below for other validation error kinds): the API not following its own
-        // documented contract is always treated as a bug.
+        // An undeclared 5xx (or a declared one with a mismatched body) always
+        // crashes, regardless of `crash_criteria`.
         match validate_response(api, request, response) {
             Err(validation_err) => {
                 log::debug!(
@@ -167,10 +165,8 @@ pub(crate) fn process_response(
                 *exit_kind = ExitKind::Crash;
                 maybe_validation_error = Some(validation_err);
             }
-            // The spec does declare this exact 5xx (status and body both match), so
-            // whether it counts as a crash is controlled by `crash_criteria` like any
-            // other validation error kind, via the dedicated `Status5xxSpecified`
-            // discriminant (included by default).
+            // Spec declares this exact 5xx, so it's gated by `crash_criteria` like
+            // any other validation error kind.
             Ok(()) => {
                 let err = ValidationError::Status5xxSpecified {
                     got: response.status(),

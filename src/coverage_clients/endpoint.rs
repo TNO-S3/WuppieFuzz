@@ -111,8 +111,8 @@ pub struct CoverArgs<'a> {
     /// The validation error found for this response, if any.
     pub validation_error: Option<ValidationError>,
     /// The full request sequence currently being executed. Saved to `CRASHES_DIR`
-    /// the first time a new fault is observed (see `ensure_crash_file`); for a plain
-    /// valid hit, no proactive write happens (see `test_case_name`).
+    /// on a new fault (see `ensure_crash_file`); for a plain valid hit, no write
+    /// happens (see `test_case_name`).
     pub sequence: &'a OpenApiInput,
 }
 
@@ -131,17 +131,13 @@ struct FaultArgs<'a> {
 /// Locates the on-disk file named `file_name` holding the request sequence for a
 /// given fault or coverage example, without writing a new copy of it.
 ///
-/// Genuine faults recorded via `record_fault` are proactively written to
-/// `CRASHES_DIR` (see `ensure_crash_file`) the moment they are first observed, so
-/// this is checked first. Non-fault coverage examples (a plain, valid "hit" on a
-/// `(method, path, status)` declared in the spec) are deliberately *not* written
-/// there: `CRASHES_DIR` should only ever contain actual objectives. Instead, such
-/// an example's coverage is new by construction (see `EndpointCoverageClient::cover`),
-/// so LibAFL's own feedback/corpus machinery (fed by the same coverage map, see
-/// `construct_observer` in `fuzzer.rs`) is expected to have already persisted it to
-/// `QUEUE_DIR` as an "interesting" input, under the same deterministic name
-/// (`Input::generate_name`) - which is why that directory is also checked here.
-/// Only if neither location has the file does this return `None`.
+/// Genuine faults are proactively written to `CRASHES_DIR` (see
+/// `ensure_crash_file`), so that's checked first. Non-fault coverage examples are
+/// deliberately *not* written there (`CRASHES_DIR` should only contain actual
+/// objectives); instead their coverage is new by construction, so LibAFL's own
+/// corpus machinery is expected to have already persisted them to `QUEUE_DIR`
+/// under the same deterministic name (`Input::generate_name`). `None` if neither
+/// location has the file.
 pub fn locate_test_case(file_name: &str) -> Option<String> {
     for dir in [CRASHES_DIR, QUEUE_DIR] {
         let path = Path::new(dir).join(file_name);
@@ -156,10 +152,9 @@ pub fn locate_test_case(file_name: &str) -> Option<String> {
 /// name (`Input::generate_name`), the same name and directory LibAFL's own
 /// `solutions` corpus would use for it, and returns that name.
 ///
-/// Only ever called for genuine faults (via `record_fault`, and for the
-/// always-a-fault `Coverage::UnexpectedFound` case), so that every file in
-/// `CRASHES_DIR` really is an actual objective, never a plain valid "hit"; see
-/// `test_case_name` for the non-fault counterpart.
+/// Only ever called for genuine faults (via `record_fault`, and the always-a-fault
+/// `Coverage::UnexpectedFound` case), so `CRASHES_DIR` never holds a plain valid
+/// hit; see `test_case_name` for the non-fault counterpart.
 ///
 /// Corpus minimization trims the initial corpus down to a minimal set of
 /// inputs that together cover every observed `(method, path, status)`
@@ -186,13 +181,11 @@ fn ensure_crash_file(sequence: &OpenApiInput) -> String {
 
 /// Returns the deterministic content-hash name (`Input::generate_name`) that
 /// identifies `sequence`, without writing anything to disk. Used for non-fault
-/// coverage examples (see `ensure_crash_file`'s doc comment): such a sequence's
-/// coverage is new, so it is expected to already be persisted by LibAFL itself
-/// under this same name, found later via `locate_test_case`'s `QUEUE_DIR` check.
-/// If it was not (e.g. this example is "upgrading" a previously-tainted hit with a
-/// later clean one, which is not new coverage on its own), the resulting id may not
-/// be locatable; callers handle that gracefully as a `TEST_CASE_UNAVAILABLE` fault
-/// (see `reporting::wfc_report`).
+/// coverage examples, whose coverage is new and thus expected to already be
+/// persisted by LibAFL under this same name (found via `locate_test_case`'s
+/// `QUEUE_DIR` check). If not found (e.g. an "upgrade" of a previously-tainted
+/// hit, which isn't new coverage on its own), callers fall back to
+/// `TEST_CASE_UNAVAILABLE`.
 fn test_case_name(sequence: &OpenApiInput) -> String {
     sequence.generate_name(None)
 }
@@ -289,12 +282,9 @@ enum Coverage {
         /// Whether the response failed spec-validation.
         tainted: bool,
         /// Deterministic content-hash name (see `ensure_crash_file`/`test_case_name`)
-        /// of the request sequence that produced this example. If `tainted` (an
-        /// actual fault), it was proactively persisted to `CRASHES_DIR`; otherwise
-        /// no write happens here and it is expected to already be in `QUEUE_DIR`
-        /// via LibAFL's own corpus (see `test_case_name`'s doc comment). Either way,
-        /// WFC reports can cite a real, locatable test case for this coverage (see
-        /// `reporting::wfc_report`).
+        /// of the request sequence that produced this example. If `tainted`, it's
+        /// in `CRASHES_DIR`; otherwise it's expected to already be in LibAFL's own
+        /// `QUEUE_DIR`. Either way, WFC reports can cite a real, locatable test case.
         test_case_id: String,
     },
     /// This status code was seen but does not occur in the specification.
@@ -319,7 +309,7 @@ fn render_fault_variant(fault: &EndpointFault) -> String {
     format!(
         r#"<div class="fault-variant">
             <div class="fv-header"><span class="badge {class}">{category}</span> &times;{occurrences} &mdash; {message}</div>
-            <h4>Request</h4><p class="fv-hint">Final request of the sequence that triggered this fault; for a stateful API, replaying only this request may not reproduce the fault on its own &mdash; use "Reproduce" below to replay the full sequence.</p><div class="fv-pane">{request}</div>
+            <h4>Request</h4><p class="fv-hint">Only the final request of the sequence &mdash; use "Reproduce" below to replay the full sequence.</p><div class="fv-pane">{request}</div>
             <h4>Response</h4><div class="fv-pane">{response}</div>
             <h4>Reproduce</h4><div class="fv-pane">{reproduce}</div>
         </div>"#,
@@ -440,10 +430,8 @@ impl EndpointCoverageClient {
                         // response observed for them failed validation; such a
                         // "tainted" example is upgraded below as soon as a clean one
                         // is seen, so it isn't stuck permanently doubling as a fault's
-                        // own example. Only the tainted case is an actual fault (and
-                        // was already written to `CRASHES_DIR` by `record_fault` above);
-                        // a clean hit is not, so it only gets a `test_case_name` (see
-                        // its doc comment for why no write is needed here).
+                        // own example. Only the tainted case is a real fault, so only
+                        // that one is written to `CRASHES_DIR`.
                         let tainted = validation_error.is_some();
                         entry.insert(Coverage::ExpectedFound {
                             request: curl_string,

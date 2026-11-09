@@ -78,23 +78,20 @@ pub enum ValidationError {
     OperationNotInSpec { path: String, method: Method },
 
     /// The 5xx HTTP status code returned from the API is not one of the status codes
-    /// mentioned for this path in the specification (or the body doesn't match the
-    /// declared schema for it). This always counts as a crash, regardless of
-    /// `--crash-criteria` (see `executor::process_response`): the API violating its
-    /// own documented contract is always treated as a bug. For a 5xx that *is*
-    /// correctly declared, see `ValidationError::Status5xxSpecified`.
+    /// mentioned for this path in the spec (or the body doesn't match its schema).
+    /// Always a crash, regardless of `--crash-criteria`: an API violating its own
+    /// documented contract is always a bug. For a 5xx that *is* correctly declared,
+    /// see `ValidationError::Status5xxSpecified`.
     ///
     /// This error only captures 5xx status codes; for other status codes, see
     /// `ValidationError::OtherStatusNotSpecified`. This distinction can be helpful
     /// because a 5xx status code often indicates a more severe or 'real' crash.
     Status5xxNotSpecified { got: StatusCode },
 
-    /// A 5xx HTTP status code was returned from the API, and the spec *does* declare
-    /// this exact status (with a matching body, if any) for this path. Unlike
-    /// `Status5xxNotSpecified`, this is not necessarily a bug (the API may document
-    /// that it can fail this way), so whether it counts as a crash is controlled by
-    /// `--crash-criteria` like any other validation error (see
-    /// `executor::process_response`); it is included by default.
+    /// A 5xx HTTP status code was returned, and the spec *does* declare this exact
+    /// status (with a matching body, if any) for this path. Unlike
+    /// `Status5xxNotSpecified`, this isn't necessarily a bug, so it's gated by
+    /// `--crash-criteria` like any other validation error (included by default).
     Status5xxSpecified { got: StatusCode },
 
     /// The HTTP status code (1xx - 4xx) returned from the API is not one of the status codes
