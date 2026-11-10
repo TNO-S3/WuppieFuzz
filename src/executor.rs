@@ -477,7 +477,8 @@ where
                     // `ValidationError` variant and whether it's always a crash (see
                     // their doc comments for rationale); all other reasons fall
                     // through to the generic handling below.
-                    let http2_error = h2_error_reason(&transport_error).and_then(|reason| {
+                    let h2_reason = h2_error_reason(&transport_error);
+                    let http2_error = h2_reason.and_then(|reason| {
                         let h2_reason = reason.to_string();
                         match reason {
                             h2::Reason::PROTOCOL_ERROR => Some((
@@ -527,7 +528,11 @@ where
                     // We set exit_kind to timeout even if some other transport error occurs as that is the most fitting one within LibAFL
                     exit_kind = ExitKind::Timeout;
                     stop_reason = SequenceStopReason::TransportError;
-                    if transport_error.is_timeout() {
+                    // An HTTP/2 `SETTINGS_TIMEOUT` reset just means the peer didn't
+                    // acknowledge a SETTINGS frame in time - a timeout like any other.
+                    if transport_error.is_timeout()
+                        || h2_reason == Some(h2::Reason::SETTINGS_TIMEOUT)
+                    {
                         log::error!(
                             "Time-out occurred during communication with the API under test: {transport_error}"
                         );
