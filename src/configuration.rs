@@ -131,7 +131,9 @@ pub enum Commands {
         /// Which errors should be considered a bug while replaying this input.
         /// See help for the `fuzz` command for a list of possible values.
         ///
-        /// By default, all validation error variants are considered crashes.
+        /// By default, all validation error variants are considered crashes, except
+        /// "Http2StreamResetOnMalformedRequest", "Http2StreamResetRateLimited", and
+        /// "Http2StreamRefused".
         #[arg(value_parser, long, value_enum, required = false, ignore_case = true)]
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
         // Manually added possible values below, since automatically showing possible values of an external (remote) enum
@@ -164,7 +166,9 @@ pub enum Commands {
         /// during the fuzzing run that produced the crash files; with a different (narrower)
         /// criteria set, crash files may be reported as non-reproducible.
         ///
-        /// By default, all error types are considered bugs.
+        /// By default, all error types are considered bugs, except
+        /// "Http2StreamResetOnMalformedRequest", "Http2StreamResetRateLimited", and
+        /// "Http2StreamRefused".
         #[arg(
             value_parser,
             long,
@@ -262,8 +266,16 @@ pub enum Commands {
         /// - "PossibleNoSqlInjectionSignature": The response body contains a known NoSQL backend error message, or reflects a NoSQL-injection-style request value verbatim.
         /// - "PossibleCommandInjectionSignature": The response body contains a known shell/OS error message, or reflects an OS-command-injection-style request value verbatim.
         /// - "PossibleXssInjectionSignature": The response body reflects an XSS-style request value (e.g. `<script>`) verbatim, unescaped.
+        /// - "Http2StreamResetOnMalformedRequest": No response was received at all because the server reset the HTTP/2 stream with reason `PROTOCOL_ERROR`, which RFC 9113 permits as an alternative to a `400 Bad Request` for malformed requests. Not necessarily a bug, so unlike most errors above, this one is *not* included by default; opt in explicitly to treat it as a crash.
+        /// - "Http2StreamResetRateLimited": No response was received at all because the server reset the HTTP/2 stream with reason `ENHANCE_YOUR_CALM`, the HTTP/2-level equivalent of a `429 Too Many Requests` (rate limiting/anti-abuse protection). Not a bug, so not included by default.
+        /// - "Http2StreamRefused": No response was received at all because the server refused the HTTP/2 stream with reason `REFUSED_STREAM`, meaning it didn't process the request and it is safe to retry. Not a bug, so not included by default.
+        /// - "Http2StreamResetInternalError": No response was received at all because the server reset the HTTP/2 stream with reason `INTERNAL_ERROR`, the HTTP/2-level equivalent of a `500 Internal Server Error`. Like "Status5xxNotSpecified", always a crash, regardless of this setting.
         ///
-        /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors, you can configure what behaviour is considered a bug by the fuzzer.
+        /// By default, the value for this option is a list of all of the above
+        /// except "Http2StreamResetOnMalformedRequest", "Http2StreamResetRateLimited",
+        /// and "Http2StreamRefused" (none of these are necessarily a bug, so they're
+        /// opt-in only). By specifying a subset of the above errors, you can
+        /// configure what behaviour is considered a bug by the fuzzer.
         #[arg(
             value_parser,
             long,
@@ -889,9 +901,18 @@ impl TryFrom<PartialConfiguration> for Configuration {
             timeout: value.timeout,
             request_timeout: value.request_timeout.unwrap_or(DEFAULT_REQUEST_TIMEOUT),
             power_schedule: value.power_schedule.unwrap_or(BaseSchedule::FAST),
-            crash_criteria: value
-                .crash_criteria
-                .unwrap_or_else(|| ValidationErrorDiscriminants::VARIANTS.to_vec()),
+            crash_criteria: value.crash_criteria.unwrap_or_else(|| {
+                const EXCLUDED_BY_DEFAULT: [ValidationErrorDiscriminants; 3] = [
+                    ValidationErrorDiscriminants::Http2StreamResetOnMalformedRequest,
+                    ValidationErrorDiscriminants::Http2StreamResetRateLimited,
+                    ValidationErrorDiscriminants::Http2StreamRefused,
+                ];
+                ValidationErrorDiscriminants::VARIANTS
+                    .iter()
+                    .copied()
+                    .filter(|v| !EXCLUDED_BY_DEFAULT.contains(v))
+                    .collect()
+            }),
             report: value.report.unwrap_or(false),
             method_mutation_strategy: value
                 .method_mutation_strategy

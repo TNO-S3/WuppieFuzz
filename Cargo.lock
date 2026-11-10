@@ -4377,6 +4377,7 @@ dependencies = [
  "ctrlc",
  "env_logger 0.11.11",
  "flate2",
+ "h2",
  "indexmap",
  "itertools 0.15.0",
  "json_env_logger2",

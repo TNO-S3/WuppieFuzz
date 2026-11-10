@@ -176,6 +176,27 @@ pub enum ValidationError {
     /// (XSS) payload (e.g. `<script>`), suggesting it was not sanitized or escaped by
     /// the backend before being echoed back in the response.
     PossibleXssInjectionSignature { detail: String },
+
+    /// No response received: the server reset the HTTP/2 stream with reason
+    /// `PROTOCOL_ERROR`. RFC 9113 §8.1.1 permits this as an alternative to `400 Bad
+    /// Request` for malformed requests, so unlike most variants, this is not
+    /// included in the default `--crash-criteria`.
+    Http2StreamResetOnMalformedRequest { h2_reason: String },
+
+    /// No response received: the server reset the HTTP/2 stream with reason
+    /// `ENHANCE_YOUR_CALM`, the HTTP/2 equivalent of `429 Too Many Requests`. Not
+    /// included in the default `--crash-criteria`.
+    Http2StreamResetRateLimited { h2_reason: String },
+
+    /// No response received: the server refused the HTTP/2 stream with reason
+    /// `REFUSED_STREAM` (request not processed, safe to retry). Not included in the
+    /// default `--crash-criteria`.
+    Http2StreamRefused { h2_reason: String },
+
+    /// No response received: the server reset the HTTP/2 stream with reason
+    /// `INTERNAL_ERROR`, the HTTP/2 equivalent of `500 Internal Server Error`. Like
+    /// `Status5xxNotSpecified`, always a crash regardless of `--crash-criteria`.
+    Http2StreamResetInternalError { h2_reason: String },
 }
 
 impl ValidationError {
@@ -293,10 +314,45 @@ impl std::fmt::Display for ValidationError {
                 fmt,
                 "Possible XSS injection signature detected in response: {detail}"
             ),
+            ValidationError::Http2StreamResetOnMalformedRequest { h2_reason } => write!(
+                fmt,
+                "No response received: server reset the HTTP/2 stream ({h2_reason}), \
+                 likely rejecting a malformed request per RFC 9113 \u{a7}8.1.1"
+            ),
+            ValidationError::Http2StreamResetRateLimited { h2_reason } => write!(
+                fmt,
+                "No response received: server reset the HTTP/2 stream ({h2_reason}), \
+                 likely rate-limiting/anti-abuse protection, not a target bug"
+            ),
+            ValidationError::Http2StreamRefused { h2_reason } => write!(
+                fmt,
+                "No response received: server refused the HTTP/2 stream ({h2_reason}) \
+                 without processing it, not a target bug"
+            ),
+            ValidationError::Http2StreamResetInternalError { h2_reason } => write!(
+                fmt,
+                "No response received: server reset the HTTP/2 stream ({h2_reason}), \
+                 indicating an internal error, similar to a 500 response"
+            ),
         }
     }
 }
 impl Error for ValidationError {}
+
+/// If `error` (or anything in its `source()` chain) is an HTTP/2 stream/connection
+/// error, returns the `h2::Reason` the peer gave for it. `None` otherwise (e.g. a
+/// plain connection refusal, timeout, or HTTP/1.1 connection close, none of which
+/// carry a structured "why" the way HTTP/2 does).
+pub fn h2_error_reason(error: &reqwest::Error) -> Option<h2::Reason> {
+    let mut source: Option<&(dyn Error + 'static)> = Some(error);
+    while let Some(err) = source {
+        if let Some(h2_err) = err.downcast_ref::<h2::Error>() {
+            return h2_err.reason();
+        }
+        source = err.source();
+    }
+    None
+}
 
 /// Well-known substrings that tend to appear in raw SQL backend error messages leaked
 /// into a response body. Their presence often means the backend failed to handle a
