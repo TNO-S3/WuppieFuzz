@@ -178,9 +178,10 @@ pub enum ValidationError {
     PossibleXssInjectionSignature { detail: String },
 
     /// No response received: the server reset the HTTP/2 stream with reason
-    /// `PROTOCOL_ERROR`. RFC 9113 §8.1.1 permits this as an alternative to `400 Bad
-    /// Request` for malformed requests, so unlike most variants, this is not
-    /// included in the default `--crash-criteria`.
+    /// `PROTOCOL_ERROR`, `FRAME_SIZE_ERROR`, or `COMPRESSION_ERROR`. These all mean
+    /// the HTTP/2 stack correctly rejected a malformed request (RFC 9113 §8.1.1
+    /// permits this as an alternative to `400 Bad Request`), so unlike most
+    /// variants, this is not included in the default `--crash-criteria`.
     Http2StreamResetOnMalformedRequest { h2_reason: String },
 
     /// No response received: the server reset the HTTP/2 stream with reason

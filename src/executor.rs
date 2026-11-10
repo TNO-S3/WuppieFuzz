@@ -481,7 +481,9 @@ where
                     let http2_error = h2_reason.and_then(|reason| {
                         let h2_reason = reason.to_string();
                         match reason {
-                            h2::Reason::PROTOCOL_ERROR => Some((
+                            h2::Reason::PROTOCOL_ERROR
+                            | h2::Reason::FRAME_SIZE_ERROR
+                            | h2::Reason::COMPRESSION_ERROR => Some((
                                 ValidationError::Http2StreamResetOnMalformedRequest { h2_reason },
                                 false,
                             )),
