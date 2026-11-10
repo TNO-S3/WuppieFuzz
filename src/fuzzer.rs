@@ -185,6 +185,7 @@ pub fn fuzz() -> Result<()> {
     }
     executor.report_final_coverage_and_stats(&state);
     executor.generate_coverage_report_if_path(report_path.as_deref());
+    executor.generate_wfc_report_if_requested(&state, report_path.as_deref());
 
     Ok(())
 }
