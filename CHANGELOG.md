@@ -6,6 +6,19 @@
 
 ## Fixes
 
+# v1.8.1 (2026-11-10)
+
+## Highlights
+
+Fuzzing campaigns can now export a `report.json` conforming to the [Web Fuzzing Commons](https://github.com/WebFuzzing/Commons) schema, opening the door to WFC-compatible tooling and cross-tool comparisons - just pass the existing `--report` flag. Every fault and covered endpoint/status in the report links to a real, replayable test case, and the HTML endpoint coverage report got a matching facelift: faults are grouped per endpoint/status right next to the spec-compliant example that was actually observed, instead of a separate flat list.
+
+## Features
+
+## Fixes
+
+- Treat path parameters that are not templated in their path as query parameters, so they are still fuzzed instead of being dropped with an error during corpus generation in [#405](https://github.com/TNO-S3/WuppieFuzz/pull/405)
+- Implement WFC-report support: `--report` now also writes a schema-compliant `report.json` alongside the existing HTML/coverage report, with every `testCaseId` guaranteed to resolve to a real, locatable test case, and code-coverage criteria omitted in black-box/endpoint-only mode in [#397](https://github.com/TNO-S3/WuppieFuzz/pull/397)
+- Split the single generic injection-signature crash criterion into dedicated `PossibleLdapInjectionSignature`, `PossibleSqlInjectionSignature`, `PossibleNoSqlInjectionSignature`, `PossibleCommandInjectionSignature`, and `PossibleXssInjectionSignature` variants, each mapped to its own WFC security fault category; a 5xx response that is declared in the spec is likewise now a separate, configurable crash criterion (`Status5xxSpecified`, included by default) in [#397](https://github.com/TNO-S3/WuppieFuzz/pull/397)
 - Repair regex patterns with an unescaped hyphen after a class escape (e.g. `[\w-/]`) so examples can still be generated, and log remaining regex failures once (then at debug level) in [#404](https://github.com/TNO-S3/WuppieFuzz/pull/404)
 - Generate example request bodies for schemas with multiple `allOf` entries, schemas with properties but no `type`, and bodies made only of `allOf`/`oneOf`/`anyOf`; remaining empty-body warnings are logged once in [#406](https://github.com/TNO-S3/WuppieFuzz/pull/406)
 
