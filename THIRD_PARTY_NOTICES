@@ -160,6 +160,7 @@ Components:
 - cmake
 - cobs
 - colorchoice
+- constant_time_eq
 - cookie
 - cookie_store
 - core-foundation
@@ -391,6 +392,7 @@ Components:
 - yaml_serde
 - zerocopy
 - zeroize
+- zeroize_derive
 
 ===============================================================================
 BSD-3-Clause LICENSE NOTICE

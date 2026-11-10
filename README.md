@@ -1,4 +1,4 @@
-# WuppieFuzz v1.8.0
+# WuppieFuzz v1.8.1
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/WuppieFuzz-dark.svg">
@@ -149,6 +149,17 @@ written into this subdirectory. There are two types of coverage reports:
 On top of that a database is filled with all request information related to your
 fuzzing campaign. This database can be visualised and explored through the
 Grafana dashboard.
+
+### Web Fuzzing Commons (WFC) report
+
+The same `--report` flag also writes a `report.json` file into the
+`reports/<timestamp>` directory, following the [Web Fuzzing Commons report
+schema](https://github.com/WebFuzzing/Commons/blob/master/src/main/resources/wfc/schemas/report.yaml),
+allowing results to be consumed by WFC-compatible tooling. It summarizes the
+generated test cases, the endpoints and HTTP status codes covered, any faults
+(validation errors) found, and basic coverage statistics (code coverage is
+included only when a coverage agent - e.g. JaCoCo - is configured; in
+black-box/endpoint-only mode only endpoint coverage is reported).
 
 ## Structure of this repository
 
