@@ -2,6 +2,14 @@
 
 ## Highlights
 
+## Features
+
+## Fixes
+
+# v1.8.1 (2026-11-10)
+
+## Highlights
+
 Fuzzing campaigns can now export a `report.json` conforming to the [Web Fuzzing Commons](https://github.com/WebFuzzing/Commons) schema, opening the door to WFC-compatible tooling and cross-tool comparisons - just pass the existing `--report` flag. Every fault and covered endpoint/status in the report links to a real, replayable test case, and the HTML endpoint coverage report got a matching facelift: faults are grouped per endpoint/status right next to the spec-compliant example that was actually observed, instead of a separate flat list.
 
 ## Features

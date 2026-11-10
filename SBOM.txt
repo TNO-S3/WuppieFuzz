@@ -49,9 +49,6 @@ base64 0.22.1
 base64 0.23.1
 	licensed under "Apache-2.0 OR MIT"
 	by Marshall Pierce <marshall@mpierce.org>
-bitflags 1.3.2
-	licensed under "Apache-2.0 OR MIT"
-	by The Rust Project Developers
 bitflags 2.13.2
 	licensed under "Apache-2.0 OR MIT"
 	by The Rust Project Developers
@@ -112,6 +109,9 @@ const_format 0.2.37
 const_panic 0.2.17
 	licensed under "Zlib"
 	by rodrimati1992 <rodrimatt1985@gmail.com>
+constant_time_eq 0.6.1
+	licensed under "Apache-2.0 OR CC0-1.0 OR MIT-0"
+	by Cesar Eduardo Barros <cesarb@cesarb.eti.br>
 cookie 0.18.2
 	licensed under "Apache-2.0 OR MIT"
 	by Sergio Benitez <sb@sergio.bz>|Alex Crichton <alex@alexcrichton.com>
@@ -136,7 +136,7 @@ core_detect 1.0.0
 cpufeatures 0.3.1
 	licensed under "Apache-2.0 OR MIT"
 	by RustCrypto Developers
-crc32fast 1.5.4
+crc32fast 1.5.5
 	licensed under "Apache-2.0 OR MIT"
 	by Sam Rijs <srijs@airpost.net>|Alex Crichton <alex@alexcrichton.com>
 ctor 1.0.13
@@ -145,9 +145,6 @@ ctor 1.0.13
 ctrlc 3.5.2
 	licensed under "Apache-2.0 OR MIT"
 	by Antti Keränen <detegr@gmail.com>
-defmt-macros 1.2.0
-	licensed under "Apache-2.0 OR MIT"
-	by The Knurling-rs developers
 deranged 0.5.9
 	licensed under "Apache-2.0 OR MIT"
 	by Jacob Pratt <jacob@jhpratt.dev>
@@ -202,10 +199,10 @@ fast_rands 0.16.1
 fastbloom 0.17.0
 	licensed under "Apache-2.0 OR MIT"
 	by tomtomwombat
-fixedbitset 0.5.7
+fixedbitset 0.5.9
 	licensed under "Apache-2.0 OR MIT"
 	by bluss
-flate2 1.1.10
+flate2 1.1.11
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Josh Triplett <josh@joshtriplett.org>
 fnv 1.0.7
@@ -352,13 +349,13 @@ ipnet 2.12.2
 is_terminal_polyfill 1.70.2
 	licensed under "Apache-2.0 OR MIT"
 	by unspecified authors
-itoa 1.0.18
+itoa 1.0.19
 	licensed under "Apache-2.0 OR MIT"
 	by David Tolnay <dtolnay@gmail.com>
-jiff 0.2.39
+jiff 0.2.42
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
-jiff-static 0.2.39
+jiff-static 0.2.42
 	licensed under "MIT OR Unlicense"
 	by Andrew Gallant <jamslam@gmail.com>
 jni 0.22.4
@@ -454,7 +451,7 @@ meminterval 0.4.2
 memoffset 0.9.1
 	licensed under "MIT"
 	by Gilad Naaman <gilad.naaman@gmail.com>
-mime 0.3.17
+mime 0.3.18
 	licensed under "Apache-2.0 OR MIT"
 	by Sean McArthur <sean@seanmonstar.com>
 minibsod 0.16.1
@@ -664,7 +661,7 @@ roas 0.21.0
 rsqlite-vfs 0.2.0
 	licensed under "MIT"
 	by unspecified authors
-rusqlite 0.41.0
+rusqlite 0.41.1
 	licensed under "MIT"
 	by The rusqlite developers
 rustc-demangle 0.1.28
@@ -745,13 +742,13 @@ siphasher 1.0.4
 slab 0.4.12
 	licensed under "MIT"
 	by Carl Lerche <me@carllerche.com>
-smallvec 1.16.4
+smallvec 1.16.5
 	licensed under "Apache-2.0 OR MIT"
 	by The Servo Project Developers
 socket2 0.6.5
 	licensed under "Apache-2.0 OR MIT"
 	by Alex Crichton <alex@alexcrichton.com>|Thomas de Zeeuw <thomasdezeeuw@gmail.com>
-sqlite-wasm-rs 0.6.2
+sqlite-wasm-rs 0.6.3
 	licensed under "MIT"
 	by Spxg <noz@live.com>
 stable_deref_trait 1.2.1
@@ -886,9 +883,9 @@ utf8parse 0.2.2
 utf_types 1.0.0
 	licensed under "Apache-2.0 OR MIT"
 	by Henri Sivonen <hsivonen@hsivonen.fi>
-uuid 1.29.0
+uuid 1.29.2
 	licensed under "Apache-2.0 OR MIT"
-	by Ashley Mannix<ashleymannix@live.com.au>|Dylan DPC<dylan.dpc@gmail.com>|Hunar Roop Kahlon<hunar.roop@gmail.com>
+	by unspecified authors
 value-bag 1.14.1
 	licensed under "Apache-2.0 OR MIT"
 	by Ashley Mannix <ashleymannix@live.com.au>
@@ -1060,7 +1057,7 @@ zerovec 0.11.9
 zerovec-derive 0.11.7
 	licensed under "Unicode-3.0"
 	by Manish Goregaokar <manishsmail@gmail.com>
-zip 9.3.0
+zip 9.5.0
 	licensed under "MIT"
 	by Mathijs van de Nes <git@mathijs.vd-nes.nl>|Marli Frost <marli@frost.red>|Ryan Levick <ryan.levick@gmail.com>|Chris Hennick <hennickc@amazon.com>
 zlib-rs 0.6.8
