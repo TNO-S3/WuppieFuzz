@@ -246,7 +246,8 @@ pub enum Commands {
         ///
         /// The possible errors are:
         /// - "OperationNotInSpec": The operation does not exist in the spec, which incidentally means it should not have been executed by the fuzzer to begin with.
-        /// - "Status5xxNotSpecified": The HTTP status code 5xx returned from the API is not one of the status codes mentioned for this path in the specification.
+        /// - "Status5xxNotSpecified": The HTTP status code 5xx returned from the API is not one of the status codes mentioned for this path in the specification (or its body doesn't match the schema). Always a crash, regardless of this setting.
+        /// - "Status5xxSpecified": The HTTP status code 5xx returned, matching what is declared for this path. Unlike "Status5xxNotSpecified", not necessarily a bug, so controlled by this setting (included by default).
         /// - "OtherStatusNotSpecified": The HTTP status code 1xx - 4xx returned from the API is not one of the status codes mentioned for this path in the specification.
         /// - "ResponseReferenceBroken":  The specification calls for an object to be returned, and refers to the correct structure of this object using a reference (`#/example/reference`). However, the reference path is not present in the specification or contains circular references.
         /// - "ResponseObjectIncorrect": The response body returned by the API does not match the structure specified in the API specification.
@@ -255,6 +256,12 @@ pub enum Commands {
         /// - "UnexpectedContent": The API returned a response body, but no response is specified.
         /// - "MediaTypeContainsNoSchema": The API contains a media type "application/json" with no schema for the data inside the json object. We can't validate the response if no model is given.
         /// - "SchemaIsAny": The schema can be anything (occurs e.g. when it does not specify a type) we cannot validate schemas that are this flexible.
+        /// - "SchemaIsFalse": The schema is the JSON Schema `false` literal, which does not describe any valid response.
+        /// - "PossibleLdapInjectionSignature": The response body contains a known LDAP backend error message, or reflects an LDAP-injection-style request value verbatim.
+        /// - "PossibleSqlInjectionSignature": The response body contains a known SQL backend error message, or reflects a SQL-injection-style request value verbatim.
+        /// - "PossibleNoSqlInjectionSignature": The response body contains a known NoSQL backend error message, or reflects a NoSQL-injection-style request value verbatim.
+        /// - "PossibleCommandInjectionSignature": The response body contains a known shell/OS error message, or reflects an OS-command-injection-style request value verbatim.
+        /// - "PossibleXssInjectionSignature": The response body reflects an XSS-style request value (e.g. `<script>`) verbatim, unescaped.
         ///
         /// By default, the value for this option is a list of all of the above. By specifying a subset of the above errors, you can configure what behaviour is considered a bug by the fuzzer.
         #[arg(
@@ -268,7 +275,9 @@ pub enum Commands {
         crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
         /// If present, ask the coverage monitor to generate a report after the
-        /// time-out passes
+        /// time-out passes. This also writes a `report.json` file following the
+        /// Web Fuzzing Commons (WFC) report schema; see
+        /// https://github.com/WebFuzzing/Commons/blob/master/src/main/resources/wfc/schemas/report.yaml
         #[arg(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
         report: Option<bool>,
 
@@ -520,7 +529,8 @@ struct PartialConfiguration {
     pub crash_criteria: Option<Vec<ValidationErrorDiscriminants>>,
 
     /// If present, ask the coverage monitor to generate a report after the
-    /// time-out passes
+    /// time-out passes. This also writes a `report.json` file following the
+    /// Web Fuzzing Commons (WFC) report schema.
     #[clap(long, value_parser(value_parser!(bool)), num_args(0..=1), require_equals = true, default_missing_value("true"), ignore_case = true)]
     pub report: Option<bool>,
 
@@ -702,7 +712,8 @@ pub struct Configuration {
     pub crash_criteria: Vec<ValidationErrorDiscriminants>,
 
     /// If present, ask the coverage monitor to generate a report after the
-    /// time-out passes.
+    /// time-out passes. This also writes a `report.json` file following the
+    /// Web Fuzzing Commons (WFC) report schema.
     pub report: bool,
 
     /// If present, determine with which HTTP methods to mutate.

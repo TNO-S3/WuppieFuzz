@@ -1,6 +1,6 @@
 [package]
 name = "wuppiefuzz"
-version = "1.8.0"
+version = "1.8.1"
 authors = [
     "TNO Software and System Security"
 ]
@@ -53,13 +53,11 @@ base64 = "0.23.0"
 build_html = "2.7.0"
 byteorder = "1.5.0"
 cesu8 = "1.1.0"
-chrono = "0.4.43"
+chrono = { version = "0.4.43", default-features = false, features = ["clock", "std"] }
 clap = { version = "4.5.60", features = ["cargo", "derive", "env"] }
 ctrlc = "3.5.2"
 env_logger = "0.11.9"
 indexmap = { version = "2.13.1", features = ["serde"] }
-indicatif = "0.18.4"
-iter-read = "1.1.0"
 itertools = "0.15.0"
 json_env_logger2 = "0.2.1"
 lazy_static = "1.5.0"
@@ -70,7 +68,6 @@ log = { version = "0.4.30", features = ["serde"] }
 num = { version = "0.4.3", default-features = false }
 num-derive = "0.5.1"
 num-traits = { version = "0.2", default-features = false }
-once_cell = "1.21.3"
 openapiv3-extended = { version = "6.0.1", features = ["v2"] }
 petgraph = "0.8.3"
 porter-stemmer = "0.1.2"
@@ -79,28 +76,27 @@ rand_regex = "0.19.0"
 regex = "1.12.3"
 reqwest = { version = "0.13.4", features = ["blocking", "cookies", "form", "json"] }
 reqwest_cookie_store = "0.10.0"
-rusqlite = "0.40.1"
+rusqlite = "0.41.0"
 serde = { version = "1.0", default-features = false, features = [
     "alloc",
     "derive",
 ] }
 serde_json = "1.0"
-serde_urlencoded = "0.7.1"
 serde_yaml = "0.9.34"
-tempfile = "3.25.0"
 quick-xml = { version = "0.42", features = ["serialize"] }
-zip = "8"
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 strum = { version = "0.28.0", features = ["derive"] }
 unicode-truncate = "3.0.0"
 url = { version = "2.5.8", features = ["serde"] }
 urlencoding = "2.1.3"
 walkdir = "2.5.0"
+# Not used directly; required by libafl's `cmin` feature. Direct dependency only to enable `vendored`.
 z3 = "0.20.2"
 oas3 = { version = "0.22.0", features = ["yaml-spec"] }
 semver = "1.0.28"
-axum = "0.8"
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 flate2 = "1.1.5"
-opentelemetry-proto = { version = "0.33.0", features = ["gen-tonic", "trace"] }
+opentelemetry-proto = { version = "0.33.0", default-features = false, features = ["gen-tonic", "trace"] }
 prost = "0.14.1"
 prost-types = "0.14.1"
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "sync", "time"] }
@@ -122,3 +118,4 @@ openssl = "0.10"
 
 [dev-dependencies]
 mockito = "1.7.2"
+tempfile = "3.25.0"
