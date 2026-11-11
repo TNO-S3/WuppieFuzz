@@ -87,6 +87,7 @@ fn ensure_column(
 }
 
 fn ensure_stats_columns(conn: &Connection) -> anyhow::Result<()> {
+    ensure_column(conn, "stats", "elapsed_secs", "INTEGER NOT NULL DEFAULT 0")?;
     for column in OTEL_STATS_COLUMNS {
         ensure_column(conn, "stats", column, "INTEGER NOT NULL DEFAULT 0")?;
     }
@@ -209,6 +210,7 @@ impl MySqLite {
             "CREATE TABLE IF NOT EXISTS stats (
                 id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 `timestamp` DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                `elapsed_secs` INTEGER NOT NULL DEFAULT 0,
                 `seq_per_sec` REAL NOT NULL,
                 `req_per_sec` REAL NOT NULL,
                 `requests_completed_total` INTEGER NOT NULL DEFAULT 0,
@@ -485,6 +487,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
             .conn
             .prepare_cached(
                 "INSERT INTO stats (
+                    elapsed_secs,
                     seq_per_sec,
                     req_per_sec,
                     requests_completed_total,
@@ -523,6 +526,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
                     otel_sequence_finish_unknown_trace_total,
                     runid
                 ) VALUES (
+                    :elapsed_secs,
                     :seq_per_sec,
                     :req_per_sec,
                     :requests_completed_total,
@@ -567,6 +571,7 @@ impl Reporting<i64, OpenApiFuzzerStateType> for MySqLite {
 
         insert_stmt
             .insert(named_params! {
+                ":elapsed_secs": i64::try_from(stats.elapsed_secs).unwrap_or(i64::MAX),
                 ":seq_per_sec": stats.seq_per_sec,
                 ":req_per_sec": stats.req_per_sec,
                 ":requests_completed_total": i64::try_from(stats.requests_completed_total).unwrap_or(i64::MAX),
