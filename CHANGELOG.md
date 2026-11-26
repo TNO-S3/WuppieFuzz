@@ -4,6 +4,8 @@
 
 ## Features
 
+- Distinguish HTTP/2 stream resets by reason instead of treating every one as a generic transport failure: `PROTOCOL_ERROR` (malformed request, permitted by RFC 9113 §8.1.1), `ENHANCE_YOUR_CALM` (rate limiting), and `REFUSED_STREAM` (safe to retry) are new opt-in `--crash-criteria`, excluded by default; `INTERNAL_ERROR` (the HTTP/2 equivalent of a `500`) is now its own always-crash criterion in ...
+
 ## Fixes
 
 # v1.8.1 (2026-11-10)

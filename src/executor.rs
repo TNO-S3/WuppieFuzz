@@ -42,7 +42,7 @@ use crate::{
         spec::Spec,
         validate_response::{
             Response, ValidationError, ValidationErrorDiscriminants, detect_injection_signatures,
-            validate_response,
+            h2_error_reason, validate_response,
         },
     },
     parameter_feedback::ParameterFeedback,
@@ -479,10 +479,69 @@ where
                         &mut self.sequence_timing_stats.report_response_us,
                         report_response_start,
                     );
+
+                    // Map known, non-fatal HTTP/2 stream-reset reasons to their
+                    // `ValidationError` variant and whether it's always a crash (see
+                    // their doc comments for rationale); all other reasons fall
+                    // through to the generic handling below.
+                    let h2_reason = h2_error_reason(&transport_error);
+                    let http2_error = h2_reason.and_then(|reason| {
+                        let h2_reason = reason.to_string();
+                        match reason {
+                            h2::Reason::PROTOCOL_ERROR
+                            | h2::Reason::FRAME_SIZE_ERROR
+                            | h2::Reason::COMPRESSION_ERROR => Some((
+                                ValidationError::Http2StreamResetOnMalformedRequest { h2_reason },
+                                false,
+                            )),
+                            h2::Reason::ENHANCE_YOUR_CALM => {
+                                log::warn!(
+                                    "HTTP/2 stream reset with reason 'ENHANCE_YOUR_CALM' encountered!"
+                                );
+                                log::warn!("Rate limiting is likely active on the program under test.");
+                                log::warn!("This hinders fuzz testing. Consider disabling it.");
+                                Some((
+                                    ValidationError::Http2StreamResetRateLimited { h2_reason },
+                                    false,
+                                ))
+                            }
+                            h2::Reason::REFUSED_STREAM => Some((
+                                ValidationError::Http2StreamRefused { h2_reason },
+                                false,
+                            )),
+                            h2::Reason::INTERNAL_ERROR => Some((
+                                ValidationError::Http2StreamResetInternalError { h2_reason },
+                                true,
+                            )),
+                            _ => None,
+                        }
+                    });
+                    if let Some((err, always_crash)) = http2_error {
+                        if always_crash || self.config.crash_criteria.contains(&err.discriminant())
+                        {
+                            // Unlike response-based crashes, there's no endpoint/fault
+                            // coverage data to link a reproducer to here, so just mark
+                            // it as a crash (and let LibAFL's `CrashFeedback` persist
+                            // the input to `CRASHES_DIR` as usual) without stopping the
+                            // whole campaign over it - just this chain.
+                            log::debug!("{err} (treated as a crash)");
+                            exit_kind = ExitKind::Crash;
+                            stop_reason = SequenceStopReason::CrashOrValidation;
+                        } else {
+                            log::debug!("{err} (not treated as a crash, continuing campaign)");
+                            stop_reason = SequenceStopReason::TransportError;
+                        }
+                        break;
+                    }
+
                     // We set exit_kind to timeout even if some other transport error occurs as that is the most fitting one within LibAFL
                     exit_kind = ExitKind::Timeout;
                     stop_reason = SequenceStopReason::TransportError;
-                    if transport_error.is_timeout() {
+                    // An HTTP/2 `SETTINGS_TIMEOUT` reset just means the peer didn't
+                    // acknowledge a SETTINGS frame in time - a timeout like any other.
+                    if transport_error.is_timeout()
+                        || h2_reason == Some(h2::Reason::SETTINGS_TIMEOUT)
+                    {
                         log::error!(
                             "Time-out occurred during communication with the API under test: {transport_error}"
                         );

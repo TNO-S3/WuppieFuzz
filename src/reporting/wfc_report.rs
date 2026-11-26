@@ -198,6 +198,11 @@ pub(crate) fn fault_category_name(
         PossibleXssInjectionSignature => ("SECURITY_XSS_INJECTION", 301),
         PossibleCommandInjectionSignature => ("SECURITY_COMMAND_INJECTION", 313),
         PossibleNoSqlInjectionSignature => ("SECURITY_NOSQL_INJECTION", 314),
+        // WFC has no category for "no response at all"; this is WuppieFuzz-specific.
+        Http2StreamResetOnMalformedRequest => ("WUP_HTTP2_STREAM_RESET_ON_MALFORMED_REQUEST", 905),
+        Http2StreamResetRateLimited => ("WUP_HTTP2_STREAM_RESET_RATE_LIMITED", 906),
+        Http2StreamRefused => ("WUP_HTTP2_STREAM_REFUSED", 907),
+        Http2StreamResetInternalError => ("WUP_HTTP2_STREAM_RESET_INTERNAL_ERROR", 908),
     }
 }
 
